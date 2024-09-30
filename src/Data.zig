@@ -53,7 +53,7 @@ const test_levels = [_][]const u8{
 };
 
 levels: []const []const u8 = undefined,
-things: std.EnumArray(Thing.Kind, Thing) = undefined,
+things: std.EnumMap(Thing.Kind, Thing) = undefined,
 
 pub fn init() Error!*Data {
     const plat = App.getPlat();

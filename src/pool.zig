@@ -8,9 +8,9 @@ var global_pool_id: u32 = 0;
 pub const Id = struct {
     const Self = @This();
 
-    pool: u32,
-    idx: u32,
-    gen: u64,
+    pool: u32 = 0,
+    idx: u32 = 0,
+    gen: u64 = 0,
 
     pub fn eql(self: Self, other: Self) bool {
         return self.pool == other.pool and self.idx == other.idx and self.gen == other.gen;

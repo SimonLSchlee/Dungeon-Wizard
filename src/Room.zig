@@ -151,16 +151,22 @@ pub fn deinit(self: *Room) void {
     }
 }
 
-pub fn queueSpawnThingByKind(self: *Room, kind: Thing.Kind, pos: V2f) Error!?pool.Id {
-    const app = App.get();
+pub fn queueSpawnThing(self: *Room, proto: *const Thing, pos: V2f) Error!?pool.Id {
     const t = self.things.alloc();
     if (t) |thing| {
-        const proto = app.data.things.getPtr(kind);
         try proto.copyTo(thing);
         thing.spawn_state = .spawning;
         thing.pos = pos;
         try self.spawn_queue.append(thing.id);
         return thing.id;
+    }
+    return null;
+}
+
+pub fn queueSpawnThingByKind(self: *Room, kind: Thing.Kind, pos: V2f) Error!?pool.Id {
+    const app = App.get();
+    if (app.data.things.getPtr(kind)) |proto| {
+        return self.queueSpawnThing(proto, pos);
     }
     return null;
 }
@@ -171,6 +177,16 @@ pub fn getThingById(self: *Room, id: pool.Id) ?*Thing {
 
 pub fn getConstThingById(self: *const Room, id: pool.Id) ?*const Thing {
     return self.things.getConst(id);
+}
+
+pub fn getThingByPos(self: *Room, pos: V2f) ?*Thing {
+    for (&self.things.items) |*thing| {
+        if (!thing.isActive()) continue;
+        if (pos.dist(thing.pos) < thing.coll_radius) {
+            return thing;
+        }
+    }
+    return null;
 }
 
 pub fn getPlayer(self: *Room) ?*Thing {

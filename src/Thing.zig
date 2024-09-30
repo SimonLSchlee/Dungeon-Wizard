@@ -25,15 +25,18 @@ const pool = @import("pool.zig");
 
 const Player = @import("Player.zig");
 const Goat = @import("Goat.zig");
+const Spell = @import("Spell.zig");
 
 pub const Kind = enum {
     player,
     goat,
+    spell,
 };
 
 pub const KindData = union(Kind) {
     player: Player,
     goat: Goat,
+    spell: Spell.ThingData,
 
     pub fn render(self: *const Thing, room: *const Room) Error!void {
         try self.defaultRender(room);
@@ -46,7 +49,7 @@ pub const KindData = union(Kind) {
 pub const Pool = pool.BoundedPool(Thing, 32);
 pub const Id = pool.Id;
 
-const Movement = struct {
+pub const Movement = struct {
     const State = enum {
         none,
         walk,
@@ -55,6 +58,12 @@ const Movement = struct {
     state: State = .none,
     ticks_in_state: i64 = 0,
 };
+
+pub const CollLayer = enum {
+    creature,
+    tile,
+};
+pub const CollMask = std.EnumSet(CollLayer);
 
 id: Id = undefined,
 alloc_state: pool.AllocState = undefined,
@@ -71,6 +80,8 @@ vel: V2f = .{},
 dir: V2f = V2f.right,
 dirv: f32 = 0,
 coll_radius: f32 = 0,
+coll_mask: CollMask = .{},
+coll_layer: CollMask = .{},
 draw_color: Colorf = Colorf.red,
 vision_range: f32 = 0,
 accel_params: AccelParams = .{},
@@ -83,6 +94,7 @@ movement: Movement = .{},
 ai: ?union(Kind) {
     player: void,
     goat: Goat.AI,
+    spell: void,
 } = null,
 path: std.BoundedArray(V2f, 32) = .{},
 
@@ -102,7 +114,7 @@ pub fn update(self: *Thing, room: *Room) Error!void {
     }
 }
 
-pub fn deferFree(self: *Thing) Error!void {
+pub fn deferFree(self: *Thing) void {
     assert(self.spawn_state == .spawned);
     self.spawn_state = .freeable;
 }
@@ -188,13 +200,13 @@ pub fn isActive(self: *const Thing) bool {
     return self.alloc_state == .allocated and self.spawn_state == .spawned;
 }
 
-pub fn getNextCollisionWithThings(self: *Thing, room: *Room) ThingCollision {
+pub fn getNextCollisionWithCreatures(self: *Thing, room: *Room) ThingCollision {
     var coll: ThingCollision = .{ .pos = self.pos };
 
     for (&room.things.items) |*thing| {
         if (!thing.isActive()) continue;
         if (thing.id.eql(self.id)) continue;
-        if (thing.coll_radius == 0) continue;
+        if (!thing.coll_layer.contains(.creature)) continue;
 
         coll = getCircleCircleCollision(self.pos, self.coll_radius, thing.pos, thing.coll_radius);
         if (coll.collided) break;
@@ -357,8 +369,10 @@ pub fn moveAndCollide(self: *Thing, room: *Room) Error!void {
     while (num_iters < 5) {
         var coll: ThingCollision = .{ .pos = self.pos };
 
-        coll = getNextCollisionWithThings(self, room);
-        if (!coll.collided) {
+        if (self.coll_mask.contains(.creature)) {
+            coll = getNextCollisionWithCreatures(self, room);
+        }
+        if (!coll.collided and self.coll_mask.contains(.tile)) {
             coll = getCircleCollisionWithTiles(self.pos, self.coll_radius, room);
         }
 

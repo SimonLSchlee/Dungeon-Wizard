@@ -18,7 +18,8 @@ const App = @import("App.zig");
 const getPlat = App.getPlat;
 const Thing = @import("Thing.zig");
 const Room = @import("Room.zig");
-const Player = @import("Player.zig");
+const Spell = @import("Spell.zig");
+const Player = @This();
 
 pub fn protoype() Error!Thing {
     var ret = Thing{
@@ -27,6 +28,8 @@ pub fn protoype() Error!Thing {
         .coll_radius = 20,
         .draw_color = Colorf.cyan,
         .vision_range = 300,
+        .coll_mask = Thing.CollMask.initMany(&.{ .creature, .tile }),
+        .coll_layer = Thing.CollMask.initMany(&.{.creature}),
     };
     try ret.init();
     return ret;
@@ -43,6 +46,13 @@ pub fn update(self: *Thing, room: *Room) Error!void {
     if (plat.input_buffer.mouseBtnIsJustPressed(.right)) {
         const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
         try self.findPath(room, mouse_pos);
+    }
+    if (plat.input_buffer.mouseBtnIsJustPressed(.left)) {
+        const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
+        if (room.getThingByPos(mouse_pos)) |thing| {
+            var spell = Spell.Unherring.proto;
+            try spell.cast(self, room, .{ .target = .{ .thing = thing.id } });
+        }
     }
     // move
     {

@@ -33,6 +33,8 @@ pub fn protoype() Error!Thing {
         .draw_color = Colorf.yellow,
         .vision_range = 160,
         .ai = .{ .goat = .{} },
+        .coll_mask = Thing.CollMask.initMany(&.{ .creature, .tile }),
+        .coll_layer = Thing.CollMask.initMany(&.{.creature}),
     };
     try ret.init();
     return ret;
