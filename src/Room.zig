@@ -56,7 +56,6 @@ things: Thing.Pool = undefined,
 spawn_queue: ThingBoundedArray = .{},
 free_queue: ThingBoundedArray = .{},
 player: ?pool.Id = null,
-next_command_id: i32 = 0,
 fog: Fog = undefined,
 curr_tick: i64 = 0,
 edit_mode: bool = false,
@@ -107,7 +106,6 @@ fn clearThings(self: *Room) void {
     self.spawn_queue.len = 0;
     self.free_queue.len = 0;
     self.player = null;
-    self.next_command_id = 0;
 }
 
 pub fn reset(self: *Room) Error!void {
@@ -124,7 +122,7 @@ pub fn reset(self: *Room) Error!void {
         }
     }
     // sheep in start zone
-    if (!self.tilemap.start_zone.dims.isZero()) {
+    if (false and !self.tilemap.start_zone.dims.isZero()) {
         const start_zone_center = self.tilemap.start_zone.pos.add(self.tilemap.start_zone.dims.scale(0.5));
         const poses = [4]V2f{
             start_zone_center.add(v2f(-1, 1)),
@@ -208,7 +206,7 @@ pub fn update(self: *Room) Error!void {
         if (plat.input_buffer.mouseBtnIsJustPressed(.left)) {
             const pos = plat.screenPosToCamPos(self.camera, plat.input_buffer.getCurrMousePos());
             //std.debug.print("spawn sheep at {d:0.2}, {d:0.2}\n", .{ pos.x, pos.y });
-            _ = try self.queueSpawnThingByKind(.sheep, pos);
+            _ = try self.queueSpawnThingByKind(.goat, pos);
         }
     }
 

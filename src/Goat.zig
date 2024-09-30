@@ -88,12 +88,7 @@ pub fn update(_: *Goat, self: *Thing, room: *Room) Error!void {
     }
     //const next_pos = self.followPathGetNextPoint(20);
     //const follow_dir = next_pos.sub(self.pos).normalizedOrZero();
-    const follow_dir = goat.wander_dir;
-    const params: Thing.BoidParams = .{
-        .s_avoid = 0.4,
-        .s_sep = 0.4,
-        .s_follow = 0.5,
-    };
+    //const follow_dir = goat.wander_dir;
 
-    try self.steerSum(room, things_in_view.slice(), follow_dir, params);
+    //try self.steerSum(room, things_in_view.slice(), follow_dir, params);
 }

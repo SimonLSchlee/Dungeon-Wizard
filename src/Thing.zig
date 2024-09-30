@@ -25,13 +25,12 @@ const pool = @import("pool.zig");
 
 pub const Kind = enum {
     player,
-    sheep,
     goat,
 };
 
 pub const KindData = union(Kind) {
     player: @import("Player.zig"),
-    sheep: @import("Sheep.zig"),
+    //sheep: @import("Sheep.zig"),
     goat: @import("Goat.zig"),
 
     pub fn render(_: *const KindData, self: *const Thing, room: *const Room) Error!void {
@@ -66,13 +65,6 @@ dir_accel_params: DirAccelParams = .{},
 dbg: struct {
     last_coll: ThingCollision = .{},
     coords_searched: std.ArrayList(V2i) = undefined,
-    boid_sep: V2f = .{},
-    boid_cohere: V2f = .{},
-    boid_align: V2f = .{},
-    boid_avoid: V2f = .{},
-    boid_follow: V2f = .{},
-    boid_wall_sep: V2f = .{},
-    boid_desired_vel: V2f = .{},
 } = .{},
 path: std.BoundedArray(V2f, 32) = .{},
 
@@ -121,9 +113,7 @@ pub fn copyTo(self: *const Thing, other: *Thing) Error!void {
 pub fn defaultRender(self: *const Thing, room: *const Room) Error!void {
     assert(self.spawn_state == .spawned);
     const plat = getPlat();
-    //if (self.kind == .sheep) {
-    //    std.debug.print("i'm rendering maaam! {s} at {d:0.2}, {d:0.2}\n", .{ self.name, self.pos.x, self.pos.y });
-    //}
+
     plat.circlef(self.pos, self.coll_radius, .{ .fill_color = self.draw_color });
     plat.arrowf(self.pos, self.pos.add(self.dir.scale(self.coll_radius)), 5, Colorf.black);
     if (debug.show_thing_collisions) {
@@ -434,234 +424,6 @@ pub fn updateVel(self: *Thing, accel_dir: V2f, params: AccelParams) void {
     }
 
     self.vel = new_vel;
-}
-
-pub fn getBoidThingAvoidance(self: *Thing, others_in_vision_range: []*Thing) V2f {
-    var ret: V2f = .{};
-
-    const vel_dir = self.vel.normalizedOrZero();
-    if (vel_dir.isZero()) return ret;
-
-    const projected_pos = self.pos.add(vel_dir.scale(self.coll_radius));
-    //var coll = self.getCircleCollisionWithTiles(projected_pos, self.coll_radius, room: *Room)
-    var best_coll: ThingCollision = .{};
-    var best_dist: f32 = std.math.inf(f32);
-
-    for (others_in_vision_range) |other| {
-        const coll = getCircleCircleCollision(projected_pos, self.coll_radius, other.pos, other.coll_radius);
-        if (!coll.collided) continue;
-        if (!best_coll.collided) {
-            best_coll = coll;
-        }
-        const dist = coll.pos.dist(projected_pos);
-        if (dist < best_dist) {
-            best_dist = dist;
-            best_coll = coll;
-        }
-    }
-
-    if (best_coll.collided) {
-        const cross = vel_dir.cross(best_coll.normal);
-        const perp = if (cross < 0) best_coll.normal.rot90CW() else best_coll.normal.rot90CCW();
-        const avoid_dir = if (cross < 0) vel_dir.rot90CCW() else vel_dir.rot90CW();
-        // how much are we facing the thing
-        const f = vel_dir.dot(perp);
-        ret = avoid_dir.scale(f);
-    }
-
-    return ret;
-}
-
-pub fn getBoidThingSeparation(self: *Thing, others_in_vision_range: []*Thing, sep_range: f32) V2f {
-    var ret: V2f = .{};
-    var num: f32 = 0;
-
-    for (others_in_vision_range) |other| {
-        const vec = other.pos.sub(self.pos);
-        const dist = vec.length();
-        const range = @max(dist - self.coll_radius - other.coll_radius, 0);
-
-        if (range < sep_range) {
-            const inv = @max(sep_range - range, 0);
-            const v_inv = if (dist > 0.001) vec.scale(inv / dist) else V2f.right;
-            ret = ret.sub(v_inv);
-            num += 1;
-        }
-    }
-
-    if (num > 0) {
-        ret = ret.scale(1 / num);
-        ret = ret.clampLength(sep_range);
-        ret = ret.remapLengthTo0_1(0, sep_range);
-    }
-
-    return ret;
-}
-
-pub fn getBoidCohesion(self: *Thing, others_in_vision_range: []*Thing) V2f {
-    var num: f32 = 0;
-    var ret: V2f = .{};
-
-    for (others_in_vision_range) |other| {
-        if (utl.unionTagEql(self.kind, other.kind)) {
-            // TODO weight based on range, somehow?
-            // cant just weight the pos, that doesn't make sense
-            // record a separate number per 'other' (0-1), to scale with when averaging? running average? ???
-            ret = ret.add(other.pos);
-            num += 1;
-        }
-    }
-
-    if (num > 0) {
-        ret = ret.scale(1 / num);
-        ret = ret.sub(self.pos);
-        ret = ret.clampLength(self.vision_range);
-        ret = ret.remapLengthTo0_1(0, self.vision_range);
-    }
-
-    return ret;
-}
-
-pub fn getBoidAlignment(self: *Thing, others_in_vision_range: []*Thing) V2f {
-    var num: f32 = 0;
-    var ret: V2f = .{};
-
-    for (others_in_vision_range) |other| {
-        if (utl.unionTagEql(self.kind, other.kind)) {
-            const dist = other.pos.dist(self.pos);
-            const range = @max(dist - self.coll_radius - other.coll_radius, 0);
-            // only care about velocity direction, scale based on how far the other is
-            const inv = @max(self.vision_range - range, 0);
-            const v = other.vel.normalizedOrZero().scale(inv);
-            ret = ret.add(v);
-            num += 1;
-        }
-    }
-
-    if (num > 0) {
-        ret = ret.scale(1 / num);
-        ret = ret.clampLength(self.vision_range);
-        ret = ret.remapLengthTo0_1(0, self.vision_range);
-    }
-
-    return ret;
-}
-
-pub fn getSteeringWallSep(self: *Thing, room: *const Room, sep_range: f32) V2f {
-    var wall_sep_vec: V2f = .{};
-    const tile_coll = Thing.getCircleCollisionWithTiles(self.pos, self.coll_radius + sep_range, room);
-    if (tile_coll.collided) {
-        const dist = tile_coll.pos.sub(self.pos).length();
-        const max_dist = self.coll_radius + sep_range;
-        const inv = @max(max_dist - dist, 0);
-        wall_sep_vec = wall_sep_vec.add(tile_coll.normal.scale(inv));
-    }
-    {
-        const room_botright = room.tilemap.dims.scale(0.5);
-        const room_topleft = room_botright.neg();
-        const border_soft: f32 = 50;
-        const border_offset_soft = V2f.splat(border_soft + self.coll_radius);
-        const border_topleft = room_topleft.add(border_offset_soft);
-        const border_botright = room_botright.sub(border_offset_soft);
-
-        var outside_topleft = border_topleft.sub(self.pos);
-        outside_topleft.x = utl.clampf(outside_topleft.x, 0, border_soft);
-        outside_topleft.y = utl.clampf(outside_topleft.y, 0, border_soft);
-        wall_sep_vec = wall_sep_vec.add(outside_topleft);
-
-        var outside_botright = self.pos.sub(border_botright);
-        outside_botright.x = utl.clampf(outside_botright.x, 0, border_soft);
-        outside_botright.y = utl.clampf(outside_botright.y, 0, border_soft);
-        wall_sep_vec = wall_sep_vec.sub(outside_botright);
-    }
-    wall_sep_vec = wall_sep_vec.normalizedOrZero();
-
-    return wall_sep_vec;
-}
-
-pub const BoidParams = struct {
-    s_cohere: f32 = 0,
-    s_avoid: f32 = 0,
-    s_sep: f32 = 0,
-    s_align: f32 = 0,
-    s_follow: f32 = 0,
-    sep_thing_range: f32 = 10,
-    sep_wall_range: f32 = 8,
-};
-
-pub fn steerSum(self: *Thing, room: *Room, others: []*Thing, follow_vec: V2f, params: BoidParams) Error!void {
-    const v_cohere = self.getBoidCohesion(others);
-    const v_sep = self.getBoidThingSeparation(others, params.sep_thing_range);
-    const v_align = self.getBoidAlignment(others);
-    const v_avoid = self.getBoidThingAvoidance(others);
-    const v_follow = follow_vec;
-    const v_wall = self.getSteeringWallSep(room, params.sep_wall_range);
-
-    const weights = [_]f32{ params.s_cohere, params.s_sep, params.s_align, params.s_avoid, params.s_follow, params.s_sep };
-    const vecs = [weights.len]V2f{ v_cohere, v_sep, v_align, v_avoid, v_follow, v_wall };
-    const dbg_vecs = [weights.len]?*V2f{ &self.dbg.boid_cohere, &self.dbg.boid_sep, &self.dbg.boid_align, &self.dbg.boid_avoid, &self.dbg.boid_follow, &self.dbg.boid_wall_sep };
-    var summed_vecs: V2f = .{};
-    for (vecs, 0..) |v, i| {
-        const scaled = v.scale(weights[i]);
-        if (dbg_vecs[i]) |ptr| {
-            ptr.* = scaled;
-        }
-        //std.debug.print("[{}]: {d:0.2} {d:0.2}\n", .{ i, v.x, v.y });
-        summed_vecs = summed_vecs.add(scaled);
-    }
-    const desired_dir = summed_vecs.normalizedOrZero();
-
-    self.dbg.boid_desired_vel = desired_dir;
-    //std.debug.print("{d:0.2} {d:0.2}\n", .{ summed_accels.x, summed_accels.y });
-
-    self.updateVel(desired_dir, self.accel_params);
-    self.updateDir(desired_dir, self.dir_accel_params);
-
-    try self.moveAndCollide(room);
-}
-
-pub fn steerAvg(self: *Thing, room: *Room, others: []*Thing, follow_vec: V2f, params: BoidParams) Error!void {
-    const wall_sep_vec: V2f = self.getSteeringWallSep(room, params.sep_wall_range);
-    const v_cohere = self.getBoidCohesion(others);
-    self.dbg.boid_cohere = v_cohere.scale(params.s_cohere);
-    const v_sep = self.getBoidThingSeparation(others, params.sep_thing_range);
-    self.dbg.boid_sep = v_sep.scale(params.s_sep);
-    const v_align = self.getBoidAlignment(others);
-    self.dbg.boid_align = v_align.scale(params.s_align);
-    const v_avoid = self.getBoidThingAvoidance(others);
-    self.dbg.boid_avoid = v_avoid.scale(params.s_avoid);
-    const v_follow = follow_vec;
-    self.dbg.boid_follow = v_follow.scale(params.s_follow);
-    const v_wall = wall_sep_vec;
-    const weights = [_]f32{ params.s_cohere, params.s_sep, params.s_align, params.s_avoid, params.s_follow, params.s_sep };
-    const vecs = [weights.len]V2f{ v_cohere, v_sep, v_align, v_avoid, v_follow, v_wall };
-    var summed_vecs: V2f = .{};
-    //var summed_lens: f32 = 0;
-    var summed_weights: f32 = 0;
-    for (vecs, 0..) |v, i| {
-        summed_vecs = summed_vecs.add(v.scale(weights[i]));
-        //summed_lens += v.length();
-        summed_weights += weights[i];
-    }
-    //std.debug.print("{d:0.2} {d:0.2} {d:0.2} {d:0.2}\n", .{ v_cohere.lengthSquared(), v_avoid.lengthSquared(), v_align.lengthSquared(), v_follow.lengthSquared() });
-    const avg_vec = summed_vecs.scale(1.0 / summed_weights);
-    const desired_vel_norm = avg_vec.clampLength(1);
-    //const avg_len = summed_lens / vecs.len;
-    //const avg = avg_vec_normalized.scale(avg_len);
-
-    self.dbg.boid_desired_vel = desired_vel_norm;
-
-    std.debug.print("{d:0.2} {d:0.2}\n", .{ desired_vel_norm.x, desired_vel_norm.y });
-
-    var accel_params: Thing.AccelParams = .{};
-    const dv = desired_vel_norm.scale(accel_params.max_speed).sub(self.vel);
-    const len = dv.length();
-    accel_params.accel = @min(accel_params.accel, len);
-    const accel_dir = dv.normalizedOrZero();
-    self.updateVel(accel_dir, accel_params);
-    self.updateDir(desired_vel_norm.normalizedOrZero(), .{});
-
-    try self.moveAndCollide(room);
 }
 
 pub fn debugDrawPath(self: *const Thing, room: *const Room) Error!void {

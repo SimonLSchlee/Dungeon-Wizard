@@ -68,7 +68,7 @@ pub fn reload(self: *Data) Error!void {
     self.things = @TypeOf(self.things).init(
         .{
             .player = try @import("Player.zig").protoype(),
-            .sheep = try @import("Sheep.zig").protoype(),
+            //.sheep = try @import("Sheep.zig").protoype(),
             .goat = try @import("Goat.zig").protoype(),
         },
     );
