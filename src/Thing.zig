@@ -23,27 +23,40 @@ const TileMap = @import("TileMap.zig");
 const data = @import("data.zig");
 const pool = @import("pool.zig");
 
+const Player = @import("Player.zig");
+const Goat = @import("Goat.zig");
+
 pub const Kind = enum {
     player,
     goat,
 };
 
 pub const KindData = union(Kind) {
-    player: @import("Player.zig"),
-    //sheep: @import("Sheep.zig"),
-    goat: @import("Goat.zig"),
+    player: Player,
+    goat: Goat,
 
-    pub fn render(_: *const KindData, self: *const Thing, room: *const Room) Error!void {
+    pub fn render(self: *const Thing, room: *const Room) Error!void {
         try self.defaultRender(room);
     }
-    pub fn update(_: *KindData, self: *Thing, room: *Room) Error!void {
+    pub fn update(self: *Thing, room: *Room) Error!void {
         try self.defaultUpdate(room);
     }
 };
 
 pub const Pool = pool.BoundedPool(Thing, 32);
+pub const Id = pool.Id;
 
-id: pool.Id = undefined,
+const Movement = struct {
+    const State = enum {
+        none,
+        walk,
+    };
+
+    state: State = .none,
+    ticks_in_state: i64 = 0,
+};
+
+id: Id = undefined,
 alloc_state: pool.AllocState = undefined,
 spawn_state: enum {
     instance, // not in any pool
@@ -66,13 +79,18 @@ dbg: struct {
     last_coll: ThingCollision = .{},
     coords_searched: std.ArrayList(V2i) = undefined,
 } = .{},
+movement: Movement = .{},
+ai: ?union(Kind) {
+    player: void,
+    goat: Goat.AI,
+} = null,
 path: std.BoundedArray(V2f, 32) = .{},
 
 pub fn render(self: *const Thing, room: *const Room) Error!void {
     if (self.spawn_state != .spawned) return;
     switch (self.kind) {
         // inline else is required, otherwise KindData.render will be used
-        inline else => |e| try e.render(self, room),
+        inline else => |e| try @TypeOf(e).render(self, room),
     }
 }
 
@@ -80,7 +98,7 @@ pub fn update(self: *Thing, room: *Room) Error!void {
     if (self.spawn_state != .spawned) return;
     switch (self.kind) {
         // inline else is required, otherwise KindData.update will be used
-        inline else => |*e| try e.update(self, room),
+        inline else => |e| try @TypeOf(e).update(self, room),
     }
 }
 

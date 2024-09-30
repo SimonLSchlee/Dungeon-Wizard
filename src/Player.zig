@@ -20,28 +20,6 @@ const Thing = @import("Thing.zig");
 const Room = @import("Room.zig");
 const Player = @import("Player.zig");
 
-const Movement = struct {
-    const State = enum {
-        none,
-        walk,
-    };
-
-    state: State = .none,
-    ticks_in_state: i64 = 0,
-    last_leaped_tick: i64 = 0,
-    leap_cd_ticks: i64 = 20,
-    leap_ticks: i64 = 10,
-};
-
-action_tick: i64 = 0,
-curr_action: enum {
-    none,
-    call,
-    bork,
-} = .none,
-
-movement: Movement = .{},
-
 pub fn protoype() Error!Thing {
     var ret = Thing{
         .kind = .{ .player = .{} },
@@ -54,16 +32,13 @@ pub fn protoype() Error!Thing {
     return ret;
 }
 
-pub fn render(_: *const Player, self: *const Thing, room: *const Room) Error!void {
+pub fn render(self: *const Thing, room: *const Room) Error!void {
     try Thing.defaultRender(self, room);
-    const player = &self.kind.player;
-    _ = player;
 }
 
-pub fn update(_: *const Player, self: *Thing, room: *Room) Error!void {
+pub fn update(self: *Thing, room: *Room) Error!void {
     assert(self.spawn_state == .spawned);
     const plat = getPlat();
-    var player = &self.kind.player;
 
     if (plat.input_buffer.mouseBtnIsJustPressed(.right)) {
         const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
@@ -81,7 +56,7 @@ pub fn update(_: *const Player, self: *Thing, room: *Room) Error!void {
             .friction = 0.09,
             .max_speed = 2,
         };
-        const movement = &player.movement;
+        const movement = &self.movement;
 
         movement.state = move_state: switch (movement.state) {
             .none => {

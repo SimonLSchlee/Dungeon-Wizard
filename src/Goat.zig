@@ -21,24 +21,24 @@ const Thing = @import("Thing.zig");
 const Room = @import("Room.zig");
 const Goat = @This();
 
-last_command_id: i32 = -1,
-unconfidence: f32 = 200,
-call_range: f32 = 200,
-wander_dir: V2f = V2f.down,
+pub const AI = struct {
+    wander_dir: V2f = V2f.down,
+};
 
 pub fn protoype() Error!Thing {
     var ret = Thing{
-        .kind = .{ .goat = .{} },
+        .kind = .goat,
         .spawn_state = .instance,
         .coll_radius = 20,
         .draw_color = Colorf.yellow,
         .vision_range = 160,
+        .ai = .{ .goat = .{} },
     };
     try ret.init();
     return ret;
 }
 
-pub fn render(_: *const Goat, self: *const Thing, room: *const Room) Error!void {
+pub fn render(self: *const Thing, room: *const Room) Error!void {
     const plat = getPlat();
 
     try Thing.defaultRender(self, room);
@@ -54,9 +54,8 @@ pub fn render(_: *const Goat, self: *const Thing, room: *const Room) Error!void 
     }
 }
 
-pub fn update(_: *Goat, self: *Thing, room: *Room) Error!void {
+pub fn update(self: *Thing, room: *Room) Error!void {
     assert(self.spawn_state == .spawned);
-    var goat = &self.kind.goat;
 
     var things_in_view: std.BoundedArray(*Thing, 16) = .{};
     for (&room.things.items) |*thing| {
@@ -70,25 +69,17 @@ pub fn update(_: *Goat, self: *Thing, room: *Room) Error!void {
             things_in_view.append(thing) catch break;
         }
     }
-
+    const ai = &self.ai.?.goat;
     const coll = Thing.getCircleCollisionWithTiles(self.pos.add(self.vel), self.coll_radius, room);
     if (coll.collided) {
-        if (coll.normal.dot(goat.wander_dir) < 0) {
-            goat.wander_dir = goat.wander_dir.neg();
+        if (coll.normal.dot(ai.wander_dir) < 0) {
+            ai.wander_dir = ai.wander_dir.neg();
         }
     }
-    if (self.path.len == 0) {
-        var target_pos = self.pos;
-        if (self.pos.y < 0) {
-            target_pos.y = 100;
-        } else {
-            target_pos.y = -100;
-        }
-        try self.findPath(room, target_pos);
+    const follow_dir = ai.wander_dir;
+    self.updateVel(follow_dir, .{});
+    if (!self.vel.isZero()) {
+        self.dir = self.vel.normalized();
     }
-    //const next_pos = self.followPathGetNextPoint(20);
-    //const follow_dir = next_pos.sub(self.pos).normalizedOrZero();
-    //const follow_dir = goat.wander_dir;
-
-    //try self.steerSum(room, things_in_view.slice(), follow_dir, params);
+    try self.moveAndCollide(room);
 }
