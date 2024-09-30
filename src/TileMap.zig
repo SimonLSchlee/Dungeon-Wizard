@@ -362,6 +362,15 @@ pub fn findPathThetaStar(self: *const TileMap, allocator: std.mem.Allocator, sta
     };
     const start_coord = posToTileCoord(start);
     const goal_coord = posToTileCoord(goal);
+    // simple fallback for impassible destination - draw a straight line to goal
+    if (self.tiles.get(goal_coord)) |goal_tile| {
+        if (!goal_tile.passable) {
+            var ret = std.BoundedArray(V2f, 32){};
+            ret.append(start) catch unreachable;
+            ret.append(goal) catch unreachable;
+            return ret;
+        }
+    }
     var path_arr = std.ArrayList(V2f).init(allocator);
     defer path_arr.deinit();
     var queue = std.PriorityQueue(ThetaStar.PqEl, void, ThetaStar.PqEl.lessThan).init(allocator, {});
