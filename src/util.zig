@@ -137,3 +137,49 @@ pub fn remapClampf(orig_a: f32, orig_b: f32, target_a: f32, target_b: f32, v: f3
     const t = invLerpClampf(orig_a, orig_b, v);
     return lerpf(target_a, target_b, t);
 }
+
+pub fn expectTypeInfo(T: type, comptime kind: std.builtin.TypeId) std.meta.TagPayload(std.builtin.Type, kind) {
+    const info = @typeInfo(T);
+    if (info != kind) @compileError("Expected typeinfo " ++ @tagName(kind) ++ ", got " ++ @tagName(info));
+    return @field(info, @tagName(kind));
+}
+
+// combine fields of structs together
+pub fn MixStructFields(Structs: []const type) type {
+    var total_fields = 0;
+    const layout = expectTypeInfo(Structs[0], .@"struct").layout;
+    const backing_integer = expectTypeInfo(Structs[0], .@"struct").backing_integer;
+
+    for (Structs) |S| {
+        const s = expectTypeInfo(S, .@"struct");
+        if (s.layout != layout) @compileError("Super and extend struct layouts must be the same");
+        if (s.backing_integer != backing_integer) @compileError("Super and extend struct backing integers must be the same");
+        total_fields += s.fields.len;
+    }
+    const EmptyField = std.builtin.Type.StructField{
+        .name = "",
+        .type = undefined,
+        .default_value = null,
+        .is_comptime = false,
+        .alignment = 0,
+    };
+    var fields: [total_fields]std.builtin.Type.StructField = [_]std.builtin.Type.StructField{EmptyField} ** total_fields;
+    var i = 0;
+    for (Structs) |S| {
+        const s = expectTypeInfo(S, .@"struct");
+        for (s.fields) |f| {
+            fields[i] = f;
+            i += 1;
+        }
+    }
+
+    return @Type(.{
+        .@"struct" = .{
+            .layout = layout,
+            .backing_integer = backing_integer,
+            .fields = &fields,
+            .decls = &.{},
+            .is_tuple = false,
+        },
+    });
+}
