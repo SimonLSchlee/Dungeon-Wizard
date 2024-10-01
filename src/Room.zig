@@ -222,7 +222,7 @@ pub fn update(self: *Room) Error!void {
         if (plat.input_buffer.mouseBtnIsJustPressed(.left)) {
             const pos = plat.screenPosToCamPos(self.camera, plat.input_buffer.getCurrMousePos());
             //std.debug.print("spawn sheep at {d:0.2}, {d:0.2}\n", .{ pos.x, pos.y });
-            _ = try self.queueSpawnThingByKind(.goat, pos);
+            _ = try self.queueSpawnThingByKind(.troll, pos);
         }
     }
 

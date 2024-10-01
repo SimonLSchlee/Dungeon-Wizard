@@ -28,60 +28,13 @@ const Spell = @This();
 pub const Pool = pool.BoundedPool(Spell, 32);
 pub const Id = pool.Id;
 
-pub const SpellImports = [_]type{
+pub const SpellTypes = [_]type{
     @import("spells/Unherring.zig"),
     @import("spells/Protec.zig"),
 };
 
-// uses SpellImports to make enum members with names from field: enum_name
-pub const Kind = blk: {
-    const EnumField = std.builtin.Type.EnumField;
-    const empty = EnumField{
-        .name = "",
-        .value = 0,
-    };
-    var fields: [SpellImports.len]EnumField = [_]EnumField{empty} ** SpellImports.len;
-    for (SpellImports, 0..) |M, i| {
-        fields[i] = .{
-            .name = M.enum_name,
-            .value = i,
-        };
-    }
-    break :blk @Type(.{
-        .@"enum" = .{
-            .tag_type = u32,
-            .fields = &fields,
-            .decls = &.{},
-            .is_exhaustive = true,
-        },
-    });
-};
-
-// maps Kind enum to spell type
-pub const KindData = blk: {
-    const UnionField = std.builtin.Type.UnionField;
-    const empty = UnionField{
-        .name = "",
-        .type = void,
-        .alignment = 1,
-    };
-    var fields: [SpellImports.len]UnionField = [_]UnionField{empty} ** SpellImports.len;
-    for (SpellImports, 0..) |M, i| {
-        fields[i] = .{
-            .name = M.enum_name,
-            .type = M,
-            .alignment = @alignOf(M),
-        };
-    }
-    break :blk @Type(.{
-        .@"union" = .{
-            .layout = .auto,
-            .tag_type = Kind,
-            .fields = &fields,
-            .decls = &.{},
-        },
-    });
-};
+pub const Kind = utl.EnumFromTypes(&SpellTypes, "enum_name");
+pub const KindData = utl.TaggedUnionFromTypes(&SpellTypes, "enum_name", Kind);
 
 pub fn GetKindType(kind: Kind) type {
     const fields: []const std.builtin.Type.UnionField = std.meta.fields(KindData);
@@ -134,18 +87,37 @@ pub const TargetingData = struct {
     } = null,
 };
 
-pub const ThingData = struct {
+pub const Controller = struct {
+    const ControllerTypes = blk: {
+        var num = 0;
+        for (SpellTypes) |M| {
+            for (M.Controllers) |_| {
+                num += 1;
+            }
+        }
+        var Types: [num]type = undefined;
+        var i = 0;
+        for (SpellTypes) |M| {
+            for (M.Controllers) |C| {
+                Types[i] = C;
+                i += 1;
+            }
+        }
+        break :blk Types;
+    };
+    pub const ControllerKind = utl.EnumFromTypes(&ControllerTypes, "controller_enum_name");
+    pub const ControllerKindData = utl.TaggedUnionFromTypes(&ControllerTypes, "controller_enum_name", ControllerKind);
+
+    controller: ControllerKindData,
     spell: Spell,
     params: Params,
 
-    pub fn render(self: *const Thing, room: *const Room) Error!void {
-        try self.defaultRender(room);
-    }
-
     pub fn update(self: *Thing, room: *Room) Error!void {
-        const spell_data = self.kind.spell;
-        switch (spell_data.spell.kind) {
-            inline else => |s| try @TypeOf(s).update(self, room),
+        const scontroller = self.controller.spell;
+        switch (scontroller.controller) {
+            inline else => |s| {
+                try @TypeOf(s).update(self, room);
+            },
         }
     }
 };

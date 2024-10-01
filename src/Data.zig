@@ -26,7 +26,7 @@ const test_levels = [_][]const u8{
     \\#                       #
     \\#                       #
     \\#                       #
-    \\#       p   g           #
+    \\#       p   t           #
     \\#                       #
     \\#                       #
     \\#                       #
@@ -38,7 +38,7 @@ const test_levels = [_][]const u8{
     \\##           ###    ##          ####                 ##
     \\#         ##  #          # ##   #       ####    ### ###
     \\####     ##   #         ####        # ####           ##
-    \\#######  g      ##      #                       #######
+    \\#######  t      ##      #                       #######
     \\#AAAAA##         ####      #####     ##      ####BBBBB#
     \\#AAAAA p     #         ########      #   #   ####BBBBB#
     \\#AAAAA    #    ##   ############     #####       BBBBB#
@@ -67,9 +67,8 @@ pub fn reload(self: *Data) Error!void {
     self.levels = &test_levels;
     self.things = @TypeOf(self.things).init(
         .{
-            .player = try @import("Player.zig").protoype(),
-            //.sheep = try @import("Sheep.zig").protoype(),
-            .goat = try @import("Goat.zig").protoype(),
+            .player = try @import("player.zig").protoype(),
+            .troll = try @import("enemies.zig").troll(),
         },
     );
 }

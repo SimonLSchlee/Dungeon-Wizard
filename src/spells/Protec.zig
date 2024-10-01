@@ -28,6 +28,7 @@ const Params = Spell.Params;
 const ThingData = Spell.ThingData;
 
 pub const enum_name = "protec";
+pub const Controllers = [_]type{};
 
 pub const proto = Spell.makeProto(
     .protec,

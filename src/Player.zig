@@ -21,76 +21,91 @@ const Room = @import("Room.zig");
 const Spell = @import("Spell.zig");
 const Player = @This();
 
+pub const enum_name = "player";
+
 pub fn protoype() Error!Thing {
     var ret = Thing{
-        .kind = .{ .player = .{} },
+        .kind = .player,
         .spawn_state = .instance,
         .coll_radius = 20,
-        .draw_color = Colorf.cyan,
         .vision_range = 300,
         .coll_mask = Thing.CollMask.initMany(&.{ .creature, .tile }),
         .coll_layer = Thing.CollMask.initMany(&.{.creature}),
+        .controller = .{ .player = .{} },
+        .renderer = .{ .default = .{
+            .draw_color = .cyan,
+            .draw_radius = 20,
+        } },
     };
     try ret.init();
     return ret;
 }
 
-pub fn render(self: *const Thing, room: *const Room) Error!void {
-    try Thing.defaultRender(self, room);
-}
-
-pub fn update(self: *Thing, room: *Room) Error!void {
-    assert(self.spawn_state == .spawned);
-    const plat = getPlat();
-
-    if (plat.input_buffer.mouseBtnIsJustPressed(.right)) {
-        const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
-        try self.findPath(room, mouse_pos);
-    }
-    if (plat.input_buffer.mouseBtnIsJustPressed(.left)) {
-        const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
-        if (room.getThingByPos(mouse_pos)) |thing| {
-            var spell = Spell.getProto(.unherring);
-            try spell.cast(self, room, .{ .target = .{ .thing = thing.id } });
-        }
-    }
-    // move
-    {
-        const p = self.followPathGetNextPoint(20);
-        const input_dir = p.sub(self.pos).normalizedOrZero();
-
-        const accel_dir: V2f = input_dir;
-        // non-leap accel params
-        const accel_params: Thing.AccelParams = .{
-            .accel = 0.15,
-            .friction = 0.09,
-            .max_speed = 2,
-        };
-        const movement = &self.movement;
-
-        movement.state = move_state: switch (movement.state) {
-            .none => {
-                if (!input_dir.isZero()) {
-                    movement.ticks_in_state = 0;
-                    continue :move_state .walk;
-                }
-                break :move_state .none;
-            },
-            .walk => {
-                if (input_dir.isZero()) {
-                    movement.ticks_in_state = 0;
-                    continue :move_state .none;
-                }
-                break :move_state .walk;
-            },
+pub const InputController = struct {
+    pub const Movement = struct {
+        const State = enum {
+            none,
+            walk,
         };
 
-        movement.ticks_in_state += 1;
-        self.updateVel(accel_dir, accel_params);
-        if (!self.vel.isZero()) {
-            self.dir = self.vel.normalized();
-        }
-    }
+        state: State = .none,
+        ticks_in_state: i64 = 0,
+    };
+    movement: Movement = .{},
 
-    try self.moveAndCollide(room);
-}
+    pub fn update(self: *Thing, room: *Room) Error!void {
+        assert(self.spawn_state == .spawned);
+        const plat = getPlat();
+
+        if (plat.input_buffer.mouseBtnIsJustPressed(.right)) {
+            const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
+            try self.findPath(room, mouse_pos);
+        }
+        if (plat.input_buffer.mouseBtnIsJustPressed(.left)) {
+            const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
+            if (room.getThingByPos(mouse_pos)) |thing| {
+                var spell = Spell.getProto(.unherring);
+                try spell.cast(self, room, .{ .target = .{ .thing = thing.id } });
+            }
+        }
+        // move
+        {
+            const p = self.followPathGetNextPoint(20);
+            const input_dir = p.sub(self.pos).normalizedOrZero();
+
+            const accel_dir: V2f = input_dir;
+            // non-leap accel params
+            const accel_params: Thing.AccelParams = .{
+                .accel = 0.15,
+                .friction = 0.09,
+                .max_speed = 2,
+            };
+            const movement = &self.controller.player.movement;
+
+            movement.state = move_state: switch (movement.state) {
+                .none => {
+                    if (!input_dir.isZero()) {
+                        movement.ticks_in_state = 0;
+                        continue :move_state .walk;
+                    }
+                    break :move_state .none;
+                },
+                .walk => {
+                    if (input_dir.isZero()) {
+                        movement.ticks_in_state = 0;
+                        continue :move_state .none;
+                    }
+                    break :move_state .walk;
+                },
+            };
+
+            movement.ticks_in_state += 1;
+            self.updateVel(accel_dir, accel_params);
+            if (!self.vel.isZero()) {
+                self.dir = self.vel.normalized();
+            }
+        }
+
+        try self.moveAndCollide(room);
+    }
+};

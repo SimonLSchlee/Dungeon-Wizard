@@ -183,3 +183,53 @@ pub fn MixStructFields(Structs: []const type) type {
         },
     });
 }
+
+pub fn EnumFromTypes(Types: []const type, enum_name_field: []const u8) type {
+    const EnumField = std.builtin.Type.EnumField;
+    const empty = EnumField{
+        .name = "",
+        .value = 0,
+    };
+    var fields: [Types.len]EnumField = [_]EnumField{empty} ** Types.len;
+    for (Types, 0..) |M, i| {
+        const enum_name = @field(M, enum_name_field);
+        fields[i] = .{
+            .name = enum_name,
+            .value = i,
+        };
+    }
+    return @Type(.{
+        .@"enum" = .{
+            .tag_type = u32,
+            .fields = &fields,
+            .decls = &.{},
+            .is_exhaustive = true,
+        },
+    });
+}
+
+pub fn TaggedUnionFromTypes(Types: []const type, enum_name_field: []const u8, TagType: type) type {
+    const UnionField = std.builtin.Type.UnionField;
+    const empty = UnionField{
+        .name = "",
+        .type = void,
+        .alignment = 1,
+    };
+    var fields: [Types.len]UnionField = [_]UnionField{empty} ** Types.len;
+    for (Types, 0..) |M, i| {
+        const enum_name = @field(M, enum_name_field);
+        fields[i] = .{
+            .name = enum_name,
+            .type = M,
+            .alignment = @alignOf(M),
+        };
+    }
+    return @Type(.{
+        .@"union" = .{
+            .layout = .auto,
+            .tag_type = TagType,
+            .fields = &fields,
+            .decls = &.{},
+        },
+    });
+}

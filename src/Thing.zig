@@ -23,41 +23,19 @@ const TileMap = @import("TileMap.zig");
 const data = @import("data.zig");
 const pool = @import("pool.zig");
 
-const Player = @import("Player.zig");
-const Goat = @import("Goat.zig");
+const player = @import("Player.zig");
+const enemies = @import("enemies.zig");
 const Spell = @import("Spell.zig");
 
 pub const Kind = enum {
     player,
-    goat,
-    spell,
-};
-
-pub const KindData = union(Kind) {
-    player: Player,
-    goat: Goat,
-    spell: Spell.ThingData,
-
-    pub fn render(self: *const Thing, room: *const Room) Error!void {
-        try self.defaultRender(room);
-    }
-    pub fn update(self: *Thing, room: *Room) Error!void {
-        try self.defaultUpdate(room);
-    }
+    troll,
+    projectile,
 };
 
 pub const Pool = pool.BoundedPool(Thing, 32);
+// TODO wrap
 pub const Id = pool.Id;
-
-pub const Movement = struct {
-    const State = enum {
-        none,
-        walk,
-    };
-
-    state: State = .none,
-    ticks_in_state: i64 = 0,
-};
 
 pub const CollLayer = enum {
     creature,
@@ -74,7 +52,7 @@ spawn_state: enum {
     freeable, // in pool. yet to be freed
 } = .instance,
 //
-kind: KindData,
+kind: Kind = undefined,
 pos: V2f = .{},
 vel: V2f = .{},
 dir: V2f = V2f.right,
@@ -82,7 +60,6 @@ dirv: f32 = 0,
 coll_radius: f32 = 0,
 coll_mask: CollMask = .{},
 coll_layer: CollMask = .{},
-draw_color: Colorf = Colorf.red,
 vision_range: f32 = 0,
 accel_params: AccelParams = .{},
 dir_accel_params: DirAccelParams = .{},
@@ -90,26 +67,74 @@ dbg: struct {
     last_coll: ThingCollision = .{},
     coords_searched: std.ArrayList(V2i) = undefined,
 } = .{},
-movement: Movement = .{},
-ai: ?union(Kind) {
-    player: void,
-    goat: Goat.AI,
-    spell: void,
-} = null,
+controller: union(enum) {
+    none: void,
+    player: player.InputController,
+    enemy: enemies.AIController,
+    spell: Spell.Controller,
+} = .none,
+renderer: union(enum) {
+    none: void,
+    default: DebugCircleRenderer,
+} = .{ .default = .{} },
 path: std.BoundedArray(V2f, 32) = .{},
 
-pub fn render(self: *const Thing, room: *const Room) Error!void {
-    if (self.spawn_state != .spawned) return;
-    switch (self.kind) {
-        // inline else is required, otherwise KindData.render will be used
-        inline else => |e| try @TypeOf(e).render(self, room),
+pub const DebugCircleRenderer = struct {
+    draw_radius: f32 = 20,
+    draw_color: Colorf = Colorf.red,
+
+    pub fn render(self: *const Thing, room: *const Room) Error!void {
+        assert(self.spawn_state == .spawned);
+        const plat = getPlat();
+        const renderer = &self.renderer.default;
+
+        plat.circlef(self.pos, renderer.draw_radius, .{ .fill_color = renderer.draw_color });
+        plat.arrowf(self.pos, self.pos.add(self.dir.scale(renderer.draw_radius)), 5, Colorf.black);
+
+        if (debug.show_thing_collisions) {
+            if (self.dbg.last_coll.collided) {
+                const coll = self.dbg.last_coll;
+                plat.arrowf(coll.pos, coll.pos.add(coll.normal.scale(self.coll_radius * 0.75)), 3, Colorf.red);
+            }
+        }
+        if (debug.show_thing_coords_searched) {
+            if (self.path.len > 0) {
+                for (self.dbg.coords_searched.items) |coord| {
+                    plat.circlef(TileMap.tileCoordToCenterPos(coord), 10, .{ .outline_color = Colorf.white, .fill_color = null });
+                }
+            }
+        }
+        if (debug.show_thing_paths) {
+            if (self.path.len > 0) {
+                try self.debugDrawPath(room);
+            }
+        }
+    }
+};
+
+pub const DefaultController = struct {
+    pub fn update(_: *Thing, _: *Room) Error!void {}
+};
+
+pub fn update(self: *Thing, room: *Room) Error!void {
+    switch (self.controller) {
+        inline else => |c| {
+            const C = @TypeOf(c);
+            if (std.meta.hasMethod(C, "update")) {
+                try C.update(self, room);
+            }
+        },
     }
 }
 
-pub fn update(self: *Thing, room: *Room) Error!void {
-    if (self.spawn_state != .spawned) return;
-    switch (self.kind) {
-        inline else => |e| try @TypeOf(e).update(self, room),
+pub fn render(self: *const Thing, room: *const Room) Error!void {
+    switch (self.renderer) {
+        inline else => |r| {
+            const R = @TypeOf(r);
+            if (std.meta.hasMethod(R, "render")) {
+                try R.render(self, room);
+            }
+        },
     }
 }
 
@@ -138,32 +163,6 @@ pub fn copyTo(self: *const Thing, other: *Thing) Error!void {
     other.id = id;
     other.alloc_state = alloc_state;
     other.spawn_state = spawn_state;
-}
-
-pub fn defaultRender(self: *const Thing, room: *const Room) Error!void {
-    assert(self.spawn_state == .spawned);
-    const plat = getPlat();
-
-    plat.circlef(self.pos, self.coll_radius, .{ .fill_color = self.draw_color });
-    plat.arrowf(self.pos, self.pos.add(self.dir.scale(self.coll_radius)), 5, Colorf.black);
-    if (debug.show_thing_collisions) {
-        if (self.dbg.last_coll.collided) {
-            const coll = self.dbg.last_coll;
-            plat.arrowf(coll.pos, coll.pos.add(coll.normal.scale(self.coll_radius * 0.75)), 3, Colorf.red);
-        }
-    }
-    if (debug.show_thing_coords_searched) {
-        if (self.path.len > 0) {
-            for (self.dbg.coords_searched.items) |coord| {
-                plat.circlef(TileMap.tileCoordToCenterPos(coord), 10, .{ .outline_color = Colorf.white, .fill_color = null });
-            }
-        }
-    }
-    if (debug.show_thing_paths) {
-        if (self.path.len > 0) {
-            try self.debugDrawPath(room);
-        }
-    }
 }
 
 fn defaultUpdate(self: *Thing, room: *Room) Error!void {
