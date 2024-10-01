@@ -50,7 +50,7 @@ pub fn update(self: *Thing, room: *Room) Error!void {
     if (plat.input_buffer.mouseBtnIsJustPressed(.left)) {
         const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
         if (room.getThingByPos(mouse_pos)) |thing| {
-            var spell = Spell.Unherring.proto;
+            var spell = Spell.getProto(.unherring);
             try spell.cast(self, room, .{ .target = .{ .thing = thing.id } });
         }
     }
