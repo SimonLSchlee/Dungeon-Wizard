@@ -109,14 +109,14 @@ pub fn render(self: *const Thing, room: *const Room) Error!void {
 pub fn update(self: *Thing, room: *Room) Error!void {
     if (self.spawn_state != .spawned) return;
     switch (self.kind) {
-        // inline else is required, otherwise KindData.update will be used
         inline else => |e| try @TypeOf(e).update(self, room),
     }
 }
 
-pub fn deferFree(self: *Thing) void {
+pub fn deferFree(self: *Thing, room: *Room) void {
     assert(self.spawn_state == .spawned);
     self.spawn_state = .freeable;
+    room.free_queue.append(self.id) catch @panic("out of free_queue space!");
 }
 
 pub fn init(self: *Thing) Error!void {

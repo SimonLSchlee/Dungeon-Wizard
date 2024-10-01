@@ -68,7 +68,7 @@ pub fn update(self: *Thing, room: *Room) Error!void {
         done = true;
     }
     if (done) {
-        self.deferFree();
+        self.deferFree(room);
     }
 }
 
