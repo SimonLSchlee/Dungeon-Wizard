@@ -1,7 +1,7 @@
 const std = @import("std");
 const raylib_build = @import("raylib");
 
-const title = "boids";
+const title = "action-deckbuilder";
 
 // Although this function looks imperative, note that its job is to
 // declaratively construct a build graph that will be executed by an external
