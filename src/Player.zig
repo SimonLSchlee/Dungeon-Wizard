@@ -57,7 +57,7 @@ pub const InputController = struct {
         assert(self.spawn_state == .spawned);
         const plat = getPlat();
 
-        if (plat.input_buffer.mouseBtnIsJustPressed(.right)) {
+        if (plat.input_buffer.mouseBtnIsDown(.right)) {
             const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
             try self.findPath(room, mouse_pos);
         }
