@@ -87,62 +87,54 @@ pub const AIController = struct {
                 break :state .idle;
             },
             .pursue => {
-                var lost_target: bool = false;
-                if (ai.target) |t_id| {
-                    if (room.getThingById(t_id)) |target| {
-                        const dist = target.pos.dist(self.pos);
-                        const range = @max(dist - self.coll_radius - target.coll_radius, 0);
-                        if (range < ai.attack_range) {
-                            ai.ticks_in_state = 0;
-                            continue :state .melee_attack;
-                        } else {
-                            _ = self.renderer.default.animator.play(.none, .{});
-                            try self.findPath(room, target.pos);
-                            const p = self.followPathGetNextPoint(10);
-                            self.updateVel(p.sub(self.pos).normalizedOrZero(), .{});
+                const target = blk: {
+                    if (ai.target) |t_id| {
+                        if (room.getThingById(t_id)) |t| {
+                            break :blk t;
                         }
-                    } else {
-                        lost_target = true;
                     }
-                } else {
-                    lost_target = true;
-                }
-                if (lost_target) {
                     ai.target = null;
                     ai.ticks_in_state = 0;
                     continue :state .idle;
+                };
+                const dist = target.pos.dist(self.pos);
+                const range = @max(dist - self.coll_radius - target.coll_radius, 0);
+                if (range < ai.attack_range) {
+                    ai.ticks_in_state = 0;
+                    continue :state .melee_attack;
+                } else {
+                    _ = self.renderer.default.animator.play(.none, .{});
+                    try self.findPath(room, target.pos);
+                    const p = self.followPathGetNextPoint(10);
+                    self.updateVel(p.sub(self.pos).normalizedOrZero(), .{});
                 }
                 break :state .pursue;
             },
             .melee_attack => {
-                var lost_target: bool = false;
-                if (ai.target) |t_id| {
-                    if (room.getThingById(t_id)) |target| {
-                        const dist = target.pos.dist(self.pos);
-                        const range = @max(dist - self.coll_radius - target.coll_radius, 0);
-                        if (range < ai.attack_range) {
-                            self.updateVel(.{}, .{});
-                            if (dist > 0.001) {
-                                self.dir = target.pos.sub(self.pos).normalized();
-                            }
-                            if (self.renderer.default.animator.play(.attack, .{ .loop = true })) {
-                                //std.debug.print("hit targetu\n", .{});
-                                _ = self.renderer.default.animator.play(.none, .{});
-                            }
-                        } else {
-                            ai.ticks_in_state = 0;
-                            continue :state .pursue;
+                const target = blk: {
+                    if (ai.target) |t_id| {
+                        if (room.getThingById(t_id)) |t| {
+                            break :blk t;
                         }
-                    } else {
-                        lost_target = true;
                     }
-                } else {
-                    lost_target = true;
-                }
-                if (lost_target) {
                     ai.target = null;
                     ai.ticks_in_state = 0;
                     continue :state .idle;
+                };
+                const dist = target.pos.dist(self.pos);
+                const range = @max(dist - self.coll_radius - target.coll_radius, 0);
+                if (range < ai.attack_range) {
+                    self.updateVel(.{}, .{});
+                    if (dist > 0.001) {
+                        self.dir = target.pos.sub(self.pos).normalized();
+                    }
+                    if (self.renderer.default.animator.play(.attack, .{ .loop = true })) {
+                        //std.debug.print("hit targetu\n", .{});
+                        _ = self.renderer.default.animator.play(.none, .{});
+                    }
+                } else {
+                    ai.ticks_in_state = 0;
+                    continue :state .pursue;
                 }
                 break :state .melee_attack;
             },
