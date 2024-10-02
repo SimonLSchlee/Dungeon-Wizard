@@ -80,8 +80,54 @@ renderer: union(enum) {
 path: std.BoundedArray(V2f, 32) = .{},
 
 pub const DebugCircleRenderer = struct {
+    pub const DebugAnimator = struct {
+        pub const DebugAnimPlayParams = struct {
+            from: ?i32 = null, // null == continue from last frame, or 0 if new anim
+            loop: bool = false,
+        };
+
+        pub const DebugAnimKind = enum {
+            none,
+            attack,
+        };
+        pub const DebugAnim = struct {
+            num_frames: i32 = 1,
+        };
+        curr: DebugAnimKind = .none,
+        tick: i64 = 0,
+        anims: std.EnumMap(DebugAnimKind, DebugAnim) = std.EnumMap(DebugAnimKind, DebugAnim).init(.{ .none = .{} }),
+
+        pub fn play(self: *DebugAnimator, anim_kind: DebugAnimKind, params: DebugAnimPlayParams) bool {
+            const anim = if (self.anims.get(anim_kind)) |a| a else {
+                std.debug.print("WARNING: tried to play non-existent debug anim: {any}\n", .{anim_kind});
+                return false;
+            };
+
+            if (params.from) |f| {
+                self.tick = f;
+            } else if (anim_kind != self.curr) {
+                self.tick = 0;
+            }
+            self.curr = anim_kind;
+            // stopped anim
+            if (self.tick >= anim.num_frames) {
+                return true;
+            }
+
+            self.tick += 1;
+            if (self.tick >= anim.num_frames) {
+                if (params.loop) {
+                    self.tick = 0;
+                }
+                return true;
+            }
+            return false;
+        }
+    };
+
     draw_radius: f32 = 20,
     draw_color: Colorf = Colorf.red,
+    animator: DebugAnimator = .{},
 
     pub fn render(self: *const Thing, room: *const Room) Error!void {
         assert(self.spawn_state == .spawned);
@@ -90,6 +136,14 @@ pub const DebugCircleRenderer = struct {
 
         plat.circlef(self.pos, renderer.draw_radius, .{ .fill_color = renderer.draw_color });
         plat.arrowf(self.pos, self.pos.add(self.dir.scale(renderer.draw_radius)), 5, Colorf.black);
+
+        const animator = renderer.animator;
+        switch (animator.curr) {
+            .none => {},
+            .attack => {
+                plat.circlef(self.pos.add(self.dir.scale(renderer.draw_radius)), 5, .{ .fill_color = Colorf.red });
+            },
+        }
 
         if (debug.show_thing_collisions) {
             if (self.dbg.last_coll.collided) {
