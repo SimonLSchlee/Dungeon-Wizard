@@ -362,13 +362,10 @@ pub fn findPathThetaStar(self: *const TileMap, allocator: std.mem.Allocator, sta
     };
     const start_coord = posToTileCoord(start);
     const goal_coord = posToTileCoord(goal);
-    // simple fallback for impassible destination - draw a straight line to goal
+
     if (self.tiles.get(goal_coord)) |goal_tile| {
         if (!goal_tile.passable) {
-            var ret = std.BoundedArray(V2f, 32){};
-            ret.append(start) catch unreachable;
-            ret.append(goal) catch unreachable;
-            return ret;
+            return .{};
         }
     }
     var path_arr = std.ArrayList(V2f).init(allocator);
@@ -396,6 +393,7 @@ pub fn findPathThetaStar(self: *const TileMap, allocator: std.mem.Allocator, sta
     while (queue.items.len > 0) {
         const curr = queue.remove();
         const curr_seen = seen.getPtr(curr.p).?;
+        if (curr_seen.visited) continue;
         curr_seen.visited = true;
         try coords_searched.append(curr.p);
 
@@ -449,6 +447,7 @@ pub fn findPathThetaStar(self: *const TileMap, allocator: std.mem.Allocator, sta
                 if (next.g < entry.value_ptr.best_g) {
                     entry.value_ptr.best_g = next.g;
                     entry.value_ptr.prev = prev;
+                    try queue.add(next);
                 }
             } else {
                 entry.value_ptr.* = .{
@@ -456,9 +455,8 @@ pub fn findPathThetaStar(self: *const TileMap, allocator: std.mem.Allocator, sta
                     .prev = prev,
                     .best_g = next.g,
                 };
+                try queue.add(next);
             }
-
-            try queue.add(next);
         }
     }
     // backtrack to get path

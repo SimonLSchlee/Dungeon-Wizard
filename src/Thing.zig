@@ -447,6 +447,10 @@ pub fn moveAndCollide(self: *Thing, room: *Room) Error!void {
 
 pub fn findPath(self: *Thing, room: *Room, goal: V2f) Error!void {
     self.path = try room.tilemap.findPathThetaStar(getPlat().heap, self.pos, goal, self.coll_radius, &self.dbg.coords_searched);
+    if (self.path.len == 0) {
+        self.path.append(self.pos) catch unreachable;
+        self.path.append(goal) catch unreachable;
+    }
 }
 
 pub const DirAccelParams = struct {
