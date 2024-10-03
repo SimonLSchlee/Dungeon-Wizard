@@ -63,7 +63,35 @@ pub fn init() Error!*Data {
     return data;
 }
 
+pub fn loadSprites(_: *Data) Error!void {
+    const plat = App.getPlat();
+    var creature = std.fs.cwd().openDir("assets/images/creature", .{ .iterate = true }) catch return Error.FileSystemFail;
+    defer creature.close();
+    var walker = try creature.walk(plat.heap);
+    defer walker.deinit();
+    while (walker.next() catch return Error.FileSystemFail) |w| {
+        if (std.mem.endsWith(u8, w.basename, ".json")) {
+            var f = creature.openFile(w.basename, .{}) catch return Error.FileSystemFail;
+            const s = f.readToEndAlloc(plat.heap, 8 * 1024 * 1024) catch return Error.FileSystemFail;
+            //std.debug.print("{s}\n", .{s});
+            var scanner = std.json.Scanner.initCompleteInput(plat.heap, s);
+            const tree = std.json.Value.jsonParse(plat.heap, &scanner, .{ .max_value_len = s.len }) catch return Error.ParseFail;
+            // TODO I guess tree just leaks rn? use arena?
+            const frames = tree.object.get("frames").?.array;
+            const meta = tree.object.get("meta").?.object;
+            for (frames.items) |v| {
+                v.dump();
+            }
+            meta.get("image").?.dump();
+            meta.get("frameTags").?.dump();
+            //const image_filename = meta.get("image").?.string;
+            //const
+        }
+    }
+}
+
 pub fn reload(self: *Data) Error!void {
+    loadSprites(self) catch std.debug.print("WARNING: failed to load all sprites\n", .{});
     self.levels = &test_levels;
     self.things = @TypeOf(self.things).init(
         .{
