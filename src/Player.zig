@@ -91,6 +91,7 @@ pub const InputController = struct {
                         movement.ticks_in_state = 0;
                         continue :move_state .walk;
                     }
+                    _ = self.animator.creature.play(.idle, .{ .loop = true });
                     break :move_state .none;
                 },
                 .walk => {
@@ -98,6 +99,7 @@ pub const InputController = struct {
                         movement.ticks_in_state = 0;
                         continue :move_state .none;
                     }
+                    _ = self.animator.creature.play(.move, .{ .loop = true });
                     break :move_state .walk;
                 },
             };

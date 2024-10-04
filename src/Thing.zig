@@ -100,7 +100,7 @@ pub const CreatureRenderer = struct {
         plat.arrowf(arrow_start, arrow_end, 5, renderer.draw_color);
 
         const animator = self.animator.creature;
-        const frame = animator.getCurrFrame(self.dir);
+        const frame = animator.getCurrRenderFrame(self.dir);
         const opt = draw.TextureOpt{
             .origin = .center,
             .src_pos = frame.pos.toV2f(),

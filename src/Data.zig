@@ -138,6 +138,9 @@ pub fn loadSpriteSheets(self: *Data) Error!void {
                 });
             }
             sheet.frames = try sheet_frames.toOwnedSlice();
+            //for (sheet.frames) |f| {
+            //    std.debug.print("{any}\n", .{f});
+            //}
             //try self.sprite_sheets.put(sheet_name, sheet);
             var it_dash = std.mem.tokenizeScalar(u8, sheet_name, '-');
             const creature_name = it_dash.next().?;
@@ -148,7 +151,7 @@ pub fn loadSpriteSheets(self: *Data) Error!void {
             const anim = sprites.CreatureAnim{
                 .creature_kind = creature_kind,
                 .anim_kind = anim_kind,
-                .num_frames = sheet.tags[0].to_frame - sheet.tags[0].from_frame,
+                .num_frames = sheet.tags[0].to_frame - sheet.tags[0].from_frame + 1,
                 .num_dirs = u.as(u8, sheet.tags.len), // TODO
             };
             self.creature_anims.getPtr(creature_kind).getPtr(anim_kind).* = anim;

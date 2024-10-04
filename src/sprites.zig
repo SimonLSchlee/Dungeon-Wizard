@@ -130,21 +130,22 @@ pub const CreatureAnimKindSet = std.EnumSet(CreatureAnim.AnimKind);
 
 pub const CreatureAnimator = struct {
     pub const PlayParams = struct {
-        from: ?i32 = null, // null == continue from last frame, or 0 if new anim
+        reset: bool = false, // always true if new anim played
         loop: bool = false,
     };
 
     creature_kind: CreatureAnim.Kind = .wizard,
     curr_anim: CreatureAnim.AnimKind = .idle,
     curr_anim_frame: i32 = 0,
-    curr_tick: i32 = 0,
+    tick_in_frame: i32 = 0,
+    anim_tick: i32 = 0,
 
-    pub fn getCurrFrame(self: *const CreatureAnimator, dir: V2f) CreatureAnim.RenderFrame {
+    pub fn getCurrRenderFrame(self: *const CreatureAnimator, dir: V2f) CreatureAnim.RenderFrame {
         const sprite_sheet = App.get().data.creature_sprite_sheets.get(self.creature_kind).get(self.curr_anim).?;
         const anim = App.get().data.creature_anims.get(self.creature_kind).get(self.curr_anim).?;
         const num_dirs_f = utl.as(f32, anim.num_dirs);
         const angle_inc = utl.tau / num_dirs_f;
-        const shifted_dir = dir.rotRadians(-angle_inc * 0.5);
+        const shifted_dir = dir.rotRadians(angle_inc * 0.5);
         const shifted_angle = shifted_dir.toAngleRadians();
         const a = utl.normalizeRadians0_Tau(shifted_angle);
         assert(a >= 0 and a <= utl.tau);
@@ -164,31 +165,44 @@ pub const CreatureAnimator = struct {
         return rframe;
     }
 
-    pub fn play(self: *CreatureAnimator, kind: CreatureAnim.Kind, params: PlayParams) std.EnumSet(CreatureAnim.Event) {
-        const anim = if (self.anims.get(kind)) |a| a else {
-            std.debug.dumpCurrentStackTrace(null);
-            std.debug.print("{s}: WARNING: tried to play non-existent anim: {any}\n", .{ @src().file, kind });
-            return false;
+    pub fn play(self: *CreatureAnimator, anim_kind: CreatureAnim.AnimKind, params: PlayParams) std.EnumSet(CreatureAnim.Event.Kind) {
+        var ret = std.EnumSet(CreatureAnim.Event.Kind).initEmpty();
+        const anim = if (App.get().data.creature_anims.get(self.creature_kind).get(anim_kind)) |a| a else {
+            std.debug.print("{s}: WARNING: tried to play non-existent anim: {any}\n", .{ @src().file, anim_kind });
+            return ret;
         };
 
-        if (params.from) |f| {
-            self.tick = f;
-        } else if (kind != self.curr) {
-            self.tick = 0;
+        if (params.reset or self.curr_anim != anim_kind) {
+            self.anim_tick = 0;
+            self.tick_in_frame = 0;
+            self.curr_anim_frame = 0;
         }
-        self.curr = kind;
-        // stopped anim
-        if (self.tick >= anim.num_frames) {
-            return true;
+        self.curr_anim = anim_kind;
+
+        const sprite_sheet = App.get().data.creature_sprite_sheets.get(self.creature_kind).get(self.curr_anim).?;
+        // NOTE: We assume all the dirs of the anim are the same durations in each frame; not a big deal probably(!)
+        const ssframe: SpriteSheet.Frame = sprite_sheet.frames[utl.as(usize, self.curr_anim_frame)];
+        const frame_ticks_f = utl.as(f32, ssframe.duration_ms) * 0.06; // TODO! 60 fps means 1 / 16.66ms == 0.06
+        const frame_ticks = utl.as(i32, frame_ticks_f);
+
+        if (self.tick_in_frame >= frame_ticks) {
+            // end of anim: last tick of frame, and on last frame
+            if (self.curr_anim_frame >= anim.num_frames - 1) {
+                if (params.loop) {
+                    self.anim_tick = 0;
+                    self.tick_in_frame = 0;
+                    self.curr_anim_frame = 0;
+                }
+                ret.insert(.end);
+                return ret;
+            }
+            self.curr_anim_frame += 1;
+            self.tick_in_frame = 0;
         }
 
-        self.tick += 1;
-        if (self.tick >= anim.num_frames) {
-            if (params.loop) {
-                self.tick = 0;
-            }
-            return true;
-        }
-        return false;
+        // TODO self.anim_tick is useless?
+        self.anim_tick += 1;
+        self.tick_in_frame += 1;
+        return ret;
     }
 };
