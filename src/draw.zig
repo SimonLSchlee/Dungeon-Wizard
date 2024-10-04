@@ -154,15 +154,16 @@ pub const PolyOpt = struct {
     outline_color: ?Colorf = null,
 };
 
+pub const TextureOrigin = union(enum) {
+    topleft,
+    center,
+    offset: V2f,
+};
 pub const TextureOpt = struct {
     tint: Colorf = Colorf.white,
     smoothing: Smoothing = .none,
     // draw, rotate, scale with origin at center (bit weird for offset)
-    origin: union(enum) {
-        topleft,
-        center,
-        offset: V2f,
-    } = .topleft,
+    origin: TextureOrigin = .topleft,
     // cut rect out of source image
     src_pos: ?V2f = null,
     src_dims: ?V2f = null,

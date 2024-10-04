@@ -465,7 +465,7 @@ pub fn texturef(_: *Platform, pos: V2f, tex: Texture2D, opt: draw.TextureOpt) vo
     const origin = switch (opt.origin) {
         .topleft => V2f{},
         .center => v2f(dest.width, dest.height).scale(0.5),
-        .offset => |o| o,
+        .offset => |o| o.scale(opt.uniform_scaling),
     };
     const r_filter = switch (opt.smoothing) {
         .none => r.TEXTURE_FILTER_POINT,

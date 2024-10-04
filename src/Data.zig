@@ -107,8 +107,10 @@ pub fn loadSpriteSheets(self: *Data) Error!void {
 
             const frames = tree.object.get("frames").?.array;
             const tags = meta.get("frameTags").?.array;
+            const _layers = meta.get("layers");
             var sheet_frames = try std.ArrayList(SpriteSheet.Frame).initCapacity(plat.heap, frames.items.len);
             var sheet_tags = try std.ArrayList(SpriteSheet.Tag).initCapacity(plat.heap, tags.items.len);
+            var sheet_meta = try std.ArrayList(SpriteSheet.Meta).initCapacity(plat.heap, tags.items.len);
 
             for (tags.items) |t| {
                 const name = t.object.get("name").?.string;
@@ -138,22 +140,66 @@ pub fn loadSpriteSheets(self: *Data) Error!void {
                 });
             }
             sheet.frames = try sheet_frames.toOwnedSlice();
-            //for (sheet.frames) |f| {
-            //    std.debug.print("{any}\n", .{f});
-            //}
-            //try self.sprite_sheets.put(sheet_name, sheet);
+
+            if (_layers) |layers| {
+                for (layers.array.items) |layer| {
+                    if (layer.object.get("cels")) |cels| {
+                        for (cels.array.items) |cel| {
+                            if (cel.object.get("data")) |data| {
+                                var it_data = std.mem.tokenizeScalar(u8, data.string, ',');
+                                while (it_data.next()) |item| {
+                                    var it_eq = std.mem.tokenizeScalar(u8, item, '=');
+                                    const key = it_eq.next().?;
+                                    const val = it_eq.next().?;
+                                    var m = SpriteSheet.Meta{};
+                                    m.name = try @TypeOf(m.name).init(key);
+                                    blk: {
+                                        int_blk: {
+                                            const int = std.fmt.parseInt(i64, val, 0) catch break :int_blk;
+                                            m.data.int = int;
+                                            break :blk;
+                                        }
+                                        float_blk: {
+                                            const float = std.fmt.parseFloat(f32, val) catch break :float_blk;
+                                            m.data.float = float;
+                                            break :blk;
+                                        }
+                                        m.data.string = try @TypeOf(m.data.string).init(val);
+                                    }
+                                    try sheet_meta.append(m);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            sheet.meta = try sheet_meta.toOwnedSlice();
+
             var it_dash = std.mem.tokenizeScalar(u8, sheet_name, '-');
             const creature_name = it_dash.next().?;
             const creature_kind = std.meta.stringToEnum(sprites.CreatureAnim.Kind, creature_name).?;
             const anim_name = it_dash.next().?;
             const anim_kind = std.meta.stringToEnum(sprites.CreatureAnim.AnimKind, anim_name).?;
             self.creature_sprite_sheets.getPtr(creature_kind).getPtr(anim_kind).* = sheet;
-            const anim = sprites.CreatureAnim{
+
+            // sprite sheet to creature anim
+            var anim = sprites.CreatureAnim{
                 .creature_kind = creature_kind,
                 .anim_kind = anim_kind,
                 .num_frames = sheet.tags[0].to_frame - sheet.tags[0].from_frame + 1,
                 .num_dirs = u.as(u8, sheet.tags.len), // TODO
             };
+            for (sheet.meta) |m| {
+                if (std.mem.eql(u8, m.name.constSlice(), "pivot-y")) {
+                    const y = switch (m.data) {
+                        .int => |i| u.as(f32, i),
+                        .float => |f| f,
+                        .string => return Error.ParseFail,
+                    };
+                    const x = u.as(f32, sheet.frames[0].size.x) * 0.5;
+                    anim.origin = .{ .offset = v2f(x, y) };
+                }
+            }
             self.creature_anims.getPtr(creature_kind).getPtr(anim_kind).* = anim;
         }
     }

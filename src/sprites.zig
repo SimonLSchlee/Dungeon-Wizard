@@ -36,7 +36,7 @@ pub fn BoundedString(max_len: usize) type {
         pub fn slice(self: *@This()) []u8 {
             return self.buf[0..self.len];
         }
-        pub fn constSlice(self: *@This()) []const u8 {
+        pub fn constSlice(self: *const @This()) []const u8 {
             return self.buf[0..self.len];
         }
     };
@@ -74,11 +74,20 @@ pub const SpriteSheet = struct {
         from_frame: i32,
         to_frame: i32,
     };
+    pub const Meta = struct {
+        name: BoundedString(16) = .{},
+        data: union(enum) {
+            int: i64,
+            float: f32,
+            string: BoundedString(16),
+        } = undefined,
+    };
 
     file_name: BoundedString(64) = .{},
     texture: Platform.Texture2D = undefined,
     frames: []Frame = &.{},
     tags: []Tag = &.{},
+    meta: []Meta = &.{},
 };
 
 pub const CreatureAnim = struct {
@@ -106,6 +115,7 @@ pub const CreatureAnim = struct {
         pos: V2i,
         size: V2i,
         texture: Platform.Texture2D,
+        origin: draw.TextureOrigin,
     };
 
     pub const kind_strings: EnumToBoundedStringArrayType(Kind) = enumToBoundedStringArray(Kind);
@@ -124,6 +134,7 @@ pub const CreatureAnim = struct {
     // 4 = right/down/left/up
     // 8 = ...etc
     num_dirs: u8 = 1,
+    origin: draw.TextureOrigin = .center,
 };
 
 pub const CreatureAnimKindSet = std.EnumSet(CreatureAnim.AnimKind);
@@ -160,6 +171,7 @@ pub const CreatureAnimator = struct {
             .pos = ssframe.pos,
             .size = ssframe.size,
             .texture = sprite_sheet.texture,
+            .origin = anim.origin,
         };
 
         return rframe;
