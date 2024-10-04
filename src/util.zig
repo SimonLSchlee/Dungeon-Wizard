@@ -1,8 +1,8 @@
 const std = @import("std");
 const Self = @This();
 
-pub const pi = std.math.pi;
-pub const tau = 2 * std.math.pi;
+pub const pi: f32 = std.math.pi;
+pub const tau: f32 = 2 * std.math.pi;
 
 pub inline fn swap(T: type, a: *T, b: *T) void {
     const tmp = a.*;
@@ -28,13 +28,13 @@ pub fn radiansToDegrees(radians: f32) f32 {
     return sign * abs_ret;
 }
 
-// normalize to 0 - 2pi
+// normalize radians to range [0, tau]
 pub fn normalizeRadians0_Tau(radians: f32) f32 {
     const sign = std.math.sign(radians);
     const abs = @abs(radians);
     const abs_mod = @mod(abs, tau);
     if (sign == -1) {
-        return abs_mod.add(tau);
+        return -abs_mod + tau;
     }
     return abs_mod;
 }

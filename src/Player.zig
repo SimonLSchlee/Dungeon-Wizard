@@ -32,9 +32,12 @@ pub fn protoype() Error!Thing {
         .coll_mask = Thing.CollMask.initMany(&.{ .creature, .tile }),
         .coll_layer = Thing.CollMask.initMany(&.{.creature}),
         .controller = .{ .player = .{} },
-        .renderer = .{ .default = .{
+        .renderer = .{ .creature = .{
             .draw_color = .cyan,
             .draw_radius = 20,
+        } },
+        .animator = .{ .creature = .{
+            .creature_kind = .wizard,
         } },
     };
     try ret.init();

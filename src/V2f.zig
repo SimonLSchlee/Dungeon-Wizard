@@ -126,7 +126,7 @@ pub fn cross(self: Self, other: Self) f32 {
 }
 
 pub fn toAngleRadians(self: Self) f32 {
-    return std.math.atan2(self.x, -self.y);
+    return std.math.atan2(self.y, self.x);
 }
 
 pub fn rot90CW(self: Self) Self {

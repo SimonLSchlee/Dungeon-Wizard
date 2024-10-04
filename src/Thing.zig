@@ -22,6 +22,7 @@ const Room = @import("Room.zig");
 const TileMap = @import("TileMap.zig");
 const data = @import("data.zig");
 const pool = @import("pool.zig");
+const sprites = @import("sprites.zig");
 
 const player = @import("Player.zig");
 const enemies = @import("enemies.zig");
@@ -76,8 +77,39 @@ controller: union(enum) {
 renderer: union(enum) {
     none: void,
     default: DebugCircleRenderer,
+    creature: CreatureRenderer,
 } = .{ .default = .{} },
+animator: union(enum) {
+    none: void,
+    creature: sprites.CreatureAnimator,
+} = .none,
 path: std.BoundedArray(V2f, 32) = .{},
+
+pub const CreatureRenderer = struct {
+    draw_radius: f32 = 20,
+    draw_color: Colorf = Colorf.red,
+
+    pub fn render(self: *const Thing, _: *const Room) Error!void {
+        assert(self.spawn_state == .spawned);
+        const plat = getPlat();
+        const renderer = &self.renderer.creature;
+
+        plat.circlef(self.pos, renderer.draw_radius, .{ .fill_color = null, .outline_color = renderer.draw_color });
+        const arrow_start = self.pos.add(self.dir.scale(renderer.draw_radius));
+        const arrow_end = self.pos.add(self.dir.scale(renderer.draw_radius + 5));
+        plat.arrowf(arrow_start, arrow_end, 5, renderer.draw_color);
+
+        const animator = self.animator.creature;
+        const frame = animator.getCurrFrame(self.dir);
+        const opt = draw.TextureOpt{
+            .origin = .center,
+            .src_pos = frame.pos.toV2f(),
+            .src_dims = frame.size.toV2f(),
+            .uniform_scaling = 4,
+        };
+        plat.texturef(self.pos, frame.texture, opt);
+    }
+};
 
 pub const DebugCircleRenderer = struct {
     pub const DebugAnimator = struct {

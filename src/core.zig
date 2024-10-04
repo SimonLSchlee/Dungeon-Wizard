@@ -11,6 +11,8 @@ pub const Error = error{
     OutOfRange,
     LookupFail,
     RecompileFail,
+    FileSystemFail,
+    ParseFail,
 };
 
 pub const Key = enum(u32) {
