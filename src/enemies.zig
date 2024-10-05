@@ -199,6 +199,10 @@ pub fn troll() Error!Thing {
             .rel_pos = V2f.right.scale(60),
             .damage = 5,
         },
+        .hurtbox = .{
+            .layers = Thing.HurtBox.Mask.initOne(.enemy),
+            .radius = 15,
+        },
         .hp = Thing.HP.init(50),
         .faction = .enemy,
     };

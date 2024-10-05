@@ -50,29 +50,45 @@ pub fn render(self: *const Thing, room: *const Room) Error!void {
 pub const Projectile = struct {
     pub const controller_enum_name = enum_name ++ "_projectile";
 
+    target_pos: V2f = .{},
+    target_radius: f32 = 10,
+
     pub fn update(self: *Thing, room: *Room) Error!void {
-        const spell = self.controller.spell.spell;
-        const params = self.controller.spell.params;
+        const spell_controller = &self.controller.spell;
+        const spell = spell_controller.spell;
+        const unherring = spell.kind.unherring;
+        const params = spell_controller.params;
+        const projectile = &spell_controller.controller.unherring_projectile;
         const target_id = params.target.thing;
-        const damage = spell.kind.unherring.damage;
+        const _target = room.getThingById(target_id);
         var done = false;
-        if (room.getThingById(target_id)) |target| {
-            const v = target.pos.sub(self.pos);
-            if (v.length() < self.coll_radius + target.coll_radius) {
-                // hit em
-                // explode?
-                std.debug.print("{} damageu!\n", .{damage});
-                done = true;
-            } else {
-                self.updateVel(v.normalized(), self.accel_params);
-                self.updateDir(self.vel, .{ .ang_accel = 999, .max_ang_vel = 999 });
-                try self.moveAndCollide(room);
+
+        if (_target) |target| {
+            projectile.target_pos = target.pos;
+            projectile.target_radius = target.coll_radius;
+            if (target.hurtbox) |*hurtbox| {
+                projectile.target_pos = target.pos.add(hurtbox.rel_pos);
+                projectile.target_radius = hurtbox.radius;
             }
-        } else {
-            done = true;
         }
+
+        const v = projectile.target_pos.sub(self.pos);
+        if (v.length() < self.coll_radius + projectile.target_radius) {
+            done = true;
+            if (_target) |target| {
+                if (target.hurtbox) |*hurtbox| {
+                    hurtbox.hit(target, room, unherring.damage);
+                }
+            }
+        }
+
         if (done) {
+            // explode/vfx?
             self.deferFree(room);
+        } else {
+            self.updateVel(v.normalized(), self.accel_params);
+            self.updateDir(self.vel, .{ .ang_accel = 999, .max_ang_vel = 999 });
+            try self.moveAndCollide(room);
         }
     }
 };
@@ -80,6 +96,13 @@ pub const Projectile = struct {
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
     assert(std.meta.activeTag(params.target) == Spell.TargetKind.thing);
     assert(utl.unionTagEql(params.target, .{ .thing = .{} }));
+
+    const _target = room.getThingById(params.target.thing);
+    if (_target == null) {
+        // fizzle
+        return;
+    }
+    const target = _target.?;
 
     var herring = Thing{
         .kind = .projectile,
@@ -91,7 +114,10 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
         .controller = .{ .spell = .{
             .spell = self.*,
             .params = params,
-            .controller = .{ .unherring_projectile = .{} },
+            .controller = .{ .unherring_projectile = .{
+                .target_pos = target.pos,
+                .target_radius = target.coll_radius,
+            } },
         } },
         .renderer = .{ .default = .{
             .draw_color = .white,
