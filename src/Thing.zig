@@ -183,7 +183,7 @@ pub const CreatureRenderer = struct {
     draw_radius: f32 = 20,
     draw_color: Colorf = Colorf.red,
 
-    pub fn render(self: *const Thing, room: *const Room) Error!void {
+    pub fn renderUnder(self: *const Thing, _: *const Room) Error!void {
         assert(self.spawn_state == .spawned);
         const plat = getPlat();
         const renderer = &self.renderer.creature;
@@ -192,6 +192,11 @@ pub const CreatureRenderer = struct {
         const arrow_start = self.pos.add(self.dir.scale(renderer.draw_radius));
         const arrow_end = self.pos.add(self.dir.scale(renderer.draw_radius + 5));
         plat.arrowf(arrow_start, arrow_end, 5, renderer.draw_color);
+    }
+
+    pub fn render(self: *const Thing, _: *const Room) Error!void {
+        assert(self.spawn_state == .spawned);
+        const plat = getPlat();
 
         const animator = self.animator.creature;
         const frame = animator.getCurrRenderFrame(self.dir);
@@ -202,6 +207,12 @@ pub const CreatureRenderer = struct {
             .uniform_scaling = 4,
         };
         plat.texturef(self.pos, frame.texture, opt);
+    }
+
+    pub fn renderOver(self: *const Thing, room: *const Room) Error!void {
+        assert(self.spawn_state == .spawned);
+        const plat = getPlat();
+        const renderer = &self.renderer.creature;
 
         if (debug.show_hitboxes) {
             if (self.hitbox) |hitbox| {
@@ -333,12 +344,34 @@ pub fn update(self: *Thing, room: *Room) Error!void {
     }
 }
 
+pub fn renderUnder(self: *const Thing, room: *const Room) Error!void {
+    switch (self.renderer) {
+        inline else => |r| {
+            const R = @TypeOf(r);
+            if (std.meta.hasMethod(R, "renderUnder")) {
+                try R.renderUnder(self, room);
+            }
+        },
+    }
+}
+
 pub fn render(self: *const Thing, room: *const Room) Error!void {
     switch (self.renderer) {
         inline else => |r| {
             const R = @TypeOf(r);
             if (std.meta.hasMethod(R, "render")) {
                 try R.render(self, room);
+            }
+        },
+    }
+}
+
+pub fn renderOver(self: *const Thing, room: *const Room) Error!void {
+    switch (self.renderer) {
+        inline else => |r| {
+            const R = @TypeOf(r);
+            if (std.meta.hasMethod(R, "renderOver")) {
+                try R.renderOver(self, room);
             }
         },
     }

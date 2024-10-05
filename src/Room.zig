@@ -308,7 +308,13 @@ pub fn render(self: *const Room) Error!void {
         };
         std.sort.pdq(*const Thing, thing_arr.slice(), {}, SortStruct.lessThan);
         for (thing_arr.constSlice()) |thing| {
+            try thing.renderUnder(self);
+        }
+        for (thing_arr.constSlice()) |thing| {
             try thing.render(self);
+        }
+        for (thing_arr.constSlice()) |thing| {
+            try thing.renderOver(self);
         }
     }
 
