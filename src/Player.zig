@@ -43,6 +43,8 @@ pub fn protoype() Error!Thing {
             .layers = Thing.HurtBox.Mask.initOne(.player),
             .radius = 15,
         },
+        .hp = Thing.HP.init(50),
+        .faction = .player,
     };
     try ret.init();
     return ret;

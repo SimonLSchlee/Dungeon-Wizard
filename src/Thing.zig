@@ -89,10 +89,32 @@ path: std.BoundedArray(V2f, 32) = .{},
 hitbox: ?HitBox = null,
 hurtbox: ?HurtBox = null,
 hp: ?HP = null,
+faction: Faction = .neutral,
+
+pub const Faction = enum {
+    neutral,
+    player,
+    ally,
+    enemy,
+};
 
 pub const HP = struct {
     curr: f32 = 10,
     max: f32 = 10,
+
+    pub const faction_colors = std.EnumArray(Faction, Colorf).init(.{
+        .neutral = Colorf.gray,
+        .player = Colorf.green,
+        .ally = Colorf.blue,
+        .enemy = Colorf.red,
+    });
+
+    pub fn init(max: f32) HP {
+        return .{
+            .curr = max,
+            .max = max,
+        };
+    }
 };
 
 pub const HitBox = struct {
@@ -102,6 +124,7 @@ pub const HitBox = struct {
     active: bool = false,
     deactivate_on_update: bool = true,
     deactivate_on_hit: bool = true,
+    damage: f32 = 1,
 
     pub fn update(_: *HitBox, self: *Thing, room: *Room) void {
         const hitbox = &self.hitbox.?;
@@ -121,7 +144,7 @@ pub const HitBox = struct {
             const dist = pos.dist(hurtbox_pos);
             if (dist > hitbox.radius + hurtbox.radius) continue;
             // hit!
-            hurtbox.hit(thing, room);
+            hurtbox.hit(thing, room, hitbox.damage);
             //std.debug.print("{any}: I hit {any}\n", .{ self.kind, thing.kind });
             if (hitbox.deactivate_on_hit) {
                 hitbox.active = false;
@@ -145,11 +168,13 @@ pub const HurtBox = struct {
     radius: f32 = 0,
     layers: HurtBox.Mask = HurtBox.Mask.initEmpty(),
 
-    pub fn hit(_: *HurtBox, self: *Thing, room: *Room) void {
-        const hurtbox = &self.hurtbox.?;
+    pub fn hit(_: *HurtBox, self: *Thing, room: *Room, damage: f32) void {
+        //const hurtbox = &self.hurtbox.?;
         // for debug vis
         self.dbg.last_tick_hurtbox_was_hit = room.curr_tick;
-        _ = hurtbox; // TODOO
+        if (self.hp) |*hp| {
+            hp.curr = utl.clampf(hp.curr - damage, 0, hp.max);
+        }
         //std.debug.print("{any}: I got hit! ouch\n", .{self.kind});
     }
 };
@@ -190,6 +215,15 @@ pub const CreatureRenderer = struct {
                 const color = Colorf.yellow.fade(0.5);
                 plat.circlef(self.pos.add(hurtbox.rel_pos), hurtbox.radius, .{ .fill_color = color });
             }
+        }
+
+        if (self.hp) |hp| {
+            const width = renderer.draw_radius * 2;
+            const height = 5;
+            const curr_width = utl.remapClampf(0, hp.max, 0, width, hp.curr);
+            const offset = v2f(-width * 0.5, -renderer.draw_radius * 3.5);
+            plat.rectf(self.pos.add(offset), v2f(width, height), .{ .fill_color = Colorf.black });
+            plat.rectf(self.pos.add(offset), v2f(curr_width, height), .{ .fill_color = HP.faction_colors.get(self.faction) });
         }
     }
 };

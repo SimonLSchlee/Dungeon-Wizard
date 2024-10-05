@@ -197,7 +197,10 @@ pub fn troll() Error!Thing {
             .mask = Thing.HurtBox.Mask.init(.{ .player = true, .player_ally = true }),
             .radius = 15,
             .rel_pos = V2f.right.scale(60),
+            .damage = 5,
         },
+        .hp = Thing.HP.init(50),
+        .faction = .enemy,
     };
     try ret.init();
     return ret;
