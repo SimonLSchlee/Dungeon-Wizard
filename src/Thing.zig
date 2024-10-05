@@ -67,6 +67,8 @@ dir_accel_params: DirAccelParams = .{},
 dbg: struct {
     last_coll: ThingCollision = .{},
     coords_searched: std.ArrayList(V2i) = undefined,
+    last_tick_hitbox_was_active: i64 = -10000,
+    last_tick_hurtbox_was_hit: i64 = -10000,
 } = .{},
 controller: union(enum) {
     none: void,
@@ -84,12 +86,79 @@ animator: union(enum) {
     creature: sprites.CreatureAnimator,
 } = .none,
 path: std.BoundedArray(V2f, 32) = .{},
+hitbox: ?HitBox = null,
+hurtbox: ?HurtBox = null,
+hp: ?HP = null,
+
+pub const HP = struct {
+    curr: f32 = 10,
+    max: f32 = 10,
+};
+
+pub const HitBox = struct {
+    rel_pos: V2f = .{},
+    radius: f32 = 0,
+    mask: HurtBox.Mask = HurtBox.Mask.initEmpty(),
+    active: bool = false,
+    deactivate_on_update: bool = true,
+    deactivate_on_hit: bool = true,
+
+    pub fn update(_: *HitBox, self: *Thing, room: *Room) void {
+        const hitbox = &self.hitbox.?;
+        if (!hitbox.active) return;
+        // for debug vis
+        self.dbg.last_tick_hitbox_was_active = room.curr_tick;
+        std.debug.print("hitbox active\n", .{});
+
+        const pos = self.pos.add(hitbox.rel_pos);
+        for (&room.things.items) |*thing| {
+            if (!thing.isActive()) continue;
+
+            if (thing.hurtbox == null) continue;
+            var hurtbox = &thing.hurtbox.?;
+            if (hitbox.mask.intersectWith(hurtbox.layers).count() <= 0) continue;
+            const hurtbox_pos = thing.pos.add(hurtbox.rel_pos);
+            const dist = pos.dist(hurtbox_pos);
+            if (dist > hitbox.radius + hurtbox.radius) continue;
+            // hit!
+            hurtbox.hit(thing, room);
+            //std.debug.print("{any}: I hit {any}\n", .{ self.kind, thing.kind });
+            if (hitbox.deactivate_on_hit) {
+                hitbox.active = false;
+                break;
+            }
+        }
+        if (hitbox.deactivate_on_update) {
+            hitbox.active = false;
+        }
+    }
+};
+
+pub const HurtBox = struct {
+    pub const Kind = enum {
+        player,
+        player_ally,
+        enemy,
+    };
+    pub const Mask = std.EnumSet(HurtBox.Kind);
+    rel_pos: V2f = .{},
+    radius: f32 = 0,
+    layers: HurtBox.Mask = HurtBox.Mask.initEmpty(),
+
+    pub fn hit(_: *HurtBox, self: *Thing, room: *Room) void {
+        const hurtbox = &self.hurtbox.?;
+        // for debug vis
+        self.dbg.last_tick_hurtbox_was_hit = room.curr_tick;
+        _ = hurtbox; // TODOO
+        //std.debug.print("{any}: I got hit! ouch\n", .{self.kind});
+    }
+};
 
 pub const CreatureRenderer = struct {
     draw_radius: f32 = 20,
     draw_color: Colorf = Colorf.red,
 
-    pub fn render(self: *const Thing, _: *const Room) Error!void {
+    pub fn render(self: *const Thing, room: *const Room) Error!void {
         assert(self.spawn_state == .spawned);
         const plat = getPlat();
         const renderer = &self.renderer.creature;
@@ -108,6 +177,20 @@ pub const CreatureRenderer = struct {
             .uniform_scaling = 4,
         };
         plat.texturef(self.pos, frame.texture, opt);
+
+        if (debug.show_hitboxes) {
+            if (self.hitbox) |hitbox| {
+                const ticks_since = room.curr_tick - self.dbg.last_tick_hitbox_was_active;
+                if (ticks_since < 120) {
+                    const color = Colorf.red.fade(utl.remapClampf(0, 120, 0.5, 0, utl.as(f32, ticks_since)));
+                    plat.circlef(self.pos.add(hitbox.rel_pos), hitbox.radius, .{ .fill_color = color });
+                }
+            }
+            if (self.hurtbox) |hurtbox| {
+                const color = Colorf.yellow.fade(0.5);
+                plat.circlef(self.pos.add(hurtbox.rel_pos), hurtbox.radius, .{ .fill_color = color });
+            }
+        }
     }
 };
 
@@ -210,6 +293,9 @@ pub fn update(self: *Thing, room: *Room) Error!void {
                 try C.update(self, room);
             }
         },
+    }
+    if (self.hitbox) |*hitbox| {
+        hitbox.update(self, room);
     }
 }
 

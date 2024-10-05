@@ -76,6 +76,8 @@ pub const AIController = struct {
         const nearest_target = getNearestTarget(self, room);
         const ai = &self.controller.enemy;
 
+        self.renderer.creature.draw_color = Colorf.yellow;
+
         ai.state = state: switch (ai.state) {
             .idle => {
                 if (nearest_target) |t| {
@@ -132,11 +134,15 @@ pub const AIController = struct {
                     self.updateVel(.{}, .{});
                     const events = self.animator.creature.play(.attack, .{ .loop = true });
                     if (events.contains(.end)) {
-                        std.debug.print("attack end\n", .{});
+                        //std.debug.print("attack end\n", .{});
                         ai.ticks_in_state = 0;
                         continue :state .melee_attack;
                     } else if (events.contains(.hit)) {
-                        std.debug.print("hit targetu\n", .{});
+                        //std.debug.print("hit targetu\n", .{});
+                        self.renderer.creature.draw_color = Colorf.red;
+                        const hitbox = &self.hitbox.?;
+                        hitbox.rel_pos = self.dir.scale(hitbox.rel_pos.length());
+                        hitbox.active = true;
                     }
                 } else {
                     ai.ticks_in_state = 0;
@@ -187,6 +193,11 @@ pub fn troll() Error!Thing {
         .animator = .{ .creature = .{
             .creature_kind = .troll,
         } },
+        .hitbox = .{
+            .mask = Thing.HurtBox.Mask.init(.{ .player = true, .player_ally = true }),
+            .radius = 15,
+            .rel_pos = V2f.right.scale(60),
+        },
     };
     try ret.init();
     return ret;

@@ -261,7 +261,9 @@ pub fn update(self: *Room) Error!void {
     self.free_queue.len = 0;
 
     // TODO might mess up edit modeu
-    self.curr_tick += 1;
+    if (!self.edit_mode) {
+        self.curr_tick += 1;
+    }
 }
 
 pub fn render(self: *const Room) Error!void {

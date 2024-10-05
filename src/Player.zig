@@ -39,6 +39,10 @@ pub fn protoype() Error!Thing {
         .animator = .{ .creature = .{
             .creature_kind = .wizard,
         } },
+        .hurtbox = .{
+            .layers = Thing.HurtBox.Mask.initOne(.player),
+            .radius = 15,
+        },
     };
     try ret.init();
     return ret;
