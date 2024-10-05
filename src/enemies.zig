@@ -83,7 +83,7 @@ pub const AIController = struct {
                     ai.ticks_in_state = 0;
                     continue :state .pursue;
                 }
-                _ = self.renderer.default.animator.play(.none, .{});
+                _ = self.animator.creature.play(.idle, .{ .loop = true });
                 break :state .idle;
             },
             .pursue => {
@@ -103,7 +103,7 @@ pub const AIController = struct {
                     ai.ticks_in_state = 0;
                     continue :state .melee_attack;
                 } else {
-                    _ = self.renderer.default.animator.play(.none, .{});
+                    _ = self.animator.creature.play(.move, .{ .loop = true });
                     try self.findPath(room, target.pos);
                     const p = self.followPathGetNextPoint(10);
                     self.updateVel(p.sub(self.pos).normalizedOrZero(), .{});
@@ -128,10 +128,11 @@ pub const AIController = struct {
                     if (dist > 0.001) {
                         self.dir = target.pos.sub(self.pos).normalized();
                     }
-                    if (self.renderer.default.animator.play(.attack, .{ .loop = true })) {
-                        //std.debug.print("hit targetu\n", .{});
-                        _ = self.renderer.default.animator.play(.none, .{});
-                    }
+                    _ = self.animator.creature.play(.attack, .{ .loop = true });
+                    //if (self.renderer.default.animator.play(.attack, .{ .loop = true })) {
+                    //std.debug.print("hit targetu\n", .{});
+                    //    _ = self.animator.creature.play(.idle, .{ .loop = true });
+                    //}
                 } else {
                     ai.ticks_in_state = 0;
                     continue :state .pursue;
@@ -174,10 +175,12 @@ pub fn troll() Error!Thing {
         .coll_mask = Thing.CollMask.initMany(&.{ .creature, .tile }),
         .coll_layer = Thing.CollMask.initMany(&.{.creature}),
         .controller = .{ .enemy = .{} },
-        .renderer = .{ .default = .{
+        .renderer = .{ .creature = .{
             .draw_color = .yellow,
             .draw_radius = 20,
-            .animator = animator,
+        } },
+        .animator = .{ .creature = .{
+            .creature_kind = .troll,
         } },
     };
     try ret.init();

@@ -116,8 +116,8 @@ pub fn loadSpriteSheets(self: *Data) Error!void {
                 const name = t.object.get("name").?.string;
                 const from = t.object.get("from").?.integer;
                 const to = t.object.get("to").?.integer;
-                assert(from >= 0 and from < frames.items.len);
-                assert(to >= from and to < frames.items.len);
+                assert(from >= 0 and from <= frames.items.len);
+                assert(to >= from and to <= frames.items.len);
                 try sheet_tags.append(.{
                     .name = try @TypeOf(sheet.tags[0].name).init(name),
                     .from_frame = u.as(i32, from),
