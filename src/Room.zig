@@ -283,18 +283,31 @@ pub fn render(self: *const Room) Error!void {
 
     try self.tilemap.debugDraw();
 
-    if (fog_enabled) {
-        if (self.getConstPlayer()) |player| {
-            for (self.things.items) |thing| {
-                if (!thing.isActive()) continue;
-                if (thing.pos.dist(player.pos) <= player.vision_range + player.coll_radius + thing.coll_radius) {
-                    try thing.render(self);
+    {
+        var thing_arr = std.BoundedArray(*const Thing, @TypeOf(self.things).max_len){};
+        const player = self.getConstPlayer();
+        for (&self.things.items) |*thing| {
+            if (!thing.isActive()) continue;
+            if (fog_enabled) {
+                if (player) |p| {
+                    if (thing.pos.dist(p.pos) > p.vision_range + p.coll_radius + thing.coll_radius) {
+                        continue;
+                    }
+                } else {
+                    // no player? cant see anything
+                    continue;
                 }
             }
-        } // no player? cant see anything
-    } else {
-        for (self.things.items) |thing| {
-            if (!thing.isActive()) continue;
+            thing_arr.append(thing) catch unreachable;
+        }
+
+        const SortStruct = struct {
+            pub fn lessThan(_: void, lhs: *const Thing, rhs: *const Thing) bool {
+                return lhs.pos.y < rhs.pos.y;
+            }
+        };
+        std.sort.pdq(*const Thing, thing_arr.slice(), {}, SortStruct.lessThan);
+        for (thing_arr.constSlice()) |thing| {
             try thing.render(self);
         }
     }

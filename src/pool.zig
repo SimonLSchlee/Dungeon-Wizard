@@ -63,6 +63,7 @@ pub fn BoundedPool(MemberType: type, size: usize) type {
 
     return struct {
         const Self = @This();
+        pub const max_len = size;
 
         id: u32 = undefined,
         items: [size]MemberType = undefined,
