@@ -189,8 +189,12 @@ pub fn loadSpriteSheets(self: *Data) Error!void {
                 .num_frames = sheet.tags[0].to_frame - sheet.tags[0].from_frame + 1,
                 .num_dirs = u.as(u8, sheet.tags.len), // TODO
             };
-            for (sheet.meta) |m| {
-                if (std.mem.eql(u8, m.name.constSlice(), "pivot-y")) {
+
+            meta_blk: for (sheet.meta) |m| {
+                const m_name = m.name.constSlice();
+                //std.debug.print("Meta '{s}'\n", .{m_name});
+
+                if (std.mem.eql(u8, m_name, "pivot-y")) {
                     const y = switch (m.data) {
                         .int => |i| u.as(f32, i),
                         .float => |f| f,
@@ -198,6 +202,21 @@ pub fn loadSpriteSheets(self: *Data) Error!void {
                     };
                     const x = u.as(f32, sheet.frames[0].size.x) * 0.5;
                     anim.origin = .{ .offset = v2f(x, y) };
+                    continue;
+                }
+
+                const event_info = @typeInfo(sprites.CreatureAnim.Event.Kind);
+                inline for (event_info.@"enum".fields) |f| {
+                    if (std.mem.eql(u8, m_name, f.name)) {
+                        //std.debug.print("Adding event '{s}' on frame {}\n", .{ f.name, m.data.int });
+                        anim.events.append(.{
+                            .frame = u.as(i32, m.data.int),
+                            .kind = @enumFromInt(f.value),
+                        }) catch {
+                            std.debug.print("Skipped adding anim event \"{s}\"; buffer full\n", .{f.name});
+                        };
+                        continue :meta_blk;
+                    }
                 }
             }
             self.creature_anims.getPtr(creature_kind).getPtr(anim_kind).* = anim;

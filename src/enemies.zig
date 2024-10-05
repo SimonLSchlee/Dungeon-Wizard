@@ -123,16 +123,21 @@ pub const AIController = struct {
                 };
                 const dist = target.pos.dist(self.pos);
                 const range = @max(dist - self.coll_radius - target.coll_radius, 0);
-                if (range < ai.attack_range) {
-                    self.updateVel(.{}, .{});
+                if (ai.ticks_in_state == 0) {
                     if (dist > 0.001) {
                         self.dir = target.pos.sub(self.pos).normalized();
                     }
-                    _ = self.animator.creature.play(.attack, .{ .loop = true });
-                    //if (self.renderer.default.animator.play(.attack, .{ .loop = true })) {
-                    //std.debug.print("hit targetu\n", .{});
-                    //    _ = self.animator.creature.play(.idle, .{ .loop = true });
-                    //}
+                }
+                if (range < ai.attack_range) {
+                    self.updateVel(.{}, .{});
+                    const events = self.animator.creature.play(.attack, .{ .loop = true });
+                    if (events.contains(.end)) {
+                        std.debug.print("attack end\n", .{});
+                        ai.ticks_in_state = 0;
+                        continue :state .melee_attack;
+                    } else if (events.contains(.hit)) {
+                        std.debug.print("hit targetu\n", .{});
+                    }
                 } else {
                     ai.ticks_in_state = 0;
                     continue :state .pursue;

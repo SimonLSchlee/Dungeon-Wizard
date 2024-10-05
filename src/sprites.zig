@@ -105,7 +105,7 @@ pub const CreatureAnim = struct {
     };
     pub const Event = struct {
         pub const Kind = enum {
-            melee_hit,
+            hit,
             end,
         };
         kind: Event.Kind,
@@ -210,6 +210,15 @@ pub const CreatureAnimator = struct {
             }
             self.curr_anim_frame += 1;
             self.tick_in_frame = 0;
+        }
+
+        // first tick of a frame; add frame events
+        if (self.tick_in_frame == 0) {
+            for (anim.events.constSlice()) |e| {
+                if (self.curr_anim_frame == e.frame) {
+                    ret.insert(e.kind);
+                }
+            }
         }
 
         // TODO self.anim_tick is useless?
