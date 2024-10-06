@@ -23,6 +23,7 @@ const Thing = @import("Thing.zig");
 const pool = @import("pool.zig");
 const TileMap = @import("TileMap.zig");
 const Fog = @import("Fog.zig");
+const gameUI = @import("gameUI.zig");
 
 pub const ThingBoundedArray = std.BoundedArray(pool.Id, 32);
 
@@ -55,7 +56,8 @@ camera: draw.Camera2D = .{},
 things: Thing.Pool = undefined,
 spawn_queue: ThingBoundedArray = .{},
 free_queue: ThingBoundedArray = .{},
-player: ?pool.Id = null,
+player_id: ?pool.Id = null,
+spell_slots: gameUI.SpellSlots = .{},
 fog: Fog = undefined,
 curr_tick: i64 = 0,
 edit_mode: bool = false,
@@ -105,7 +107,7 @@ fn clearThings(self: *Room) void {
     self.next_pool_id += 1;
     self.spawn_queue.len = 0;
     self.free_queue.len = 0;
-    self.player = null;
+    self.player_id = null;
 }
 
 pub fn reset(self: *Room) Error!void {
@@ -117,7 +119,7 @@ pub fn reset(self: *Room) Error!void {
         std.debug.print("Room init: spawning a {any}\n", .{spawn.kind});
         if (try self.queueSpawnThingByKind(spawn.kind, spawn.pos)) |id| {
             if (spawn.kind == .player) {
-                self.player = id;
+                self.player_id = id;
             }
         }
     }
@@ -190,14 +192,14 @@ pub fn getThingByPos(self: *Room, pos: V2f) ?*Thing {
 }
 
 pub fn getPlayer(self: *Room) ?*Thing {
-    if (self.player) |id| {
+    if (self.player_id) |id| {
         return self.getThingById(id);
     }
     return null;
 }
 
 pub fn getConstPlayer(self: *const Room) ?*const Thing {
-    if (self.player) |id| {
+    if (self.player_id) |id| {
         return self.getConstThingById(id);
     }
     return null;
@@ -339,6 +341,9 @@ pub fn render(self: *const Room) Error!void {
         const p: V2f = v2f(plat.screen_dims_f.x * 0.5, plat.screen_dims_f.y - 50);
         plat.rectf(p.sub(dims.scale(0.5)), dims, .{ .fill_color = Colorf.black.fade(0.5) });
         try plat.textf(p, txt, .{}, opt);
+    } else {
+        const p: V2f = v2f(plat.screen_dims_f.x * 0.5, plat.screen_dims_f.y - 50);
+        try self.spell_slots.render(self, p);
     }
 
     plat.endRenderToTexture();
