@@ -75,10 +75,9 @@ pub const Params = struct {
 
 pub const TargetingData = struct {
     kind: TargetKind = .self,
-    color: Colorf = .blue,
+    color: Colorf = .cyan,
     line_to_mouse: bool = false,
-    target_enemy: bool = false,
-    target_ally: bool = false,
+    target_faction_mask: Thing.Faction.Mask = .{},
     target_mouse_pos: bool = false,
     radius_under_mouse: ?f32 = null,
     cone_from_self_to_mouse: ?struct {
@@ -323,6 +322,27 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             const K = @TypeOf(k);
             if (std.meta.hasMethod(K, "cast")) {
                 try K.cast(self, caster, room, params);
+            }
+        },
+    }
+}
+
+pub fn renderTargeting(self: *const Spell, room: *const Room) Error!void {
+    const plat = App.getPlat();
+    const targeting_data = self.targeting_data;
+    const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
+
+    switch (targeting_data.kind) {
+        .pos => {},
+        .self => {},
+        .thing => {
+            for (&room.things.items) |*thing| {
+                if (!thing.isActive()) continue;
+                if (thing.select_radius == null) continue;
+                if (!targeting_data.target_faction_mask.contains(thing.faction)) continue;
+                const select_radius = thing.select_radius.?;
+                const draw_radius = if (mouse_pos.dist(thing.pos) < select_radius) select_radius + 20 else select_radius;
+                plat.circlef(thing.pos, draw_radius, .{ .fill_color = targeting_data.color.fade(0.8) });
             }
         },
     }

@@ -90,12 +90,15 @@ hitbox: ?HitBox = null,
 hurtbox: ?HurtBox = null,
 hp: ?HP = null,
 faction: Faction = .neutral,
+select_radius: ?f32 = 20,
 
 pub const Faction = enum {
     neutral,
     player,
     ally,
     enemy,
+
+    pub const Mask = std.EnumSet(Faction);
 };
 
 pub const HP = struct {
@@ -131,7 +134,6 @@ pub const HitBox = struct {
         if (!hitbox.active) return;
         // for debug vis
         self.dbg.last_tick_hitbox_was_active = room.curr_tick;
-        std.debug.print("hitbox active\n", .{});
 
         const pos = self.pos.add(hitbox.rel_pos);
         for (&room.things.items) |*thing| {

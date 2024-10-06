@@ -290,6 +290,10 @@ pub fn render(self: *const Room) Error!void {
 
     try self.tilemap.debugDraw();
 
+    if (self.spell_slots.getSelected()) |spell| {
+        try spell.renderTargeting(self);
+    }
+
     {
         var thing_arr = std.BoundedArray(*const Thing, @TypeOf(self.things).max_len){};
         const player = self.getConstPlayer();

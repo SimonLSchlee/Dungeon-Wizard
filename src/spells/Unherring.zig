@@ -35,7 +35,7 @@ pub const proto = Spell.makeProto(
         .color = .red,
         .targeting_data = .{
             .kind = .thing,
-            .target_enemy = true,
+            .target_faction_mask = Thing.Faction.Mask.initOne(.enemy),
         },
     },
 );

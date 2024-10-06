@@ -62,6 +62,15 @@ pub const SpellSlots = struct {
         return ret;
     }
 
+    pub fn getSelected(self: *const SpellSlots) ?Spell {
+        if (self.selected) |i| {
+            if (self.slots[i]) |slot| {
+                return slot.spell;
+            }
+        }
+        return null;
+    }
+
     pub fn render(self: *const SpellSlots, _: *const Room) Error!void {
         const plat = App.getPlat();
         const rects = getSlotRects();
