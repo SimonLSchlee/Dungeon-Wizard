@@ -75,7 +75,7 @@ pub const InputController = struct {
                 assert(slot.spell != null);
                 const spell = slot.spell.?;
                 const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
-                if (spell.getTargetParams(room, mouse_pos)) |params| {
+                if (spell.getTargetParams(room, self, mouse_pos)) |params| {
                     room.spell_slots.clearSlot(slot.idx);
                     try spell.cast(self, room, params);
                 }

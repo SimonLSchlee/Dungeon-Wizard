@@ -327,11 +327,16 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     }
 }
 
-pub fn getTargetParams(self: *const Spell, room: *Room, target_pos: V2f) ?Params {
+pub fn getTargetParams(self: *const Spell, room: *Room, caster: *const Thing, target_pos: V2f) ?Params {
     const targeting_data = self.targeting_data;
+    _ = caster;
     switch (targeting_data.kind) {
         .pos => {},
-        .self => {},
+        .self => {
+            return .{
+                .target = .self,
+            };
+        },
         .thing => {
             for (&room.things.items) |*thing| {
                 if (!thing.isActive()) continue;
@@ -347,14 +352,17 @@ pub fn getTargetParams(self: *const Spell, room: *Room, target_pos: V2f) ?Params
     return null;
 }
 
-pub fn renderTargeting(self: *const Spell, room: *const Room) Error!void {
+pub fn renderTargeting(self: *const Spell, room: *const Room, caster: *const Thing) Error!void {
     const plat = App.getPlat();
     const targeting_data = self.targeting_data;
     const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
 
     switch (targeting_data.kind) {
         .pos => {},
-        .self => {},
+        .self => {
+            const draw_radius = caster.select_radius.? + 20;
+            plat.circlef(caster.pos, draw_radius, .{ .fill_color = targeting_data.color.fade(0.8) });
+        },
         .thing => {
             for (&room.things.items) |*thing| {
                 if (!thing.isActive()) continue;

@@ -141,11 +141,15 @@ pub fn reset(self: *Room) Error!void {
     }
     // TODO placeholder
     const unherring = Spell.getProto(.unherring);
+    const protec = Spell.getProto(.protec);
     for (0..5) |_| {
         self.deck.append(unherring) catch break;
+        self.deck.append(protec) catch break;
     }
     for (0..gameUI.SpellSlots.num_slots) |i| {
-        self.spell_slots.fillSlot(unherring, i);
+        if (self.drawSpell()) |spell| {
+            self.spell_slots.fillSlot(spell, i);
+        }
     }
 }
 
@@ -316,9 +320,11 @@ pub fn render(self: *const Room) Error!void {
 
     try self.tilemap.debugDraw();
 
-    if (self.spell_slots.getSelectedSlot()) |slot| {
-        assert(slot.spell != null);
-        try slot.spell.?.renderTargeting(self);
+    if (self.getConstPlayer()) |player| {
+        if (self.spell_slots.getSelectedSlot()) |slot| {
+            assert(slot.spell != null);
+            try slot.spell.?.renderTargeting(self, player);
+        }
     }
 
     {

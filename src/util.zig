@@ -233,3 +233,35 @@ pub fn TaggedUnionFromTypes(Types: []const type, enum_name_field: []const u8, Ta
         },
     });
 }
+
+pub const TickCounter = struct {
+    num_ticks: i64,
+    curr_tick: i64 = 0,
+    running: bool = false,
+
+    pub fn init(num: i64) TickCounter {
+        return .{
+            .num_ticks = num,
+        };
+    }
+
+    pub fn restart(self: *TickCounter) void {
+        self.curr_tick = 0;
+        self.running = true;
+    }
+
+    pub fn tick(self: *TickCounter, restart_on_done: bool) bool {
+        self.curr_tick = @min(self.curr_tick + 1, self.num_ticks);
+        const done = self.curr_tick >= self.num_ticks;
+
+        if (done) {
+            self.running = false;
+            if (restart_on_done) {
+                self.restart();
+            }
+        } else {
+            self.running = true;
+        }
+        return done;
+    }
+};

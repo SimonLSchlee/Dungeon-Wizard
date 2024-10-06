@@ -91,6 +91,16 @@ hurtbox: ?HurtBox = null,
 hp: ?HP = null,
 faction: Faction = .neutral,
 select_radius: ?f32 = 20,
+statuses: StatusEffect.StatusArray = StatusEffect.StatusArray.initFill(.{}),
+
+pub const StatusEffect = struct {
+    const Kind = enum {
+        protected,
+    };
+    const StatusArray = std.EnumArray(StatusEffect.Kind, StatusEffect);
+    stacks: i32 = 0,
+    stack_counter: utl.TickCounter = utl.TickCounter.init(60),
+};
 
 pub const Faction = enum {
     neutral,
@@ -170,14 +180,15 @@ pub const HurtBox = struct {
     radius: f32 = 0,
     layers: HurtBox.Mask = HurtBox.Mask.initEmpty(),
 
-    pub fn hit(_: *HurtBox, self: *Thing, room: *Room, damage: f32) void {
-        //const hurtbox = &self.hurtbox.?;
-        // for debug vis
-        self.dbg.last_tick_hurtbox_was_hit = room.curr_tick;
+    pub fn hit(_: *HurtBox, self: *Thing, _: *Room, damage: f32) void {
+        const status_protect = self.statuses.getPtr(.protected);
+        if (status_protect.stacks > 0) {
+            status_protect.stacks -= 1;
+            return;
+        }
         if (self.hp) |*hp| {
             hp.curr = utl.clampf(hp.curr - damage, 0, hp.max);
         }
-        //std.debug.print("{any}: I got hit! ouch\n", .{self.kind});
     }
 };
 
@@ -343,6 +354,13 @@ pub fn update(self: *Thing, room: *Room) Error!void {
     }
     if (self.hitbox) |*hitbox| {
         hitbox.update(self, room);
+    }
+    for (&self.statuses.values) |*status| {
+        if (status.stacks > 0) {
+            if (status.stack_counter.tick(false)) {
+                status.stacks -= 1;
+            }
+        }
     }
 }
 

@@ -33,24 +33,21 @@ pub const Controllers = [_]type{};
 pub const proto = Spell.makeProto(
     .protec,
     .{
-        .color = .red,
+        .color = .green,
         .targeting_data = .{
             .kind = .self,
         },
     },
 );
 
-pub fn render(self: *const Thing, room: *const Room) Error!void {
-    _ = self;
-    _ = room;
-}
-pub fn update(self: *Thing, room: *Room) Error!void {
-    _ = self;
-    _ = room;
-}
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
+    assert(params.target == .self);
+    const status = caster.statuses.getPtr(.protected);
+    if (status.stacks <= 0) {
+        status.stacks = 0;
+        status.stack_counter = utl.TickCounter.init(60);
+    }
+    status.stacks += 1;
     _ = self;
-    _ = caster;
     _ = room;
-    _ = params;
 }
