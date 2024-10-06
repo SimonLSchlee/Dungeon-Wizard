@@ -42,11 +42,6 @@ pub const proto = Spell.makeProto(
 
 damage: f32 = 10,
 
-pub fn render(self: *const Thing, room: *const Room) Error!void {
-    _ = self;
-    _ = room;
-}
-
 pub const Projectile = struct {
     pub const controller_enum_name = enum_name ++ "_projectile";
 

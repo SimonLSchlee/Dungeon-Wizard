@@ -27,6 +27,7 @@ const sprites = @import("sprites.zig");
 const player = @import("Player.zig");
 const enemies = @import("enemies.zig");
 const Spell = @import("Spell.zig");
+const StatusEffect = @import("StatusEffect.zig");
 
 pub const Kind = enum {
     player,
@@ -91,16 +92,7 @@ hurtbox: ?HurtBox = null,
 hp: ?HP = null,
 faction: Faction = .neutral,
 select_radius: ?f32 = 20,
-statuses: StatusEffect.StatusArray = StatusEffect.StatusArray.initFill(.{}),
-
-pub const StatusEffect = struct {
-    const Kind = enum {
-        protected,
-    };
-    const StatusArray = std.EnumArray(StatusEffect.Kind, StatusEffect);
-    stacks: i32 = 0,
-    stack_counter: utl.TickCounter = utl.TickCounter.init(60),
-};
+statuses: StatusEffect.StatusArray = StatusEffect.proto_array,
 
 pub const Faction = enum {
     neutral,
@@ -356,9 +348,17 @@ pub fn update(self: *Thing, room: *Room) Error!void {
         hitbox.update(self, room);
     }
     for (&self.statuses.values) |*status| {
-        if (status.stacks > 0) {
-            if (status.stack_counter.tick(false)) {
-                status.stacks -= 1;
+        if (status.cd_type != .no_cd and status.stacks > 0) {
+            if (status.cooldown.tick(true)) {
+                switch (status.cd_type) {
+                    .remove_one_stack => {
+                        status.stacks -= 1;
+                    },
+                    .remove_all_stacks => {
+                        status.stacks = 0;
+                    },
+                    else => unreachable,
+                }
             }
         }
     }

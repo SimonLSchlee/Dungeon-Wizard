@@ -42,12 +42,8 @@ pub const proto = Spell.makeProto(
 
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
     assert(params.target == .self);
-    const status = caster.statuses.getPtr(.protected);
-    if (status.stacks <= 0) {
-        status.stacks = 0;
-        status.stack_counter = utl.TickCounter.init(60);
-    }
-    status.stacks += 1;
+    caster.statuses.getPtr(.protected).* += 1;
+
     _ = self;
     _ = room;
 }
