@@ -327,6 +327,26 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     }
 }
 
+pub fn getTargetParams(self: *const Spell, room: *Room, target_pos: V2f) ?Params {
+    const targeting_data = self.targeting_data;
+    switch (targeting_data.kind) {
+        .pos => {},
+        .self => {},
+        .thing => {
+            for (&room.things.items) |*thing| {
+                if (!thing.isActive()) continue;
+                if (thing.select_radius == null) continue;
+                if (!targeting_data.target_faction_mask.contains(thing.faction)) continue;
+                const select_radius = thing.select_radius.?;
+                if (target_pos.dist(thing.pos) < select_radius) {
+                    return .{ .target = .{ .thing = thing.id } };
+                }
+            }
+        },
+    }
+    return null;
+}
+
 pub fn renderTargeting(self: *const Spell, room: *const Room) Error!void {
     const plat = App.getPlat();
     const targeting_data = self.targeting_data;

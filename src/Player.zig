@@ -70,11 +70,13 @@ pub const InputController = struct {
             const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
             try self.findPath(room, mouse_pos);
         }
-        if (plat.input_buffer.mouseBtnIsJustPressed(.left)) {
-            const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
-            if (room.getThingByPos(mouse_pos)) |thing| {
-                var spell = Spell.getProto(.unherring);
-                try spell.cast(self, room, .{ .target = .{ .thing = thing.id } });
+        if (room.spell_slots.getSelectedSlot()) |slot| {
+            if (!room.ui_clicked and plat.input_buffer.mouseBtnIsJustPressed(.left)) {
+                const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
+                if (slot.spell.getTargetParams(room, mouse_pos)) |params| {
+                    room.spell_slots.clearSlot(slot.idx);
+                    try slot.spell.cast(self, room, params);
+                }
             }
         }
         // move

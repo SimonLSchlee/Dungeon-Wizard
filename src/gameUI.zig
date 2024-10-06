@@ -24,6 +24,7 @@ const Spell = @import("Spell.zig");
 
 pub const SpellSlots = struct {
     pub const Slot = struct {
+        idx: usize,
         spell: Spell,
     };
     pub const num_slots = 4;
@@ -62,11 +63,10 @@ pub const SpellSlots = struct {
         return ret;
     }
 
-    pub fn getSelected(self: *const SpellSlots) ?Spell {
+    pub fn getSelectedSlot(self: *const SpellSlots) ?Slot {
         if (self.selected) |i| {
-            if (self.slots[i]) |slot| {
-                return slot.spell;
-            }
+            assert(self.slots[i] != null);
+            return self.slots[i].?;
         }
         return null;
     }
@@ -124,6 +124,24 @@ pub const SpellSlots = struct {
                 .{ .color = key_color },
             );
         }
+    }
+
+    pub fn clearSlot(self: *SpellSlots, slot_idx: usize) void {
+        assert(slot_idx < num_slots);
+        self.slots[slot_idx] = null;
+        if (self.selected) |selected_idx| {
+            if (selected_idx == slot_idx) {
+                self.selected = null;
+            }
+        }
+    }
+
+    pub fn setSlot(self: *SpellSlots, slot: Slot) void {
+        assert(slot.idx < num_slots);
+        if (self.selected) |s| {
+            assert(s != slot.idx);
+        }
+        self.slots[slot.idx] = slot;
     }
 
     pub fn update(self: *SpellSlots, _: *Room) Error!void {

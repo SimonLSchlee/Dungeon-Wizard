@@ -66,6 +66,7 @@ spell_slots: gameUI.SpellSlots = .{},
 deck: SpellArray = .{},
 discard: SpellArray = .{},
 fog: Fog = undefined,
+ui_clicked: bool = false,
 curr_tick: i64 = 0,
 edit_mode: bool = false,
 // reinit stuff, never needs saving or copying, probably?:
@@ -135,10 +136,12 @@ pub fn reset(self: *Room) Error!void {
     }
     // TODO placeholder
     const unherring = Spell.getProto(.unherring);
-    self.spell_slots.slots[0] = .{ .spell = unherring };
-    self.spell_slots.slots[1] = .{ .spell = unherring };
-    self.spell_slots.slots[2] = .{ .spell = unherring };
-    self.spell_slots.slots[3] = .{ .spell = unherring };
+    for (0..gameUI.SpellSlots.num_slots) |i| {
+        self.spell_slots.setSlot(.{
+            .idx = i,
+            .spell = unherring,
+        });
+    }
 }
 
 fn reloadFromTilemapString(self: *Room, str: []const u8) Error!void {
@@ -210,6 +213,7 @@ pub fn getConstPlayer(self: *const Room) ?*const Thing {
 
 pub fn update(self: *Room) Error!void {
     const plat = getPlat();
+    self.ui_clicked = false;
 
     if (plat.input_buffer.keyIsJustPressed(.backtick)) {
         self.edit_mode = !self.edit_mode;
@@ -242,7 +246,14 @@ pub fn update(self: *Room) Error!void {
     self.spawn_queue.len = 0;
 
     if (!self.edit_mode) {
-        try self.spell_slots.update(self);
+        {
+            const old = self.spell_slots.selected;
+            try self.spell_slots.update(self);
+            const new = self.spell_slots.selected;
+            if (old != new) {
+                self.ui_clicked = true;
+            }
+        }
 
         for (&self.things.items) |*thing| {
             if (!thing.isActive()) continue;
@@ -290,8 +301,8 @@ pub fn render(self: *const Room) Error!void {
 
     try self.tilemap.debugDraw();
 
-    if (self.spell_slots.getSelected()) |spell| {
-        try spell.renderTargeting(self);
+    if (self.spell_slots.getSelectedSlot()) |slot| {
+        try slot.spell.renderTargeting(self);
     }
 
     {
