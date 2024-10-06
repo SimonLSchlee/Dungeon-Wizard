@@ -349,6 +349,19 @@ pub fn circlef(_: *Platform, center: V2f, radius: f32, opt: draw.PolyOpt) void {
     }
 }
 
+pub fn sectorf(_: *Platform, center: V2f, radius: f32, start_ang_rads: f32, end_ang_rads: f32, opt: draw.PolyOpt) void {
+    const p = cVec(center);
+    const segs = 20;
+    const start_deg = u.radiansToDegrees(start_ang_rads);
+    const end_deg = u.radiansToDegrees(end_ang_rads);
+    if (opt.fill_color) |color| {
+        r.DrawCircleSector(p, radius, start_deg, end_deg, segs, cColorf(color));
+    }
+    if (opt.outline_color) |color| {
+        r.DrawCircleSectorLines(p, radius, start_deg, end_deg, segs, cColorf(color));
+    }
+}
+
 //pub fn polyf(_: *Platform, points: []V2f, opt: draw.PolyOpt) void {
 //    r.drawPol
 //    r.DrawPoly(center: Vector2, sides: c_int, radius: f32, rotation: f32, color: Colorf)

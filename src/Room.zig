@@ -137,10 +137,7 @@ pub fn reset(self: *Room) Error!void {
     // TODO placeholder
     const unherring = Spell.getProto(.unherring);
     for (0..gameUI.SpellSlots.num_slots) |i| {
-        self.spell_slots.setSlot(.{
-            .idx = i,
-            .spell = unherring,
-        });
+        self.spell_slots.fillSlot(unherring, i);
     }
 }
 
@@ -208,6 +205,11 @@ pub fn getConstPlayer(self: *const Room) ?*const Thing {
     if (self.player_id) |id| {
         return self.getConstThingById(id);
     }
+    return null;
+}
+
+pub fn drawSpell(self: *Room) ?Spell {
+    if (self.deck.len > 0) {}
     return null;
 }
 
@@ -302,7 +304,8 @@ pub fn render(self: *const Room) Error!void {
     try self.tilemap.debugDraw();
 
     if (self.spell_slots.getSelectedSlot()) |slot| {
-        try slot.spell.renderTargeting(self);
+        assert(slot.spell != null);
+        try slot.spell.?.renderTargeting(self);
     }
 
     {

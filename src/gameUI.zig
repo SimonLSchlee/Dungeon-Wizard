@@ -22,10 +22,43 @@ const Room = @import("Room.zig");
 const Thing = @import("Thing.zig");
 const Spell = @import("Spell.zig");
 
+pub const TickCounter = struct {
+    num_ticks: i64,
+    curr_tick: i64 = 0,
+    running: bool = false,
+
+    pub fn init(num: i64) TickCounter {
+        return .{
+            .num_ticks = num,
+        };
+    }
+
+    pub fn restart(self: *TickCounter) void {
+        self.curr_tick = 0;
+        self.running = true;
+    }
+
+    pub fn tick(self: *TickCounter, restart_on_done: bool) bool {
+        self.curr_tick = @min(self.curr_tick + 1, self.num_ticks);
+        const done = self.curr_tick >= self.num_ticks;
+
+        if (done) {
+            self.running = false;
+            if (restart_on_done) {
+                self.restart();
+            }
+        } else {
+            self.running = true;
+        }
+        return done;
+    }
+};
+
 pub const SpellSlots = struct {
     pub const Slot = struct {
         idx: usize,
-        spell: Spell,
+        spell: ?Spell = null,
+        draw_counter: TickCounter = TickCounter.init(90),
     };
     pub const num_slots = 4;
     pub const idx_to_key = [num_slots]core.Key{ .q, .w, .e, .r };
@@ -42,7 +75,15 @@ pub const SpellSlots = struct {
     const slot_dims = v2f(60, 80);
     const slot_spacing: f32 = 20;
 
-    slots: [num_slots]?Slot = .{null} ** num_slots,
+    slots: [num_slots]Slot = blk: {
+        var ret: [num_slots]Slot = undefined;
+        for (0..num_slots) |i| {
+            ret[i] = .{
+                .idx = i,
+            };
+        }
+        break :blk ret;
+    },
     selected: ?usize = null,
 
     pub fn getSlotRects() [num_slots]geom.Rectf {
@@ -65,8 +106,8 @@ pub const SpellSlots = struct {
 
     pub fn getSelectedSlot(self: *const SpellSlots) ?Slot {
         if (self.selected) |i| {
-            assert(self.slots[i] != null);
-            return self.slots[i].?;
+            assert(self.slots[i].spell != null);
+            return self.slots[i];
         }
         return null;
     }
@@ -75,13 +116,14 @@ pub const SpellSlots = struct {
         const plat = App.getPlat();
         const rects = getSlotRects();
 
-        for (self.slots, 0..) |_slot, i| {
+        for (self.slots, 0..) |slot, i| {
             const key_str = idx_to_key_str[i];
             const rect = rects[i];
+            const slot_center_pos = rect.pos.add(slot_dims.scale(0.5));
             var key_color = Colorf.gray;
             var border_color = Colorf.darkgray;
             plat.rectf(rect.pos, rect.dims, .{ .fill_color = Colorf.black });
-            if (_slot) |slot| {
+            if (slot.spell) |spell| {
                 key_color = .white;
                 border_color = .blue;
                 if (self.selected) |selected| {
@@ -89,12 +131,12 @@ pub const SpellSlots = struct {
                         border_color = Colorf.orange;
                     }
                 }
-                const name: []const u8 = @tagName(slot.spell.kind);
+                const name: []const u8 = @tagName(spell.kind);
                 const spell_char = [1]u8{name[0]};
                 // TODO spell image
                 // spell letter
                 try plat.textf(
-                    rect.pos.add(slot_dims.scale(0.5)),
+                    slot_center_pos,
                     "{s}",
                     .{&spell_char},
                     .{
@@ -103,8 +145,13 @@ pub const SpellSlots = struct {
                         .center = true,
                     },
                 );
-            } else {
-                //
+            } else if (slot.draw_counter.running) {
+                const num_ticks_f = u.as(f32, slot.draw_counter.num_ticks);
+                const curr_tick_f = u.as(f32, slot.draw_counter.curr_tick);
+                const rads = u.remapClampf(0, num_ticks_f, 0, u.tau, curr_tick_f);
+                const radius = slot_dims.x * 0.5 * 0.7;
+                std.debug.print("{d:.2}\n", .{rads});
+                plat.sectorf(slot_center_pos, radius, 0, rads, .{ .fill_color = .blue });
             }
             // border
             plat.rectf(
@@ -128,7 +175,10 @@ pub const SpellSlots = struct {
 
     pub fn clearSlot(self: *SpellSlots, slot_idx: usize) void {
         assert(slot_idx < num_slots);
-        self.slots[slot_idx] = null;
+        const slot = &self.slots[slot_idx];
+        assert(slot.spell != null);
+        slot.spell = null;
+        slot.draw_counter.restart();
         if (self.selected) |selected_idx| {
             if (selected_idx == slot_idx) {
                 self.selected = null;
@@ -136,15 +186,16 @@ pub const SpellSlots = struct {
         }
     }
 
-    pub fn setSlot(self: *SpellSlots, slot: Slot) void {
-        assert(slot.idx < num_slots);
+    pub fn fillSlot(self: *SpellSlots, spell: Spell, slot_idx: usize) void {
+        assert(slot_idx < num_slots);
         if (self.selected) |s| {
-            assert(s != slot.idx);
+            assert(s != slot_idx);
         }
-        self.slots[slot.idx] = slot;
+        const slot = &self.slots[slot_idx];
+        slot.spell = spell;
     }
 
-    pub fn update(self: *SpellSlots, _: *Room) Error!void {
+    pub fn update(self: *SpellSlots, room: *Room) Error!void {
         const plat = App.getPlat();
         const rects = getSlotRects();
         const mouse_pressed = plat.input_buffer.mouseBtnIsJustPressed(.left);
@@ -152,21 +203,25 @@ pub const SpellSlots = struct {
         var selection: ?usize = null;
         for (0..num_slots) |i| {
             const rect = rects[i];
-            if (mouse_pressed) {
-                const mouse_pos = plat.input_buffer.getCurrMousePos();
-                if (self.slots[i]) |_| {
+            const slot = &self.slots[i];
+            if (slot.spell) |_| {
+                if (selection == null and mouse_pressed) {
+                    const mouse_pos = plat.input_buffer.getCurrMousePos();
+
                     if (geom.pointIsInRectf(mouse_pos, rect)) {
                         selection = i;
                         break;
                     }
-                }
-            } else {
-                const key = idx_to_key[i];
-                if (plat.input_buffer.keyIsJustPressed(key)) {
-                    if (self.slots[i]) |_| {
+                } else {
+                    const key = idx_to_key[i];
+                    if (plat.input_buffer.keyIsJustPressed(key)) {
                         selection = i;
                         break;
                     }
+                }
+            } else if (slot.draw_counter.tick(false)) {
+                if (room.drawSpell()) |spell| {
+                    slot.spell = spell;
                 }
             }
         }

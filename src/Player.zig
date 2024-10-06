@@ -72,10 +72,12 @@ pub const InputController = struct {
         }
         if (room.spell_slots.getSelectedSlot()) |slot| {
             if (!room.ui_clicked and plat.input_buffer.mouseBtnIsJustPressed(.left)) {
+                assert(slot.spell != null);
+                const spell = slot.spell.?;
                 const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
-                if (slot.spell.getTargetParams(room, mouse_pos)) |params| {
+                if (spell.getTargetParams(room, mouse_pos)) |params| {
                     room.spell_slots.clearSlot(slot.idx);
-                    try slot.spell.cast(self, room, params);
+                    try spell.cast(self, room, params);
                 }
             }
         }
