@@ -24,8 +24,13 @@ const pool = @import("pool.zig");
 const TileMap = @import("TileMap.zig");
 const Fog = @import("Fog.zig");
 const gameUI = @import("gameUI.zig");
+const Spell = @import("Spell.zig");
 
-pub const ThingBoundedArray = std.BoundedArray(pool.Id, 32);
+pub const max_things_in_room = 128;
+pub const max_spells_in_deck = 32;
+
+pub const ThingBoundedArray = std.BoundedArray(pool.Id, max_things_in_room);
+pub const SpellArray = std.BoundedArray(Spell, max_spells_in_deck);
 
 // Room is basically the "World" state, of things that can change frame-to-frame in realtime while playing the 'main' game
 // that would include the UI state, graphics, etc...
@@ -58,6 +63,8 @@ spawn_queue: ThingBoundedArray = .{},
 free_queue: ThingBoundedArray = .{},
 player_id: ?pool.Id = null,
 spell_slots: gameUI.SpellSlots = .{},
+deck: SpellArray = .{},
+discard: SpellArray = .{},
 fog: Fog = undefined,
 curr_tick: i64 = 0,
 edit_mode: bool = false,
@@ -108,6 +115,9 @@ fn clearThings(self: *Room) void {
     self.spawn_queue.len = 0;
     self.free_queue.len = 0;
     self.player_id = null;
+    self.spell_slots = .{};
+    self.deck = .{};
+    self.discard = .{};
 }
 
 pub fn reset(self: *Room) Error!void {
@@ -123,19 +133,12 @@ pub fn reset(self: *Room) Error!void {
             }
         }
     }
-    // sheep in start zone
-    if (false and !self.tilemap.start_zone.dims.isZero()) {
-        const start_zone_center = self.tilemap.start_zone.pos.add(self.tilemap.start_zone.dims.scale(0.5));
-        const poses = [4]V2f{
-            start_zone_center.add(v2f(-1, 1)),
-            start_zone_center.add(v2f(-1, -1)),
-            start_zone_center.add(v2f(1, -1)),
-            start_zone_center.add(v2f(1, 1)),
-        };
-        for (0..10) |i| {
-            _ = try self.queueSpawnThingByKind(.sheep, poses[i % 4]);
-        }
-    }
+    // TODO placeholder
+    const unherring = Spell.getProto(.unherring);
+    self.spell_slots.slots[0] = .{ .spell = unherring };
+    self.spell_slots.slots[1] = .{ .spell = unherring };
+    self.spell_slots.slots[2] = .{ .spell = unherring };
+    self.spell_slots.slots[3] = .{ .spell = unherring };
 }
 
 fn reloadFromTilemapString(self: *Room, str: []const u8) Error!void {
@@ -239,6 +242,8 @@ pub fn update(self: *Room) Error!void {
     self.spawn_queue.len = 0;
 
     if (!self.edit_mode) {
+        try self.spell_slots.update(self);
+
         for (&self.things.items) |*thing| {
             if (!thing.isActive()) continue;
             try thing.update(self);
@@ -342,8 +347,7 @@ pub fn render(self: *const Room) Error!void {
         plat.rectf(p.sub(dims.scale(0.5)), dims, .{ .fill_color = Colorf.black.fade(0.5) });
         try plat.textf(p, txt, .{}, opt);
     } else {
-        const p: V2f = v2f(plat.screen_dims_f.x * 0.5, plat.screen_dims_f.y - 50);
-        try self.spell_slots.render(self, p);
+        try self.spell_slots.render(self);
     }
 
     plat.endRenderToTexture();

@@ -34,7 +34,7 @@ pub const Kind = enum {
     projectile,
 };
 
-pub const Pool = pool.BoundedPool(Thing, 32);
+pub const Pool = pool.BoundedPool(Thing, Room.max_things_in_room);
 // TODO wrap
 pub const Id = pool.Id;
 
