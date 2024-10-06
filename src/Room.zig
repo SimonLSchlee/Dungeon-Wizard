@@ -72,6 +72,8 @@ edit_mode: bool = false,
 // reinit stuff, never needs saving or copying, probably?:
 render_texture: ?Platform.RenderTexture2D = null,
 next_pool_id: u32 = 0, // i hate this, can we change it?
+seed: u64 = 0,
+rng: std.Random.DefaultPrng = undefined,
 // fields to save/load for level loading
 //  - spawns, tiles, zones
 //  - gets 'append'ed to a file
@@ -82,7 +84,7 @@ next_pool_id: u32 = 0, // i hate this, can we change it?
 //
 tilemap: TileMap = .{},
 
-pub fn init() Error!Room {
+pub fn init(seed: u64) Error!Room {
     const plat = getPlat();
     const app = App.get();
 
@@ -95,6 +97,8 @@ pub fn init() Error!Room {
             .zoom = 1,
         },
         .fog = try Fog.init(),
+        .rng = std.Random.DefaultPrng.init(seed),
+        .seed = seed,
     };
 
     // temporaryyyy
@@ -125,6 +129,7 @@ pub fn reset(self: *Room) Error!void {
     self.clearThings();
     self.fog.clearAll();
     self.curr_tick = 0;
+    self.rng.seed(self.seed);
 
     for (self.tilemap.spawns.constSlice()) |spawn| {
         std.debug.print("Room init: spawning a {any}\n", .{spawn.kind});
@@ -136,6 +141,9 @@ pub fn reset(self: *Room) Error!void {
     }
     // TODO placeholder
     const unherring = Spell.getProto(.unherring);
+    for (0..5) |_| {
+        self.deck.append(unherring) catch break;
+    }
     for (0..gameUI.SpellSlots.num_slots) |i| {
         self.spell_slots.fillSlot(unherring, i);
     }
@@ -209,7 +217,12 @@ pub fn getConstPlayer(self: *const Room) ?*const Thing {
 }
 
 pub fn drawSpell(self: *Room) ?Spell {
-    if (self.deck.len > 0) {}
+    if (self.deck.len > 0) {
+        const last = u.as(u32, self.deck.len - 1);
+        const idx = u.as(usize, self.rng.random().intRangeAtMost(u32, 0, last));
+        const spell = self.deck.swapRemove(idx);
+        return spell;
+    }
     return null;
 }
 

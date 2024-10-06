@@ -49,7 +49,7 @@ export fn appInit(plat: *Platform) *anyopaque {
 
     // populate _app here, Room.init() uses it
     _app = app;
-    app.room = Room.init() catch @panic("Failed to init game state");
+    app.room = Room.init(0) catch @panic("Failed to init game state");
 
     return app;
 }

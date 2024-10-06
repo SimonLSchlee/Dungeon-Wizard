@@ -150,7 +150,7 @@ pub const SpellSlots = struct {
                 const curr_tick_f = u.as(f32, slot.draw_counter.curr_tick);
                 const rads = u.remapClampf(0, num_ticks_f, 0, u.tau, curr_tick_f);
                 const radius = slot_dims.x * 0.5 * 0.7;
-                std.debug.print("{d:.2}\n", .{rads});
+                //std.debug.print("{d:.2}\n", .{rads});
                 plat.sectorf(slot_center_pos, radius, 0, rads, .{ .fill_color = .blue });
             }
             // border
