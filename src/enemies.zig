@@ -166,11 +166,12 @@ pub const AIController = struct {
                     ai.can_turn_during_attack = false;
                 }
                 if (events.contains(.hit)) {
-                    //std.debug.print("hit targetu\n", .{});
-                    self.renderer.creature.draw_color = Colorf.red;
-                    const hitbox = &self.hitbox.?;
-                    hitbox.rel_pos = self.dir.scale(hitbox.rel_pos.length());
-                    hitbox.active = true;
+                    if (self.hitbox) |*hitbox| {
+                        //std.debug.print("hit targetu\n", .{});
+                        self.renderer.creature.draw_color = Colorf.red;
+                        hitbox.rel_pos = self.dir.scale(hitbox.rel_pos.length());
+                        hitbox.active = true;
+                    }
                 }
 
                 break :state .melee_attack;
@@ -235,6 +236,47 @@ pub fn troll() Error!Thing {
             .radius = 9 * 4,
         },
         .hp = Thing.HP.init(50),
+        .faction = .enemy,
+    };
+    try ret.init();
+    return ret;
+}
+
+pub fn gobbow() Error!Thing {
+    var animator = Thing.DebugCircleRenderer.DebugAnimator{};
+    animator.anims = @TypeOf(animator.anims).init(.{
+        .none = .{},
+        .attack = .{
+            .num_frames = 30,
+        },
+    });
+    var ret = Thing{
+        .kind = .gobbow,
+        .spawn_state = .instance,
+        .coll_radius = 15,
+        .vision_range = 160,
+        .coll_mask = Thing.CollMask.initMany(&.{ .creature, .tile }),
+        .coll_layer = Thing.CollMask.initMany(&.{.creature}),
+        .controller = .{ .enemy = .{
+            .attack_range = 300,
+            .attack_cooldown = utl.TickCounter.initStopped(60),
+        } },
+        .renderer = .{ .creature = .{
+            .draw_color = .yellow,
+            .draw_radius = 15,
+        } },
+        .animator = .{ .creature = .{
+            .creature_kind = .gobbow,
+        } },
+        .hurtbox = .{
+            .layers = Thing.HurtBox.Mask.initOne(.enemy),
+            .radius = 15,
+        },
+        .selectable = .{
+            .height = 9 * 4, // TODO pixellszslz
+            .radius = 5 * 4,
+        },
+        .hp = Thing.HP.init(20),
         .faction = .enemy,
     };
     try ret.init();

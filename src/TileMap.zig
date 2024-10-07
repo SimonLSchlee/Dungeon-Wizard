@@ -87,6 +87,9 @@ pub fn initStr(self: *TileMap, str: []const u8) Error!void {
                 't' => {
                     self.spawns.append(.{ .kind = .troll, .pos = tileCoordToCenterPos(curr_coord) }) catch std.log.warn("Out of spawns!", .{});
                 },
+                'g' => {
+                    self.spawns.append(.{ .kind = .gobbow, .pos = tileCoordToCenterPos(curr_coord) }) catch std.log.warn("Out of spawns!", .{});
+                },
                 'A', 'B' => {
                     const idx: usize = ch - 'A';
                     var zone_pos = zones[idx].pos.toArr();

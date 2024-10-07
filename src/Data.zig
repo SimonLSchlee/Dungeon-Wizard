@@ -231,6 +231,7 @@ pub fn reload(self: *Data) Error!void {
         .{
             .player = try @import("player.zig").protoype(),
             .troll = try @import("enemies.zig").troll(),
+            .gobbow = try @import("enemies.zig").gobbow(),
         },
     );
 }

@@ -94,6 +94,7 @@ pub const CreatureAnim = struct {
     pub const Kind = enum {
         wizard,
         troll,
+        gobbow,
     };
     pub const AnimKind = enum {
         idle,

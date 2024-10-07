@@ -32,6 +32,7 @@ const StatusEffect = @import("StatusEffect.zig");
 pub const Kind = enum {
     player,
     troll,
+    gobbow,
     projectile,
     shield,
 };
@@ -178,7 +179,7 @@ pub const HurtBox = struct {
     radius: f32 = 0,
     layers: HurtBox.Mask = HurtBox.Mask.initEmpty(),
 
-    pub fn hit(_: *HurtBox, self: *Thing, _: *Room, damage: f32) void {
+    pub fn hit(_: *HurtBox, self: *Thing, room: *Room, damage: f32) void {
         const status_protect = self.statuses.getPtr(.protected);
         if (status_protect.stacks > 0) {
             status_protect.stacks -= 1;
@@ -186,6 +187,9 @@ pub const HurtBox = struct {
         }
         if (self.hp) |*hp| {
             hp.curr = utl.clampf(hp.curr - damage, 0, hp.max);
+            if (hp.curr == 0) {
+                self.deferFree(room);
+            }
         }
     }
 };
