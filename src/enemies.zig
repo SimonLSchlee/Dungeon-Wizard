@@ -51,6 +51,7 @@ pub fn getNearestTarget(self: *Thing, room: *Room) ?*Thing {
     for (&room.things.items) |*other| {
         if (!other.isActive()) continue;
         if (other.id.eql(self.id)) continue;
+        if (other.faction == .enemy or other.faction == .neutral) continue;
         const dist = other.pos.dist(self.pos);
         if (dist < closest_dist) {
             closest_dist = dist;
@@ -140,13 +141,14 @@ pub const AIController = struct {
                     continue :state .idle;
                 };
                 const dist = target.pos.dist(self.pos);
-                const range = @max(dist - self.coll_radius - target.coll_radius, 0);
+                // dont want it to be cancelable
+                //const range = @max(dist - self.coll_radius - target.coll_radius, 0);
                 // unless out of range, then pursue
-                if (range > ai.attack_range) {
-                    ai.ticks_in_state = 0;
-                    continue :state .pursue;
-                }
-                // face le target
+                //if (range > ai.attack_range) {
+                //    ai.ticks_in_state = 0;
+                //    continue :state .pursue;
+                //}
+                // face le target, unless past point of no return
                 if (ai.can_turn_during_attack and dist > 0.001) {
                     self.dir = target.pos.sub(self.pos).normalized();
                 }
