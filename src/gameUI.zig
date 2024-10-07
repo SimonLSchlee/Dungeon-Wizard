@@ -196,7 +196,8 @@ pub const SpellSlots = struct {
         if (selection) |new| blk: {
             if (self.selected) |old| {
                 if (new == old) {
-                    self.selected = null;
+                    // NOTE: this is spam-click/button unfriendly, and cancel is anyway easy with RMB
+                    //self.selected = null;
                     break :blk;
                 }
             }
