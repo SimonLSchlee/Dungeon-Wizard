@@ -43,6 +43,10 @@ pub fn protoype() Error!Thing {
             .layers = Thing.HurtBox.Mask.initOne(.player),
             .radius = 15,
         },
+        .selectable = .{
+            .height = 10 * 4, // TODO pixellszslz
+            .radius = 6 * 4,
+        },
         .hp = Thing.HP.init(50),
         .faction = .player,
     };
@@ -87,6 +91,7 @@ pub const InputController = struct {
                     const spell = slot.spell.?;
                     const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
                     if (spell.getTargetParams(room, self, mouse_pos)) |params| {
+                        self.path.len = 0; // cancel the current path on cast, but you can buffer a new one
                         room.spell_slots.clearSlot(slot.idx);
                         room.discardSpell(spell);
                         controller.spell_casting = .{

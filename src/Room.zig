@@ -61,6 +61,7 @@ camera: draw.Camera2D = .{},
 things: Thing.Pool = undefined,
 spawn_queue: ThingBoundedArray = .{},
 free_queue: ThingBoundedArray = .{},
+moused_over_thing: ?Thing.Id = null,
 player_id: ?pool.Id = null,
 spell_slots: gameUI.SpellSlots = .{},
 deck: SpellArray = .{},
@@ -271,6 +272,32 @@ pub fn update(self: *Room) Error!void {
         thing.spawn_state = .spawned;
     }
     self.spawn_queue.len = 0;
+
+    {
+        const mouse_pos = plat.screenPosToCamPos(self.camera, plat.input_buffer.getCurrMousePos());
+        self.moused_over_thing = null;
+        var best_y = -std.math.inf(f32);
+        for (&self.things.items) |*thing| {
+            if (!thing.isActive()) continue;
+            if (thing.selectable == null) continue;
+            if (thing.pos.y < best_y) continue;
+
+            const selectable = thing.selectable.?;
+            const rect = geom.Rectf{
+                .pos = thing.pos.sub(v2f(selectable.radius, selectable.height)),
+                .dims = v2f(selectable.radius * 2, selectable.height),
+            };
+            //const top_circle_pos = thing.pos.sub(v2f(0, selectable.height));
+
+            if (mouse_pos.dist(thing.pos) < selectable.radius or
+                geom.pointIsInRectf(mouse_pos, rect)) //or
+                //mouse_pos.dist(top_circle_pos) < selectable.radius)
+            {
+                best_y = thing.pos.y;
+                self.moused_over_thing = thing.id;
+            }
+        }
+    }
 
     if (!self.edit_mode) {
         {

@@ -93,7 +93,11 @@ hitbox: ?HitBox = null,
 hurtbox: ?HurtBox = null,
 hp: ?HP = null,
 faction: Faction = .neutral,
-select_radius: ?f32 = 20,
+selectable: ?struct {
+    // its a half capsule shape
+    radius: f32 = 20,
+    height: f32 = 50,
+} = null,
 statuses: StatusEffect.StatusArray = StatusEffect.proto_array,
 
 pub const Faction = enum {
@@ -249,9 +253,21 @@ pub const CreatureRenderer = struct {
         plat.arrowf(arrow_start, arrow_end, 5, renderer.draw_color);
     }
 
-    pub fn render(self: *const Thing, _: *const Room) Error!void {
+    pub fn render(self: *const Thing, room: *const Room) Error!void {
         assert(self.spawn_state == .spawned);
         const plat = getPlat();
+
+        if (debug.show_selectable) {
+            if (self.selectable) |s| {
+                if (room.moused_over_thing) |id| {
+                    if (id.eql(self.id)) {
+                        const opt = draw.PolyOpt{ .fill_color = Colorf.cyan };
+                        plat.circlef(self.pos, s.radius, opt);
+                        plat.rectf(self.pos.sub(v2f(s.radius, s.height)), v2f(s.radius * 2, s.height), opt);
+                    }
+                }
+            }
+        }
 
         const animator = self.animator.creature;
         const frame = animator.getCurrRenderFrame(self.dir);
@@ -268,7 +284,7 @@ pub const CreatureRenderer = struct {
         const protected = self.statuses.get(.protected);
         if (protected.stacks > 0) {
             // TODO dont use select radius
-            const r = if (self.select_radius) |sr| sr else self.coll_radius;
+            const r = if (self.selectable) |s| s.height * 0.5 else self.coll_radius;
             const shield_center = self.pos.sub(v2f(0, r));
             const popt = draw.PolyOpt{
                 .fill_color = null,

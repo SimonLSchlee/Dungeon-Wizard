@@ -230,6 +230,10 @@ pub fn troll() Error!Thing {
             .layers = Thing.HurtBox.Mask.initOne(.enemy),
             .radius = 15,
         },
+        .selectable = .{
+            .height = 20 * 4, // TODO pixellszslz
+            .radius = 9 * 4,
+        },
         .hp = Thing.HP.init(50),
         .faction = .enemy,
     };

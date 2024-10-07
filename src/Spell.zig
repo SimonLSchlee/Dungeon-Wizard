@@ -315,16 +315,15 @@ pub fn getTargetParams(self: *const Spell, room: *Room, caster: *const Thing, ta
             };
         },
         .thing => {
-            for (&room.things.items) |*thing| {
-                if (!thing.isActive()) continue;
-                if (thing.select_radius == null) continue;
-                if (!targeting_data.target_faction_mask.contains(thing.faction)) continue;
-                const select_radius = thing.select_radius.?;
-                if (target_pos.dist(thing.pos) < select_radius) {
-                    return .{
-                        .target = .{ .thing = thing.id },
-                        .face_dir = target_pos.sub(caster.pos).normalizedChecked() orelse caster.dir,
-                    };
+            // TODO is it bad if moused_over_thing blocks selecting a valid target?
+            if (room.moused_over_thing) |id| {
+                if (room.getThingById(id)) |thing| {
+                    if (targeting_data.target_faction_mask.contains(thing.faction)) {
+                        return .{
+                            .target = .{ .thing = thing.id },
+                            .face_dir = thing.pos.sub(caster.pos).normalizedChecked() orelse caster.dir,
+                        };
+                    }
                 }
             }
         },
@@ -355,17 +354,17 @@ pub fn renderTargeting(self: *const Spell, room: *const Room, caster: *const Thi
             //plat.linef(caster.pos, mouse_pos, 4, .red);
         },
         .self => {
-            const draw_radius = caster.select_radius.? + 20;
+            const draw_radius = caster.selectable.?.radius + 20;
             plat.circlef(caster.pos, draw_radius, .{ .fill_color = targeting_data.color.fade(0.8) });
         },
         .thing => {
             for (&room.things.items) |*thing| {
                 if (!thing.isActive()) continue;
-                if (thing.select_radius == null) continue;
+                if (thing.selectable == null) continue;
                 if (!targeting_data.target_faction_mask.contains(thing.faction)) continue;
-                const select_radius = thing.select_radius.?;
-                const draw_radius = if (mouse_pos.dist(thing.pos) < select_radius) select_radius + 20 else select_radius;
-                plat.circlef(thing.pos, draw_radius, .{ .fill_color = targeting_data.color.fade(0.5) });
+                const selectable = thing.selectable.?;
+                const draw_radius = if (mouse_pos.dist(thing.pos) < selectable.radius) selectable.radius else selectable.radius - 10;
+                plat.circlef(thing.pos, draw_radius, .{ .fill_color = targeting_data.color.fade(0.4) });
             }
         },
     }
