@@ -81,6 +81,7 @@ renderer: union(enum) {
     none: void,
     default: DebugCircleRenderer,
     creature: CreatureRenderer,
+    shape: ShapeRenderer,
 } = .{ .default = .{} },
 animator: union(enum) {
     none: void,
@@ -184,6 +185,51 @@ pub const HurtBox = struct {
     }
 };
 
+pub const ShapeRenderer = struct {
+    pub const PointArray = std.BoundedArray(V2f, 32);
+
+    kind: union(enum) {
+        sector: struct {
+            start_ang_rads: f32,
+            end_ang_rads: f32,
+            radius: f32,
+        },
+        poly: PointArray,
+    },
+    poly_opt: draw.PolyOpt,
+    draw_under: bool = false,
+    draw_normal: bool = true,
+    draw_over: bool = false,
+
+    fn _render(self: *const Thing, renderer: *const ShapeRenderer, _: *const Room) void {
+        const plat = App.getPlat();
+        switch (renderer.kind) {
+            .sector => |s| {
+                plat.sectorf(self.pos, s.radius, s.start_ang_rads, s.end_ang_rads, renderer.poly_opt);
+            },
+            else => @panic("unimplemented"),
+        }
+    }
+    pub fn renderUnder(self: *const Thing, room: *const Room) Error!void {
+        const renderer = &self.renderer.shape;
+        if (renderer.draw_under) {
+            _render(self, renderer, room);
+        }
+    }
+    pub fn render(self: *const Thing, room: *const Room) Error!void {
+        const renderer = &self.renderer.shape;
+        if (renderer.draw_normal) {
+            _render(self, renderer, room);
+        }
+    }
+    pub fn renderOver(self: *const Thing, room: *const Room) Error!void {
+        const renderer = &self.renderer.shape;
+        if (renderer.draw_over) {
+            _render(self, renderer, room);
+        }
+    }
+};
+
 pub const CreatureRenderer = struct {
     draw_radius: f32 = 20,
     draw_color: Colorf = Colorf.red,
@@ -193,7 +239,10 @@ pub const CreatureRenderer = struct {
         const plat = getPlat();
         const renderer = &self.renderer.creature;
 
-        plat.circlef(self.pos, renderer.draw_radius, .{ .fill_color = null, .outline_color = renderer.draw_color });
+        plat.circlef(self.pos, renderer.draw_radius, .{
+            .fill_color = null,
+            .outline_color = renderer.draw_color,
+        });
         const arrow_start = self.pos.add(self.dir.scale(renderer.draw_radius));
         const arrow_end = self.pos.add(self.dir.scale(renderer.draw_radius + 5));
         plat.arrowf(arrow_start, arrow_end, 5, renderer.draw_color);
@@ -205,11 +254,13 @@ pub const CreatureRenderer = struct {
 
         const animator = self.animator.creature;
         const frame = animator.getCurrRenderFrame(self.dir);
+        const tint: Colorf = if (self.statuses.get(.frozen).stacks > 0) StatusEffect.proto_array.get(.frozen).color else .white;
         const opt = draw.TextureOpt{
             .origin = frame.origin,
             .src_pos = frame.pos.toV2f(),
             .src_dims = frame.size.toV2f(),
             .uniform_scaling = 4,
+            .tint = tint,
         };
         plat.texturef(self.pos, frame.texture, opt);
     }
@@ -336,13 +387,15 @@ pub const DefaultController = struct {
 };
 
 pub fn update(self: *Thing, room: *Room) Error!void {
-    switch (self.controller) {
-        inline else => |c| {
-            const C = @TypeOf(c);
-            if (std.meta.hasMethod(C, "update")) {
-                try C.update(self, room);
-            }
-        },
+    if (self.statuses.get(.frozen).stacks == 0) {
+        switch (self.controller) {
+            inline else => |c| {
+                const C = @TypeOf(c);
+                if (std.meta.hasMethod(C, "update")) {
+                    try C.update(self, room);
+                }
+            },
+        }
     }
     if (self.hitbox) |*hitbox| {
         hitbox.update(self, room);

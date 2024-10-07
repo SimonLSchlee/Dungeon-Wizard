@@ -22,43 +22,11 @@ const Room = @import("Room.zig");
 const Thing = @import("Thing.zig");
 const Spell = @import("Spell.zig");
 
-pub const TickCounter = struct {
-    num_ticks: i64,
-    curr_tick: i64 = 0,
-    running: bool = false,
-
-    pub fn init(num: i64) TickCounter {
-        return .{
-            .num_ticks = num,
-        };
-    }
-
-    pub fn restart(self: *TickCounter) void {
-        self.curr_tick = 0;
-        self.running = true;
-    }
-
-    pub fn tick(self: *TickCounter, restart_on_done: bool) bool {
-        self.curr_tick = @min(self.curr_tick + 1, self.num_ticks);
-        const done = self.curr_tick >= self.num_ticks;
-
-        if (done) {
-            self.running = false;
-            if (restart_on_done) {
-                self.restart();
-            }
-        } else {
-            self.running = true;
-        }
-        return done;
-    }
-};
-
 pub const SpellSlots = struct {
     pub const Slot = struct {
         idx: usize,
         spell: ?Spell = null,
-        draw_counter: TickCounter = TickCounter.init(90),
+        draw_counter: u.TickCounter = u.TickCounter.init(90),
     };
     pub const num_slots = 4;
     pub const idx_to_key = [num_slots]core.Key{ .q, .w, .e, .r };

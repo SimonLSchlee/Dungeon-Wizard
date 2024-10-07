@@ -142,9 +142,13 @@ pub fn reset(self: *Room) Error!void {
     // TODO placeholder
     const unherring = Spell.getProto(.unherring);
     const protec = Spell.getProto(.protec);
+    const frost = Spell.getProto(.frost_vom);
     for (0..5) |_| {
-        self.deck.append(unherring) catch break;
-        self.deck.append(protec) catch break;
+        if (false) {
+            self.deck.append(unherring) catch break;
+            self.deck.append(protec) catch break;
+        }
+        self.deck.append(frost) catch break;
     }
     for (0..gameUI.SpellSlots.num_slots) |i| {
         if (self.drawSpell()) |spell| {

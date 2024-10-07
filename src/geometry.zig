@@ -26,6 +26,22 @@ pub fn rectsAreIntersecting(rect_a: Rectf, rect_b: Rectf) bool {
     return botright_a.x >= rect_b.pos.x and rect_a.pos.x <= botright_b.x and botright_a.y >= rect_b.pos.y and rect_a.pos.y <= botright_b.y;
 }
 
+pub fn pointIsInSector(pos_a: V2f, pos_seg: V2f, radius_seg: f32, start_rads: f32, end_rads: f32) bool {
+    const seg_to_a = pos_a.sub(pos_seg);
+    const dist = seg_to_a.length();
+    if (dist > radius_seg) return false;
+
+    const a_rads = utl.normalizeRadians0_Tau(seg_to_a.toAngleRadians());
+    const start_n = utl.normalizeRadians0_Tau(start_rads);
+    const end_n = utl.normalizeRadians0_Tau(end_rads);
+
+    if (start_n <= end_n) {
+        return a_rads >= start_n and a_rads <= end_n;
+    } else {
+        return a_rads < end_n or a_rads > start_n;
+    }
+}
+
 pub const LineSegIntersection = union(enum) {
     none, // no intersection
     colinear: ?[2]V2f, // colinear; either disjoint (null) or overlapping on 2 points

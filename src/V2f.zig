@@ -76,13 +76,21 @@ pub fn length(self: Self) f32 {
 
 pub fn normalized(self: Self) Self {
     const len = self.length();
-    assert(len > 0.001);
+    assert(len >= 0.001);
+    return self.scale(1 / len);
+}
+
+pub fn normalizedChecked(self: Self) ?Self {
+    const len = self.length();
+    if (len < 0.001) {
+        return null;
+    }
     return self.scale(1 / len);
 }
 
 pub fn normalizedOrZero(self: Self) Self {
     const len = self.length();
-    if (len <= 0.001) {
+    if (len < 0.001) {
         return .{};
     }
     return self.scale(1 / len);

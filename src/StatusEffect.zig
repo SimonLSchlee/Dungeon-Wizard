@@ -30,19 +30,24 @@ const Spell = @import("Spell.zig");
 
 const ComptimeProto = struct {
     enum_name: [:0]const u8,
-    cooldown: i64,
+    cd: i64,
     cd_type: CdType,
+    color: Colorf,
 };
-fn cmpProto(name: [:0]const u8, cd: i64, cd_type: CdType) ComptimeProto {
-    return .{
-        .enum_name = name,
-        .cooldown = cd,
-        .cd_type = cd_type,
-    };
-}
+
 const protos = [_]ComptimeProto{
-    cmpProto("protected", 5 * core.fups_per_sec, .remove_one_stack),
-    cmpProto("frozen", 1 * core.fups_per_sec, .remove_one_stack),
+    .{
+        .enum_name = "protected",
+        .cd = 5 * core.fups_per_sec,
+        .cd_type = .remove_one_stack,
+        .color = Colorf.rgb(0.7, 0.7, 0.4),
+    },
+    .{
+        .enum_name = "frozen",
+        .cd = 1 * core.fups_per_sec,
+        .cd_type = .remove_one_stack,
+        .color = Colorf.rgb(0.3, 0.4, 0.9),
+    },
 };
 
 const Kind = blk: {
@@ -71,8 +76,9 @@ pub const proto_array = blk: {
         ret.set(kind, .{
             .kind = kind,
             .stacks = 0,
-            .cooldown = utl.TickCounter.init(p.cooldown),
+            .cooldown = utl.TickCounter.init(p.cd),
             .cd_type = p.cd_type,
+            .color = p.color,
         });
     }
     break :blk ret;
@@ -88,3 +94,4 @@ kind: Kind,
 stacks: i32,
 cooldown: utl.TickCounter,
 cd_type: CdType,
+color: Colorf,

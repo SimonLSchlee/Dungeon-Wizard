@@ -20,12 +20,12 @@ const getPlat = App.getPlat;
 const Room = @import("../Room.zig");
 const Thing = @import("../Thing.zig");
 const TileMap = @import("../TileMap.zig");
+const StatusEffect = @import("../StatusEffect.zig");
 
 const Spell = @import("../Spell.zig");
 const TargetKind = Spell.TargetKind;
 const TargetingData = Spell.TargetingData;
 const Params = Spell.Params;
-const ThingData = Spell.ThingData;
 
 pub const enum_name = "protec";
 pub const Controllers = [_]type{};
@@ -42,7 +42,7 @@ pub const proto = Spell.makeProto(
 
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
     assert(params.target == .self);
-    caster.statuses.getPtr(.protected).* += 1;
+    caster.statuses.getPtr(.protected).stacks += 1;
 
     _ = self;
     _ = room;

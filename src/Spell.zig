@@ -31,6 +31,7 @@ pub const Id = pool.Id;
 pub const SpellTypes = [_]type{
     @import("spells/Unherring.zig"),
     @import("spells/Protec.zig"),
+    @import("spells/FrostVom.zig"),
 };
 
 pub const Kind = utl.EnumFromTypes(&SpellTypes, "enum_name");
@@ -127,35 +128,6 @@ pub fn makeProto(kind: Kind, the_rest: Spell) Spell {
     ret.cast_time_ticks = 30 * ret.cast_time;
     return ret;
 }
-
-// TODO move these spells to own files
-pub const FrostVom = struct {
-    pub const proto: Spell = makeProto(
-        .frostvom,
-        .{
-            .cast_time = 2,
-            .color = .blue,
-            .targeting_data = .{
-                .kind = .pos,
-                .cone_from_self_to_mouse = true,
-            },
-        },
-    );
-    pub fn render(self: *const Thing, room: *const Room) Error!void {
-        _ = self;
-        _ = room;
-    }
-    pub fn update(self: *Thing, room: *Room) Error!void {
-        _ = self;
-        _ = room;
-    }
-    pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
-        _ = self;
-        _ = caster;
-        _ = room;
-        _ = params;
-    }
-};
 
 pub const Mint = struct {
     pub const proto: Spell = makeProto(
@@ -331,7 +303,11 @@ pub fn getTargetParams(self: *const Spell, room: *Room, caster: *const Thing, ta
     const targeting_data = self.targeting_data;
     _ = caster;
     switch (targeting_data.kind) {
-        .pos => {},
+        .pos => {
+            return .{
+                .target = .{ .pos = target_pos },
+            };
+        },
         .self => {
             return .{
                 .target = .self,
@@ -358,7 +334,22 @@ pub fn renderTargeting(self: *const Spell, room: *const Room, caster: *const Thi
     const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
 
     switch (targeting_data.kind) {
-        .pos => {},
+        .pos => {
+            if (targeting_data.cone_from_self_to_mouse) |cone| {
+                const target_dir = if (mouse_pos.sub(caster.pos).normalizedChecked()) |d| d else V2f.right;
+                const start_rads = target_dir.toAngleRadians() - cone.radians * 0.5;
+                const end_rads = start_rads + cone.radians;
+                //try plat.textf(caster.pos.add(V2f.right.scale(cone.radius * 0.5).rotRadians(start_rads)), "{d:.3}", .{start_rads}, .{ .color = .white });
+                plat.sectorf(
+                    caster.pos,
+                    cone.radius,
+                    start_rads,
+                    end_rads,
+                    .{ .fill_color = targeting_data.color.fade(0.5) },
+                );
+            }
+            //plat.linef(caster.pos, mouse_pos, 4, .red);
+        },
         .self => {
             const draw_radius = caster.select_radius.? + 20;
             plat.circlef(caster.pos, draw_radius, .{ .fill_color = targeting_data.color.fade(0.8) });
@@ -370,7 +361,7 @@ pub fn renderTargeting(self: *const Spell, room: *const Room, caster: *const Thi
                 if (!targeting_data.target_faction_mask.contains(thing.faction)) continue;
                 const select_radius = thing.select_radius.?;
                 const draw_radius = if (mouse_pos.dist(thing.pos) < select_radius) select_radius + 20 else select_radius;
-                plat.circlef(thing.pos, draw_radius, .{ .fill_color = targeting_data.color.fade(0.8) });
+                plat.circlef(thing.pos, draw_radius, .{ .fill_color = targeting_data.color.fade(0.5) });
             }
         },
     }
