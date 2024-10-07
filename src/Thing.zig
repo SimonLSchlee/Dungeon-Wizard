@@ -33,6 +33,7 @@ pub const Kind = enum {
     player,
     troll,
     projectile,
+    shield,
 };
 
 pub const Pool = pool.BoundedPool(Thing, Room.max_things_in_room);
@@ -263,6 +264,20 @@ pub const CreatureRenderer = struct {
             .tint = tint,
         };
         plat.texturef(self.pos, frame.texture, opt);
+
+        const protected = self.statuses.get(.protected);
+        if (protected.stacks > 0) {
+            // TODO dont use select radius
+            const r = if (self.select_radius) |sr| sr else self.coll_radius;
+            const shield_center = self.pos.sub(v2f(0, r));
+            const popt = draw.PolyOpt{
+                .fill_color = null,
+                .outline_color = StatusEffect.proto_array.get(.protected).color,
+            };
+            for (0..utl.as(usize, protected.stacks)) |i| {
+                plat.circlef(shield_center, r * 2 + 2 + utl.as(f32, i) * 2, popt);
+            }
+        }
     }
 
     pub fn renderOver(self: *const Thing, room: *const Room) Error!void {
