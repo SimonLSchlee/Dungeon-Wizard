@@ -67,6 +67,7 @@ pub const TargetKind = enum {
 };
 
 pub const Params = struct {
+    face_dir: ?V2f = null,
     target: union(TargetKind) {
         self,
         thing: Thing.Id,
@@ -301,11 +302,11 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
 
 pub fn getTargetParams(self: *const Spell, room: *Room, caster: *const Thing, target_pos: V2f) ?Params {
     const targeting_data = self.targeting_data;
-    _ = caster;
     switch (targeting_data.kind) {
         .pos => {
             return .{
                 .target = .{ .pos = target_pos },
+                .face_dir = target_pos.sub(caster.pos).normalizedChecked() orelse caster.dir,
             };
         },
         .self => {
@@ -320,7 +321,10 @@ pub fn getTargetParams(self: *const Spell, room: *Room, caster: *const Thing, ta
                 if (!targeting_data.target_faction_mask.contains(thing.faction)) continue;
                 const select_radius = thing.select_radius.?;
                 if (target_pos.dist(thing.pos) < select_radius) {
-                    return .{ .target = .{ .thing = thing.id } };
+                    return .{
+                        .target = .{ .thing = thing.id },
+                        .face_dir = target_pos.sub(caster.pos).normalizedChecked() orelse caster.dir,
+                    };
                 }
             }
         },

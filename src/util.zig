@@ -235,7 +235,7 @@ pub fn TaggedUnionFromTypes(Types: []const type, enum_name_field: []const u8, Ta
 }
 
 pub const TickCounter = struct {
-    num_ticks: i64,
+    num_ticks: i64 = 0,
     curr_tick: i64 = 0,
     running: bool = false,
 

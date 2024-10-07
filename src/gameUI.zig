@@ -100,7 +100,7 @@ pub const SpellSlots = struct {
                     }
                 }
                 const name: []const u8 = @tagName(spell.kind);
-                const spell_char = [1]u8{name[0]};
+                const spell_char = [1]u8{std.ascii.toUpper(name[0])};
                 // TODO spell image
                 // spell letter
                 try plat.textf(
@@ -108,7 +108,7 @@ pub const SpellSlots = struct {
                     "{s}",
                     .{&spell_char},
                     .{
-                        .color = .lightgray,
+                        .color = spell.color,
                         .size = 40,
                         .center = true,
                     },

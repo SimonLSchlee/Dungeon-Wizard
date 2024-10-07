@@ -33,7 +33,7 @@ pub const Controllers = [_]type{};
 pub const proto = Spell.makeProto(
     .protec,
     .{
-        .color = .green,
+        .color = StatusEffect.proto_array.get(.protected).color,
         .targeting_data = .{
             .kind = .self,
         },

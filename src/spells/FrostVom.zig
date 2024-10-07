@@ -37,7 +37,7 @@ pub const proto = Spell.makeProto(
     .frost_vom,
     .{
         .cast_time = 2,
-        .color = .blue,
+        .color = StatusEffect.proto_array.get(.frozen).color,
         .targeting_data = .{
             .kind = .pos,
             .cone_from_self_to_mouse = .{
@@ -49,6 +49,7 @@ pub const proto = Spell.makeProto(
 );
 
 damage: f32 = 8,
+frozen_stacks: i32 = 3,
 radius: f32 = cone_radius,
 arc_rads: f32 = cone_rads,
 expand_dur_ticks: i64 = 30,
@@ -98,7 +99,7 @@ pub const Projectile = struct {
                                 shape.kind.sector.end_ang_rads,
                             )) {
                                 hurtbox.hit(thing, room, frost_vom.damage);
-                                thing.statuses.getPtr(.frozen).stacks += 3;
+                                thing.statuses.getPtr(.frozen).stacks = frost_vom.frozen_stacks;
                             }
                         }
                     }
@@ -159,7 +160,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
                         .radius = 0,
                     },
                 },
-                .poly_opt = .{ .fill_color = StatusEffect.proto_array.get(.frozen).color },
+                .poly_opt = .{ .fill_color = self.color },
             },
         },
     };
