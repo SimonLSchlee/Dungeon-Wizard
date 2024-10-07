@@ -144,12 +144,10 @@ pub fn reset(self: *Room) Error!void {
     const protec = Spell.getProto(.protec);
     const frost = Spell.getProto(.frost_vom);
     for (0..5) |_| {
-        if (false) {
-            self.deck.append(unherring) catch break;
-            self.deck.append(protec) catch break;
-        }
-        self.deck.append(frost) catch break;
+        self.deck.append(unherring) catch break;
+        self.deck.append(protec) catch break;
     }
+    self.deck.append(frost) catch {};
     for (0..gameUI.SpellSlots.num_slots) |i| {
         if (self.drawSpell()) |spell| {
             self.spell_slots.fillSlot(spell, i);
@@ -230,8 +228,14 @@ pub fn drawSpell(self: *Room) ?Spell {
         const idx = u.as(usize, self.rng.random().intRangeAtMost(u32, 0, last));
         const spell = self.deck.swapRemove(idx);
         return spell;
+    } else {
+        self.deck.insertSlice(0, self.discard.constSlice()) catch unreachable;
     }
     return null;
+}
+
+pub fn discardSpell(self: *Room, spell: Spell) void {
+    self.discard.append(spell) catch @panic("discard ran out of space");
 }
 
 pub fn update(self: *Room) Error!void {

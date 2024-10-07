@@ -77,6 +77,7 @@ pub const InputController = struct {
                 const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
                 if (spell.getTargetParams(room, self, mouse_pos)) |params| {
                     room.spell_slots.clearSlot(slot.idx);
+                    room.discardSpell(spell);
                     try spell.cast(self, room, params);
                 }
             }
