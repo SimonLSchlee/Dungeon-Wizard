@@ -109,7 +109,6 @@ pub const InputController = struct {
             const input_dir = p.sub(self.pos).normalizedOrZero();
 
             const accel_dir: V2f = input_dir;
-            // non-leap accel params
             const accel_params: Thing.AccelParams = .{
                 .accel = 0.15,
                 .friction = 0.09,

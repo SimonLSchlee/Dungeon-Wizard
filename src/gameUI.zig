@@ -80,7 +80,7 @@ pub const SpellSlots = struct {
         return null;
     }
 
-    pub fn render(self: *const SpellSlots, _: *const Room) Error!void {
+    pub fn render(self: *const SpellSlots, room: *const Room) Error!void {
         const plat = App.getPlat();
         const rects = getSlotRects();
 
@@ -138,6 +138,12 @@ pub const SpellSlots = struct {
                 .{&key_str},
                 .{ .color = key_color },
             );
+        }
+
+        {
+            const last_rect = rects[rects.len - 1];
+            const p = last_rect.pos.add(v2f(last_rect.dims.x + 10, 0));
+            try plat.textf(p, "deck: {}\ndiscard: {}\n", .{ room.deck.len, room.discard.len }, .{ .color = .white });
         }
     }
 

@@ -231,6 +231,7 @@ pub fn drawSpell(self: *Room) ?Spell {
         return spell;
     } else {
         self.deck.insertSlice(0, self.discard.constSlice()) catch unreachable;
+        self.discard.len = 0;
     }
     return null;
 }
