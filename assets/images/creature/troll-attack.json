@@ -6,7 +6,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 52 },
     "sourceSize": { "w": 48, "h": 52 },
-    "duration": 300
+    "duration": 400
    },
    {
     "filename": "attack-E 1",
@@ -15,7 +15,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 52 },
     "sourceSize": { "w": 48, "h": 52 },
-    "duration": 400
+    "duration": 300
    },
    {
     "filename": "attack-E 2",
@@ -24,7 +24,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 52 },
     "sourceSize": { "w": 48, "h": 52 },
-    "duration": 500
+    "duration": 600
    },
    {
     "filename": "attack-W 0",
@@ -33,7 +33,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 52 },
     "sourceSize": { "w": 48, "h": 52 },
-    "duration": 300
+    "duration": 400
    },
    {
     "filename": "attack-W 1",
@@ -42,7 +42,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 52 },
     "sourceSize": { "w": 48, "h": 52 },
-    "duration": 400
+    "duration": 300
    },
    {
     "filename": "attack-W 2",
@@ -51,7 +51,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 52 },
     "sourceSize": { "w": 48, "h": 52 },
-    "duration": 500
+    "duration": 600
    }
  ],
  "meta": {
@@ -66,7 +66,7 @@
    { "name": "attack-W", "from": 4, "to": 6, "direction": "forward", "color": "#000000ff" }
   ],
   "layers": [
-   { "name": "data", "opacity": 255, "blendMode": "normal", "cels": [{ "frame": 7, "data": "pivot-y=41,hit=2" }] },
+   { "name": "data", "opacity": 255, "blendMode": "normal", "cels": [{ "frame": 7, "data": "pivot-y=41,hit=2,commit=1" }] },
    { "name": "legs", "opacity": 255, "blendMode": "normal" },
    { "name": "body", "opacity": 255, "blendMode": "normal" },
    { "name": "arm-left", "opacity": 255, "blendMode": "normal" },
