@@ -105,6 +105,7 @@ pub const CreatureAnim = struct {
     };
     pub const Event = struct {
         pub const Kind = enum {
+            commit,
             hit,
             end,
         };

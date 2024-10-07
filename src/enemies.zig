@@ -70,6 +70,8 @@ pub const AIController = struct {
     ticks_in_state: i64 = 0,
     target: ?Thing.Id = null,
     attack_range: f32 = 40,
+    attack_cooldown: utl.TickCounter = utl.TickCounter.initStopped(60),
+    can_turn_during_attack: bool = true,
 
     pub fn update(self: *Thing, room: *Room) Error!void {
         assert(self.spawn_state == .spawned);
@@ -77,7 +79,7 @@ pub const AIController = struct {
         const ai = &self.controller.enemy;
 
         self.renderer.creature.draw_color = Colorf.yellow;
-
+        _ = ai.attack_cooldown.tick(false);
         ai.state = state: switch (ai.state) {
             .idle => {
                 if (nearest_target) |t| {
@@ -85,6 +87,7 @@ pub const AIController = struct {
                     ai.ticks_in_state = 0;
                     continue :state .pursue;
                 }
+                self.updateVel(.{}, .{});
                 _ = self.animator.creature.play(.idle, .{ .loop = true });
                 break :state .idle;
             },
@@ -101,9 +104,18 @@ pub const AIController = struct {
                 };
                 const dist = target.pos.dist(self.pos);
                 const range = @max(dist - self.coll_radius - target.coll_radius, 0);
-                if (range < ai.attack_range) {
-                    ai.ticks_in_state = 0;
-                    continue :state .melee_attack;
+                if (range <= ai.attack_range) {
+                    // in range, but have to wait for cooldown before starting attack
+                    if (ai.attack_cooldown.running) {
+                        self.updateVel(.{}, .{});
+                        if (dist > 0.001) {
+                            self.dir = target.pos.sub(self.pos).normalized();
+                        }
+                        _ = self.animator.creature.play(.idle, .{ .loop = true });
+                    } else {
+                        ai.ticks_in_state = 0;
+                        continue :state .melee_attack;
+                    }
                 } else {
                     _ = self.animator.creature.play(.move, .{ .loop = true });
                     try self.findPath(room, target.pos);
@@ -113,6 +125,10 @@ pub const AIController = struct {
                 break :state .pursue;
             },
             .melee_attack => {
+                if (ai.ticks_in_state == 0) {
+                    ai.can_turn_during_attack = true;
+                }
+                // if target no longer exists, go idle
                 const target = blk: {
                     if (ai.target) |t_id| {
                         if (room.getThingById(t_id)) |t| {
@@ -125,29 +141,36 @@ pub const AIController = struct {
                 };
                 const dist = target.pos.dist(self.pos);
                 const range = @max(dist - self.coll_radius - target.coll_radius, 0);
-                if (ai.ticks_in_state == 0) {
-                    if (dist > 0.001) {
-                        self.dir = target.pos.sub(self.pos).normalized();
-                    }
-                }
-                if (range < ai.attack_range) {
-                    self.updateVel(.{}, .{});
-                    const events = self.animator.creature.play(.attack, .{ .loop = true });
-                    if (events.contains(.end)) {
-                        //std.debug.print("attack end\n", .{});
-                        ai.ticks_in_state = 0;
-                        continue :state .melee_attack;
-                    } else if (events.contains(.hit)) {
-                        //std.debug.print("hit targetu\n", .{});
-                        self.renderer.creature.draw_color = Colorf.red;
-                        const hitbox = &self.hitbox.?;
-                        hitbox.rel_pos = self.dir.scale(hitbox.rel_pos.length());
-                        hitbox.active = true;
-                    }
-                } else {
+                // unless out of range, then pursue
+                if (range > ai.attack_range) {
                     ai.ticks_in_state = 0;
                     continue :state .pursue;
                 }
+                // face le target
+                if (ai.can_turn_during_attack and dist > 0.001) {
+                    self.dir = target.pos.sub(self.pos).normalized();
+                }
+
+                self.updateVel(.{}, .{});
+                const events = self.animator.creature.play(.attack, .{ .loop = true });
+                if (events.contains(.end)) {
+                    //std.debug.print("attack end\n", .{});
+                    ai.attack_cooldown.restart();
+                    // must re-enter melee_attack via pursue (once cooldown expires)
+                    ai.ticks_in_state = 0;
+                    continue :state .pursue;
+                }
+                if (events.contains(.commit)) {
+                    ai.can_turn_during_attack = false;
+                }
+                if (events.contains(.hit)) {
+                    //std.debug.print("hit targetu\n", .{});
+                    self.renderer.creature.draw_color = Colorf.red;
+                    const hitbox = &self.hitbox.?;
+                    hitbox.rel_pos = self.dir.scale(hitbox.rel_pos.length());
+                    hitbox.active = true;
+                }
+
                 break :state .melee_attack;
             },
         };
@@ -185,7 +208,9 @@ pub fn troll() Error!Thing {
         .vision_range = 160,
         .coll_mask = Thing.CollMask.initMany(&.{ .creature, .tile }),
         .coll_layer = Thing.CollMask.initMany(&.{.creature}),
-        .controller = .{ .enemy = .{} },
+        .controller = .{ .enemy = .{
+            .attack_cooldown = utl.TickCounter.initStopped(60),
+        } },
         .renderer = .{ .creature = .{
             .draw_color = .yellow,
             .draw_radius = 20,

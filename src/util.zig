@@ -245,6 +245,14 @@ pub const TickCounter = struct {
         };
     }
 
+    // timer won't run until restart()
+    pub fn initStopped(num: i64) TickCounter {
+        return .{
+            .num_ticks = num,
+            .curr_tick = num,
+        };
+    }
+
     pub fn restart(self: *TickCounter) void {
         self.curr_tick = 0;
         self.running = true;
