@@ -144,11 +144,17 @@ pub fn reset(self: *Room) Error!void {
     const unherring = Spell.getProto(.unherring);
     const protec = Spell.getProto(.protec);
     const frost = Spell.getProto(.frost_vom);
-    for (0..5) |_| {
-        self.deck.append(unherring) catch break;
-        self.deck.append(protec) catch break;
+    const starter_deck = [_]struct { Spell, usize }{
+        .{ unherring, 5 },
+        .{ protec, 3 },
+        .{ frost, 1 },
+    };
+
+    deck: for (starter_deck) |t| {
+        for (0..t[1]) |_| {
+            self.deck.append(t[0]) catch break :deck;
+        }
     }
-    self.deck.append(frost) catch {};
     for (0..gameUI.SpellSlots.num_slots) |i| {
         if (self.drawSpell()) |spell| {
             self.spell_slots.fillSlot(spell, i);
