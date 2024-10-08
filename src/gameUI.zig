@@ -84,6 +84,11 @@ pub const SpellSlots = struct {
         const plat = App.getPlat();
         const rects = getSlotRects();
 
+        const slots_are_enabled = if (room.getConstPlayer()) |p|
+            p.controller.player.spell_casting == null
+        else
+            false;
+
         for (self.slots, 0..) |slot, i| {
             const key_str = idx_to_key_str[i];
             const rect = rects[i];
@@ -93,10 +98,12 @@ pub const SpellSlots = struct {
             plat.rectf(rect.pos, rect.dims, .{ .fill_color = Colorf.black });
             if (slot.spell) |spell| {
                 key_color = .white;
-                border_color = .blue;
-                if (self.selected) |selected| {
-                    if (selected == i) {
-                        border_color = Colorf.orange;
+                if (slots_are_enabled) {
+                    border_color = .blue;
+                    if (self.selected) |selected| {
+                        if (selected == i) {
+                            border_color = Colorf.orange;
+                        }
                     }
                 }
                 const name: []const u8 = @tagName(spell.kind);
@@ -173,6 +180,11 @@ pub const SpellSlots = struct {
         const plat = App.getPlat();
         const rects = getSlotRects();
         const mouse_pressed = plat.input_buffer.mouseBtnIsJustPressed(.left);
+        if (room.getConstPlayer()) |p| {
+            if (p.controller.player.spell_casting != null) {
+                return;
+            }
+        }
 
         var selection: ?usize = null;
         for (0..num_slots) |i| {

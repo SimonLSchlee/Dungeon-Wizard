@@ -354,8 +354,8 @@ pub fn renderTargeting(self: *const Spell, room: *const Room, caster: *const Thi
             //plat.linef(caster.pos, mouse_pos, 4, .red);
         },
         .self => {
-            const draw_radius = caster.selectable.?.radius + 20;
-            plat.circlef(caster.pos, draw_radius, .{ .fill_color = targeting_data.color.fade(0.8) });
+            const draw_radius = caster.selectable.?.radius;
+            plat.circlef(caster.pos, draw_radius, .{ .fill_color = targeting_data.color.fade(0.4) });
         },
         .thing => {
             for (&room.things.items) |*thing| {
@@ -364,7 +364,7 @@ pub fn renderTargeting(self: *const Spell, room: *const Room, caster: *const Thi
                 if (!targeting_data.target_faction_mask.contains(thing.faction)) continue;
                 const selectable = thing.selectable.?;
                 const draw_radius = if (mouse_pos.dist(thing.pos) < selectable.radius) selectable.radius else selectable.radius - 10;
-                plat.circlef(thing.pos, draw_radius, .{ .fill_color = targeting_data.color.fade(0.4) });
+                plat.circlef(thing.pos, draw_radius, .{ .fill_color = targeting_data.color.fade(0.5) });
             }
         },
     }

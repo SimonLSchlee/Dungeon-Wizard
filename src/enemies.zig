@@ -30,6 +30,7 @@ fn gobbowArrow(pos: V2f, dir: V2f, room: *Room) Error!void {
         .coll_radius = 5,
         .vel = dir.scale(4),
         .dir = dir,
+        .coll_mask = Thing.CollMask.initMany(&.{.tile}),
         .controller = .{ .projectile = .{} },
         .renderer = .{ .shape = .{
             .kind = .{ .arrow = .{
@@ -301,7 +302,7 @@ pub fn gobbow() Error!Thing {
         },
         .selectable = .{
             .height = 9 * 4, // TODO pixellszslz
-            .radius = 5 * 4,
+            .radius = 6 * 4,
         },
         .hp = Thing.HP.init(20),
         .faction = .enemy,

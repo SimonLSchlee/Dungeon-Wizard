@@ -112,7 +112,7 @@ pub const InputController = struct {
             const accel_params: Thing.AccelParams = .{
                 .accel = 0.15,
                 .friction = 0.09,
-                .max_speed = 2,
+                .max_speed = 1.2,
             };
 
             controller.state = state: switch (controller.state) {

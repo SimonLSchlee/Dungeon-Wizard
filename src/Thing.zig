@@ -204,6 +204,9 @@ pub const ProjectileController = struct {
                 self.deferFree(room);
             }
         }
+        if (self.getNextCollision(room)) |_| {
+            self.deferFree(room);
+        }
     }
 };
 
