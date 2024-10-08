@@ -194,29 +194,30 @@ pub const SpellSlots = struct {
         const plat = App.getPlat();
         const rects = getSlotRects();
         const mouse_pressed = plat.input_buffer.mouseBtnIsJustPressed(.left);
-        if (room.getConstPlayer()) |p| {
-            if (p.controller.player.spell_casting != null) {
-                return;
-            }
-        }
+        const slots_are_enabled = if (room.getConstPlayer()) |p|
+            p.controller.player.spell_casting == null
+        else
+            false;
 
         var selection: ?usize = null;
         for (0..num_slots) |i| {
             const rect = rects[i];
             const slot = &self.slots[i];
-            if (slot.spell) |_| {
-                if (selection == null and mouse_pressed) {
-                    const mouse_pos = plat.input_buffer.getCurrMousePos();
+            if (slot.spell != null) {
+                if (slots_are_enabled) {
+                    if (selection == null and mouse_pressed) {
+                        const mouse_pos = plat.input_buffer.getCurrMousePos();
 
-                    if (geom.pointIsInRectf(mouse_pos, rect)) {
-                        selection = i;
-                        break;
-                    }
-                } else {
-                    const key = idx_to_key[i];
-                    if (plat.input_buffer.keyIsJustPressed(key)) {
-                        selection = i;
-                        break;
+                        if (geom.pointIsInRectf(mouse_pos, rect)) {
+                            selection = i;
+                            break;
+                        }
+                    } else {
+                        const key = idx_to_key[i];
+                        if (plat.input_buffer.keyIsJustPressed(key)) {
+                            selection = i;
+                            break;
+                        }
                     }
                 }
             } else if (slot.draw_counter.tick(false)) {
