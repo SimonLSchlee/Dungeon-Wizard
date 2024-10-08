@@ -24,12 +24,12 @@ const EnemyProjectile = enum {
     arrow,
 };
 
-fn gobbowArrow(pos: V2f, dir: V2f, room: *Room) Error!void {
+fn gobbowArrow(self: *const Thing, room: *Room) Error!void {
     var arrow = Thing{
         .kind = .projectile,
         .coll_radius = 5,
-        .vel = dir.scale(4),
-        .dir = dir,
+        .vel = self.dir.scale(4),
+        .dir = self.dir,
         .coll_mask = Thing.CollMask.initMany(&.{.tile}),
         .controller = .{ .projectile = .{} },
         .renderer = .{ .shape = .{
@@ -43,15 +43,15 @@ fn gobbowArrow(pos: V2f, dir: V2f, room: *Room) Error!void {
             .active = true,
             .deactivate_on_hit = true,
             .deactivate_on_update = false,
-            .mask = Thing.HurtBox.Mask.initMany(&.{ .player, .ally }),
+            .mask = Thing.Faction.opposing_masks.get(self.faction),
             .damage = 7,
             .radius = 4,
-            .rel_pos = dir.scale(28),
+            .rel_pos = self.dir.scale(28),
         },
     };
     try arrow.init();
     defer arrow.deinit();
-    _ = try room.queueSpawnThing(&arrow, pos);
+    _ = try room.queueSpawnThing(&arrow, self.pos);
 }
 
 pub fn getThingsInRadius(self: *Thing, room: *Room, radius: f32, buf: []*Thing) usize {
@@ -84,7 +84,7 @@ pub fn getNearestTarget(self: *Thing, room: *Room) ?*Thing {
     for (&room.things.items) |*other| {
         if (!other.isActive()) continue;
         if (other.id.eql(self.id)) continue;
-        if (other.faction == .enemy or other.faction == .neutral) continue;
+        if (!Thing.Faction.opposing_masks.get(self.faction).contains(other.faction)) continue;
         const dist = other.pos.dist(self.pos);
         if (dist < closest_dist) {
             closest_dist = dist;
@@ -206,13 +206,14 @@ pub const AIController = struct {
                     self.renderer.creature.draw_color = Colorf.red;
                     if (self.hitbox) |*hitbox| {
                         //std.debug.print("hit targetu\n", .{});
+                        hitbox.mask = Thing.Faction.opposing_masks.get(self.faction);
                         hitbox.rel_pos = self.dir.scale(hitbox.rel_pos.length());
                         hitbox.active = true;
                     }
                     if (ai.attack_projectile) |proj_name| {
                         switch (proj_name) {
                             .arrow => {
-                                try gobbowArrow(self.pos, self.dir, room);
+                                try gobbowArrow(self, room);
                             },
                         }
                     }
@@ -255,13 +256,12 @@ pub fn troll() Error!Thing {
             .creature_kind = .troll,
         } },
         .hitbox = .{
-            .mask = Thing.HurtBox.Mask.initMany(&.{ .player, .ally }),
+            .mask = Thing.Faction.opposing_masks.get(.enemy),
             .radius = 15,
             .rel_pos = V2f.right.scale(60),
             .damage = 15,
         },
         .hurtbox = .{
-            .layers = Thing.HurtBox.Mask.initOne(.enemy),
             .radius = 15,
         },
         .selectable = .{
@@ -296,7 +296,6 @@ pub fn gobbow() Error!Thing {
             .creature_kind = .gobbow,
         } },
         .hurtbox = .{
-            .layers = Thing.HurtBox.Mask.initOne(.enemy),
             .radius = 15,
         },
         .selectable = .{

@@ -40,7 +40,6 @@ pub fn protoype() Error!Thing {
             .creature_kind = .wizard,
         } },
         .hurtbox = .{
-            .layers = Thing.HurtBox.Mask.initOne(.player),
             .radius = 15,
         },
         .selectable = .{

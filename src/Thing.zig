@@ -102,12 +102,23 @@ selectable: ?struct {
 statuses: StatusEffect.StatusArray = StatusEffect.proto_array,
 
 pub const Faction = enum {
+    object,
     neutral,
     player,
     ally,
     enemy,
+    bezerk,
 
     pub const Mask = std.EnumSet(Faction);
+    // factions' natural enemies - who they will aggro on, and use to supply hitbox masks for (some, not all) projectiles
+    pub const opposing_masks = std.EnumArray(Faction, Faction.Mask).init(.{
+        .object = .{},
+        .neutral = .{},
+        .player = Faction.Mask.initMany(&.{ .enemy, .bezerk }),
+        .ally = Faction.Mask.initMany(&.{ .enemy, .bezerk }),
+        .enemy = Faction.Mask.initMany(&.{ .player, .ally, .bezerk }),
+        .bezerk = Faction.Mask.initMany(&.{ .neutral, .player, .ally, .enemy, .bezerk }),
+    });
 };
 
 pub const HP = struct {
@@ -115,10 +126,12 @@ pub const HP = struct {
     max: f32 = 10,
 
     pub const faction_colors = std.EnumArray(Faction, Colorf).init(.{
+        .object = Colorf.gray,
         .neutral = Colorf.gray,
         .player = Colorf.green,
         .ally = Colorf.blue,
         .enemy = Colorf.red,
+        .bezerk = Colorf.orange,
     });
 
     pub fn init(max: f32) HP {
@@ -132,7 +145,7 @@ pub const HP = struct {
 pub const HitBox = struct {
     rel_pos: V2f = .{},
     radius: f32 = 0,
-    mask: HurtBox.Mask = HurtBox.Mask.initEmpty(),
+    mask: Faction.Mask = Faction.Mask.initEmpty(),
     active: bool = false,
     deactivate_on_update: bool = true,
     deactivate_on_hit: bool = true,
@@ -150,7 +163,7 @@ pub const HitBox = struct {
 
             if (thing.hurtbox == null) continue;
             var hurtbox = &thing.hurtbox.?;
-            if (hitbox.mask.intersectWith(hurtbox.layers).count() <= 0) continue;
+            if (!hitbox.mask.contains(thing.faction)) continue;
             const hurtbox_pos = thing.pos.add(hurtbox.rel_pos);
             const dist = pos.dist(hurtbox_pos);
             if (dist > hitbox.radius + hurtbox.radius) continue;
@@ -169,15 +182,8 @@ pub const HitBox = struct {
 };
 
 pub const HurtBox = struct {
-    pub const Kind = enum {
-        player,
-        ally,
-        enemy,
-    };
-    pub const Mask = std.EnumSet(HurtBox.Kind);
     rel_pos: V2f = .{},
     radius: f32 = 0,
-    layers: HurtBox.Mask = HurtBox.Mask.initEmpty(),
 
     pub fn hit(_: *HurtBox, self: *Thing, room: *Room, damage: f32) void {
         const status_protect = self.statuses.getPtr(.protected);
