@@ -18,77 +18,7 @@ const v2i = V2i.v2i;
 const Thing = @This();
 const App = @import("App.zig");
 const getPlat = App.getPlat;
-
-pub fn BoundedString(max_len: usize) type {
-    return struct {
-        buf: [max_len]u8 = .{0} ** max_len,
-        len: usize = 0,
-
-        pub fn init(str: []const u8) Error!@This() {
-            var ret = @This(){};
-            if (str.len > max_len) {
-                return Error.NoSpaceLeft;
-            }
-            std.mem.copyForwards(u8, &ret.buf, str);
-            ret.len = str.len;
-            return ret;
-        }
-        pub fn slice(self: *@This()) []u8 {
-            return self.buf[0..self.len];
-        }
-        pub fn constSlice(self: *const @This()) []const u8 {
-            return self.buf[0..self.len];
-        }
-    };
-}
-
-pub fn EnumToBoundedStringArrayType(E: type) type {
-    var max_len = 0;
-    const info = @typeInfo(E);
-    for (info.@"enum".fields) |f| {
-        if (f.name.len > max_len) {
-            max_len = f.name.len;
-        }
-    }
-    return std.EnumArray(E, BoundedString(max_len));
-}
-
-pub fn enumToBoundedStringArray(E: type) EnumToBoundedStringArrayType(E) {
-    var ret = EnumToBoundedStringArrayType(E).initUndefined();
-    const BoundedArrayType = @TypeOf(ret).Value;
-    const info = @typeInfo(E);
-    for (info.@"enum".fields) |f| {
-        ret.set(@enumFromInt(f.value), BoundedArrayType.init(f.name));
-    }
-    return ret;
-}
-
-pub const SpriteSheet = struct {
-    pub const Frame = struct {
-        pos: V2i,
-        size: V2i,
-        duration_ms: i64,
-    };
-    pub const Tag = struct {
-        name: BoundedString(16),
-        from_frame: i32,
-        to_frame: i32,
-    };
-    pub const Meta = struct {
-        name: BoundedString(16) = .{},
-        data: union(enum) {
-            int: i64,
-            float: f32,
-            string: BoundedString(16),
-        } = undefined,
-    };
-
-    file_name: BoundedString(64) = .{},
-    texture: Platform.Texture2D = undefined,
-    frames: []Frame = &.{},
-    tags: []Tag = &.{},
-    meta: []Meta = &.{},
-};
+const Data = @import("Data.zig");
 
 pub const CreatureAnim = struct {
     pub const Kind = enum {
@@ -120,8 +50,8 @@ pub const CreatureAnim = struct {
         origin: draw.TextureOrigin,
     };
 
-    pub const kind_strings: EnumToBoundedStringArrayType(Kind) = enumToBoundedStringArray(Kind);
-    pub const anim_kind_strings: EnumToBoundedStringArrayType(AnimKind) = enumToBoundedStringArray(AnimKind);
+    pub const kind_strings: Data.EnumToBoundedStringArrayType(Kind) = Data.enumToBoundedStringArray(Kind);
+    pub const anim_kind_strings: Data.EnumToBoundedStringArrayType(AnimKind) = Data.enumToBoundedStringArray(AnimKind);
 
     creature_kind: Kind,
     anim_kind: AnimKind,
@@ -168,7 +98,7 @@ pub const CreatureAnimator = struct {
         const dir_index = utl.as(i32, @floor(f * num_dirs_f));
         assert(dir_index >= 0 and dir_index < anim.num_dirs);
         const frame_idx = utl.as(usize, dir_index * anim.num_frames + self.curr_anim_frame);
-        const ssframe: SpriteSheet.Frame = sprite_sheet.frames[frame_idx];
+        const ssframe: Data.SpriteSheet.Frame = sprite_sheet.frames[frame_idx];
         const rframe = CreatureAnim.RenderFrame{
             .pos = ssframe.pos,
             .size = ssframe.size,
@@ -195,7 +125,7 @@ pub const CreatureAnimator = struct {
 
         const sprite_sheet = App.get().data.creature_sprite_sheets.get(self.creature_kind).get(self.curr_anim).?;
         // NOTE: We assume all the dirs of the anim are the same durations in each frame; not a big deal probably(!)
-        const ssframe: SpriteSheet.Frame = sprite_sheet.frames[utl.as(usize, self.curr_anim_frame)];
+        const ssframe: Data.SpriteSheet.Frame = sprite_sheet.frames[utl.as(usize, self.curr_anim_frame)];
         const frame_ticks_f = utl.as(f32, ssframe.duration_ms) * 0.06; // TODO! 60 fps means 1 / 16.66ms == 0.06
         const frame_ticks = utl.as(i32, frame_ticks_f);
 

@@ -40,7 +40,7 @@ pub const SpellSlots = struct {
         }
         break :blk arr;
     };
-    const slot_dims = v2f(60, 80);
+    const slot_dims = v2f(100, 120);
     const slot_spacing: f32 = 20;
 
     slots: [num_slots]Slot = blk: {
@@ -82,6 +82,7 @@ pub const SpellSlots = struct {
 
     pub fn render(self: *const SpellSlots, room: *const Room) Error!void {
         const plat = App.getPlat();
+        const data = App.get().data;
         const rects = getSlotRects();
 
         const slots_are_enabled = if (room.getConstPlayer()) |p|
@@ -107,19 +108,32 @@ pub const SpellSlots = struct {
                     }
                 }
                 const name: []const u8 = @tagName(spell.kind);
+                const kind = std.meta.activeTag(spell.kind);
+                //const kind = std.meta.stringToEnum(Spell.Kind, name).?;
                 const spell_char = [1]u8{std.ascii.toUpper(name[0])};
-                // TODO spell image
-                // spell letter
-                try plat.textf(
-                    slot_center_pos,
-                    "{s}",
-                    .{&spell_char},
-                    .{
-                        .color = spell.color,
-                        .size = 40,
-                        .center = true,
-                    },
-                );
+                // spell image
+                if (data.spell_icons_indices.get(kind)) |idx| {
+                    const sheet = data.spell_icons;
+                    const frame = sheet.frames[u.as(usize, idx)];
+                    plat.texturef(slot_center_pos, sheet.texture, .{
+                        .origin = .center,
+                        .src_pos = frame.pos.toV2f(),
+                        .src_dims = frame.size.toV2f(),
+                        .uniform_scaling = 4,
+                    });
+                } else {
+                    // spell letter
+                    try plat.textf(
+                        slot_center_pos,
+                        "{s}",
+                        .{&spell_char},
+                        .{
+                            .color = spell.color,
+                            .size = 40,
+                            .center = true,
+                        },
+                    );
+                }
             } else if (slot.draw_counter.running) {
                 const num_ticks_f = u.as(f32, slot.draw_counter.num_ticks);
                 const curr_tick_f = u.as(f32, slot.draw_counter.curr_tick);
