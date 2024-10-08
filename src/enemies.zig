@@ -74,13 +74,6 @@ pub fn getThingsInRadius(self: *Thing, room: *Room, radius: f32, buf: []*Thing) 
 pub fn getNearestTarget(self: *Thing, room: *Room) ?*Thing {
     var closest_dist = std.math.inf(f32);
     var closest: ?*Thing = null;
-    if (room.getPlayer()) |p| {
-        const dist = p.pos.dist(self.pos);
-        if (dist <= closest_dist) {
-            closest_dist = dist;
-            closest = p;
-        }
-    }
     for (&room.things.items) |*other| {
         if (!other.isActive()) continue;
         if (other.id.eql(self.id)) continue;
@@ -113,12 +106,18 @@ pub const AIController = struct {
         const nearest_target = getNearestTarget(self, room);
         const ai = &self.controller.enemy;
 
+        // always go for the nearest targeet
+        if (nearest_target) |t| {
+            ai.target = t.id;
+        } else {
+            ai.target = null;
+        }
+
         self.renderer.creature.draw_color = Colorf.yellow;
         _ = ai.attack_cooldown.tick(false);
         ai.state = state: switch (ai.state) {
             .idle => {
-                if (nearest_target) |t| {
-                    ai.target = t.id;
+                if (ai.target) |_| {
                     ai.ticks_in_state = 0;
                     continue :state .pursue;
                 }
