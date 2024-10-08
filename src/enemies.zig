@@ -19,7 +19,38 @@ const App = @import("App.zig");
 const getPlat = App.getPlat;
 const Thing = @import("Thing.zig");
 const Room = @import("Room.zig");
-const Goat = @This();
+
+const EnemyProjectile = enum {
+    arrow,
+};
+
+fn gobbowArrow(pos: V2f, dir: V2f, room: *Room) Error!void {
+    var arrow = Thing{
+        .kind = .projectile,
+        .coll_radius = 5,
+        .vel = dir.scale(3),
+        .dir = dir,
+        .controller = .{ .projectile = .{} },
+        .renderer = .{
+            .default = .{
+                .draw_color = .orange,
+                .draw_radius = 5,
+            },
+        },
+        .hitbox = .{
+            .active = true,
+            .deactivate_on_hit = true,
+            .deactivate_on_update = false,
+            .mask = Thing.HurtBox.Mask.initMany(&.{ .player, .ally }),
+            .damage = 5,
+            .radius = 5,
+            .rel_pos = dir.scale(5),
+        },
+    };
+    try arrow.init();
+    defer arrow.deinit();
+    _ = try room.queueSpawnThing(&arrow, pos);
+}
 
 pub fn getThingsInRadius(self: *Thing, room: *Room, radius: f32, buf: []*Thing) usize {
     var num: usize = 0;
@@ -73,6 +104,7 @@ pub const AIController = struct {
     attack_range: f32 = 40,
     attack_cooldown: utl.TickCounter = utl.TickCounter.initStopped(60),
     can_turn_during_attack: bool = true,
+    attack_projectile: ?EnemyProjectile = null,
 
     pub fn update(self: *Thing, room: *Room) Error!void {
         assert(self.spawn_state == .spawned);
@@ -166,11 +198,18 @@ pub const AIController = struct {
                     ai.can_turn_during_attack = false;
                 }
                 if (events.contains(.hit)) {
+                    self.renderer.creature.draw_color = Colorf.red;
                     if (self.hitbox) |*hitbox| {
                         //std.debug.print("hit targetu\n", .{});
-                        self.renderer.creature.draw_color = Colorf.red;
                         hitbox.rel_pos = self.dir.scale(hitbox.rel_pos.length());
                         hitbox.active = true;
+                    }
+                    if (ai.attack_projectile) |proj_name| {
+                        switch (proj_name) {
+                            .arrow => {
+                                try gobbowArrow(self.pos, self.dir, room);
+                            },
+                        }
                     }
                 }
 
@@ -222,7 +261,7 @@ pub fn troll() Error!Thing {
             .creature_kind = .troll,
         } },
         .hitbox = .{
-            .mask = Thing.HurtBox.Mask.init(.{ .player = true, .player_ally = true }),
+            .mask = Thing.HurtBox.Mask.initMany(&.{ .player, .ally }),
             .radius = 15,
             .rel_pos = V2f.right.scale(60),
             .damage = 5,
@@ -260,6 +299,7 @@ pub fn gobbow() Error!Thing {
         .controller = .{ .enemy = .{
             .attack_range = 300,
             .attack_cooldown = utl.TickCounter.initStopped(60),
+            .attack_projectile = .arrow,
         } },
         .renderer = .{ .creature = .{
             .draw_color = .yellow,

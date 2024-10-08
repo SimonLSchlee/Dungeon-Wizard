@@ -78,6 +78,7 @@ controller: union(enum) {
     player: player.InputController,
     enemy: enemies.AIController,
     spell: Spell.Controller,
+    projectile: ProjectileController,
 } = .none,
 renderer: union(enum) {
     none: void,
@@ -171,7 +172,7 @@ pub const HitBox = struct {
 pub const HurtBox = struct {
     pub const Kind = enum {
         player,
-        player_ally,
+        ally,
         enemy,
     };
     pub const Mask = std.EnumSet(HurtBox.Kind);
@@ -188,6 +189,19 @@ pub const HurtBox = struct {
         if (self.hp) |*hp| {
             hp.curr = utl.clampf(hp.curr - damage, 0, hp.max);
             if (hp.curr == 0) {
+                self.deferFree(room);
+            }
+        }
+    }
+};
+
+pub const ProjectileController = struct {
+    pub fn update(self: *Thing, room: *Room) Error!void {
+        assert(self.spawn_state == .spawned);
+        //const projectile = &self.controller.projectile;
+        self.pos = self.pos.add(self.vel);
+        if (self.hitbox) |hitbox| {
+            if (!hitbox.active) {
                 self.deferFree(room);
             }
         }
@@ -300,24 +314,10 @@ pub const CreatureRenderer = struct {
         }
     }
 
-    pub fn renderOver(self: *const Thing, room: *const Room) Error!void {
+    pub fn renderOver(self: *const Thing, _: *const Room) Error!void {
         assert(self.spawn_state == .spawned);
         const plat = getPlat();
         const renderer = &self.renderer.creature;
-
-        if (debug.show_hitboxes) {
-            if (self.hitbox) |hitbox| {
-                const ticks_since = room.curr_tick - self.dbg.last_tick_hitbox_was_active;
-                if (ticks_since < 120) {
-                    const color = Colorf.red.fade(utl.remapClampf(0, 120, 0.5, 0, utl.as(f32, ticks_since)));
-                    plat.circlef(self.pos.add(hitbox.rel_pos), hitbox.radius, .{ .fill_color = color });
-                }
-            }
-            if (self.hurtbox) |hurtbox| {
-                const color = Colorf.yellow.fade(0.5);
-                plat.circlef(self.pos.add(hurtbox.rel_pos), hurtbox.radius, .{ .fill_color = color });
-            }
-        }
 
         if (self.hp) |hp| {
             const width = renderer.draw_radius * 2;
@@ -482,6 +482,24 @@ pub fn renderOver(self: *const Thing, room: *const Room) Error!void {
                 try R.renderOver(self, room);
             }
         },
+    }
+
+    const plat = App.getPlat();
+    if (debug.show_hitboxes) {
+        if (self.hitbox) |hitbox| {
+            if (hitbox.active) {
+                const ticks_since = room.curr_tick - self.dbg.last_tick_hitbox_was_active;
+                if (ticks_since < 120) {
+                    const color = Colorf.red.fade(utl.remapClampf(0, 120, 0.5, 0, utl.as(f32, ticks_since)));
+                    const pos: V2f = self.pos.add(hitbox.rel_pos);
+                    plat.circlef(pos, hitbox.radius, .{ .fill_color = color });
+                }
+            }
+        }
+        if (self.hurtbox) |hurtbox| {
+            const color = Colorf.yellow.fade(0.5);
+            plat.circlef(self.pos.add(hurtbox.rel_pos), hurtbox.radius, .{ .fill_color = color });
+        }
     }
 }
 
@@ -704,6 +722,21 @@ pub fn followPathGetNextPoint(self: *Thing, dist: f32) V2f {
     }
 
     return ret;
+}
+
+// TODO cllleaeeaan up
+pub fn getNextCollision(self: *Thing, room: *Room) ?ThingCollision {
+    var coll: ThingCollision = .{ .pos = self.pos };
+
+    if (self.coll_mask.contains(.creature)) {
+        coll = getNextCollisionWithCreatures(self, room);
+    }
+    if (!coll.collided and self.coll_mask.contains(.tile)) {
+        coll = getCircleCollisionWithTiles(self.pos, self.coll_radius, room);
+    }
+    if (coll.collided) return coll;
+
+    return null;
 }
 
 pub fn moveAndCollide(self: *Thing, room: *Room) Error!void {
