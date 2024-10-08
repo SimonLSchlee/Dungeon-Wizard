@@ -32,6 +32,7 @@ pub const SpellTypes = [_]type{
     @import("spells/Unherring.zig"),
     @import("spells/Protec.zig"),
     @import("spells/FrostVom.zig"),
+    @import("spells/Blackmail.zig"),
 };
 
 pub const Kind = utl.EnumFromTypes(&SpellTypes, "enum_name");
@@ -228,35 +229,6 @@ pub const FlameExplode = struct {
 
     direct_hit_damage: f32 = 20,
     aoe_damage: f32 = 50,
-
-    pub fn render(self: *const Thing, room: *const Room) Error!void {
-        _ = self;
-        _ = room;
-    }
-    pub fn update(self: *Thing, room: *Room) Error!void {
-        _ = self;
-        _ = room;
-    }
-    pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
-        _ = self;
-        _ = caster;
-        _ = room;
-        _ = params;
-    }
-};
-
-pub const Blackmail = struct {
-    pub const proto: Spell = makeProto(
-        .blackmail,
-        .{
-            .cast_time = 2,
-            .color = .red,
-            .targeting_data = .{
-                .kind = .thing,
-                .target_enemy = true,
-            },
-        },
-    );
 
     pub fn render(self: *const Thing, room: *const Room) Error!void {
         _ = self;

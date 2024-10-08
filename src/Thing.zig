@@ -382,6 +382,14 @@ pub fn update(self: *Thing, room: *Room) Error!void {
                     },
                     else => unreachable,
                 }
+                switch (status.kind) {
+                    .blackmailed => if (status.stacks == 0) {
+                        if (App.get().data.things.get(self.kind)) |proto| {
+                            self.faction = proto.faction;
+                        }
+                    },
+                    else => {},
+                }
             }
         }
     }

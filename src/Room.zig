@@ -144,10 +144,12 @@ pub fn reset(self: *Room) Error!void {
     const unherring = Spell.getProto(.unherring);
     const protec = Spell.getProto(.protec);
     const frost = Spell.getProto(.frost_vom);
+    const blackmail = Spell.getProto(.blackmail);
     const starter_deck = [_]struct { Spell, usize }{
         .{ unherring, 5 },
         .{ protec, 3 },
         .{ frost, 1 },
+        .{ blackmail, 10 },
     };
 
     deck: for (starter_deck) |t| {

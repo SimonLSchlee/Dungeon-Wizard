@@ -48,6 +48,12 @@ const protos = [_]ComptimeProto{
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(0.3, 0.4, 0.9),
     },
+    .{
+        .enum_name = "blackmailed",
+        .cd = 1 * core.fups_per_sec,
+        .cd_type = .remove_one_stack,
+        .color = Colorf.rgb(0.6, 0, 0),
+    },
 };
 
 const Kind = blk: {
