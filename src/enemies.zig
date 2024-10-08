@@ -28,23 +28,24 @@ fn gobbowArrow(pos: V2f, dir: V2f, room: *Room) Error!void {
     var arrow = Thing{
         .kind = .projectile,
         .coll_radius = 5,
-        .vel = dir.scale(3),
+        .vel = dir.scale(4),
         .dir = dir,
         .controller = .{ .projectile = .{} },
-        .renderer = .{
-            .default = .{
-                .draw_color = .orange,
-                .draw_radius = 5,
-            },
-        },
+        .renderer = .{ .shape = .{
+            .kind = .{ .arrow = .{
+                .length = 35,
+                .thickness = 4,
+            } },
+            .poly_opt = .{ .fill_color = draw.Coloru.rgb(220, 172, 89).toColorf() },
+        } },
         .hitbox = .{
             .active = true,
             .deactivate_on_hit = true,
             .deactivate_on_update = false,
             .mask = Thing.HurtBox.Mask.initMany(&.{ .player, .ally }),
-            .damage = 5,
-            .radius = 5,
-            .rel_pos = dir.scale(5),
+            .damage = 7,
+            .radius = 4,
+            .rel_pos = dir.scale(28),
         },
     };
     try arrow.init();
@@ -236,13 +237,6 @@ pub const AIController = struct {
 };
 
 pub fn troll() Error!Thing {
-    var animator = Thing.DebugCircleRenderer.DebugAnimator{};
-    animator.anims = @TypeOf(animator.anims).init(.{
-        .none = .{},
-        .attack = .{
-            .num_frames = 30,
-        },
-    });
     var ret = Thing{
         .kind = .troll,
         .spawn_state = .instance,
@@ -264,7 +258,7 @@ pub fn troll() Error!Thing {
             .mask = Thing.HurtBox.Mask.initMany(&.{ .player, .ally }),
             .radius = 15,
             .rel_pos = V2f.right.scale(60),
-            .damage = 5,
+            .damage = 15,
         },
         .hurtbox = .{
             .layers = Thing.HurtBox.Mask.initOne(.enemy),
@@ -282,13 +276,6 @@ pub fn troll() Error!Thing {
 }
 
 pub fn gobbow() Error!Thing {
-    var animator = Thing.DebugCircleRenderer.DebugAnimator{};
-    animator.anims = @TypeOf(animator.anims).init(.{
-        .none = .{},
-        .attack = .{
-            .num_frames = 30,
-        },
-    });
     var ret = Thing{
         .kind = .gobbow,
         .spawn_state = .instance,

@@ -82,10 +82,9 @@ controller: union(enum) {
 } = .none,
 renderer: union(enum) {
     none: void,
-    default: DebugCircleRenderer,
     creature: CreatureRenderer,
     shape: ShapeRenderer,
-} = .{ .default = .{} },
+} = .none,
 animator: union(enum) {
     none: void,
     creature: sprites.CreatureAnimator,
@@ -212,10 +211,17 @@ pub const ShapeRenderer = struct {
     pub const PointArray = std.BoundedArray(V2f, 32);
 
     kind: union(enum) {
+        circle: struct {
+            radius: f32,
+        },
         sector: struct {
             start_ang_rads: f32,
             end_ang_rads: f32,
             radius: f32,
+        },
+        arrow: struct {
+            thickness: f32,
+            length: f32,
         },
         poly: PointArray,
     },
@@ -227,8 +233,15 @@ pub const ShapeRenderer = struct {
     fn _render(self: *const Thing, renderer: *const ShapeRenderer, _: *const Room) void {
         const plat = App.getPlat();
         switch (renderer.kind) {
+            .circle => |s| {
+                plat.circlef(self.pos, s.radius, renderer.poly_opt);
+            },
             .sector => |s| {
                 plat.sectorf(self.pos, s.radius, s.start_ang_rads, s.end_ang_rads, renderer.poly_opt);
+            },
+            .arrow => |s| {
+                const color: Colorf = if (renderer.poly_opt.fill_color) |c| c else .white;
+                plat.arrowf(self.pos, self.pos.add(self.dir.scale(s.length)), s.thickness, color);
             },
             else => @panic("unimplemented"),
         }
@@ -330,93 +343,6 @@ pub const CreatureRenderer = struct {
     }
 };
 
-pub const DebugCircleRenderer = struct {
-    pub const DebugAnimator = struct {
-        pub const DebugAnimPlayParams = struct {
-            from: ?i32 = null, // null == continue from last frame, or 0 if new anim
-            loop: bool = false,
-        };
-
-        pub const DebugAnimKind = enum {
-            none,
-            attack,
-        };
-        pub const DebugAnim = struct {
-            num_frames: i32 = 1,
-        };
-        curr: DebugAnimKind = .none,
-        tick: i64 = 0,
-        anims: std.EnumMap(DebugAnimKind, DebugAnim) = std.EnumMap(DebugAnimKind, DebugAnim).init(.{ .none = .{} }),
-
-        pub fn play(self: *DebugAnimator, anim_kind: DebugAnimKind, params: DebugAnimPlayParams) bool {
-            const anim = if (self.anims.get(anim_kind)) |a| a else {
-                std.debug.print("WARNING: tried to play non-existent debug anim: {any}\n", .{anim_kind});
-                return false;
-            };
-
-            if (params.from) |f| {
-                self.tick = f;
-            } else if (anim_kind != self.curr) {
-                self.tick = 0;
-            }
-            self.curr = anim_kind;
-            // stopped anim
-            if (self.tick >= anim.num_frames) {
-                return true;
-            }
-
-            self.tick += 1;
-            if (self.tick >= anim.num_frames) {
-                if (params.loop) {
-                    self.tick = 0;
-                }
-                return true;
-            }
-            return false;
-        }
-    };
-
-    draw_radius: f32 = 20,
-    draw_color: Colorf = Colorf.red,
-    animator: DebugAnimator = .{},
-
-    pub fn render(self: *const Thing, room: *const Room) Error!void {
-        assert(self.spawn_state == .spawned);
-        const plat = getPlat();
-        const renderer = &self.renderer.default;
-
-        plat.circlef(self.pos, renderer.draw_radius, .{ .fill_color = renderer.draw_color });
-        plat.arrowf(self.pos, self.pos.add(self.dir.scale(renderer.draw_radius)), 5, Colorf.black);
-
-        const animator = renderer.animator;
-        switch (animator.curr) {
-            .none => {},
-            .attack => {
-                plat.circlef(self.pos.add(self.dir.scale(renderer.draw_radius)), 5, .{ .fill_color = Colorf.red });
-            },
-        }
-
-        if (debug.show_thing_collisions) {
-            if (self.dbg.last_coll.collided) {
-                const coll = self.dbg.last_coll;
-                plat.arrowf(coll.pos, coll.pos.add(coll.normal.scale(self.coll_radius * 0.75)), 3, Colorf.red);
-            }
-        }
-        if (debug.show_thing_coords_searched) {
-            if (self.path.len > 0) {
-                for (self.dbg.coords_searched.items) |coord| {
-                    plat.circlef(TileMap.tileCoordToCenterPos(coord), 10, .{ .outline_color = Colorf.white, .fill_color = null });
-                }
-            }
-        }
-        if (debug.show_thing_paths) {
-            if (self.path.len > 0) {
-                try self.debugDrawPath(room);
-            }
-        }
-    }
-};
-
 pub const DefaultController = struct {
     pub fn update(_: *Thing, _: *Room) Error!void {}
 };
@@ -485,15 +411,31 @@ pub fn renderOver(self: *const Thing, room: *const Room) Error!void {
     }
 
     const plat = App.getPlat();
+    if (debug.show_thing_collisions) {
+        if (self.dbg.last_coll.collided) {
+            const coll = self.dbg.last_coll;
+            plat.arrowf(coll.pos, coll.pos.add(coll.normal.scale(self.coll_radius * 0.75)), 3, Colorf.red);
+        }
+    }
+    if (debug.show_thing_coords_searched) {
+        if (self.path.len > 0) {
+            for (self.dbg.coords_searched.items) |coord| {
+                plat.circlef(TileMap.tileCoordToCenterPos(coord), 10, .{ .outline_color = Colorf.white, .fill_color = null });
+            }
+        }
+    }
+    if (debug.show_thing_paths) {
+        if (self.path.len > 0) {
+            try self.debugDrawPath(room);
+        }
+    }
     if (debug.show_hitboxes) {
         if (self.hitbox) |hitbox| {
-            if (hitbox.active) {
-                const ticks_since = room.curr_tick - self.dbg.last_tick_hitbox_was_active;
-                if (ticks_since < 120) {
-                    const color = Colorf.red.fade(utl.remapClampf(0, 120, 0.5, 0, utl.as(f32, ticks_since)));
-                    const pos: V2f = self.pos.add(hitbox.rel_pos);
-                    plat.circlef(pos, hitbox.radius, .{ .fill_color = color });
-                }
+            const ticks_since = room.curr_tick - self.dbg.last_tick_hitbox_was_active;
+            if (ticks_since < 120) {
+                const color = Colorf.red.fade(utl.remapClampf(0, 120, 0.5, 0, utl.as(f32, ticks_since)));
+                const pos: V2f = self.pos.add(hitbox.rel_pos);
+                plat.circlef(pos, hitbox.radius, .{ .fill_color = color });
             }
         }
         if (self.hurtbox) |hurtbox| {

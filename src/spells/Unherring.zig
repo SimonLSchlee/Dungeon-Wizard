@@ -114,9 +114,9 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
                 .target_radius = target.coll_radius,
             } },
         } },
-        .renderer = .{ .default = .{
-            .draw_color = .white,
-            .draw_radius = 5,
+        .renderer = .{ .shape = .{
+            .kind = .{ .circle = .{ .radius = 5 } },
+            .poly_opt = .{ .fill_color = Colorf.white },
         } },
     };
     try herring.init();
