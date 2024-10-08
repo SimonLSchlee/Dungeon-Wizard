@@ -139,7 +139,7 @@ pub const AIController = struct {
                 };
                 const dist = target.pos.dist(self.pos);
                 const range = @max(dist - self.coll_radius - target.coll_radius, 0);
-                if (range <= ai.attack_range) {
+                if (range <= ai.attack_range and room.tilemap.isLOSBetweenThicc(self.pos, target.pos, 10)) {
                     // in range, but have to wait for cooldown before starting attack
                     if (ai.attack_cooldown.running) {
                         self.updateVel(.{}, .{});
@@ -156,6 +156,9 @@ pub const AIController = struct {
                     try self.findPath(room, target.pos);
                     const p = self.followPathGetNextPoint(10);
                     self.updateVel(p.sub(self.pos).normalizedOrZero(), .{});
+                    if (!self.vel.isAlmostZero()) {
+                        self.dir = self.vel.normalized();
+                    }
                 }
                 break :state .pursue;
             },
@@ -228,10 +231,6 @@ pub const AIController = struct {
                     ai.wander_dir = V2f.randomDir();
                 }
             }
-        }
-
-        if (!self.vel.isZero()) {
-            self.dir = self.vel.normalized();
         }
         try self.moveAndCollide(room);
     }

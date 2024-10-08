@@ -290,6 +290,17 @@ pub fn tileCoordIsPassable(self: *const TileMap, coord: V2i) bool {
     return true;
 }
 
+pub fn isLOSBetweenThicc(self: *const TileMap, a: V2f, b: V2f, thickness: f32) bool {
+    const a_to_b = a.sub(b);
+    const n = a_to_b.rot90CW().normalized();
+    const offset = n.scale(thickness * 0.5);
+    const a_right = a.add(offset);
+    const b_right = b.add(offset);
+    const a_left = a.sub(offset);
+    const b_left = b.sub(offset);
+    return self.isLOSBetween(a_right, b_right) and self.isLOSBetween(a_left, b_left);
+}
+
 pub fn isLOSBetween(self: *const TileMap, _a: V2f, _b: V2f) bool {
     const a_coord = posToTileCoord(_a);
     const b_coord = posToTileCoord(_b);
