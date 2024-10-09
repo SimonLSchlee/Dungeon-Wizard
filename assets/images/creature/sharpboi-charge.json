@@ -72,7 +72,7 @@
     "duration": 200
    },
    {
-    "filename": "charge-NE 0",
+    "filename": "charge-NW 0",
     "frame": { "x": 0, "y": 64, "w": 32, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -81,7 +81,7 @@
     "duration": 200
    },
    {
-    "filename": "charge-NE 1",
+    "filename": "charge-NW 1",
     "frame": { "x": 32, "y": 64, "w": 32, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -90,7 +90,7 @@
     "duration": 200
    },
    {
-    "filename": "charge-NE 2",
+    "filename": "charge-NW 2",
     "frame": { "x": 64, "y": 64, "w": 32, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -99,7 +99,7 @@
     "duration": 200
    },
    {
-    "filename": "charge-NE 3",
+    "filename": "charge-NW 3",
     "frame": { "x": 96, "y": 64, "w": 32, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -108,7 +108,7 @@
     "duration": 200
    },
    {
-    "filename": "charge-NW 0",
+    "filename": "charge-NE 0",
     "frame": { "x": 0, "y": 96, "w": 32, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -117,7 +117,7 @@
     "duration": 200
    },
    {
-    "filename": "charge-NW 1",
+    "filename": "charge-NE 1",
     "frame": { "x": 32, "y": 96, "w": 32, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -126,7 +126,7 @@
     "duration": 200
    },
    {
-    "filename": "charge-NW 2",
+    "filename": "charge-NE 2",
     "frame": { "x": 64, "y": 96, "w": 32, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -135,7 +135,7 @@
     "duration": 200
    },
    {
-    "filename": "charge-NW 3",
+    "filename": "charge-NE 3",
     "frame": { "x": 96, "y": 96, "w": 32, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -154,11 +154,11 @@
   "frameTags": [
    { "name": "charge-SE", "from": 0, "to": 3, "direction": "forward", "color": "#000000ff" },
    { "name": "charge-SW", "from": 4, "to": 7, "direction": "forward", "color": "#000000ff" },
-   { "name": "charge-NE", "from": 8, "to": 11, "direction": "forward", "color": "#000000ff" },
-   { "name": "charge-NW", "from": 12, "to": 15, "direction": "forward", "color": "#000000ff" }
+   { "name": "charge-NW", "from": 8, "to": 11, "direction": "forward", "color": "#000000ff" },
+   { "name": "charge-NE", "from": 12, "to": 15, "direction": "forward", "color": "#000000ff" }
   ],
   "layers": [
-   { "name": "data", "opacity": 255, "blendMode": "normal", "cels": [{ "frame": 16, "data": "pivot-y=25" }] },
+   { "name": "data", "opacity": 255, "blendMode": "normal", "cels": [{ "frame": 16, "data": "pivot-y=25,start-angle-deg=45" }] },
    { "name": "legs", "opacity": 255, "blendMode": "normal" },
    { "name": "body", "opacity": 255, "blendMode": "normal" },
    { "name": "head", "opacity": 255, "blendMode": "normal" },
