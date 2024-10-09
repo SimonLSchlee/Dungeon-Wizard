@@ -149,7 +149,7 @@ pub fn reset(self: *Room) Error!void {
         .{ unherring, 5 },
         .{ protec, 3 },
         .{ frost, 1 },
-        .{ blackmail, 10 },
+        .{ blackmail, 1 },
     };
 
     deck: for (starter_deck) |t| {
