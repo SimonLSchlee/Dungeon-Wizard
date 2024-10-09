@@ -68,6 +68,8 @@ pub const CreatureAnim = struct {
     // 4 = right/down/left/up
     // 8 = ...etc
     num_dirs: u8 = 1,
+    // offset the 0th dir
+    start_angle_rads: f32 = 0,
     origin: draw.TextureOrigin = .center,
 };
 
@@ -87,10 +89,10 @@ pub const CreatureAnimator = struct {
 
     pub fn getCurrRenderFrame(self: *const CreatureAnimator, dir: V2f) CreatureAnim.RenderFrame {
         const sprite_sheet = App.get().data.creature_sprite_sheets.get(self.creature_kind).get(self.curr_anim).?;
-        const anim = App.get().data.creature_anims.get(self.creature_kind).get(self.curr_anim).?;
+        const anim: CreatureAnim = App.get().data.creature_anims.get(self.creature_kind).get(self.curr_anim).?;
         const num_dirs_f = utl.as(f32, anim.num_dirs);
         const angle_inc = utl.tau / num_dirs_f;
-        const shifted_dir = dir.rotRadians(angle_inc * 0.5);
+        const shifted_dir = dir.rotRadians(angle_inc * 0.5 - anim.start_angle_rads);
         const shifted_angle = shifted_dir.toAngleRadians();
         const a = utl.normalizeRadians0_Tau(shifted_angle);
         assert(a >= 0 and a <= utl.tau);

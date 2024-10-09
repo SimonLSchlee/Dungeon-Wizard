@@ -13,7 +13,7 @@ pub inline fn swap(T: type, a: *T, b: *T) void {
 pub fn degreesToRadians(degrees: f32) f32 {
     const sign = std.math.sign(degrees);
     const abs = @abs(degrees);
-    const abs_norm = (abs % 360) * (1.0 / 360.0);
+    const abs_norm = @mod(abs, 360.0) * (1.0 / 360.0);
     const abs_ret = abs_norm * tau;
 
     return sign * abs_ret;

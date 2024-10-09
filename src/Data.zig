@@ -332,6 +332,15 @@ pub fn loadCreatureSpriteSheets(self: *Data) Error!void {
                 anim.origin = .{ .offset = v2f(x, y) };
                 continue;
             }
+            if (std.mem.eql(u8, m_name, "start-angle-deg")) {
+                const deg = switch (m.data) {
+                    .int => |i| u.as(f32, i),
+                    .float => |f| f,
+                    .string => return Error.ParseFail,
+                };
+                const rads = u.degreesToRadians(deg);
+                anim.start_angle_rads = rads;
+            }
 
             const event_info = @typeInfo(sprites.CreatureAnim.Event.Kind);
             inline for (event_info.@"enum".fields) |f| {
