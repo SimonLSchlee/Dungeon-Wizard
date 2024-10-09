@@ -65,11 +65,11 @@ dirv: f32 = 0,
 coll_radius: f32 = 0,
 coll_mask: CollMask = .{},
 coll_layer: CollMask = .{},
+last_coll: ?Collision = .{},
 vision_range: f32 = 0,
 accel_params: AccelParams = .{},
 dir_accel_params: DirAccelParams = .{},
 dbg: struct {
-    last_coll: ThingCollision = .{},
     coords_searched: std.ArrayList(V2i) = undefined,
     last_tick_hitbox_was_active: i64 = -10000,
     last_tick_hurtbox_was_hit: i64 = -10000,
@@ -211,7 +211,7 @@ pub const ProjectileController = struct {
                 self.deferFree(room);
             }
         }
-        if (self.getNextCollision(room)) |_| {
+        if (self.last_coll) |_| {
             self.deferFree(room);
         }
     }
@@ -431,8 +431,7 @@ pub fn renderOver(self: *const Thing, room: *const Room) Error!void {
 
     const plat = App.getPlat();
     if (debug.show_thing_collisions) {
-        if (self.dbg.last_coll.collided) {
-            const coll = self.dbg.last_coll;
+        if (self.last_coll) |coll| {
             plat.arrowf(coll.pos, coll.pos.add(coll.normal.scale(self.coll_radius * 0.75)), 3, Colorf.red);
         }
     }
@@ -496,28 +495,24 @@ fn defaultUpdate(self: *Thing, room: *Room) Error!void {
     try self.moveAndCollide(room);
 }
 
-pub const ThingCollision = struct {
-    collided: bool = false,
+pub const Collision = struct {
     pos: V2f = .{},
     normal: V2f = V2f.right,
     pen_dist: f32 = 0,
 };
 
-pub fn getCircleCircleCollision(pos_a: V2f, radius_a: f32, pos_b: V2f, radius_b: f32) ThingCollision {
-    var coll: ThingCollision = .{ .pos = pos_a };
-
+pub fn getCircleCircleCollision(pos_a: V2f, radius_a: f32, pos_b: V2f, radius_b: f32) ?Collision {
+    var coll: ?Collision = null;
     const b_to_a = pos_a.sub(pos_b);
     const dist = b_to_a.length();
     if (dist < radius_a + radius_b) {
-        // default to right, is ok fallback
-        if (dist > 0.001) {
-            coll.normal = b_to_a.scale(1 / dist);
-        }
-        coll.pen_dist = @max(radius_a + radius_b - dist, 0);
-        coll.pos = pos_b.add(coll.normal.scale(radius_b));
-        coll.collided = true;
+        const n = if (dist > 0.001) b_to_a.scale(1 / dist) else V2f.right;
+        coll = Collision{
+            .normal = n,
+            .pen_dist = @max(radius_a + radius_b - dist, 0),
+            .pos = pos_b.add(n.scale(radius_b)),
+        };
     }
-
     return coll;
 }
 
@@ -525,22 +520,28 @@ pub fn isActive(self: *const Thing) bool {
     return self.alloc_state == .allocated and self.spawn_state == .spawned;
 }
 
-pub fn getNextCollisionWithCreatures(self: *Thing, room: *Room) ThingCollision {
-    var coll: ThingCollision = .{ .pos = self.pos };
+pub fn getNextCollisionWithThings(self: *Thing, room: *Room) ?Collision {
+    var best_coll: ?Collision = null;
+    var best_dist: f32 = std.math.inf(f32);
 
     for (&room.things.items) |*thing| {
         if (!thing.isActive()) continue;
         if (thing.id.eql(self.id)) continue;
-        if (!thing.coll_layer.contains(.creature)) continue;
+        if (self.coll_mask.intersectWith(thing.coll_layer).count() == 0) continue;
 
-        coll = getCircleCircleCollision(self.pos, self.coll_radius, thing.pos, thing.coll_radius);
-        if (coll.collided) break;
+        if (getCircleCircleCollision(self.pos, self.coll_radius, thing.pos, thing.coll_radius)) |coll| {
+            const dist = self.pos.dist(coll.pos);
+            if (best_coll == null or dist < best_dist) {
+                best_coll = coll;
+                best_dist = dist;
+            }
+        }
     }
-    return coll;
+    return best_coll;
 }
 
-pub fn getCircleCollisionWithTiles(pos: V2f, radius: f32, room: *const Room) ThingCollision {
-    var coll: ThingCollision = .{ .pos = pos };
+pub fn getCircleCollisionWithTiles(pos: V2f, radius: f32, room: *const Room) ?Collision {
+    var coll: ?Collision = null;
 
     for (room.tilemap.tiles.values()) |tile| outer_blk: {
         if (tile.passable) continue;
@@ -579,32 +580,37 @@ pub fn getCircleCollisionWithTiles(pos: V2f, radius: f32, room: *const Room) Thi
         // inside! arg get ouuuut
         if (geom.pointIsInRectf(pos, rect)) {
             const center_to_pos = pos.sub(center);
-            const n = center_to_pos.normalizedOrZero();
 
             // if exactly at the center, we'll always go right, but meh, is ok fallback
-            if (!n.isZero()) {
-                var is_passable_dir: bool = false;
-                var max_dot: f32 = -std.math.inf(f32);
-                var max_dir: V2f = .{};
+            const normal = blk: {
+                const n = center_to_pos.normalizedOrZero();
+                if (!n.isZero()) {
+                    var is_passable_dir: bool = false;
+                    var max_dot: f32 = -std.math.inf(f32);
+                    var max_dir: V2f = .{};
 
-                for (TileMap.neighbor_dirs) |dir| {
-                    if (passable_neighbors.get(dir)) {
-                        const dir_v = TileMap.neighbor_dirs_coords.get(dir).toV2f();
-                        const dot = dir_v.dot(center_to_pos);
-                        is_passable_dir = true;
-                        if (dot > max_dot) {
-                            max_dot = dot;
-                            max_dir = dir_v;
+                    for (TileMap.neighbor_dirs) |dir| {
+                        if (passable_neighbors.get(dir)) {
+                            const dir_v = TileMap.neighbor_dirs_coords.get(dir).toV2f();
+                            const dot = dir_v.dot(center_to_pos);
+                            is_passable_dir = true;
+                            if (dot > max_dot) {
+                                max_dot = dot;
+                                max_dir = dir_v;
+                            }
                         }
                     }
+                    if (is_passable_dir) {
+                        break :blk max_dir;
+                    }
                 }
-                if (is_passable_dir) {
-                    coll.normal = max_dir;
-                }
-            }
-            coll.pen_dist = radius;
-            coll.pos = pos;
-            coll.collided = true;
+                break :blk V2f.right;
+            };
+            coll = Collision{
+                .normal = normal,
+                .pen_dist = radius,
+                .pos = pos,
+            };
             break;
         }
         // check edges before corners, to rule out areas in corner radius that are also on edges
@@ -623,10 +629,11 @@ pub fn getCircleCollisionWithTiles(pos: V2f, radius: f32, room: *const Room) Thi
             const pos_to_intersect = intersect_pos.sub(pos);
             const dist = pos_to_intersect.length();
             if (dist < radius) {
-                coll.pen_dist = @max(radius - dist, 0);
-                coll.normal = v2f(edge_v.y, -edge_v.x).normalized();
-                coll.pos = intersect_pos;
-                coll.collided = true;
+                coll = Collision{
+                    .normal = v2f(edge_v.y, -edge_v.x).normalized(),
+                    .pen_dist = @max(radius - dist, 0),
+                    .pos = intersect_pos,
+                };
                 break :outer_blk;
             }
         }
@@ -636,23 +643,59 @@ pub fn getCircleCollisionWithTiles(pos: V2f, radius: f32, room: *const Room) Thi
             const pos_to_corner = corner_pos.sub(pos);
             const dist = pos_to_corner.length();
             if (dist < radius) {
-                if (dist < 0.001) {
-                    const center_to_pos = pos.sub(center).normalizedOrZero();
-                    if (!center_to_pos.isZero()) {
-                        coll.normal = center_to_pos;
+                const normal = blk: {
+                    if (dist < 0.001) {
+                        if (pos.sub(center).normalizedChecked()) |center_to_pos| {
+                            break :blk center_to_pos;
+                        } else {
+                            break :blk V2f.right;
+                        }
+                    } else {
+                        break :blk pos_to_corner.scale(-1 / dist);
                     }
-                } else {
-                    coll.normal = pos_to_corner.scale(-1 / dist);
-                }
-                coll.pen_dist = @max(radius - dist, 0);
-                coll.pos = corner_pos;
-                coll.collided = true;
+                };
+                coll = Collision{
+                    .normal = normal,
+                    .pen_dist = @max(radius - dist, 0),
+                    .pos = corner_pos,
+                };
                 break :outer_blk;
             }
         }
     }
 
     return coll;
+}
+
+pub fn moveAndCollide(self: *Thing, room: *Room) Error!void {
+    var num_iters: i32 = 0;
+
+    self.last_coll = null;
+    self.pos = self.pos.add(self.vel);
+
+    while (num_iters < 5) {
+        var _coll: ?Collision = null;
+
+        if (self.coll_mask.contains(.creature)) {
+            _coll = getNextCollisionWithThings(self, room);
+        }
+        if (_coll == null and self.coll_mask.contains(.tile)) {
+            _coll = getCircleCollisionWithTiles(self.pos, self.coll_radius, room);
+        }
+
+        if (_coll) |coll| {
+            self.last_coll = coll;
+            // push out
+            if (coll.pen_dist > 0) {
+                self.pos = coll.pos.add(coll.normal.scale(self.coll_radius + 1));
+            }
+            // remove -normal component from vel, isn't necessary with current implementation
+            //const d = coll_normal.dot(self.vel);
+            //self.vel = self.vel.sub(coll_normal.scale(d + 0.1));
+        }
+
+        num_iters += 1;
+    }
 }
 
 pub fn followPathGetNextPoint(self: *Thing, dist: f32) V2f {
@@ -683,53 +726,6 @@ pub fn followPathGetNextPoint(self: *Thing, dist: f32) V2f {
     }
 
     return ret;
-}
-
-// TODO cllleaeeaan up
-pub fn getNextCollision(self: *Thing, room: *Room) ?ThingCollision {
-    var coll: ThingCollision = .{ .pos = self.pos };
-
-    if (self.coll_mask.contains(.creature)) {
-        coll = getNextCollisionWithCreatures(self, room);
-    }
-    if (!coll.collided and self.coll_mask.contains(.tile)) {
-        coll = getCircleCollisionWithTiles(self.pos, self.coll_radius, room);
-    }
-    if (coll.collided) return coll;
-
-    return null;
-}
-
-pub fn moveAndCollide(self: *Thing, room: *Room) Error!void {
-    var num_iters: i32 = 0;
-
-    self.dbg.last_coll.collided = false;
-    self.pos = self.pos.add(self.vel);
-
-    while (num_iters < 5) {
-        var coll: ThingCollision = .{ .pos = self.pos };
-
-        if (self.coll_mask.contains(.creature)) {
-            coll = getNextCollisionWithCreatures(self, room);
-        }
-        if (!coll.collided and self.coll_mask.contains(.tile)) {
-            coll = getCircleCollisionWithTiles(self.pos, self.coll_radius, room);
-        }
-
-        if (!coll.collided) break;
-
-        self.dbg.last_coll = coll;
-
-        // push out
-        if (coll.pen_dist > 0) {
-            self.pos = coll.pos.add(coll.normal.scale(self.coll_radius + 1));
-        }
-        // remove -normal component from vel, isn't necessary with current implementation
-        //const d = coll_normal.dot(self.vel);
-        //self.vel = self.vel.sub(coll_normal.scale(d + 0.1));
-
-        num_iters += 1;
-    }
 }
 
 pub fn findPath(self: *Thing, room: *Room, goal: V2f) Error!void {

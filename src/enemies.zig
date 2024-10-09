@@ -261,18 +261,12 @@ pub const AIController = struct {
                             hitbox.rel_pos = self.dir.scale(hitbox.rel_pos.length());
                             hitbox.active = true;
                         }
-                        //TODO not wokkrrkrking
-                        if (self.getNextCollision(room) != null) {
-                            std.debug.print("VCOCOL\n", .{});
-                        }
-                        if (self.vel.length() >= 1.4) {
-                            if (self.getNextCollision(room) != null and !hitbox.active) {
-                                self.coll_mask.insert(.creature);
-                                ai.attack_cooldown.restart();
-                                // must re-enter melee_attack via pursue (once cooldown expires)
-                                ai.ticks_in_state = 0;
-                                continue :state .pursue;
-                            }
+                        if (self.last_coll != null or (self.vel.length() >= 1.4 and !hitbox.active)) {
+                            self.coll_mask.insert(.creature);
+                            ai.attack_cooldown.restart();
+                            // must re-enter melee_attack via pursue (once cooldown expires)
+                            ai.ticks_in_state = 0;
+                            continue :state .pursue;
                         }
                     },
                 }
@@ -400,7 +394,7 @@ pub fn sharpboi() Error!Thing {
             .height = 18 * 4, // TODO pixellszslz
             .radius = 8 * 4,
         },
-        .hp = Thing.HP.init(20),
+        .hp = Thing.HP.init(35),
         .faction = .enemy,
     };
     try ret.init();
