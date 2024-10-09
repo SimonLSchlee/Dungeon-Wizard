@@ -25,11 +25,13 @@ pub const CreatureAnim = struct {
         wizard,
         troll,
         gobbow,
+        sharpboi,
     };
     pub const AnimKind = enum {
         idle,
         move,
         attack,
+        charge,
         cast,
         hit,
         die,

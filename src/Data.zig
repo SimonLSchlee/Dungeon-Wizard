@@ -96,15 +96,29 @@ const test_levels = [_][]const u8{
     \\#########################
     \\#                       #
     \\#                       #
+    \\#    ##        ###      #
     \\#                       #
+    \\#s   p     #            #
+    \\#          #            #
+    \\#   ##             ##   #
     \\#                       #
+    \\#               #       #
+    \\#               #       #
+    \\#                       #
+    \\#########################
+    ,
+    \\#########################
+    \\#                       #
+    \\#             g         #
+    \\#    ##        ###      #
+    \\#    t  t               #
     \\#          #g           #
     \\#       p  #            #
+    \\#   ##             ##   #
     \\#                       #
-    \\#                       #
-    \\#                       #
-    \\#                       #
-    \\#                       #
+    \\#    t          #       #
+    \\#               #       #
+    \\#                g      #
     \\#########################
     ,
     \\#######################################################
@@ -346,6 +360,7 @@ pub fn reload(self: *Data) Error!void {
             .player = try @import("player.zig").protoype(),
             .troll = try @import("enemies.zig").troll(),
             .gobbow = try @import("enemies.zig").gobbow(),
+            .sharpboi = try @import("enemies.zig").sharpboi(),
         },
     );
 }

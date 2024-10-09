@@ -20,6 +20,12 @@ const getPlat = App.getPlat;
 const Thing = @import("Thing.zig");
 const Room = @import("Room.zig");
 
+const AttackType = union(enum) {
+    melee: void,
+    projectile: EnemyProjectile,
+    charge: void,
+};
+
 const EnemyProjectile = enum {
     arrow,
 };
@@ -99,7 +105,7 @@ pub const AIController = struct {
     attack_range: f32 = 40,
     attack_cooldown: utl.TickCounter = utl.TickCounter.initStopped(60),
     can_turn_during_attack: bool = true,
-    attack_projectile: ?EnemyProjectile = null,
+    attack_type: AttackType = .melee,
 
     pub fn update(self: *Thing, room: *Room) Error!void {
         assert(self.spawn_state == .spawned);
@@ -189,33 +195,86 @@ pub const AIController = struct {
                     self.dir = target.pos.sub(self.pos).normalized();
                 }
 
-                self.updateVel(.{}, .{});
-                const events = self.animator.creature.play(.attack, .{ .loop = true });
-                if (events.contains(.end)) {
-                    //std.debug.print("attack end\n", .{});
-                    ai.attack_cooldown.restart();
-                    // must re-enter melee_attack via pursue (once cooldown expires)
-                    ai.ticks_in_state = 0;
-                    continue :state .pursue;
-                }
-                if (events.contains(.commit)) {
-                    ai.can_turn_during_attack = false;
-                }
-                if (events.contains(.hit)) {
-                    self.renderer.creature.draw_color = Colorf.red;
-                    if (self.hitbox) |*hitbox| {
-                        //std.debug.print("hit targetu\n", .{});
-                        hitbox.mask = Thing.Faction.opposing_masks.get(self.faction);
-                        hitbox.rel_pos = self.dir.scale(hitbox.rel_pos.length());
-                        hitbox.active = true;
-                    }
-                    if (ai.attack_projectile) |proj_name| {
-                        switch (proj_name) {
-                            .arrow => {
-                                try gobbowArrow(self, room);
-                            },
+                switch (ai.attack_type) {
+                    .melee => {
+                        self.updateVel(.{}, .{});
+                        const events = self.animator.creature.play(.attack, .{ .loop = true });
+                        if (events.contains(.end)) {
+                            //std.debug.print("attack end\n", .{});
+                            ai.attack_cooldown.restart();
+                            // must re-enter melee_attack via pursue (once cooldown expires)
+                            ai.ticks_in_state = 0;
+                            continue :state .pursue;
                         }
-                    }
+                        if (events.contains(.commit)) {
+                            ai.can_turn_during_attack = false;
+                        }
+                        if (events.contains(.hit)) {
+                            self.renderer.creature.draw_color = Colorf.red;
+                            if (self.hitbox) |*hitbox| {
+                                //std.debug.print("hit targetu\n", .{});
+                                hitbox.mask = Thing.Faction.opposing_masks.get(self.faction);
+                                hitbox.rel_pos = self.dir.scale(hitbox.rel_pos.length());
+                                hitbox.active = true;
+                                if (App.get().data.sounds.get(.thwack)) |s| {
+                                    App.getPlat().playSound(s);
+                                }
+                            }
+                        }
+                    },
+                    .projectile => |proj_name| {
+                        self.updateVel(.{}, .{});
+                        const events = self.animator.creature.play(.attack, .{ .loop = true });
+                        if (events.contains(.end)) {
+                            //std.debug.print("attack end\n", .{});
+                            ai.attack_cooldown.restart();
+                            // must re-enter melee_attack via pursue (once cooldown expires)
+                            ai.ticks_in_state = 0;
+                            continue :state .pursue;
+                        }
+                        if (events.contains(.commit)) {
+                            ai.can_turn_during_attack = false;
+                        }
+                        if (events.contains(.hit)) {
+                            self.renderer.creature.draw_color = Colorf.red;
+                            switch (proj_name) {
+                                .arrow => {
+                                    try gobbowArrow(self, room);
+                                },
+                            }
+                        }
+                    },
+                    .charge => {
+                        if (ai.ticks_in_state == 0) {
+                            ai.can_turn_during_attack = false;
+                            self.coll_mask.remove(.creature);
+                        }
+                        const hitbox = &self.hitbox.?;
+                        const old_speed = self.vel.length();
+                        self.updateVel(self.dir, .{ .accel = 0.1, .max_speed = 2 });
+                        _ = self.animator.creature.play(.charge, .{ .loop = true });
+                        if (old_speed < 1.4 and self.vel.length() >= 1.4) {
+                            //std.debug.print("hit targetu\n", .{});
+                            hitbox.mask = Thing.Faction.opposing_masks.get(self.faction);
+                            hitbox.deactivate_on_update = false;
+                            hitbox.deactivate_on_hit = true;
+                            hitbox.rel_pos = self.dir.scale(hitbox.rel_pos.length());
+                            hitbox.active = true;
+                        }
+                        //TODO not wokkrrkrking
+                        if (self.getNextCollision(room) != null) {
+                            std.debug.print("VCOCOL\n", .{});
+                        }
+                        if (self.vel.length() >= 1.4) {
+                            if (self.getNextCollision(room) != null and !hitbox.active) {
+                                self.coll_mask.insert(.creature);
+                                ai.attack_cooldown.restart();
+                                // must re-enter melee_attack via pursue (once cooldown expires)
+                                ai.ticks_in_state = 0;
+                                continue :state .pursue;
+                            }
+                        }
+                    },
                 }
 
                 break :state .melee_attack;
@@ -285,7 +344,7 @@ pub fn gobbow() Error!Thing {
         .controller = .{ .enemy = .{
             .attack_range = 300,
             .attack_cooldown = utl.TickCounter.initStopped(60),
-            .attack_projectile = .arrow,
+            .attack_type = .{ .projectile = .arrow },
         } },
         .renderer = .{ .creature = .{
             .draw_color = .yellow,
@@ -300,6 +359,46 @@ pub fn gobbow() Error!Thing {
         .selectable = .{
             .height = 12 * 4, // TODO pixellszslz
             .radius = 6 * 4,
+        },
+        .hp = Thing.HP.init(20),
+        .faction = .enemy,
+    };
+    try ret.init();
+    return ret;
+}
+
+pub fn sharpboi() Error!Thing {
+    var ret = Thing{
+        .kind = .sharpboi,
+        .spawn_state = .instance,
+        .coll_radius = 15,
+        .vision_range = 160,
+        .coll_mask = Thing.CollMask.initMany(&.{ .creature, .tile }),
+        .coll_layer = Thing.CollMask.initMany(&.{.creature}),
+        .controller = .{ .enemy = .{
+            .attack_range = 150,
+            .attack_cooldown = utl.TickCounter.initStopped(60),
+            .attack_type = .charge,
+        } },
+        .renderer = .{ .creature = .{
+            .draw_color = .yellow,
+            .draw_radius = 15,
+        } },
+        .animator = .{ .creature = .{
+            .creature_kind = .sharpboi,
+        } },
+        .hitbox = .{
+            .mask = Thing.Faction.opposing_masks.get(.enemy),
+            .radius = 15,
+            .rel_pos = V2f.right.scale(40),
+            .damage = 9,
+        },
+        .hurtbox = .{
+            .radius = 15,
+        },
+        .selectable = .{
+            .height = 18 * 4, // TODO pixellszslz
+            .radius = 8 * 4,
         },
         .hp = Thing.HP.init(20),
         .faction = .enemy,
