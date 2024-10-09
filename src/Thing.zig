@@ -342,10 +342,11 @@ pub const CreatureRenderer = struct {
         const renderer = &self.renderer.creature;
 
         if (self.hp) |hp| {
+            const y_offset = if (self.selectable) |s| s.height + 5 else renderer.draw_radius * 3.5;
             const width = renderer.draw_radius * 2;
             const height = 5;
             const curr_width = utl.remapClampf(0, hp.max, 0, width, hp.curr);
-            const offset = v2f(-width * 0.5, -renderer.draw_radius * 3.5);
+            const offset = v2f(-width * 0.5, -y_offset);
             plat.rectf(self.pos.add(offset), v2f(width, height), .{ .fill_color = Colorf.black });
             plat.rectf(self.pos.add(offset), v2f(curr_width, height), .{ .fill_color = HP.faction_colors.get(self.faction) });
         }

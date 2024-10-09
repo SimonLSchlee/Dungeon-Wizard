@@ -298,7 +298,7 @@ pub fn gobbow() Error!Thing {
             .radius = 15,
         },
         .selectable = .{
-            .height = 9 * 4, // TODO pixellszslz
+            .height = 12 * 4, // TODO pixellszslz
             .radius = 6 * 4,
         },
         .hp = Thing.HP.init(20),

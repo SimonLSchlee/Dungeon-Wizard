@@ -43,7 +43,7 @@ pub fn protoype() Error!Thing {
             .radius = 15,
         },
         .selectable = .{
-            .height = 10 * 4, // TODO pixellszslz
+            .height = 15 * 4, // TODO pixellszslz
             .radius = 6 * 4,
         },
         .hp = Thing.HP.init(50),
