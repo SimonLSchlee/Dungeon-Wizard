@@ -106,6 +106,7 @@ pub const AIController = struct {
     attack_cooldown: utl.TickCounter = utl.TickCounter.initStopped(60),
     can_turn_during_attack: bool = true,
     attack_type: AttackType = .melee,
+    LOS_thiccness: f32 = 10,
 
     pub fn update(self: *Thing, room: *Room) Error!void {
         assert(self.spawn_state == .spawned);
@@ -144,7 +145,7 @@ pub const AIController = struct {
                 };
                 const dist = target.pos.dist(self.pos);
                 const range = @max(dist - self.coll_radius - target.coll_radius, 0);
-                if (range <= ai.attack_range and room.tilemap.isLOSBetweenThicc(self.pos, target.pos, 10)) {
+                if (range <= ai.attack_range and room.tilemap.isLOSBetweenThicc(self.pos, target.pos, ai.LOS_thiccness)) {
                     // in range, but have to wait for cooldown before starting attack
                     if (ai.attack_cooldown.running) {
                         self.updateVel(.{}, .{});
@@ -248,6 +249,7 @@ pub const AIController = struct {
                         if (ai.ticks_in_state == 0) {
                             ai.can_turn_during_attack = false;
                             self.coll_mask.remove(.creature);
+                            self.coll_layer.remove(.creature);
                         }
                         const hitbox = &self.hitbox.?;
                         const old_speed = self.vel.length();
@@ -263,6 +265,7 @@ pub const AIController = struct {
                         }
                         if (self.last_coll != null or (self.vel.length() >= 1.4 and !hitbox.active)) {
                             self.coll_mask.insert(.creature);
+                            self.coll_layer.remove(.creature);
                             ai.attack_cooldown.restart();
                             // must re-enter melee_attack via pursue (once cooldown expires)
                             ai.ticks_in_state = 0;
@@ -371,8 +374,9 @@ pub fn sharpboi() Error!Thing {
         .coll_layer = Thing.CollMask.initMany(&.{.creature}),
         .controller = .{ .enemy = .{
             .attack_range = 150,
-            .attack_cooldown = utl.TickCounter.initStopped(60),
+            .attack_cooldown = utl.TickCounter.initStopped(120),
             .attack_type = .charge,
+            .LOS_thiccness = 30,
         } },
         .renderer = .{ .creature = .{
             .draw_color = .yellow,
