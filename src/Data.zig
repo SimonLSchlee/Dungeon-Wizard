@@ -138,6 +138,11 @@ creature_sprite_sheets: AllCreatureSpriteSheetArrays = undefined,
 creature_anims: AllCreatureAnimArrays = undefined,
 spell_icons: SpriteSheet = undefined,
 spell_icons_indices: SpellIconsFrameIndexArray = undefined,
+sounds: std.EnumArray(SFX, ?Platform.Sound) = undefined,
+
+pub const SFX = enum {
+    thwack,
+};
 
 pub fn init() Error!*Data {
     const plat = App.getPlat();
@@ -145,6 +150,12 @@ pub fn init() Error!*Data {
     data.* = .{};
     try data.reload();
     return data;
+}
+
+pub fn loadSounds(self: *Data) Error!void {
+    const plat = App.getPlat();
+    self.sounds = @TypeOf(self.sounds).initFill(null);
+    self.sounds.getPtr(.thwack).* = try plat.loadSound("thwack.wav");
 }
 
 pub fn loadSpriteSheetFromJson(json_file: std.fs.File, assets_images_rel_dir_path: []const u8) Error!SpriteSheet {
@@ -328,6 +339,7 @@ pub fn loadCreatureSpriteSheets(self: *Data) Error!void {
 
 pub fn reload(self: *Data) Error!void {
     loadSpriteSheets(self) catch std.debug.print("WARNING: failed to load all sprites\n", .{});
+    loadSounds(self) catch std.debug.print("WARNING: failed to load all sounds\n", .{});
     self.levels = &test_levels;
     self.things = @TypeOf(self.things).init(
         .{

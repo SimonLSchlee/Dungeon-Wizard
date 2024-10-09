@@ -62,6 +62,9 @@ pub fn init(width: u32, height: u32, title: []const u8) Error!Platform {
     ret.default_font = try ret.loadFont("Roboto-Regular.ttf");
     ret.screen_dims = V2i.iToV2i(u32, width, height);
     ret.screen_dims_f = ret.screen_dims.toV2f();
+
+    r.InitAudioDevice();
+
     return ret;
 }
 
@@ -576,4 +579,24 @@ pub fn fitTextToRect(self: *Platform, dims: V2f, text: []const u8, opt: draw.Tex
         ret_opt.size += 1;
     }
     return ret_opt;
+}
+
+pub const Sound = struct {
+    name: []const u8,
+    r_sound: r.Sound,
+};
+
+pub fn playSound(_: *Platform, sound: Sound) void {
+    r.PlaySound(sound.r_sound);
+}
+
+pub fn loadSound(_: *Platform, path: []const u8) Error!Sound {
+    @setRuntimeSafety(core.rt_safe_blocks);
+    const path_z = try std.fmt.bufPrintZ(&str_fmt_local_buf, "{s}/sounds/{s}", .{ assets_path, path });
+    const r_sound = r.LoadSound(path_z);
+    const ret: Sound = .{
+        .name = path,
+        .r_sound = r_sound,
+    };
+    return ret;
 }
