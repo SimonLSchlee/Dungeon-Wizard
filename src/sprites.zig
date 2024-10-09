@@ -98,8 +98,9 @@ pub const CreatureAnimator = struct {
         assert(a >= 0 and a <= utl.tau);
         const f = a / utl.tau;
         const i = f * num_dirs_f;
-        assert(i >= 0 and i < num_dirs_f);
-        const dir_index = utl.as(i32, @floor(f * num_dirs_f));
+        assert(i >= 0 and i <= num_dirs_f);
+        // i could be exactly num_dirs_f, mod it to wrap to 0
+        const dir_index = @mod(utl.as(i32, @floor(i)), anim.num_dirs);
         assert(dir_index >= 0 and dir_index < anim.num_dirs);
         const frame_idx = utl.as(usize, dir_index * anim.num_frames + self.curr_anim_frame);
         const ssframe: Data.SpriteSheet.Frame = sprite_sheet.frames[frame_idx];
