@@ -98,7 +98,7 @@ pub const AIController = struct {
     state: enum {
         idle,
         pursue,
-        melee_attack,
+        attack,
     } = .idle,
     ticks_in_state: i64 = 0,
     target: ?Thing.Id = null,
@@ -155,7 +155,7 @@ pub const AIController = struct {
                         _ = self.animator.creature.play(.idle, .{ .loop = true });
                     } else {
                         ai.ticks_in_state = 0;
-                        continue :state .melee_attack;
+                        continue :state .attack;
                     }
                 } else {
                     _ = self.animator.creature.play(.move, .{ .loop = true });
@@ -168,7 +168,7 @@ pub const AIController = struct {
                 }
                 break :state .pursue;
             },
-            .melee_attack => {
+            .attack => {
                 if (ai.ticks_in_state == 0) {
                     ai.can_turn_during_attack = true;
                 }
@@ -203,7 +203,7 @@ pub const AIController = struct {
                         if (events.contains(.end)) {
                             //std.debug.print("attack end\n", .{});
                             ai.attack_cooldown.restart();
-                            // must re-enter melee_attack via pursue (once cooldown expires)
+                            // must re-enter attack via pursue (once cooldown expires)
                             ai.ticks_in_state = 0;
                             continue :state .pursue;
                         }
@@ -229,7 +229,7 @@ pub const AIController = struct {
                         if (events.contains(.end)) {
                             //std.debug.print("attack end\n", .{});
                             ai.attack_cooldown.restart();
-                            // must re-enter melee_attack via pursue (once cooldown expires)
+                            // must re-enter attack via pursue (once cooldown expires)
                             ai.ticks_in_state = 0;
                             continue :state .pursue;
                         }
@@ -252,29 +252,38 @@ pub const AIController = struct {
                             self.coll_layer.remove(.creature);
                         }
                         const hitbox = &self.hitbox.?;
-                        const old_speed = self.vel.length();
-                        self.updateVel(self.dir, .{ .accel = 0.1, .max_speed = 2 });
                         _ = self.animator.creature.play(.charge, .{ .loop = true });
-                        if (old_speed < 1.4 and self.vel.length() >= 1.4) {
-                            //std.debug.print("hit targetu\n", .{});
-                            hitbox.mask = Thing.Faction.opposing_masks.get(self.faction);
-                            hitbox.deactivate_on_update = false;
-                            hitbox.deactivate_on_hit = true;
-                            hitbox.rel_pos = self.dir.scale(hitbox.rel_pos.length());
-                            hitbox.active = true;
-                        }
-                        if (self.last_coll != null or (self.vel.length() >= 1.4 and !hitbox.active)) {
-                            self.coll_mask.insert(.creature);
-                            self.coll_layer.remove(.creature);
-                            ai.attack_cooldown.restart();
-                            // must re-enter melee_attack via pursue (once cooldown expires)
-                            ai.ticks_in_state = 0;
-                            continue :state .pursue;
+
+                        if (target.pos.sub(self.pos).dot(self.dir) > 0) {
+                            const old_speed = self.vel.length();
+                            self.updateVel(self.dir, .{ .accel = 0.2, .max_speed = 2.5 });
+                            if (old_speed < 1 and self.vel.length() >= 1) {
+                                //std.debug.print("hit targetu\n", .{});
+                                hitbox.mask = Thing.Faction.opposing_masks.get(self.faction);
+                                hitbox.deactivate_on_update = false;
+                                hitbox.deactivate_on_hit = true;
+                                hitbox.rel_pos = self.dir.scale(hitbox.rel_pos.length());
+                                hitbox.active = true;
+                            }
+                            // gone past target, stop!
+                        } else {
+                            self.updateVel(.{}, .{ .max_speed = 2, .friction = 0.03 });
+                            hitbox.active = false;
+                            if (self.vel.length() < 0.1) {
+                                //}
+                                //if (self.last_coll != null or (self.vel.length() >= 1.4 and !hitbox.active)) {
+                                self.coll_mask.insert(.creature);
+                                self.coll_layer.insert(.creature);
+                                ai.attack_cooldown.restart();
+                                // must re-enter attack via pursue (once cooldown expires)
+                                ai.ticks_in_state = 0;
+                                continue :state .pursue;
+                            }
                         }
                     },
                 }
 
-                break :state .melee_attack;
+                break :state .attack;
             },
         };
         ai.ticks_in_state += 1;
