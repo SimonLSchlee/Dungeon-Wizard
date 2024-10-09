@@ -65,7 +65,7 @@ dirv: f32 = 0,
 coll_radius: f32 = 0,
 coll_mask: CollMask = .{},
 coll_layer: CollMask = .{},
-last_coll: ?Collision = .{},
+last_coll: ?Collision = null,
 vision_range: f32 = 0,
 accel_params: AccelParams = .{},
 dir_accel_params: DirAccelParams = .{},
@@ -204,13 +204,12 @@ pub const HurtBox = struct {
 pub const ProjectileController = struct {
     pub fn update(self: *Thing, room: *Room) Error!void {
         assert(self.spawn_state == .spawned);
-        //const projectile = &self.controller.projectile;
-        self.pos = self.pos.add(self.vel);
         if (self.hitbox) |hitbox| {
             if (!hitbox.active) {
                 self.deferFree(room);
             }
         }
+        try self.moveAndCollide(room);
         if (self.last_coll) |_| {
             self.deferFree(room);
         }
