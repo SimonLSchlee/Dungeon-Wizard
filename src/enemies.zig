@@ -23,7 +23,9 @@ const Room = @import("Room.zig");
 const AttackType = union(enum) {
     melee: void,
     projectile: EnemyProjectile,
-    charge: void,
+    charge: struct {
+        charge_hitbox_activated: bool = false,
+    },
 };
 
 const EnemyProjectile = enum {
@@ -245,9 +247,10 @@ pub const AIController = struct {
                             }
                         }
                     },
-                    .charge => {
+                    .charge => |*ch| {
                         if (ai.ticks_in_state == 0) {
                             ai.can_turn_during_attack = false;
+                            ch.charge_hitbox_activated = false;
                             self.coll_mask.remove(.creature);
                             self.coll_layer.remove(.creature);
                         }
@@ -264,21 +267,20 @@ pub const AIController = struct {
                                 hitbox.deactivate_on_hit = true;
                                 hitbox.rel_pos = self.dir.scale(hitbox.rel_pos.length());
                                 hitbox.active = true;
+                                ch.charge_hitbox_activated = true;
                             }
-                            // gone past target, stop!
                         } else {
-                            self.updateVel(.{}, .{ .max_speed = 2, .friction = 0.03 });
+                            // gone past target, stop!
+                            self.updateVel(.{}, .{ .max_speed = 2.5, .friction = 0.03 });
+                        }
+                        if (ch.charge_hitbox_activated and (!hitbox.active or self.vel.length() < 0.01)) {
                             hitbox.active = false;
-                            if (self.vel.length() < 0.1) {
-                                //}
-                                //if (self.last_coll != null or (self.vel.length() >= 1.4 and !hitbox.active)) {
-                                self.coll_mask.insert(.creature);
-                                self.coll_layer.insert(.creature);
-                                ai.attack_cooldown.restart();
-                                // must re-enter attack via pursue (once cooldown expires)
-                                ai.ticks_in_state = 0;
-                                continue :state .pursue;
-                            }
+                            self.coll_mask.insert(.creature);
+                            self.coll_layer.insert(.creature);
+                            ai.attack_cooldown.restart();
+                            // must re-enter attack via pursue (once cooldown expires)
+                            ai.ticks_in_state = 0;
+                            continue :state .pursue;
                         }
                     },
                 }
@@ -384,7 +386,7 @@ pub fn sharpboi() Error!Thing {
         .controller = .{ .enemy = .{
             .attack_range = 150,
             .attack_cooldown = utl.TickCounter.initStopped(120),
-            .attack_type = .charge,
+            .attack_type = .{ .charge = .{} },
             .LOS_thiccness = 30,
         } },
         .renderer = .{ .creature = .{
