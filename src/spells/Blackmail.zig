@@ -31,7 +31,7 @@ pub const enum_name = "blackmail";
 pub const Controllers = [_]type{};
 
 pub const proto = Spell.makeProto(
-    .blackmail,
+    std.meta.stringToEnum(Spell.Kind, enum_name).?,
     .{
         .cast_time = 4,
         .color = StatusEffect.proto_array.get(.blackmailed).color,

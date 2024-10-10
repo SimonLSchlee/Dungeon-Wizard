@@ -30,7 +30,7 @@ pub const enum_name = "unherring";
 pub const Controllers = [_]type{Projectile};
 
 pub const proto = Spell.makeProto(
-    .unherring,
+    std.meta.stringToEnum(Spell.Kind, enum_name).?,
     .{
         .color = .red,
         .targeting_data = .{

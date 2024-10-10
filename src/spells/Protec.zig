@@ -31,7 +31,7 @@ pub const enum_name = "protec";
 pub const Controllers = [_]type{};
 
 pub const proto = Spell.makeProto(
-    .protec,
+    std.meta.stringToEnum(Spell.Kind, enum_name).?,
     .{
         .color = StatusEffect.proto_array.get(.protected).color,
         .targeting_data = .{
