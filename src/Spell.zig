@@ -35,6 +35,7 @@ pub const SpellTypes = [_]type{
     @import("spells/Blackmail.zig"),
     @import("spells/Mint.zig"),
     @import("spells/Impling.zig"),
+    @import("spells/Promptitude.zig"),
 };
 
 pub const Kind = utl.EnumFromTypes(&SpellTypes, "enum_name");
@@ -136,33 +137,6 @@ pub fn makeProto(kind: Kind, the_rest: Spell) Spell {
     ret.cast_time_ticks = 30 * ret.cast_time;
     return ret;
 }
-
-pub const Promptitude = struct {
-    pub const proto: Spell = makeProto(
-        .promptitude,
-        .{
-            .cast_time = 2,
-            .color = .red,
-            .targeting_data = .{
-                .kind = .self,
-            },
-        },
-    );
-    pub fn render(self: *const Thing, room: *const Room) Error!void {
-        _ = self;
-        _ = room;
-    }
-    pub fn update(self: *Thing, room: *Room) Error!void {
-        _ = self;
-        _ = room;
-    }
-    pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
-        _ = self;
-        _ = caster;
-        _ = room;
-        _ = params;
-    }
-};
 
 pub const FlameExplode = struct {
     pub const proto: Spell = makeProto(

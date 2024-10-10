@@ -147,13 +147,15 @@ pub fn reset(self: *Room) Error!void {
     const blackmail = Spell.getProto(.blackmail);
     const mint = Spell.getProto(.mint);
     const impling = Spell.getProto(.impling);
+    const promptitude = Spell.getProto(.promptitude);
     const starter_deck = [_]struct { Spell, usize }{
         .{ unherring, 5 },
         .{ protec, 3 },
         .{ frost, 1 },
         .{ blackmail, 1 },
         .{ mint, 1 },
-        .{ impling, 100 },
+        .{ impling, 1 },
+        .{ promptitude, 100 },
     };
 
     deck: for (starter_deck) |t| {

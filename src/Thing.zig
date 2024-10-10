@@ -390,15 +390,22 @@ pub const DefaultController = struct {
     pub fn update(_: *Thing, _: *Room) Error!void {}
 };
 
+fn updateController(self: *Thing, room: *Room) Error!void {
+    switch (self.controller) {
+        inline else => |c| {
+            const C = @TypeOf(c);
+            if (std.meta.hasMethod(C, "update")) {
+                try C.update(self, room);
+            }
+        },
+    }
+}
+
 pub fn update(self: *Thing, room: *Room) Error!void {
     if (self.statuses.get(.frozen).stacks == 0) {
-        switch (self.controller) {
-            inline else => |c| {
-                const C = @TypeOf(c);
-                if (std.meta.hasMethod(C, "update")) {
-                    try C.update(self, room);
-                }
-            },
+        try updateController(self, room);
+        if (self.statuses.get(.promptitude).stacks > 0) {
+            try updateController(self, room);
         }
     }
     if (self.hitbox) |*hitbox| {

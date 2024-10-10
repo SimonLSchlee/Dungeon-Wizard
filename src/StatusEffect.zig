@@ -60,6 +60,12 @@ const protos = [_]ComptimeProto{
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(1.0, 0.9, 0),
     },
+    .{
+        .enum_name = "promptitude",
+        .cd = 1 * core.fups_per_sec,
+        .cd_type = .remove_one_stack,
+        .color = Colorf.rgb(0.95, 0.9, 1.0),
+    },
 };
 
 const Kind = blk: {
