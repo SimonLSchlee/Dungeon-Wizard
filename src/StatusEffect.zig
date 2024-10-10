@@ -54,6 +54,12 @@ const protos = [_]ComptimeProto{
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(0.6, 0, 0),
     },
+    .{
+        .enum_name = "mint",
+        .cd = 1 * core.fups_per_sec,
+        .cd_type = .remove_one_stack,
+        .color = Colorf.rgb(1.0, 0.9, 0),
+    },
 };
 
 const Kind = blk: {

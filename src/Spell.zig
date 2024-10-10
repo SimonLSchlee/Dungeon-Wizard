@@ -33,6 +33,7 @@ pub const SpellTypes = [_]type{
     @import("spells/Protec.zig"),
     @import("spells/FrostVom.zig"),
     @import("spells/Blackmail.zig"),
+    @import("spells/Mint.zig"),
 };
 
 pub const Kind = utl.EnumFromTypes(&SpellTypes, "enum_name");
@@ -79,7 +80,11 @@ pub const Params = struct {
 pub const TargetingData = struct {
     kind: TargetKind = .self,
     color: Colorf = .cyan,
-    line_to_mouse: bool = false,
+    ray_to_mouse: ?struct {
+        fixed_range: bool = false,
+        max_range: f32 = 999999,
+        thickness: f32 = 1,
+    } = null,
     target_faction_mask: Thing.Faction.Mask = .{},
     target_mouse_pos: bool = false,
     radius_under_mouse: ?f32 = null,
@@ -130,33 +135,6 @@ pub fn makeProto(kind: Kind, the_rest: Spell) Spell {
     ret.cast_time_ticks = 30 * ret.cast_time;
     return ret;
 }
-
-pub const Mint = struct {
-    pub const proto: Spell = makeProto(
-        .mint,
-        .{
-            .color = .red,
-            .targeting_data = .{
-                .kind = .pos,
-                .line_to_mouse = true,
-            },
-        },
-    );
-    pub fn render(self: *const Thing, room: *const Room) Error!void {
-        _ = self;
-        _ = room;
-    }
-    pub fn update(self: *Thing, room: *Room) Error!void {
-        _ = self;
-        _ = room;
-    }
-    pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
-        _ = self;
-        _ = caster;
-        _ = room;
-        _ = params;
-    }
-};
 
 pub const Impling = struct {
     pub const proto: Spell = makeProto(
@@ -310,8 +288,9 @@ pub fn renderTargeting(self: *const Spell, room: *const Room, caster: *const Thi
 
     switch (targeting_data.kind) {
         .pos => {
+            const caster_to_mouse = mouse_pos.sub(caster.pos);
+            const target_dir = if (caster_to_mouse.normalizedChecked()) |d| d else V2f.right;
             if (targeting_data.cone_from_self_to_mouse) |cone| {
-                const target_dir = if (mouse_pos.sub(caster.pos).normalizedChecked()) |d| d else V2f.right;
                 const start_rads = target_dir.toAngleRadians() - cone.radians * 0.5;
                 const end_rads = start_rads + cone.radians;
                 //try plat.textf(caster.pos.add(V2f.right.scale(cone.radius * 0.5).rotRadians(start_rads)), "{d:.3}", .{start_rads}, .{ .color = .white });
@@ -323,7 +302,11 @@ pub fn renderTargeting(self: *const Spell, room: *const Room, caster: *const Thi
                     .{ .fill_color = targeting_data.color.fade(0.5) },
                 );
             }
-            //plat.linef(caster.pos, mouse_pos, 4, .red);
+            if (targeting_data.ray_to_mouse) |ray| {
+                const len = if (ray.fixed_range) ray.max_range else @min(ray.max_range, caster_to_mouse.length());
+                const end = caster.pos.add(target_dir.scale(len));
+                plat.linef(caster.pos, end, ray.thickness, targeting_data.color);
+            }
         },
         .self => {
             const draw_radius = caster.selectable.?.radius;
