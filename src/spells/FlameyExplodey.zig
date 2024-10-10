@@ -27,53 +27,70 @@ const TargetKind = Spell.TargetKind;
 const TargetingData = Spell.TargetingData;
 const Params = Spell.Params;
 
-pub const enum_name = "mint";
+pub const enum_name = "flamey_explodey";
 pub const Controllers = [_]type{Projectile};
 
-const base_radius = 7;
+const base_explode_radius = 50;
+const base_ball_radius = 12;
 const base_range = 200;
 
 pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
     .{
-        .cast_time = 1,
-        .color = StatusEffect.proto_array.get(.mint).color,
+        .cast_time = 2,
+        .color = .red,
         .targeting_data = .{
             .kind = .pos,
-            .fixed_range = true,
+            .fixed_range = false,
             .max_range = base_range,
             .ray_to_mouse = .{
-                .thickness = base_radius, // TODO use radius below?
+                .thickness = base_ball_radius, // TODO use radius below?
             },
+            .radius_under_mouse = base_explode_radius,
         },
     },
 );
 
-hit_effect: Thing.HitEffect = .{
-    .damage = 6,
-    .status_stacks = StatusEffect.StacksArray.initDefault(0, .{ .mint = 10 }),
+explode_hit_effect: Thing.HitEffect = .{
+    .damage = 15,
 },
-radius: f32 = base_radius,
+ball_hit_effect: Thing.HitEffect = .{
+    .damage = 5,
+},
+ball_radius: f32 = base_ball_radius,
+explode_radius: f32 = base_explode_radius,
 range: f32 = base_range,
 max_speed: f32 = 6,
 
 pub const Projectile = struct {
     pub const controller_enum_name = enum_name ++ "_projectile";
 
+    exploded: bool = false,
+    explode_counter: utl.TickCounter = utl.TickCounter.init(10),
+
     pub fn update(self: *Thing, room: *Room) Error!void {
         const spell_controller = &self.controller.spell;
         const spell = spell_controller.spell;
-        const mint = spell.kind.mint;
-        _ = mint;
+        const flamey_explodey = spell.kind.flamey_explodey;
         const params = spell_controller.params;
         const target_pos = params.target.pos;
-        const projectile: *@This() = &spell_controller.controller.mint_projectile;
-        _ = projectile;
+        const projectile: *@This() = &spell_controller.controller.flamey_explodey_projectile;
 
-        if (self.hitbox) |hitbox| {
-            if (!hitbox.active) {
-                self.deferFree(room);
-            } else if (self.pos.dist(target_pos) < self.vel.length() * 2) {
+        if (!projectile.exploded) {
+            const hitbox = &self.hitbox.?;
+            if (!hitbox.active or self.pos.dist(target_pos) < self.vel.length() * 2) {
+                projectile.exploded = true;
+                hitbox.active = true;
+                hitbox.deactivate_on_update = true;
+                hitbox.deactivate_on_hit = false;
+                hitbox.radius = flamey_explodey.explode_radius;
+                hitbox.effect = flamey_explodey.explode_hit_effect;
+                hitbox.mask = Thing.Faction.Mask.initFull();
+                self.renderer.shape.kind.circle.radius = flamey_explodey.explode_radius;
+                self.vel = .{};
+            }
+        } else {
+            if (projectile.explode_counter.tick(false)) {
                 self.deferFree(room);
             }
         }
@@ -83,14 +100,14 @@ pub const Projectile = struct {
 
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
     assert(std.meta.activeTag(params.target) == Spell.TargetKind.pos);
-    const mint = self.kind.mint;
+    const flamey_explodey = self.kind.flamey_explodey;
     const target_pos = params.target.pos;
     const target_dir = if (target_pos.sub(caster.pos).normalizedChecked()) |d| d else V2f.right;
 
-    var coin = Thing{
+    var ball = Thing{
         .kind = .projectile,
         .dir = target_dir,
-        .vel = target_dir.scale(mint.max_speed),
+        .vel = target_dir.scale(flamey_explodey.max_speed),
         .coll_radius = 5,
         .accel_params = .{
             .accel = 0.5,
@@ -100,13 +117,13 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             .spell = self.*,
             .params = params,
             .controller = .{
-                .mint_projectile = .{},
+                .flamey_explodey_projectile = .{},
             },
         } },
         .renderer = .{
             .shape = .{
-                .kind = .{ .circle = .{ .radius = mint.radius } },
-                .poly_opt = .{ .fill_color = self.color },
+                .kind = .{ .circle = .{ .radius = flamey_explodey.ball_radius } },
+                .poly_opt = .{ .fill_color = Colorf.orange },
             },
         },
         .hitbox = .{
@@ -114,11 +131,11 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             .mask = Thing.Faction.opposing_masks.get(caster.faction),
             .deactivate_on_hit = true,
             .deactivate_on_update = false,
-            .effect = mint.hit_effect,
-            .radius = mint.radius,
+            .effect = flamey_explodey.ball_hit_effect,
+            .radius = flamey_explodey.ball_radius,
         },
     };
-    try coin.init();
-    defer coin.deinit();
-    _ = try room.queueSpawnThing(&coin, caster.pos);
+    try ball.init();
+    defer ball.deinit();
+    _ = try room.queueSpawnThing(&ball, caster.pos);
 }

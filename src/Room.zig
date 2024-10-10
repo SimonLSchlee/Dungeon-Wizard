@@ -148,6 +148,7 @@ pub fn reset(self: *Room) Error!void {
     const mint = Spell.getProto(.mint);
     const impling = Spell.getProto(.impling);
     const promptitude = Spell.getProto(.promptitude);
+    const flamey_explodey = Spell.getProto(.flamey_explodey);
     const starter_deck = [_]struct { Spell, usize }{
         .{ unherring, 5 },
         .{ protec, 3 },
@@ -155,7 +156,8 @@ pub fn reset(self: *Room) Error!void {
         .{ blackmail, 1 },
         .{ mint, 1 },
         .{ impling, 1 },
-        .{ promptitude, 100 },
+        .{ promptitude, 1 },
+        .{ flamey_explodey, 100 },
     };
 
     deck: for (starter_deck) |t| {
