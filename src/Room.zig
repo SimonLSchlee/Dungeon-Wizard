@@ -441,11 +441,9 @@ pub fn render(self: *const Room) Error!void {
             plat.circlef(lower.add(v2f(0, u.as(f32, i) * -7)), 55, poly_opt);
         }
 
-        const Run = struct {
-            gold: i32 = 120,
-        }{};
+        const run = &App.get().run;
         const gold_width = (try plat.measureText("Gold", .{ .size = 25 })).x;
-        try plat.textf(center.sub(v2f(gold_width, 0)), "Gold: {}", .{Run.gold}, .{
+        try plat.textf(center.sub(v2f(gold_width, 0)), "Gold: {}", .{run.gold}, .{
             .color = text_color,
             .size = 25,
         });

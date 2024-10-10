@@ -15,7 +15,7 @@ const V2i = @import("V2i.zig");
 const v2i = V2i.v2i;
 
 const App = @This();
-const Room = @import("Room.zig");
+const Run = @import("Run.zig");
 const Data = @import("Data.zig");
 
 var _app: ?*App = null;
@@ -33,9 +33,9 @@ _arena: std.heap.ArenaAllocator = undefined,
 arena: std.mem.Allocator = undefined,
 data: *Data = undefined,
 screen: enum {
-    game,
-} = .game,
-room: Room = undefined,
+    run,
+} = .run,
+run: Run = undefined,
 
 export fn appInit(plat: *Platform) *anyopaque {
     // everything depends on plat global
@@ -49,7 +49,7 @@ export fn appInit(plat: *Platform) *anyopaque {
 
     // populate _app here, Room.init() uses it
     _app = app;
-    app.room = Room.init(0) catch @panic("Failed to init game state");
+    app.run = Run.init(0) catch @panic("Failed to init run state");
 
     return app;
 }
@@ -81,36 +81,22 @@ pub fn reset(self: *App) Error!*App {
 }
 
 pub fn deinit(self: *App) void {
-    self.room.deinit();
+    self.run.deinit();
     getPlat().heap.destroy(self);
 }
 
 fn update(self: *App) Error!void {
-    const plat = getPlat();
     switch (self.screen) {
-        .game => {
-            if (plat.input_buffer.keyIsJustPressed(.f4)) {
-                try self.room.reset();
-            }
-            try self.room.update();
+        .run => {
+            try self.run.update();
         },
     }
 }
 
 fn render(self: *App) Error!void {
-    const plat = getPlat();
     switch (self.screen) {
-        .game => {
-            try self.room.render();
-
-            plat.clear(Colorf.magenta);
-            //const game_scale: i32 = 2;
-            //const game_dims_scaled_f = game_dims.scale(game_scale).toV2f();
-            //const topleft = p.screen_dims_f.sub(game_dims_scaled_f).scale(0.5);
-            const game_texture_opt = .{
-                .flip_y = true,
-            };
-            plat.texturef(.{}, self.room.render_texture.?.texture, game_texture_opt);
+        .run => {
+            try self.run.render();
         },
     }
 }

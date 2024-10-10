@@ -200,14 +200,20 @@ pub const HurtBox = struct {
         }
         if (self.hp) |*hp| {
             hp.curr = utl.clampf(hp.curr - effect.damage, 0, hp.max);
-            if (hp.curr == 0) {
-                // TODO do this elsewhere, better
-                self.deferFree(room);
-            }
         }
         for (&self.statuses.values) |*status| {
             const stacks = effect.status_stacks.get(status.kind);
             status.stacks += stacks;
+        }
+        if (self.hp) |hp| {
+            if (hp.curr == 0) {
+                const mint_status = self.statuses.get(.mint);
+                const run = &App.get().run;
+                run.gold += mint_status.stacks;
+
+                // TODO do this elsewhere, better
+                self.deferFree(room);
+            }
         }
     }
 };
