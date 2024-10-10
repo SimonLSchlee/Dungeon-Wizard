@@ -166,6 +166,6 @@ pub const InputController = struct {
             controller.ticks_in_state += 1;
         }
 
-        try self.moveAndCollide(room);
+        self.moveAndCollide(room);
     }
 };

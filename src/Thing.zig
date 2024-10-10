@@ -209,7 +209,7 @@ pub const ProjectileController = struct {
                 self.deferFree(room);
             }
         }
-        try self.moveAndCollide(room);
+        self.moveAndCollide(room);
         if (self.last_coll) |_| {
             self.deferFree(room);
         }
@@ -491,7 +491,7 @@ pub fn copyTo(self: *const Thing, other: *Thing) Error!void {
 
 fn defaultUpdate(self: *Thing, room: *Room) Error!void {
     assert(self.spawn_state == .spawned);
-    try self.moveAndCollide(room);
+    self.moveAndCollide(room);
 }
 
 pub const Collision = struct {
@@ -666,7 +666,7 @@ pub fn getCircleCollisionWithTiles(pos: V2f, radius: f32, room: *const Room) ?Co
     return coll;
 }
 
-pub fn moveAndCollide(self: *Thing, room: *Room) Error!void {
+pub fn moveAndCollide(self: *Thing, room: *Room) void {
     var num_iters: i32 = 0;
 
     self.last_coll = null;

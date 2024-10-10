@@ -297,7 +297,7 @@ pub const AIController = struct {
                 }
             }
         }
-        try self.moveAndCollide(room);
+        self.moveAndCollide(room);
     }
 };
 

@@ -83,7 +83,7 @@ pub const Projectile = struct {
         } else {
             self.updateVel(v.normalized(), self.accel_params);
             self.updateDir(self.vel, .{ .ang_accel = 999, .max_ang_vel = 999 });
-            try self.moveAndCollide(room);
+            self.moveAndCollide(room);
         }
     }
 };
