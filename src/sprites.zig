@@ -26,6 +26,7 @@ pub const CreatureAnim = struct {
         troll,
         gobbow,
         sharpboi,
+        impling,
     };
     pub const AnimKind = enum {
         idle,

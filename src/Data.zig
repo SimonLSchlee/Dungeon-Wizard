@@ -370,6 +370,7 @@ pub fn reload(self: *Data) Error!void {
             .troll = try @import("enemies.zig").troll(),
             .gobbow = try @import("enemies.zig").gobbow(),
             .sharpboi = try @import("enemies.zig").sharpboi(),
+            .impling = try @import("spells/Impling.zig").implingProto(),
         },
     );
 }

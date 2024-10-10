@@ -57,7 +57,7 @@ fn gobbowArrow(self: *const Thing, room: *Room) Error!void {
     };
     try arrow.init();
     defer arrow.deinit();
-    _ = try room.queueSpawnThing(&arrow, self.pos);
+    assert(try room.queueSpawnThing(&arrow, self.pos) != null);
 }
 
 pub fn getThingsInRadius(self: *Thing, room: *Room, radius: f32, buf: []*Thing) usize {
@@ -161,7 +161,7 @@ pub const AIController = struct {
                     _ = self.animator.creature.play(.move, .{ .loop = true });
                     try self.findPath(room, target.pos);
                     const p = self.followPathGetNextPoint(10);
-                    self.updateVel(p.sub(self.pos).normalizedOrZero(), .{});
+                    self.updateVel(p.sub(self.pos).normalizedOrZero(), self.accel_params);
                     if (!self.vel.isAlmostZero()) {
                         self.dir = self.vel.normalized();
                     }

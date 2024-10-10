@@ -34,6 +34,7 @@ pub const Kind = enum {
     troll,
     gobbow,
     sharpboi,
+    impling,
     projectile,
     shield,
 };
