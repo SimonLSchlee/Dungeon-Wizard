@@ -30,6 +30,9 @@ const Params = Spell.Params;
 pub const enum_name = "mint";
 pub const Controllers = [_]type{Projectile};
 
+const base_radius = 7;
+const base_range = 200;
+
 pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
     .{
@@ -39,8 +42,8 @@ pub const proto = Spell.makeProto(
             .kind = .pos,
             .ray_to_mouse = .{
                 .fixed_range = true,
-                .max_range = 200,
-                .thickness = 7, // TODO use radius below
+                .max_range = base_range,
+                .thickness = base_radius, // TODO use radius below?
             },
         },
     },
@@ -50,9 +53,9 @@ hit_effect: Thing.HitEffect = .{
     .damage = 6,
     .status_stacks = StatusEffect.StacksArray.initDefault(0, .{ .mint = 10 }),
 },
-radius: f32 = 7,
-range: f32 = 200,
-max_speed: f32 = 3,
+radius: f32 = base_radius,
+range: f32 = base_range,
+max_speed: f32 = 6,
 
 pub const Projectile = struct {
     pub const controller_enum_name = enum_name ++ "_projectile";
@@ -70,10 +73,9 @@ pub const Projectile = struct {
         if (self.hitbox) |hitbox| {
             if (!hitbox.active) {
                 self.deferFree(room);
+            } else if (self.pos.dist(projectile.end_pos) < self.vel.length() * 2) {
+                self.deferFree(room);
             }
-        }
-        if (self.pos.dist(projectile.end_pos) < self.vel.length() * 2) {
-            self.deferFree(room);
         }
         self.moveAndCollide(room);
     }
@@ -105,11 +107,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
         } },
         .renderer = .{
             .shape = .{
-                .kind = .{
-                    .circle = .{
-                        .radius = mint.radius,
-                    },
-                },
+                .kind = .{ .circle = .{ .radius = mint.radius } },
                 .poly_opt = .{ .fill_color = self.color },
             },
         },

@@ -431,6 +431,24 @@ pub fn render(self: *const Room) Error!void {
         try plat.textf(p, txt, .{}, opt);
     } else {
         try self.spell_slots.render(self);
+        const fill_color = Colorf.rgb(1, 0.9, 0);
+        const text_color = Colorf.rgb(0.44, 0.3, 0.0);
+        const poly_opt = .{ .fill_color = fill_color, .outline_color = text_color, .outline_thickness = 10 };
+        const center = v2f(150, plat.screen_dims_f.y - 100);
+        const num = 3;
+        const lower = center.add(v2f(0, 7 * num));
+        for (0..num) |i| {
+            plat.circlef(lower.add(v2f(0, u.as(f32, i) * -7)), 55, poly_opt);
+        }
+
+        const Run = struct {
+            gold: i32 = 120,
+        }{};
+        const gold_width = (try plat.measureText("Gold", .{ .size = 25 })).x;
+        try plat.textf(center.sub(v2f(gold_width, 0)), "Gold: {}", .{Run.gold}, .{
+            .color = text_color,
+            .size = 25,
+        });
     }
 
     plat.endRenderToTexture();
