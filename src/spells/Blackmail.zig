@@ -47,7 +47,7 @@ num_stacks: i32 = 7,
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
     assert(std.meta.activeTag(params.target) == Spell.TargetKind.thing);
     assert(utl.unionTagEql(params.target, .{ .thing = .{} }));
-
+    _ = caster;
     const _target = room.getThingById(params.target.thing);
     if (_target == null) {
         // fizzle
@@ -55,6 +55,6 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     }
     const target = _target.?;
     const blackmail = self.kind.blackmail;
-    target.faction = caster.faction;
+    target.faction = .ally;
     target.statuses.getPtr(.blackmailed).stacks = blackmail.num_stacks;
 }

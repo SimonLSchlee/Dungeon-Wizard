@@ -131,7 +131,7 @@ pub const HP = struct {
         .object = Colorf.gray,
         .neutral = Colorf.gray,
         .player = Colorf.green,
-        .ally = Colorf.blue,
+        .ally = Colorf.rgb(0, 0.5, 1),
         .enemy = Colorf.red,
         .bezerk = Colorf.orange,
     });

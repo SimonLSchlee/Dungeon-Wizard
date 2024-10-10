@@ -80,7 +80,7 @@ pub fn implingProto() Error!Thing {
             .radius = 15,
         },
         .selectable = .{
-            .height = 18 * 4, // TODO pixellszslz
+            .height = 13 * 4, // TODO pixellszslz
             .radius = 8 * 4,
         },
         .hp = Thing.HP.init(25),
