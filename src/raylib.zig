@@ -64,6 +64,7 @@ pub fn init(width: u32, height: u32, title: []const u8) Error!Platform {
     ret.screen_dims_f = ret.screen_dims.toV2f();
 
     r.InitAudioDevice();
+    r.SetExitKey(0);
 
     return ret;
 }
