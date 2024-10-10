@@ -352,14 +352,29 @@ pub const CreatureRenderer = struct {
         const plat = getPlat();
         const renderer = &self.renderer.creature;
 
+        const hp_height = 6;
+        const hp_width = renderer.draw_radius * 2;
+        const hp_y_offset = if (self.selectable) |s| s.height + 15 else renderer.draw_radius * 3.5;
+        const hp_offset = v2f(-hp_width * 0.5, -hp_y_offset);
+
         if (self.hp) |hp| {
-            const y_offset = if (self.selectable) |s| s.height + 5 else renderer.draw_radius * 3.5;
-            const width = renderer.draw_radius * 2;
-            const height = 5;
-            const curr_width = utl.remapClampf(0, hp.max, 0, width, hp.curr);
-            const offset = v2f(-width * 0.5, -y_offset);
-            plat.rectf(self.pos.add(offset), v2f(width, height), .{ .fill_color = Colorf.black });
-            plat.rectf(self.pos.add(offset), v2f(curr_width, height), .{ .fill_color = HP.faction_colors.get(self.faction) });
+            const curr_width = utl.remapClampf(0, hp.max, 0, hp_width, hp.curr);
+            plat.rectf(self.pos.add(hp_offset), v2f(hp_width, hp_height), .{ .fill_color = Colorf.black });
+            plat.rectf(self.pos.add(hp_offset), v2f(curr_width, hp_height), .{ .fill_color = HP.faction_colors.get(self.faction) });
+        }
+        // debug draw statuses
+        const status_height = 14;
+        const status_y_offset = hp_y_offset - (hp_height + 3);
+        var status_pos = self.pos.add(v2f(-hp_width * 0.5, -status_y_offset));
+        for (self.statuses.values) |status| {
+            if (status.stacks == 0) continue;
+            const text = try utl.bufPrintLocal("{}", .{status.stacks});
+            const text_dims = try plat.measureText(text, .{ .size = status_height - 1 });
+            const status_box_width = text_dims.x;
+            const text_color = Colorf.getContrasting(status.color);
+            plat.rectf(status_pos, v2f(status_box_width, status_height), .{ .fill_color = status.color });
+            try plat.textf(status_pos, "{s}", .{text}, .{ .size = status_height - 1, .color = text_color });
+            status_pos.x += status_box_width;
         }
     }
 };

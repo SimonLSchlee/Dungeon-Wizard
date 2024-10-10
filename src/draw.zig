@@ -128,6 +128,12 @@ pub const Colorf = struct {
             u.as(u8, clamped.a * 255),
         );
     }
+
+    pub fn getContrasting(self: Colorf) Colorf {
+        const total = self.r + self.g + self.b;
+        if (total > 1.5) return .black;
+        return .white;
+    }
 };
 
 pub const Smoothing = enum {
