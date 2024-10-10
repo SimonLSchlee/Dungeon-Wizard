@@ -28,6 +28,7 @@ const player = @import("Player.zig");
 const enemies = @import("enemies.zig");
 const Spell = @import("Spell.zig");
 const StatusEffect = @import("StatusEffect.zig");
+const Collision = @import("Collision.zig");
 
 pub const Kind = enum {
     player,
@@ -534,176 +535,8 @@ fn defaultUpdate(self: *Thing, room: *Room) Error!void {
     self.moveAndCollide(room);
 }
 
-pub const Collision = struct {
-    pos: V2f = .{},
-    normal: V2f = V2f.right,
-    pen_dist: f32 = 0,
-};
-
-pub fn getCircleCircleCollision(pos_a: V2f, radius_a: f32, pos_b: V2f, radius_b: f32) ?Collision {
-    var coll: ?Collision = null;
-    const b_to_a = pos_a.sub(pos_b);
-    const dist = b_to_a.length();
-    if (dist < radius_a + radius_b) {
-        const n = if (dist > 0.001) b_to_a.scale(1 / dist) else V2f.right;
-        coll = Collision{
-            .normal = n,
-            .pen_dist = @max(radius_a + radius_b - dist, 0),
-            .pos = pos_b.add(n.scale(radius_b)),
-        };
-    }
-    return coll;
-}
-
 pub fn isActive(self: *const Thing) bool {
     return self.alloc_state == .allocated and self.spawn_state == .spawned;
-}
-
-pub fn getNextCollisionWithThings(self: *Thing, room: *Room) ?Collision {
-    var best_coll: ?Collision = null;
-    var best_dist: f32 = std.math.inf(f32);
-
-    for (&room.things.items) |*thing| {
-        if (!thing.isActive()) continue;
-        if (thing.id.eql(self.id)) continue;
-        if (self.coll_mask.intersectWith(thing.coll_layer).count() == 0) continue;
-
-        if (getCircleCircleCollision(self.pos, self.coll_radius, thing.pos, thing.coll_radius)) |coll| {
-            const dist = self.pos.dist(coll.pos);
-            if (best_coll == null or dist < best_dist) {
-                best_coll = coll;
-                best_dist = dist;
-            }
-        }
-    }
-    return best_coll;
-}
-
-pub fn getCircleCollisionWithTiles(pos: V2f, radius: f32, room: *const Room) ?Collision {
-    var coll: ?Collision = null;
-
-    for (room.tilemap.tiles.values()) |tile| outer_blk: {
-        if (tile.passable) continue;
-
-        const passable_neighbors = room.tilemap.getTileNeighborsPassable(tile.coord);
-        const all_corners_cw = TileMap.tileTopLeftToCornersCW(TileMap.tileCoordToPos(tile.coord));
-        const all_edges_cw: [4][2]V2f = blk: {
-            var ret: [4][2]V2f = undefined;
-            for (0..4) |i| {
-                ret[i] = .{ all_corners_cw[i], all_corners_cw[@mod(i + 1, 4)] };
-            }
-            break :blk ret;
-        };
-        const corners_cw = blk: {
-            const corner_dirs: [4][2]TileMap.NeighborDir = .{ .{ .N, .W }, .{ .N, .E }, .{ .S, .E }, .{ .S, .W } };
-            var ret = std.BoundedArray(V2f, 4){};
-            for (corner_dirs, 0..) |dirs, i| {
-                if (passable_neighbors.get(dirs[0]) and passable_neighbors.get(dirs[1])) {
-                    ret.append(all_corners_cw[i]) catch unreachable;
-                }
-            }
-            break :blk ret;
-        };
-        const edges_cw = blk: {
-            var ret = std.BoundedArray([2]V2f, 4){};
-            for (TileMap.neighbor_dirs, 0..) |dir, i| {
-                if (passable_neighbors.get(dir)) {
-                    ret.append(all_edges_cw[i]) catch unreachable;
-                }
-            }
-            break :blk ret;
-        };
-        const center = TileMap.tileCoordToCenterPos(tile.coord);
-        const rect = TileMap.tileCoordToRect(tile.coord);
-
-        // inside! arg get ouuuut
-        if (geom.pointIsInRectf(pos, rect)) {
-            const center_to_pos = pos.sub(center);
-
-            // if exactly at the center, we'll always go right, but meh, is ok fallback
-            const normal = blk: {
-                const n = center_to_pos.normalizedOrZero();
-                if (!n.isZero()) {
-                    var is_passable_dir: bool = false;
-                    var max_dot: f32 = -std.math.inf(f32);
-                    var max_dir: V2f = .{};
-
-                    for (TileMap.neighbor_dirs) |dir| {
-                        if (passable_neighbors.get(dir)) {
-                            const dir_v = TileMap.neighbor_dirs_coords.get(dir).toV2f();
-                            const dot = dir_v.dot(center_to_pos);
-                            is_passable_dir = true;
-                            if (dot > max_dot) {
-                                max_dot = dot;
-                                max_dir = dir_v;
-                            }
-                        }
-                    }
-                    if (is_passable_dir) {
-                        break :blk max_dir;
-                    }
-                }
-                break :blk V2f.right;
-            };
-            coll = Collision{
-                .normal = normal,
-                .pen_dist = radius,
-                .pos = pos,
-            };
-            break;
-        }
-        // check edges before corners, to rule out areas in corner radius that are also on edges
-        for (edges_cw.constSlice()) |edge| {
-            const edge_v = edge[1].sub(edge[0]);
-            const pos_v = pos.sub(edge[0]);
-            const edge_v_len = edge_v.length();
-            if (edge_v_len < 0.001) continue;
-            const edge_v_n = edge_v.scale(1 / edge_v_len);
-            const dot = edge_v_n.dot(pos_v);
-            // outside line seg
-            if (dot < 0 or dot > edge_v_len) {
-                continue;
-            }
-            const intersect_pos = edge[0].add(edge_v_n.scale(dot));
-            const pos_to_intersect = intersect_pos.sub(pos);
-            const dist = pos_to_intersect.length();
-            if (dist < radius) {
-                coll = Collision{
-                    .normal = v2f(edge_v.y, -edge_v.x).normalized(),
-                    .pen_dist = @max(radius - dist, 0),
-                    .pos = intersect_pos,
-                };
-                break :outer_blk;
-            }
-        }
-        // finally corners; only the parts which are beyond the edge
-        // TODO optimization - discover the corner in edge detection part - using dot product used to rule out line seg
-        for (corners_cw.constSlice()) |corner_pos| {
-            const pos_to_corner = corner_pos.sub(pos);
-            const dist = pos_to_corner.length();
-            if (dist < radius) {
-                const normal = blk: {
-                    if (dist < 0.001) {
-                        if (pos.sub(center).normalizedChecked()) |center_to_pos| {
-                            break :blk center_to_pos;
-                        } else {
-                            break :blk V2f.right;
-                        }
-                    } else {
-                        break :blk pos_to_corner.scale(-1 / dist);
-                    }
-                };
-                coll = Collision{
-                    .normal = normal,
-                    .pen_dist = @max(radius - dist, 0),
-                    .pos = corner_pos,
-                };
-                break :outer_blk;
-            }
-        }
-    }
-
-    return coll;
 }
 
 pub fn moveAndCollide(self: *Thing, room: *Room) void {
@@ -716,10 +549,10 @@ pub fn moveAndCollide(self: *Thing, room: *Room) void {
         var _coll: ?Collision = null;
 
         if (self.coll_mask.contains(.creature)) {
-            _coll = getNextCollisionWithThings(self, room);
+            _coll = Collision.getNextCollisionWithThings(self, room);
         }
         if (_coll == null and self.coll_mask.contains(.tile)) {
-            _coll = getCircleCollisionWithTiles(self.pos, self.coll_radius, room);
+            _coll = Collision.getCircleCollisionWithTiles(self.pos, self.coll_radius, &room.tilemap);
         }
 
         if (_coll) |coll| {
