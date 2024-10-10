@@ -38,100 +38,24 @@ pub const Tile = struct {
     passable: bool = true,
 };
 
-pub const Spawn = struct {
-    kind: Thing.Kind,
-    pos: V2f,
-};
-
 pub const tile_sz: i64 = 64;
 pub const tile_sz_f: f32 = tile_sz;
 pub const tile_dims = V2f.splat(tile_sz);
 pub const tile_dims_2 = V2f.splat(tile_sz_f * 0.5);
 
 initted: bool = false,
-spawns: std.BoundedArray(Spawn, 128) = .{},
-start_zone: geom.Rectf = undefined,
-end_zone: geom.Rectf = undefined,
 tiles: std.AutoArrayHashMap(V2i, Tile) = undefined,
 dims: V2f = .{},
 
-pub fn initStr(self: *TileMap, str: []const u8) Error!void {
-    if (self.initted) return;
-
-    self.spawns.len = 0;
-    self.tiles = @TypeOf(self.tiles).init(getPlat().heap);
-    var zones = [2]geom.Rectf{ .{}, .{} };
-    var size = v2i(0, 0);
-    var line_it = std.mem.tokenizeScalar(u8, str, '\n');
-    while (line_it.next()) |line| {
-        size.x = @intCast(line.len);
-        size.y += 1;
+pub fn init(tiles: []const Tile, dims: V2f) Error!TileMap {
+    var ret = TileMap{};
+    ret.tiles = @TypeOf(ret.tiles).init(getPlat().heap);
+    for (tiles) |tile| {
+        try ret.tiles.put(tile.coord, tile);
     }
-
-    const topleft = v2i(-@divFloor(size.x, 2), -@divFloor(size.y, 2));
-    var curr_coord = topleft;
-    line_it = std.mem.tokenizeScalar(u8, str, '\n');
-
-    while (line_it.next()) |line| {
-        for (line) |ch| {
-            switch (ch) {
-                '#' => {
-                    try self.tiles.put(curr_coord, .{
-                        .coord = curr_coord,
-                        .passable = false,
-                    });
-                },
-                'p' => {
-                    self.spawns.append(.{ .kind = .player, .pos = tileCoordToCenterPos(curr_coord) }) catch std.log.warn("Out of spawns!", .{});
-                },
-                't' => {
-                    self.spawns.append(.{ .kind = .troll, .pos = tileCoordToCenterPos(curr_coord) }) catch std.log.warn("Out of spawns!", .{});
-                },
-                'g' => {
-                    self.spawns.append(.{ .kind = .gobbow, .pos = tileCoordToCenterPos(curr_coord) }) catch std.log.warn("Out of spawns!", .{});
-                },
-                's' => {
-                    self.spawns.append(.{ .kind = .sharpboi, .pos = tileCoordToCenterPos(curr_coord) }) catch std.log.warn("Out of spawns!", .{});
-                },
-                'i' => {
-                    self.spawns.append(.{ .kind = .impling, .pos = tileCoordToCenterPos(curr_coord) }) catch std.log.warn("Out of spawns!", .{});
-                },
-                'A', 'B' => {
-                    const idx: usize = ch - 'A';
-                    var zone_pos = zones[idx].pos.toArr();
-                    var zone_dims = zones[idx].dims.toArr();
-                    const v_pos = tileCoordToPos(curr_coord);
-                    const tl_pos = v_pos.toArr();
-                    const br_pos = v_pos.add(tile_dims).toArr();
-                    for (0..2) |i| {
-                        if (zone_dims[i] == 0) {
-                            zone_pos[i] = tl_pos[i];
-                            zone_dims[i] = tile_sz_f;
-                        } else if (tl_pos[i] < zone_pos[i]) {
-                            zone_dims[i] += zone_pos[i] - tl_pos[i];
-                            zone_pos[i] = tl_pos[i];
-                        }
-                        if (zone_dims[i] == 0) {
-                            zone_pos[i] = tl_pos[i]; // yes tl
-                            zone_dims[i] = tile_sz_f;
-                        } else if (br_pos[i] > zone_pos[i] + zone_dims[i]) {
-                            zone_dims[i] = br_pos[i] - zone_pos[i];
-                        }
-                    }
-                    zones[idx] = .{ .pos = V2f.fromArr(zone_pos), .dims = V2f.fromArr(zone_dims) };
-                },
-                else => {},
-            }
-            curr_coord.x += 1;
-        }
-        curr_coord.y += 1;
-        curr_coord.x = topleft.x;
-    }
-    self.dims = size.toV2f().scale(tile_sz_f);
-    self.start_zone = zones[0];
-    self.end_zone = zones[1];
-    self.initted = true;
-    std.debug.print("Loaded tilemap:\n size: {} x {}\n dims (px): {d:0.1} x {d:0.1}\n", .{ size.x, size.y, self.dims.x, self.dims.y });
+    ret.dims = dims;
+    ret.initted = true;
+    return ret;
 }
 
 pub fn deinit(self: *TileMap) void {
@@ -550,6 +474,4 @@ pub fn debugDraw(self: *const TileMap) Error!void {
         const color = if (tile.passable) Colorf.darkgray else Colorf.gray;
         plat.rectf(tileCoordToPos(tile.coord), tile_dims, .{ .fill_color = color });
     }
-    plat.rectf(self.start_zone.pos, self.start_zone.dims, .{ .fill_color = Colorf.red.fade(0.2) });
-    plat.rectf(self.end_zone.pos, self.end_zone.dims, .{ .fill_color = Colorf.blue.fade(0.2) });
 }

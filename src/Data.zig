@@ -147,6 +147,7 @@ pub const SpellIconsFrameIndexArray = std.EnumArray(Spell.Kind, ?i32);
 
 levels: []const []const u8 = undefined,
 things: std.EnumMap(Thing.Kind, Thing) = undefined,
+char_to_thing: std.BoundedArray(struct { ch: u8, kind: Thing.Kind }, 24) = undefined,
 //sprite_sheets: std.StringArrayHashMap(sprites.SpriteSheet) = undefined,
 creature_sprite_sheets: AllCreatureSpriteSheetArrays = undefined,
 creature_anims: AllCreatureAnimArrays = undefined,
@@ -373,4 +374,8 @@ pub fn reload(self: *Data) Error!void {
             .impling = try @import("spells/Impling.zig").implingProto(),
         },
     );
+    inline for (self.things.values) |p| {
+        const ch = @tagName(p.kind)[0];
+        try self.char_to_thing.append(.{ .ch = ch, .kind = p.kind });
+    }
 }

@@ -25,6 +25,7 @@ const TileMap = @import("TileMap.zig");
 const Fog = @import("Fog.zig");
 const gameUI = @import("gameUI.zig");
 const Spell = @import("Spell.zig");
+const PackedRoom = @import("PackedRoom.zig");
 
 pub const max_things_in_room = 128;
 pub const max_spells_in_deck = 32;
@@ -84,10 +85,10 @@ rng: std.Random.DefaultPrng = undefined,
 // oh except, the tiles, (like, it IS used at runtime) ya know... so... no it should be just in Room
 //
 tilemap: TileMap = .{},
+packed_room: PackedRoom,
 
-pub fn init(seed: u64) Error!Room {
+pub fn init(packed_room: PackedRoom, seed: u64) Error!Room {
     const plat = getPlat();
-    const app = App.get();
 
     var ret: Room = .{
         .next_pool_id = 1,
@@ -100,10 +101,9 @@ pub fn init(seed: u64) Error!Room {
         .fog = try Fog.init(),
         .rng = std.Random.DefaultPrng.init(seed),
         .seed = seed,
+        .tilemap = try TileMap.init(packed_room.tiles.constSlice(), packed_room.dims),
+        .packed_room = packed_room,
     };
-
-    // temporaryyyy
-    try ret.tilemap.initStr(app.data.levels[0]);
 
     // everything is done except spawning stuff
     try ret.reset();
@@ -132,7 +132,7 @@ pub fn reset(self: *Room) Error!void {
     self.curr_tick = 0;
     self.rng.seed(self.seed);
 
-    for (self.tilemap.spawns.constSlice()) |spawn| {
+    for (self.packed_room.thing_spawns.constSlice()) |spawn| {
         std.debug.print("Room init: spawning a {any}\n", .{spawn.kind});
         if (try self.queueSpawnThingByKind(spawn.kind, spawn.pos)) |id| {
             if (spawn.kind == .player) {
@@ -174,7 +174,9 @@ pub fn reset(self: *Room) Error!void {
 
 fn reloadFromTilemapString(self: *Room, str: []const u8) Error!void {
     self.tilemap.deinit();
-    try self.tilemap.initStr(str);
+    const packed_room = try PackedRoom.init(str);
+    self.packed_room = packed_room;
+    self.tilemap = try TileMap.init(packed_room.tiles.constSlice(), packed_room.dims);
     try self.reset();
 }
 

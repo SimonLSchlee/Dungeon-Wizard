@@ -20,6 +20,7 @@ const getPlat = App.getPlat;
 const Room = @import("Room.zig");
 const Thing = @import("Thing.zig");
 const Data = @import("Data.zig");
+const PackedRoom = @import("PackedRoom.zig");
 
 gold: i32 = 0,
 room: ?Room = null,
@@ -33,8 +34,10 @@ player_thing: ?Thing = null,
 curr_tick: i64 = 0,
 
 pub fn init(seed: u64) Error!Run {
+    const app = App.get();
+    const packed_room = try PackedRoom.init(app.data.levels[0]);
     const ret: Run = .{
-        .room = try Room.init(seed),
+        .room = try Room.init(packed_room, seed),
         .rng = std.Random.DefaultPrng.init(seed),
         .seed = seed,
     };
