@@ -46,8 +46,10 @@ pub const proto = Spell.makeProto(
     },
 );
 
-damage: f32 = 6,
-mint_stacks: i32 = 10,
+hit_effect: Thing.HitEffect = .{
+    .damage = 6,
+    .status_stacks = StatusEffect.StacksArray.initDefault(0, .{ .mint = 10 }),
+},
 radius: f32 = 7,
 range: f32 = 200,
 max_speed: f32 = 3,
@@ -116,7 +118,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             .mask = Thing.Faction.opposing_masks.get(caster.faction),
             .deactivate_on_hit = true,
             .deactivate_on_update = false,
-            .damage = mint.damage,
+            .effect = mint.hit_effect,
             .radius = mint.radius,
         },
     };

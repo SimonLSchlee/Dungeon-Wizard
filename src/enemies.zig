@@ -50,7 +50,7 @@ fn gobbowArrow(self: *const Thing, room: *Room) Error!void {
             .deactivate_on_hit = true,
             .deactivate_on_update = false,
             .mask = Thing.Faction.opposing_masks.get(self.faction),
-            .damage = 7,
+            .effect = .{ .damage = 7 },
             .radius = 4,
             .rel_pos = self.dir.scale(28),
         },
@@ -323,7 +323,7 @@ pub fn troll() Error!Thing {
             .mask = Thing.Faction.opposing_masks.get(.enemy),
             .radius = 15,
             .rel_pos = V2f.right.scale(60),
-            .damage = 15,
+            .effect = .{ .damage = 15 },
         },
         .hurtbox = .{
             .radius = 15,
@@ -398,7 +398,7 @@ pub fn sharpboi() Error!Thing {
             .mask = Thing.Faction.opposing_masks.get(.enemy),
             .radius = 15,
             .rel_pos = V2f.right.scale(40),
-            .damage = 9,
+            .effect = .{ .damage = 9 },
         },
         .hurtbox = .{
             .radius = 15,

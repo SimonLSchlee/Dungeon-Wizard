@@ -80,6 +80,7 @@ const Kind = blk: {
     });
 };
 
+pub const StacksArray = std.EnumArray(Kind, i32);
 pub const StatusArray = std.EnumArray(Kind, StatusEffect);
 pub const proto_array = blk: {
     var ret: StatusArray = undefined;

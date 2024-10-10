@@ -48,8 +48,10 @@ pub const proto = Spell.makeProto(
     },
 );
 
-damage: f32 = 8,
-frozen_stacks: i32 = 3,
+hit_effect: Thing.HitEffect = .{
+    .damage = 8,
+    .status_stacks = StatusEffect.StacksArray.initDefault(0, .{ .frozen = 3 }),
+},
 radius: f32 = cone_radius,
 arc_rads: f32 = cone_rads,
 expand_dur_ticks: i64 = 30,
@@ -98,8 +100,7 @@ pub const Projectile = struct {
                                 shape.kind.sector.start_ang_rads,
                                 shape.kind.sector.end_ang_rads,
                             )) {
-                                hurtbox.hit(thing, room, frost_vom.damage);
-                                thing.statuses.getPtr(.frozen).stacks = frost_vom.frozen_stacks;
+                                hurtbox.hit(thing, room, frost_vom.hit_effect);
                             }
                         }
                     }

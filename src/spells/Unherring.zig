@@ -40,7 +40,9 @@ pub const proto = Spell.makeProto(
     },
 );
 
-damage: f32 = 10,
+hit_effect: Thing.HitEffect = .{
+    .damage = 10,
+},
 
 pub const Projectile = struct {
     pub const controller_enum_name = enum_name ++ "_projectile";
@@ -72,7 +74,7 @@ pub const Projectile = struct {
             done = true;
             if (_target) |target| {
                 if (target.hurtbox) |*hurtbox| {
-                    hurtbox.hit(target, room, unherring.damage);
+                    hurtbox.hit(target, room, unherring.hit_effect);
                 }
             }
         }

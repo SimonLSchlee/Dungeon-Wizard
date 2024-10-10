@@ -143,6 +143,12 @@ pub const HP = struct {
     }
 };
 
+pub const HitEffect = struct {
+    damage: f32 = 1,
+    status_stacks: StatusEffect.StacksArray = StatusEffect.StacksArray.initDefault(0, .{}),
+    force: V2f = .{},
+};
+
 pub const HitBox = struct {
     rel_pos: V2f = .{},
     radius: f32 = 0,
@@ -150,7 +156,7 @@ pub const HitBox = struct {
     active: bool = false,
     deactivate_on_update: bool = true,
     deactivate_on_hit: bool = true,
-    damage: f32 = 1,
+    effect: HitEffect,
 
     pub fn update(_: *HitBox, self: *Thing, room: *Room) void {
         const hitbox = &self.hitbox.?;
@@ -169,7 +175,7 @@ pub const HitBox = struct {
             const dist = pos.dist(hurtbox_pos);
             if (dist > hitbox.radius + hurtbox.radius) continue;
             // hit!
-            hurtbox.hit(thing, room, hitbox.damage);
+            hurtbox.hit(thing, room, hitbox.effect);
             //std.debug.print("{any}: I hit {any}\n", .{ self.kind, thing.kind });
             if (hitbox.deactivate_on_hit) {
                 hitbox.active = false;
@@ -186,17 +192,22 @@ pub const HurtBox = struct {
     rel_pos: V2f = .{},
     radius: f32 = 0,
 
-    pub fn hit(_: *HurtBox, self: *Thing, room: *Room, damage: f32) void {
+    pub fn hit(_: *HurtBox, self: *Thing, room: *Room, effect: HitEffect) void {
         const status_protect = self.statuses.getPtr(.protected);
         if (status_protect.stacks > 0) {
             status_protect.stacks -= 1;
             return;
         }
         if (self.hp) |*hp| {
-            hp.curr = utl.clampf(hp.curr - damage, 0, hp.max);
+            hp.curr = utl.clampf(hp.curr - effect.damage, 0, hp.max);
             if (hp.curr == 0) {
+                // TODO do this elsewhere, better
                 self.deferFree(room);
             }
+        }
+        for (&self.statuses.values) |*status| {
+            const stacks = effect.status_stacks.get(status.kind);
+            status.stacks += stacks;
         }
     }
 };
