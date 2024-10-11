@@ -56,8 +56,8 @@ pub fn lineSegsIntersect(p: V2f, r: V2f, q: V2f, s: V2f) LineSegIntersection {
     const p_to_q_x_r = p_to_q.cross(r);
     const p_to_q_x_s = p_to_q.cross(s);
 
-    if (rxs < 0.001) {
-        if (p_to_q_x_r <= 0.001) {
+    if (@abs(rxs) < 0.0001) {
+        if (@abs(p_to_q_x_r) < 0.0001) {
             // colinear
             const rr = r.dot(r);
             const _t0 = p_to_q.dot(r) / rr;
@@ -105,13 +105,31 @@ pub fn lineSegsIntersect(p: V2f, r: V2f, q: V2f, s: V2f) LineSegIntersection {
     return .none;
 }
 
-test "lineSegsIntersect() - intersect" {
+test "lineSegsIntersect() - intersect 1" {
     const p = v2f(0, 0);
     const r = v2f(2, 2);
     const q = v2f(2, 0);
     const s = v2f(-2, 2);
     const expected: LineSegIntersection = .{ .intersection = v2f(1, 1) };
     try std.testing.expectEqual(expected, lineSegsIntersect(p, r, q, s));
+}
+
+test "lineSegsIntersect() - intersect 2" {
+    const p = v2f(-1, 0);
+    const r = v2f(2, 0);
+    const q = v2f(0, 1);
+    const s = v2f(0, -2);
+    const expected: LineSegIntersection = .{ .intersection = v2f(0, 0) };
+    try std.testing.expectEqual(expected, lineSegsIntersect(p, r, q, s));
+}
+
+test "lineSegsIntersect() - intersect 3" {
+    const p = v2f(-32, 32);
+    const r = v2f(164, 35).sub(p);
+    const q = v2f(128, 64);
+    const s = v2f(128, 0).sub(q);
+    const expected = std.meta.activeTag(LineSegIntersection{ .intersection = .{} });
+    try std.testing.expectEqual(expected, std.meta.activeTag(lineSegsIntersect(p, r, q, s)));
 }
 
 test "lineSegsIntersect() - would intersect but miss" {
