@@ -97,6 +97,7 @@ selectable: ?struct {
     height: f32 = 50,
 } = null,
 statuses: StatusEffect.StatusArray = StatusEffect.proto_array,
+enemy_difficulty: f32 = 0,
 
 pub const Faction = enum {
     object,

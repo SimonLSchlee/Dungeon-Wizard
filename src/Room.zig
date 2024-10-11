@@ -33,6 +33,52 @@ pub const max_spells_in_deck = 32;
 pub const ThingBoundedArray = std.BoundedArray(pool.Id, max_things_in_room);
 pub const SpellArray = std.BoundedArray(Spell, max_spells_in_deck);
 
+pub const Wave = struct {
+    proto: Thing,
+};
+pub const WavesArray = std.BoundedArray(Wave, 10);
+const WavesParams = struct {
+    protos: std.BoundedArray(Thing, 8),
+    difficulty: f32,
+    difficulty_error: f32 = 4,
+
+    pub fn init(difficulty: f32) WavesParams {
+        const data = App.get().data;
+        var ret = WavesParams{
+            .protos = .{},
+            .difficulty = difficulty,
+        };
+        const enemy_prototypes = [_]Thing{
+            data.things.get(.troll).?,
+            data.things.get(.gobbow).?,
+            data.things.get(.sharpboi).?,
+            // data.things.get(.acolyte),
+        };
+        for (enemy_prototypes) |p| {
+            ret.protos.append(p) catch unreachable;
+        }
+        return ret;
+    }
+};
+
+fn makeWaves(packed_room: PackedRoom, rng: std.Random, params: WavesParams) WavesArray {
+    var difficulty_left = params.difficulty;
+    var ret = WavesArray{};
+    for (packed_room.waves) |wave_positions| {
+        if (wave_positions.len == 0) continue;
+        while (difficulty_left > params.difficulty_error) {
+            const idx = rng.intRangeLessThan(usize, 0, params.protos.len);
+            const proto = params.protos.buffer[idx];
+            const wave_difficulty = proto.enemy_difficulty * u.as(f32, wave_positions.len);
+            if (wave_difficulty > difficulty_left + params.difficulty_error) continue;
+            difficulty_left -= wave_difficulty;
+            ret.append(.{ .proto = proto }) catch unreachable;
+            break;
+        }
+    }
+    return ret;
+}
+
 // Room is basically the "World" state, of things that can change frame-to-frame in realtime while playing the 'main' game
 // that would include the UI state, graphics, etc...
 // save state - debugging
@@ -71,6 +117,8 @@ fog: Fog = undefined,
 ui_clicked: bool = false,
 curr_tick: i64 = 0,
 edit_mode: bool = false,
+waves: WavesArray = .{},
+curr_wave: i32 = 0,
 // reinit stuff, never needs saving or copying, probably?:
 render_texture: ?Platform.RenderTexture2D = null,
 next_pool_id: u32 = 0, // i hate this, can we change it?
@@ -104,6 +152,7 @@ pub fn init(packed_room: PackedRoom, seed: u64) Error!Room {
         .tilemap = try TileMap.init(packed_room.tiles.constSlice(), packed_room.dims),
         .packed_room = packed_room,
     };
+    ret.waves = makeWaves(packed_room, ret.rng.random(), WavesParams.init(10));
 
     // everything is done except spawning stuff
     try ret.reset();
