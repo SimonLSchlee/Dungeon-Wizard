@@ -38,7 +38,7 @@ fn gobbowArrow(self: *const Thing, room: *Room) Error!void {
         .coll_radius = 5,
         .vel = self.dir.scale(4),
         .dir = self.dir,
-        .coll_mask = Thing.CollMask.initMany(&.{.tile}),
+        .coll_mask = Thing.Collision.Mask.initMany(&.{.tile}),
         .controller = .{ .projectile = .{} },
         .renderer = .{ .shape = .{
             .kind = .{ .arrow = .{
@@ -309,8 +309,8 @@ pub fn troll() Error!Thing {
         .spawn_state = .instance,
         .coll_radius = 20,
         .vision_range = 160,
-        .coll_mask = Thing.CollMask.initMany(&.{ .creature, .tile }),
-        .coll_layer = Thing.CollMask.initMany(&.{.creature}),
+        .coll_mask = Thing.Collision.Mask.initMany(&.{ .creature, .tile }),
+        .coll_layer = Thing.Collision.Mask.initMany(&.{.creature}),
         .controller = .{ .enemy = .{
             .attack_cooldown = utl.TickCounter.initStopped(60),
         } },
@@ -347,8 +347,8 @@ pub fn gobbow() Error!Thing {
         .spawn_state = .instance,
         .coll_radius = 15,
         .vision_range = 160,
-        .coll_mask = Thing.CollMask.initMany(&.{ .creature, .tile }),
-        .coll_layer = Thing.CollMask.initMany(&.{.creature}),
+        .coll_mask = Thing.Collision.Mask.initMany(&.{ .creature, .tile }),
+        .coll_layer = Thing.Collision.Mask.initMany(&.{.creature}),
         .controller = .{ .enemy = .{
             .attack_range = 300,
             .attack_cooldown = utl.TickCounter.initStopped(60),
@@ -381,8 +381,8 @@ pub fn sharpboi() Error!Thing {
         .spawn_state = .instance,
         .coll_radius = 15,
         .vision_range = 160,
-        .coll_mask = Thing.CollMask.initMany(&.{ .creature, .tile }),
-        .coll_layer = Thing.CollMask.initMany(&.{.creature}),
+        .coll_mask = Thing.Collision.Mask.initMany(&.{ .creature, .tile }),
+        .coll_layer = Thing.Collision.Mask.initMany(&.{.creature}),
         .controller = .{ .enemy = .{
             .attack_range = 150,
             .attack_cooldown = utl.TickCounter.initStopped(120),

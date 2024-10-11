@@ -29,8 +29,8 @@ pub fn protoype() Error!Thing {
         .spawn_state = .instance,
         .coll_radius = 20,
         .vision_range = 300,
-        .coll_mask = Thing.CollMask.initMany(&.{ .creature, .tile }),
-        .coll_layer = Thing.CollMask.initMany(&.{.creature}),
+        .coll_mask = Thing.Collision.Mask.initMany(&.{ .creature, .tile }),
+        .coll_layer = Thing.Collision.Mask.initMany(&.{.creature}),
         .controller = .{ .player = .{} },
         .renderer = .{ .creature = .{
             .draw_color = .cyan,

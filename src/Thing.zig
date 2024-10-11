@@ -27,8 +27,8 @@ const sprites = @import("sprites.zig");
 const player = @import("Player.zig");
 const enemies = @import("enemies.zig");
 const Spell = @import("Spell.zig");
-const StatusEffect = @import("StatusEffect.zig");
-const Collision = @import("Collision.zig");
+pub const StatusEffect = @import("StatusEffect.zig");
+pub const Collision = @import("Collision.zig");
 
 pub const Kind = enum {
     player,
@@ -43,12 +43,6 @@ pub const Kind = enum {
 pub const Pool = pool.BoundedPool(Thing, Room.max_things_in_room);
 // TODO wrap
 pub const Id = pool.Id;
-
-pub const CollLayer = enum {
-    creature,
-    tile,
-};
-pub const CollMask = std.EnumSet(CollLayer);
 
 id: Id = undefined,
 alloc_state: pool.AllocState = undefined,
@@ -65,8 +59,8 @@ vel: V2f = .{},
 dir: V2f = V2f.right,
 dirv: f32 = 0,
 coll_radius: f32 = 0,
-coll_mask: CollMask = .{},
-coll_layer: CollMask = .{},
+coll_mask: Collision.Mask = .{},
+coll_layer: Collision.Mask = .{},
 last_coll: ?Collision = null,
 vision_range: f32 = 0,
 accel_params: AccelParams = .{},
@@ -549,7 +543,7 @@ pub fn moveAndCollide(self: *Thing, room: *Room) void {
         var _coll: ?Collision = null;
 
         if (self.coll_mask.contains(.creature)) {
-            _coll = Collision.getNextCollisionWithThings(self, room);
+            _coll = Collision.getNextCircleCollisionWithThings(self.pos, self.coll_radius, self.coll_mask, &.{self.id}, room);
         }
         if (_coll == null and self.coll_mask.contains(.tile)) {
             _coll = Collision.getCircleCollisionWithTiles(self.pos, self.coll_radius, &room.tilemap);

@@ -22,6 +22,12 @@ const Thing = @import("Thing.zig");
 const Room = @import("Room.zig");
 const Collision = @This();
 
+pub const Layer = enum {
+    creature,
+    tile,
+};
+pub const Mask = std.EnumSet(Layer);
+
 pos: V2f = .{},
 normal: V2f = V2f.right,
 pen_dist: f32 = 0,
@@ -71,6 +77,44 @@ pub fn getRayCircleCollision(ray_pos: V2f, ray_v: V2f, circle_pos: V2f, radius: 
     return null;
 }
 
+pub fn getNextSweptCircleCollision(ray_pos: V2f, ray_v: V2f, radius: f32, mask: Mask, ignore_ids: []const Thing.Id, room: *const Room) ?Collision {
+    const creature_coll: ?Collision = if (mask.contains(.creature)) getNextSweptCircleCollisionWithThings(ray_pos, ray_v, radius, mask, ignore_ids, room) else null;
+    const tile_coll: ?Collision = if (mask.contains(.tile)) getNextSweptCircleCollisionWithTiles(ray_pos, ray_pos, radius, &room.tilemap) else null;
+    // take the min dist
+    if (creature_coll) |ccoll| {
+        if (tile_coll) |tcoll| {
+            if (ccoll.pos.dist(ray_pos) < tcoll.pos.dist(ray_pos)) {
+                return ccoll;
+            }
+            return tcoll;
+        }
+        return ccoll; // no tile_coll
+    }
+    return tile_coll; // can be null
+}
+
+pub fn getNextSweptCircleCollisionWithThings(ray_pos: V2f, ray_v: V2f, radius: f32, mask: Mask, ignore_ids: []const Thing.Id, room: *const Room) ?Collision {
+    var best_coll: ?Collision = null;
+    var best_dist: f32 = std.math.inf(f32);
+
+    thing_loop: for (&room.things.items) |*thing| {
+        if (!thing.isActive()) continue;
+        for (ignore_ids) |id| {
+            if (thing.id.eql(id)) continue :thing_loop;
+        }
+        if (mask.intersectWith(thing.coll_layer).count() == 0) continue;
+
+        if (getRayCircleCollision(ray_pos, ray_v, thing.pos, radius + thing.coll_radius)) |coll| {
+            const dist = ray_pos.dist(coll.pos);
+            if (best_coll == null or dist < best_dist) {
+                best_coll = coll;
+                best_dist = dist;
+            }
+        }
+    }
+    return best_coll;
+}
+
 pub fn getCircleCircleCollision(pos_a: V2f, radius_a: f32, pos_b: V2f, radius_b: f32) ?Collision {
     var coll: ?Collision = null;
     const b_to_a = pos_a.sub(pos_b);
@@ -86,17 +130,19 @@ pub fn getCircleCircleCollision(pos_a: V2f, radius_a: f32, pos_b: V2f, radius_b:
     return coll;
 }
 
-pub fn getNextCollisionWithThings(self: *Thing, room: *Room) ?Collision {
+pub fn getNextCircleCollisionWithThings(pos: V2f, radius: f32, mask: Mask, ignore_ids: []const Thing.Id, room: *const Room) ?Collision {
     var best_coll: ?Collision = null;
     var best_dist: f32 = std.math.inf(f32);
 
-    for (&room.things.items) |*thing| {
+    thing_loop: for (&room.things.items) |*thing| {
         if (!thing.isActive()) continue;
-        if (thing.id.eql(self.id)) continue;
-        if (self.coll_mask.intersectWith(thing.coll_layer).count() == 0) continue;
+        for (ignore_ids) |id| {
+            if (thing.id.eql(id)) continue :thing_loop;
+        }
+        if (mask.intersectWith(thing.coll_layer).count() == 0) continue;
 
-        if (getCircleCircleCollision(self.pos, self.coll_radius, thing.pos, thing.coll_radius)) |coll| {
-            const dist = self.pos.dist(coll.pos);
+        if (getCircleCircleCollision(pos, radius, thing.pos, thing.coll_radius)) |coll| {
+            const dist = pos.dist(coll.pos);
             if (best_coll == null or dist < best_dist) {
                 best_coll = coll;
                 best_dist = dist;
@@ -106,6 +152,58 @@ pub fn getNextCollisionWithThings(self: *Thing, room: *Room) ?Collision {
     return best_coll;
 }
 
+pub fn getPointCollisionInTile(point: V2f, tile: TileMap.Tile, passable_neighbors: std.EnumArray(TileMap.NeighborDir, bool)) ?Collision {
+    const rect = TileMap.tileCoordToRect(tile.coord);
+    if (!geom.pointIsInRectf(point, rect)) {
+        return null;
+    }
+    const topleft = TileMap.tileCoordToPos(tile.coord);
+    const center = TileMap.tileCoordToCenterPos(tile.coord);
+    const center_to_pos = point.sub(center);
+
+    // if exactly at the center, we'll always go right, but meh, is ok fallback
+    const normal = blk: {
+        const n = center_to_pos.normalizedOrZero();
+        if (!n.isZero()) {
+            var is_passable_dir: bool = false;
+            var max_dot: f32 = -std.math.inf(f32);
+            var max_dir: V2f = .{};
+
+            for (TileMap.neighbor_dirs) |dir| {
+                if (passable_neighbors.get(dir)) {
+                    const dir_v = TileMap.neighbor_dirs_coords.get(dir).toV2f();
+                    const dot = dir_v.dot(center_to_pos);
+                    is_passable_dir = true;
+                    if (dot > max_dot) {
+                        max_dot = dot;
+                        max_dir = dir_v;
+                    }
+                }
+            }
+            if (is_passable_dir) {
+                break :blk max_dir;
+            }
+        }
+        break :blk V2f.right;
+    };
+    const pen_dist = blk: {
+        const c_idx: usize = if (normal.x != 0) 0 else 1;
+        const base = topleft.toArr()[c_idx];
+        const pt = point.toArr()[c_idx];
+        const sgn = normal.toArr()[c_idx];
+        const dif = pt - base;
+        if (sgn > 0) {
+            break :blk TileMap.tile_sz_f - dif;
+        }
+        break :blk dif;
+    };
+    return Collision{
+        .normal = normal,
+        .pen_dist = pen_dist,
+        .pos = point.add(normal.scale(pen_dist)),
+    };
+}
+
 pub fn getCircleCollisionWithTiles(pos: V2f, radius: f32, tilemap: *const TileMap) ?Collision {
     var coll: ?Collision = null;
 
@@ -113,6 +211,11 @@ pub fn getCircleCollisionWithTiles(pos: V2f, radius: f32, tilemap: *const TileMa
         if (tile.passable) continue;
 
         const passable_neighbors = tilemap.getTileNeighborsPassable(tile.coord);
+        const center = TileMap.tileCoordToCenterPos(tile.coord);
+        if (getPointCollisionInTile(pos, tile, passable_neighbors)) |c| {
+            return c;
+        }
+
         const all_corners_cw = TileMap.tileTopLeftToCornersCW(TileMap.tileCoordToPos(tile.coord));
         const all_edges_cw: [4][2]V2f = blk: {
             var ret: [4][2]V2f = undefined;
@@ -140,45 +243,7 @@ pub fn getCircleCollisionWithTiles(pos: V2f, radius: f32, tilemap: *const TileMa
             }
             break :blk ret;
         };
-        const center = TileMap.tileCoordToCenterPos(tile.coord);
-        const rect = TileMap.tileCoordToRect(tile.coord);
 
-        // inside! arg get ouuuut
-        if (geom.pointIsInRectf(pos, rect)) {
-            const center_to_pos = pos.sub(center);
-
-            // if exactly at the center, we'll always go right, but meh, is ok fallback
-            const normal = blk: {
-                const n = center_to_pos.normalizedOrZero();
-                if (!n.isZero()) {
-                    var is_passable_dir: bool = false;
-                    var max_dot: f32 = -std.math.inf(f32);
-                    var max_dir: V2f = .{};
-
-                    for (TileMap.neighbor_dirs) |dir| {
-                        if (passable_neighbors.get(dir)) {
-                            const dir_v = TileMap.neighbor_dirs_coords.get(dir).toV2f();
-                            const dot = dir_v.dot(center_to_pos);
-                            is_passable_dir = true;
-                            if (dot > max_dot) {
-                                max_dot = dot;
-                                max_dir = dir_v;
-                            }
-                        }
-                    }
-                    if (is_passable_dir) {
-                        break :blk max_dir;
-                    }
-                }
-                break :blk V2f.right;
-            };
-            coll = Collision{
-                .normal = normal,
-                .pen_dist = radius,
-                .pos = pos,
-            };
-            break;
-        }
         // check edges before corners, to rule out areas in corner radius that are also on edges
         for (edges_cw.constSlice()) |edge| {
             const edge_v = edge[1].sub(edge[0]);
@@ -231,4 +296,90 @@ pub fn getCircleCollisionWithTiles(pos: V2f, radius: f32, tilemap: *const TileMa
     }
 
     return coll;
+}
+
+pub fn getNextSweptCircleCollisionWithTiles(ray_pos: V2f, ray_v: V2f, radius: f32, tilemap: *const TileMap) ?Collision {
+    assert(radius > 0.001);
+    assert(ray_v.lengthSquared() > 0.001);
+    var best_coll: ?Collision = null;
+    var best_dist = std.math.inf(f32);
+
+    for (tilemap.tiles.values()) |tile| {
+        if (tile.passable) continue;
+
+        const passable_neighbors = tilemap.getTileNeighborsPassable(tile.coord);
+        const all_corners_cw = TileMap.tileTopLeftToCornersCW(TileMap.tileCoordToPos(tile.coord));
+        const all_edges_cw: [4][2]V2f = blk: {
+            var ret: [4][2]V2f = undefined;
+            for (0..4) |i| {
+                ret[i] = .{ all_corners_cw[i], all_corners_cw[@mod(i + 1, 4)] };
+            }
+            break :blk ret;
+        };
+        const corners_cw = blk: {
+            const corner_dirs: [4][2]TileMap.NeighborDir = .{ .{ .N, .W }, .{ .N, .E }, .{ .S, .E }, .{ .S, .W } };
+            var ret = std.BoundedArray(V2f, 4){};
+            for (corner_dirs, 0..) |dirs, i| {
+                if (passable_neighbors.get(dirs[0]) and passable_neighbors.get(dirs[1])) {
+                    ret.append(all_corners_cw[i]) catch unreachable;
+                }
+            }
+            break :blk ret;
+        };
+        const edges_cw = blk: {
+            var ret = std.BoundedArray([2]V2f, 4){};
+            for (TileMap.neighbor_dirs, 0..) |dir, i| {
+                if (passable_neighbors.get(dir)) {
+                    ret.append(all_edges_cw[i]) catch unreachable;
+                }
+            }
+            break :blk ret;
+        };
+        // check if ray starts in tile
+        if (getPointCollisionInTile(ray_pos, tile, passable_neighbors)) |c| {
+            return c;
+        }
+        // if ray hits edge, swept circle hits edge
+        const ray_end = ray_pos.add(ray_v);
+        for (edges_cw.constSlice()) |edge| {
+            const intersection = geom.lineSegsIntersect(ray_pos, ray_end, edge[0], edge[1]);
+            const intersect_point = switch (intersection) {
+                .none => continue,
+                .colinear => |_c| if (_c) |c| c[0] else continue,
+                .intersection => |i| i,
+            };
+            var coll = Collision{};
+            const intersect_v = intersect_point.sub(edge[0]);
+            const intersect_v_n = intersect_v.normalizedOrZero();
+            const edge_v = edge[1].sub(edge[0]);
+            coll.pos = blk: {
+                if (intersect_v.dot(ray_v) > 0) {
+                    const dist = @min(radius, intersect_v.length());
+                    break :blk intersect_point.sub(intersect_v_n.scale(dist));
+                } else {
+                    const dist = @min(radius, edge_v.sub(intersect_v).length());
+                    break :blk intersect_point.add(intersect_v_n.scale(dist));
+                }
+            };
+            coll.pen_dist = 0;
+            coll.normal = v2f(edge_v.y, -edge_v.x).normalized();
+            const dist = coll.pos.dist(ray_pos);
+            if (best_coll == null or dist < best_dist) {
+                best_coll = coll;
+                best_dist = dist;
+            }
+        }
+        // if ray hits circle centered at corner, swept circle hits corner
+        for (corners_cw.constSlice()) |corner_pos| {
+            if (getRayCircleCollision(ray_pos, ray_v, corner_pos, radius)) |coll| {
+                const dist = coll.pos.dist(ray_pos);
+                if (best_coll == null or dist < best_dist) {
+                    best_coll = coll;
+                    best_dist = dist;
+                }
+            }
+        }
+    }
+
+    return best_coll;
 }

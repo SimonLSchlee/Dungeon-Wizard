@@ -51,8 +51,8 @@ pub fn implingProto() Error!Thing {
         .spawn_state = .instance,
         .coll_radius = 15,
         .vision_range = 160,
-        .coll_mask = Thing.CollMask.initMany(&.{ .creature, .tile }),
-        .coll_layer = Thing.CollMask.initMany(&.{.creature}),
+        .coll_mask = Thing.Collision.Mask.initMany(&.{ .creature, .tile }),
+        .coll_layer = Thing.Collision.Mask.initMany(&.{.creature}),
         .accel_params = .{
             .accel = 0.07,
             .max_speed = 1.0,
