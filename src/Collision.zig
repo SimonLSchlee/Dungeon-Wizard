@@ -79,7 +79,7 @@ pub fn getRayCircleCollision(ray_pos: V2f, ray_v: V2f, circle_pos: V2f, radius: 
 
 pub fn getNextSweptCircleCollision(ray_pos: V2f, ray_v: V2f, radius: f32, mask: Mask, ignore_ids: []const Thing.Id, room: *const Room) ?Collision {
     const creature_coll: ?Collision = if (mask.contains(.creature)) getNextSweptCircleCollisionWithThings(ray_pos, ray_v, radius, mask, ignore_ids, room) else null;
-    const tile_coll: ?Collision = if (mask.contains(.tile)) getNextSweptCircleCollisionWithTiles(ray_pos, ray_pos, radius, &room.tilemap) else null;
+    const tile_coll: ?Collision = if (mask.contains(.tile)) getNextSweptCircleCollisionWithTiles(ray_pos, ray_v, radius, &room.tilemap) else null;
     // take the min dist
     if (creature_coll) |ccoll| {
         if (tile_coll) |tcoll| {
@@ -104,7 +104,9 @@ pub fn getNextSweptCircleCollisionWithThings(ray_pos: V2f, ray_v: V2f, radius: f
         }
         if (mask.intersectWith(thing.coll_layer).count() == 0) continue;
 
-        if (getRayCircleCollision(ray_pos, ray_v, thing.pos, radius + thing.coll_radius)) |coll| {
+        if (getRayCircleCollision(ray_pos, ray_v, thing.pos, radius + thing.coll_radius)) |r_coll| {
+            var coll = r_coll;
+            coll.pos = r_coll.pos.sub(coll.normal.scale(radius));
             const dist = ray_pos.dist(coll.pos);
             if (best_coll == null or dist < best_dist) {
                 best_coll = coll;
@@ -301,6 +303,7 @@ pub fn getCircleCollisionWithTiles(pos: V2f, radius: f32, tilemap: *const TileMa
 pub fn getNextSweptCircleCollisionWithTiles(ray_pos: V2f, ray_v: V2f, radius: f32, tilemap: *const TileMap) ?Collision {
     assert(radius > 0.001);
     assert(ray_v.lengthSquared() > 0.001);
+    const ray_v_n = ray_v.normalized();
     var best_coll: ?Collision = null;
     var best_dist = std.math.inf(f32);
 
@@ -340,29 +343,29 @@ pub fn getNextSweptCircleCollisionWithTiles(ray_pos: V2f, ray_v: V2f, radius: f3
             return c;
         }
         // if ray hits edge, swept circle hits edge
-        const ray_end = ray_pos.add(ray_v);
         for (edges_cw.constSlice()) |edge| {
-            const intersection = geom.lineSegsIntersect(ray_pos, ray_end, edge[0], edge[1]);
+            const edge_v = edge[1].sub(edge[0]);
+            const intersection = geom.lineSegsIntersect(ray_pos, ray_v, edge[0], edge_v);
             const intersect_point = switch (intersection) {
                 .none => continue,
                 .colinear => |_c| if (_c) |c| c[0] else continue,
                 .intersection => |i| i,
             };
             var coll = Collision{};
-            const intersect_v = intersect_point.sub(edge[0]);
-            const intersect_v_n = intersect_v.normalizedOrZero();
-            const edge_v = edge[1].sub(edge[0]);
-            coll.pos = blk: {
-                if (intersect_v.dot(ray_v) > 0) {
-                    const dist = @min(radius, intersect_v.length());
-                    break :blk intersect_point.sub(intersect_v_n.scale(dist));
-                } else {
-                    const dist = @min(radius, edge_v.sub(intersect_v).length());
-                    break :blk intersect_point.add(intersect_v_n.scale(dist));
-                }
-            };
             coll.pen_dist = 0;
             coll.normal = v2f(edge_v.y, -edge_v.x).normalized();
+            const dot = ray_v_n.dot(coll.normal.neg());
+            if (@abs(dot) < 0.001) {
+                if (ray_v_n.dot(edge_v) > 0) {
+                    coll.pos = edge[0];
+                } else {
+                    coll.pos = edge[1];
+                }
+            } else {
+                const hyp = radius / dot;
+                const circle_center = intersect_point.sub(ray_v_n.scale(hyp));
+                coll.pos = circle_center.add(coll.normal.neg().scale(radius));
+            }
             const dist = coll.pos.dist(ray_pos);
             if (best_coll == null or dist < best_dist) {
                 best_coll = coll;
@@ -371,7 +374,9 @@ pub fn getNextSweptCircleCollisionWithTiles(ray_pos: V2f, ray_v: V2f, radius: f3
         }
         // if ray hits circle centered at corner, swept circle hits corner
         for (corners_cw.constSlice()) |corner_pos| {
-            if (getRayCircleCollision(ray_pos, ray_v, corner_pos, radius)) |coll| {
+            if (getRayCircleCollision(ray_pos, ray_v, corner_pos, radius)) |r_coll| {
+                var coll = r_coll;
+                coll.pos = coll.pos.add(coll.normal.neg().scale(radius));
                 const dist = coll.pos.dist(ray_pos);
                 if (best_coll == null or dist < best_dist) {
                     best_coll = coll;

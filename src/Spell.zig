@@ -22,6 +22,7 @@ const Thing = @import("Thing.zig");
 const TileMap = @import("TileMap.zig");
 const data = @import("data.zig");
 const pool = @import("pool.zig");
+const Collision = @import("Collision.zig");
 
 const Spell = @This();
 
@@ -210,18 +211,23 @@ pub fn renderTargeting(self: *const Spell, room: *const Room, caster: *const Thi
             const caster_to_mouse = mouse_pos.sub(caster.pos);
             const target_dir = if (caster_to_mouse.normalizedChecked()) |d| d else V2f.right;
             const mouse_pos_dist = if (targeting_data.fixed_range) targeting_data.max_range else @min(targeting_data.max_range, caster_to_mouse.length());
-
-            var target_pos = caster.pos.add(target_dir.scale(mouse_pos_dist));
+            var target_hit_pos = caster.pos.add(target_dir.scale(mouse_pos_dist));
+            var target_circle_pos = target_hit_pos;
             if (targeting_data.ray_to_mouse) |ray| {
+                const ray_radius = ray.thickness * 0.5;
+                var coll: ?Collision = null;
                 if (caster_to_mouse.lengthSquared() > 0.001) {
-                    const Collision = @import("Collision.zig");
-                    //const coll = Collision.getNextSweptCircleCollision(caster.pos, target_dir, ray.thickness, Collision.Mask.initFull(), &.{caster.id}, room);
-                    const coll = Collision.getNextSweptCircleCollisionWithThings(caster.pos, caster_to_mouse, ray.thickness, Collision.Mask.initFull(), &.{caster.id}, room);
+                    coll = Collision.getNextSweptCircleCollision(caster.pos, caster_to_mouse, ray_radius, Collision.Mask.initFull(), &.{caster.id}, room);
                     if (coll) |c| {
-                        target_pos = c.pos;
+                        target_hit_pos = c.pos;
+                        target_circle_pos = c.pos.add(c.normal.scale(ray_radius));
                     }
                 }
-                plat.linef(caster.pos, target_pos, ray.thickness, targeting_data.color);
+                plat.linef(caster.pos, target_circle_pos, ray.thickness, targeting_data.color);
+                plat.circlef(target_circle_pos, ray_radius, .{ .fill_color = targeting_data.color });
+                //if (coll) |c| {
+                //    plat.circlef(c.pos, 3, .{ .fill_color = .red });
+                //}
             }
             if (targeting_data.cone_from_self_to_mouse) |cone| {
                 const start_rads = target_dir.toAngleRadians() - cone.radians * 0.5;
@@ -235,9 +241,8 @@ pub fn renderTargeting(self: *const Spell, room: *const Room, caster: *const Thi
                     .{ .fill_color = targeting_data.color.fade(0.5) },
                 );
             }
-
             if (targeting_data.radius_under_mouse) |r| {
-                plat.circlef(target_pos, r, .{ .fill_color = targeting_data.color });
+                plat.circlef(target_circle_pos, r, .{ .fill_color = targeting_data.color.fade(0.4) });
             }
         },
         .self => {

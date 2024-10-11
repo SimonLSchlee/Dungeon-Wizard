@@ -30,9 +30,9 @@ const Params = Spell.Params;
 pub const enum_name = "flamey_explodey";
 pub const Controllers = [_]type{Projectile};
 
-const base_explode_radius = 50;
+const base_explode_radius = 70;
 const base_ball_radius = 12;
-const base_range = 200;
+const base_range = 300;
 
 pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
@@ -44,7 +44,7 @@ pub const proto = Spell.makeProto(
             .fixed_range = false,
             .max_range = base_range,
             .ray_to_mouse = .{
-                .thickness = base_ball_radius, // TODO use radius below?
+                .thickness = base_ball_radius * 2, // TODO use radius below?
             },
             .radius_under_mouse = base_explode_radius,
         },
@@ -78,7 +78,7 @@ pub const Projectile = struct {
 
         if (!projectile.exploded) {
             const hitbox = &self.hitbox.?;
-            if (!hitbox.active or self.pos.dist(target_pos) < self.vel.length() * 2) {
+            if (!hitbox.active or self.pos.dist(target_pos) < self.vel.length() * 2 or self.last_coll != null) {
                 projectile.exploded = true;
                 hitbox.active = true;
                 hitbox.deactivate_on_update = true;
@@ -108,7 +108,8 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
         .kind = .projectile,
         .dir = target_dir,
         .vel = target_dir.scale(flamey_explodey.max_speed),
-        .coll_radius = 5,
+        .coll_radius = flamey_explodey.ball_radius,
+        .coll_mask = Thing.Collision.Mask.initMany(&.{.tile}),
         .accel_params = .{
             .accel = 0.5,
             .max_speed = 5,
