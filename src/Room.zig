@@ -111,6 +111,15 @@ pub fn init(packed_room: PackedRoom, seed: u64) Error!Room {
     return ret;
 }
 
+pub fn deinit(self: *Room) void {
+    self.clearThings();
+    self.fog.deinit();
+    self.tilemap.deinit();
+    if (self.render_texture) |tex| {
+        getPlat().destroyRenderTexture(tex);
+    }
+}
+
 fn clearThings(self: *Room) void {
     for (&self.things.items) |*thing| {
         if (thing.alloc_state != .allocated) continue;
@@ -178,15 +187,6 @@ fn reloadFromTilemapString(self: *Room, str: []const u8) Error!void {
     self.packed_room = packed_room;
     self.tilemap = try TileMap.init(packed_room.tiles.constSlice(), packed_room.dims);
     try self.reset();
-}
-
-pub fn deinit(self: *Room) void {
-    self.clearThings();
-    self.fog.deinit();
-    self.tilemap.deinit();
-    if (self.render_texture) |tex| {
-        getPlat().destroyRenderTexture(tex);
-    }
 }
 
 pub fn queueSpawnThing(self: *Room, proto: *const Thing, pos: V2f) Error!?pool.Id {
@@ -453,22 +453,6 @@ pub fn render(self: *const Room) Error!void {
         try plat.textf(p, txt, .{}, opt);
     } else {
         try self.spell_slots.render(self);
-        const fill_color = Colorf.rgb(1, 0.9, 0);
-        const text_color = Colorf.rgb(0.44, 0.3, 0.0);
-        const poly_opt = .{ .fill_color = fill_color, .outline_color = text_color, .outline_thickness = 10 };
-        const center = v2f(150, plat.screen_dims_f.y - 100);
-        const num = 3;
-        const lower = center.add(v2f(0, 7 * num));
-        for (0..num) |i| {
-            plat.circlef(lower.add(v2f(0, u.as(f32, i) * -7)), 55, poly_opt);
-        }
-
-        const run = &App.get().run;
-        const gold_width = (try plat.measureText("Gold", .{ .size = 25 })).x;
-        try plat.textf(center.sub(v2f(gold_width, 0)), "Gold: {}", .{run.gold}, .{
-            .color = text_color,
-            .size = 25,
-        });
     }
 
     plat.endRenderToTexture();
