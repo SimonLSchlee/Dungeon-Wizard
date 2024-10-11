@@ -27,19 +27,14 @@ pub const ThingSpawn = struct {
     pos: V2f,
 };
 
-pub const WaveSpawn = struct {
-    pos: V2f,
-};
-
 pub const tile_sz: i64 = 64;
 pub const tile_sz_f: f32 = tile_sz;
 pub const tile_dims = V2f.splat(tile_sz);
 pub const tile_dims_2 = V2f.splat(tile_sz_f * 0.5);
 
-entry: V2f = .{},
 exits: std.BoundedArray(V2f, 8) = .{},
+waves: [10]std.BoundedArray(V2f, 16) = .{.{}} ** 10,
 thing_spawns: std.BoundedArray(ThingSpawn, 64) = .{},
-wave_spawns: std.BoundedArray(WaveSpawn, 16) = .{},
 tiles: std.BoundedArray(Tile, 1024) = .{},
 dims: V2f = .{},
 
@@ -59,6 +54,7 @@ pub fn init(str: []const u8) Error!PackedRoom {
 
     while (line_it.next()) |line| {
         for (line) |ch| {
+            const curr_pos = TileMap.tileCoordToCenterPos(curr_coord);
             switch (ch) {
                 '#' => {
                     try ret.tiles.append(.{
@@ -66,12 +62,20 @@ pub fn init(str: []const u8) Error!PackedRoom {
                         .passable = false,
                     });
                 },
+                '&' => {
+                    try ret.exits.append(curr_pos);
+                },
                 else => {
-                    const data = App.get().data;
-                    for (data.char_to_thing.constSlice()) |s| {
-                        if (ch == s.ch) {
-                            ret.thing_spawns.append(.{ .kind = s.kind, .pos = TileMap.tileCoordToCenterPos(curr_coord) }) catch std.log.warn("Out of spawns!", .{});
-                            break;
+                    if (std.ascii.isDigit(ch)) {
+                        const idx = std.fmt.parseInt(usize, &.{ch}, 10) catch unreachable;
+                        ret.waves[idx].append(curr_pos) catch std.log.warn("Out of waves!", .{});
+                    } else {
+                        const data = App.get().data;
+                        for (data.char_to_thing.constSlice()) |s| {
+                            if (ch == s.ch) {
+                                ret.thing_spawns.append(.{ .kind = s.kind, .pos = curr_pos }) catch std.log.warn("Out of spawns!", .{});
+                                break;
+                            }
                         }
                     }
                 },

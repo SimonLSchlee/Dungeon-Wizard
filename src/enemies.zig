@@ -284,7 +284,6 @@ pub const AIController = struct {
                         }
                     },
                 }
-
                 break :state .attack;
             },
         };

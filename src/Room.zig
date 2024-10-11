@@ -373,6 +373,20 @@ pub fn render(self: *const Room) Error!void {
     plat.startCamera2D(self.camera);
 
     try self.tilemap.debugDraw();
+    //try self.tilemap.debugDrawGrid(self.camera);
+    // exit
+    for (self.packed_room.exits.constSlice()) |epos| {
+        plat.circlef(epos, 20, .{ .fill_color = Colorf.rgb(0.4, 0.3, 0.4) });
+        plat.circlef(epos.add(v2f(0, 2)), 19, .{ .fill_color = Colorf.rgb(0.2, 0.1, 0.2) });
+    }
+    // waves
+    if (debug.show_waves) {
+        for (self.packed_room.waves, 0..) |buf, i| {
+            for (buf.constSlice()) |pos| {
+                try plat.textf(pos, "{}", .{i}, .{ .center = true, .color = .magenta });
+            }
+        }
+    }
 
     if (self.getConstPlayer()) |player| {
         if (self.spell_slots.getSelectedSlot()) |slot| {
