@@ -71,6 +71,7 @@ fn makeWaves(packed_room: PackedRoom, rng: std.Random, params: WavesParams) Wave
     for (packed_room.waves, 0..) |wave_positions, i| {
         if (wave_positions.len == 0) continue;
         var wave = Wave{};
+        wave.positions = wave_positions;
         while (difficulty_left > params.difficulty_error) {
             const idx = rng.intRangeLessThan(usize, 0, params.protos.len);
             const proto = params.protos.buffer[idx];
@@ -80,10 +81,9 @@ fn makeWaves(packed_room: PackedRoom, rng: std.Random, params: WavesParams) Wave
             wave.proto = proto;
             std.debug.print("  {}: selected {any}, total difficulty: {d:.2}\n", .{ i, wave.proto.kind, wave_difficulty });
             std.debug.print("    {d:.2} difficulty left\n", .{difficulty_left});
+            ret.append(wave) catch unreachable;
             break;
         }
-        wave.positions = wave_positions;
-        ret.append(wave) catch unreachable;
     }
     std.debug.print("#############\n\n", .{});
     return ret;
