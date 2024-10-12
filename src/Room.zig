@@ -132,6 +132,11 @@ difficulty: f32 = 0,
 first_wave_timer: u.TickCounter = undefined,
 curr_wave: i32 = 0,
 num_enemies_alive: i32 = 0,
+progress_state: enum {
+    none,
+    lost,
+    won,
+} = .none,
 // reinit stuff, never needs saving or copying, probably?:
 render_texture: ?Platform.RenderTexture2D = null,
 next_pool_id: u32 = 0, // i hate this, can we change it?
@@ -406,9 +411,20 @@ pub fn update(self: *Room) Error!void {
             } else if (self.num_enemies_alive == 0) {
                 try self.spawnCurrWave();
             }
-        } else if (self.num_enemies_alive == 0) {
-            // TODO
-            // win the room
+        }
+        // check if won or lost
+        if (self.getPlayer()) |player| {
+            if (player.hp) |hp| {
+                if (hp.curr > 0) {
+                    if (self.curr_wave >= self.waves.len and self.num_enemies_alive == 0) {
+                        self.progress_state = .won;
+                    } else {
+                        self.progress_state = .none;
+                    }
+                } else {
+                    self.progress_state = .lost;
+                }
+            }
         }
         // spell slots
         {
@@ -469,8 +485,9 @@ pub fn render(self: *const Room) Error!void {
     //try self.tilemap.debugDrawGrid(self.camera);
     // exit
     for (self.packed_room.exits.constSlice()) |epos| {
+        const color = if (self.progress_state == .won) Colorf.rgb(0.2, 0.1, 0.2) else Colorf.rgb(0.4, 0.4, 0.4);
         plat.circlef(epos, 20, .{ .fill_color = Colorf.rgb(0.4, 0.3, 0.4) });
-        plat.circlef(epos.add(v2f(0, 2)), 19, .{ .fill_color = Colorf.rgb(0.2, 0.1, 0.2) });
+        plat.circlef(epos.add(v2f(0, 2)), 19, .{ .fill_color = color });
     }
 
     // waves
