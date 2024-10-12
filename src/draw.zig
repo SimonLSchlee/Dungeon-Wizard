@@ -134,6 +134,16 @@ pub const Colorf = struct {
         if (total > 1.5) return .black;
         return .white;
     }
+
+    pub fn lerp(self: Colorf, other: Colorf, t: f32) Colorf {
+        const t_clamped = u.clampf(t, 0, 1);
+        return rgba(
+            u.lerpf(self.r, other.r, t_clamped),
+            u.lerpf(self.g, other.g, t_clamped),
+            u.lerpf(self.b, other.b, t_clamped),
+            u.lerpf(self.a, other.a, t_clamped),
+        );
+    }
 };
 
 pub const Smoothing = enum {

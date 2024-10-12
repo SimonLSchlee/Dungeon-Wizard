@@ -77,12 +77,13 @@ controller: union(enum) {
     enemy: enemies.AIController,
     spell: Spell.Controller,
     projectile: ProjectileController,
-    wave_spawner: WaveSpawnerController,
+    spawner: SpawnerController,
 } = .none,
 renderer: union(enum) {
     none: void,
     creature: CreatureRenderer,
     shape: ShapeRenderer,
+    spawner: SpawnerRenderer,
 } = .none,
 animator: union(enum) {
     none: void,
@@ -217,52 +218,87 @@ pub const HurtBox = struct {
     }
 };
 
-pub const WaveSpawnerController = struct {
-    timer: utl.TickCounter = utl.TickCounter.init(2 * core.fups_per_sec),
-    spawned: bool = false,
-    wave_idx: i32,
+pub const SpawnerRenderer = struct {
+    creature_kind: sprites.CreatureAnim.Kind,
+    base_circle_radius: f32,
+    sprite_tint: Colorf = .blank,
+    base_circle_color: Colorf = .blank,
+
+    pub fn renderUnder(self: *const Thing, _: *const Room) Error!void {
+        const renderer = &self.renderer.spawner;
+        const plat = App.getPlat();
+        plat.circlef(self.pos, renderer.base_circle_radius, .{ .fill_color = renderer.base_circle_color });
+    }
+
+    pub fn render(self: *const Thing, _: *const Room) Error!void {
+        const renderer = &self.renderer.spawner;
+        const plat = App.getPlat();
+        const anim = App.get().data.getCreatureAnim(renderer.creature_kind, .idle).?;
+        const frame = anim.getRenderFrame(V2f.right, 0);
+        const tint: Colorf = renderer.sprite_tint;
+        const opt = draw.TextureOpt{
+            .origin = frame.origin,
+            .src_pos = frame.pos.toV2f(),
+            .src_dims = frame.size.toV2f(),
+            .uniform_scaling = 4,
+            .tint = tint,
+        };
+        plat.texturef(self.pos, frame.texture, opt);
+    }
+};
+
+pub const SpawnerController = struct {
+    timer: utl.TickCounter = utl.TickCounter.init(1 * core.fups_per_sec / 2),
+    state: enum {
+        fade_in_circle,
+        fade_in_creature,
+        fade_out_circle,
+    } = .fade_in_circle,
+    creature_kind: Kind,
 
     pub fn update(self: *Thing, room: *Room) Error!void {
-        const wave_spawner = &self.controller.wave_spawner;
-        if (wave_spawner.spawned) {
-            self.renderer.shape.poly_opt.fill_color = Colorf.white.fade(1 - wave_spawner.timer.remapTo0_1());
-            if (wave_spawner.timer.tick(false)) {
-                self.deferFree(room);
-            }
-        } else {
-            self.renderer.shape.poly_opt.fill_color = Colorf.white.fade(wave_spawner.timer.remapTo0_1());
-            if (wave_spawner.timer.tick(true)) {
-                wave_spawner.spawned = true;
-                const proto = &room.waves.get(utl.as(usize, wave_spawner.wave_idx)).proto;
-                _ = try room.queueSpawnThing(proto, self.pos);
-            }
+        const spawner = &self.controller.spawner;
+        switch (spawner.state) {
+            .fade_in_circle => {
+                self.renderer.spawner.base_circle_color = Colorf.white.fade(spawner.timer.remapTo0_1());
+                if (spawner.timer.tick(true)) {
+                    spawner.timer = utl.TickCounter.init(1 * core.fups_per_sec);
+                    spawner.state = .fade_in_creature;
+                }
+            },
+            .fade_in_creature => {
+                self.renderer.spawner.sprite_tint = Colorf.black.fade(0).lerp(Colorf.white, spawner.timer.remapTo0_1());
+                if (spawner.timer.tick(true)) {
+                    _ = try room.queueSpawnThingByKind(spawner.creature_kind, self.pos);
+                    spawner.state = .fade_out_circle;
+                }
+            },
+            .fade_out_circle => {
+                self.renderer.spawner.sprite_tint = .blank;
+                self.renderer.spawner.base_circle_color = Colorf.white.fade(1 - spawner.timer.remapTo0_1());
+                if (spawner.timer.tick(false)) {
+                    self.deferFree(room);
+                }
+            },
         }
     }
 
-    pub fn prototype(wave_idx: i32, room: *Room) Thing {
-        const proto = room.waves.get(utl.as(usize, wave_idx)).proto;
+    pub fn prototype(thing_kind: Kind) Thing {
+        const proto: Thing = App.get().data.things.get(thing_kind).?;
         return .{
             .kind = .spawner,
             .controller = .{
-                .wave_spawner = .{
-                    .wave_idx = wave_idx,
+                .spawner = .{
+                    .creature_kind = thing_kind,
                 },
             },
             .renderer = .{
-                .shape = .{
-                    .kind = .{
-                        .circle = .{
-                            .radius = proto.renderer.creature.draw_radius,
-                        },
-                    },
-                    .poly_opt = .{
-                        .fill_color = .blank,
-                    },
-                    .draw_normal = false,
-                    .draw_under = true,
+                .spawner = .{
+                    .creature_kind = proto.animator.creature.creature_kind,
+                    .base_circle_radius = proto.renderer.creature.draw_radius,
                 },
             },
-            .faction = .enemy, // to ensure num_enemies_alive > 0
+            .faction = proto.faction, // to ensure num_enemies_alive > 0
         };
     }
 };

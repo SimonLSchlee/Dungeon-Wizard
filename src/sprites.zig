@@ -72,6 +72,32 @@ pub const CreatureAnim = struct {
     // offset the 0th dir
     start_angle_rads: f32 = 0,
     origin: draw.TextureOrigin = .center,
+
+    pub fn getRenderFrame(self: CreatureAnim, dir: V2f, anim_frame: i32) RenderFrame {
+        const sprite_sheet: Data.SpriteSheet = App.get().data.getCreatureAnimSpriteSheet(self.creature_kind, self.anim_kind).?;
+        const num_dirs_f = utl.as(f32, self.num_dirs);
+        const angle_inc = utl.tau / num_dirs_f;
+        const shifted_dir = dir.rotRadians(angle_inc * 0.5 - self.start_angle_rads);
+        const shifted_angle = shifted_dir.toAngleRadians();
+        const a = utl.normalizeRadians0_Tau(shifted_angle);
+        assert(a >= 0 and a <= utl.tau);
+        const f = a / utl.tau;
+        const i = f * num_dirs_f;
+        assert(i >= 0 and i <= num_dirs_f);
+        // i could be exactly num_dirs_f, mod it to wrap to 0
+        const dir_index = @mod(utl.as(i32, @floor(i)), self.num_dirs);
+        assert(dir_index >= 0 and dir_index < self.num_dirs);
+        const frame_idx = utl.as(usize, dir_index * self.num_frames + anim_frame);
+        const ssframe: Data.SpriteSheet.Frame = sprite_sheet.frames[frame_idx];
+        const rframe = CreatureAnim.RenderFrame{
+            .pos = ssframe.pos,
+            .size = ssframe.size,
+            .texture = sprite_sheet.texture,
+            .origin = self.origin,
+        };
+
+        return rframe;
+    }
 };
 
 pub const CreatureAnimKindSet = std.EnumSet(CreatureAnim.AnimKind);
@@ -89,30 +115,8 @@ pub const CreatureAnimator = struct {
     anim_tick: i32 = 0,
 
     pub fn getCurrRenderFrame(self: *const CreatureAnimator, dir: V2f) CreatureAnim.RenderFrame {
-        const sprite_sheet = App.get().data.creature_sprite_sheets.get(self.creature_kind).get(self.curr_anim).?;
-        const anim: CreatureAnim = App.get().data.creature_anims.get(self.creature_kind).get(self.curr_anim).?;
-        const num_dirs_f = utl.as(f32, anim.num_dirs);
-        const angle_inc = utl.tau / num_dirs_f;
-        const shifted_dir = dir.rotRadians(angle_inc * 0.5 - anim.start_angle_rads);
-        const shifted_angle = shifted_dir.toAngleRadians();
-        const a = utl.normalizeRadians0_Tau(shifted_angle);
-        assert(a >= 0 and a <= utl.tau);
-        const f = a / utl.tau;
-        const i = f * num_dirs_f;
-        assert(i >= 0 and i <= num_dirs_f);
-        // i could be exactly num_dirs_f, mod it to wrap to 0
-        const dir_index = @mod(utl.as(i32, @floor(i)), anim.num_dirs);
-        assert(dir_index >= 0 and dir_index < anim.num_dirs);
-        const frame_idx = utl.as(usize, dir_index * anim.num_frames + self.curr_anim_frame);
-        const ssframe: Data.SpriteSheet.Frame = sprite_sheet.frames[frame_idx];
-        const rframe = CreatureAnim.RenderFrame{
-            .pos = ssframe.pos,
-            .size = ssframe.size,
-            .texture = sprite_sheet.texture,
-            .origin = anim.origin,
-        };
-
-        return rframe;
+        const anim: CreatureAnim = App.get().data.getCreatureAnim(self.creature_kind, self.curr_anim).?;
+        return anim.getRenderFrame(dir, self.curr_anim_frame);
     }
 
     pub fn play(self: *CreatureAnimator, anim_kind: CreatureAnim.AnimKind, params: PlayParams) std.EnumSet(CreatureAnim.Event.Kind) {

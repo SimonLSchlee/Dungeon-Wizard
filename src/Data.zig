@@ -172,6 +172,14 @@ pub fn init() Error!*Data {
     return data;
 }
 
+pub fn getCreatureAnim(self: *Data, creature_kind: sprites.CreatureAnim.Kind, anim_kind: sprites.CreatureAnim.AnimKind) ?sprites.CreatureAnim {
+    return self.creature_anims.get(creature_kind).get(anim_kind);
+}
+
+pub fn getCreatureAnimSpriteSheet(self: *Data, creature_kind: sprites.CreatureAnim.Kind, anim_kind: sprites.CreatureAnim.AnimKind) ?SpriteSheet {
+    return self.creature_sprite_sheets.get(creature_kind).get(anim_kind);
+}
+
 pub fn loadSounds(self: *Data) Error!void {
     const plat = App.getPlat();
     self.sounds = @TypeOf(self.sounds).initFill(null);

@@ -203,6 +203,7 @@ pub fn reset(self: *Room) Error!void {
     self.rng.seed(self.seed);
     self.first_wave_timer = u.TickCounter.init(5 * core.fups_per_sec);
     self.curr_wave = 0;
+    self.num_enemies_alive = 0;
 
     for (self.packed_room.thing_spawns.constSlice()) |spawn| {
         std.debug.print("Room init: spawning a {any}\n", .{spawn.kind});
@@ -325,7 +326,7 @@ pub fn discardSpell(self: *Room, spell: Spell) void {
 pub fn spawnCurrWave(self: *Room) Error!void {
     assert(self.curr_wave < self.waves.len);
     const wave = self.waves.get(u.as(usize, self.curr_wave));
-    const spawner_proto = Thing.WaveSpawnerController.prototype(self.curr_wave, self);
+    const spawner_proto = Thing.SpawnerController.prototype(wave.proto.kind);
     for (wave.positions.constSlice()) |pos| {
         _ = try self.queueSpawnThing(&spawner_proto, pos);
     }
@@ -546,6 +547,9 @@ pub fn render(self: *const Room) Error!void {
         try plat.textf(p, txt, .{}, opt);
     } else {
         try self.spell_slots.render(self);
+    }
+    if (debug.show_num_enemies) {
+        try plat.textf(v2f(10, 10), "num_enemies_alive: {}", .{self.num_enemies_alive}, .{ .color = .white });
     }
 
     plat.endRenderToTexture();
