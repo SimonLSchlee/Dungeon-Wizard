@@ -674,3 +674,10 @@ pub fn debugDrawPath(self: *const Thing, room: *const Room) Error!void {
         //p.linef(self.path.buffer[i], self.path.buffer[i + 1], line_thickness, Colorf.green);
     }
 }
+
+pub fn isEnemy(self: *const Thing) bool {
+    if (self.faction == .enemy) return true;
+    if (self.statuses.get(.blackmailed).stacks > 0) return true;
+
+    return false;
+}

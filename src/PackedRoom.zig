@@ -27,13 +27,15 @@ pub const ThingSpawn = struct {
     pos: V2f,
 };
 
+pub const WavePositionsArray = std.BoundedArray(V2f, 16);
+
 pub const tile_sz: i64 = 64;
 pub const tile_sz_f: f32 = tile_sz;
 pub const tile_dims = V2f.splat(tile_sz);
 pub const tile_dims_2 = V2f.splat(tile_sz_f * 0.5);
 
 exits: std.BoundedArray(V2f, 8) = .{},
-waves: [10]std.BoundedArray(V2f, 16) = .{.{}} ** 10,
+waves: [10]WavePositionsArray = .{.{}} ** 10,
 thing_spawns: std.BoundedArray(ThingSpawn, 64) = .{},
 tiles: std.BoundedArray(Tile, 1024) = .{},
 dims: V2f = .{},

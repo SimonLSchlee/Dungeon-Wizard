@@ -34,9 +34,11 @@ pub const ThingBoundedArray = std.BoundedArray(pool.Id, max_things_in_room);
 pub const SpellArray = std.BoundedArray(Spell, max_spells_in_deck);
 
 pub const Wave = struct {
-    proto: Thing,
+    proto: Thing = undefined,
+    positions: PackedRoom.WavePositionsArray = .{},
 };
 pub const WavesArray = std.BoundedArray(Wave, 10);
+
 const WavesParams = struct {
     protos: std.BoundedArray(Thing, 8),
     difficulty: f32,
@@ -64,18 +66,26 @@ const WavesParams = struct {
 fn makeWaves(packed_room: PackedRoom, rng: std.Random, params: WavesParams) WavesArray {
     var difficulty_left = params.difficulty;
     var ret = WavesArray{};
-    for (packed_room.waves) |wave_positions| {
+    std.debug.print("\n\n#############\n", .{});
+    std.debug.print("Making waves! difficulty: {d:.1}, error: {d:.1}\n", .{ params.difficulty, params.difficulty_error });
+    for (packed_room.waves, 0..) |wave_positions, i| {
         if (wave_positions.len == 0) continue;
+        var wave = Wave{};
         while (difficulty_left > params.difficulty_error) {
             const idx = rng.intRangeLessThan(usize, 0, params.protos.len);
             const proto = params.protos.buffer[idx];
             const wave_difficulty = proto.enemy_difficulty * u.as(f32, wave_positions.len);
             if (wave_difficulty > difficulty_left + params.difficulty_error) continue;
             difficulty_left -= wave_difficulty;
-            ret.append(.{ .proto = proto }) catch unreachable;
+            wave.proto = proto;
+            std.debug.print("  {}: selected {any}, total difficulty: {d:.2}\n", .{ i, wave.proto.kind, wave_difficulty });
+            std.debug.print("    {d:.2} difficulty left\n", .{difficulty_left});
             break;
         }
+        wave.positions = wave_positions;
+        ret.append(wave) catch unreachable;
     }
+    std.debug.print("#############\n\n", .{});
     return ret;
 }
 
@@ -118,7 +128,9 @@ ui_clicked: bool = false,
 curr_tick: i64 = 0,
 edit_mode: bool = false,
 waves: WavesArray = .{},
+first_wave_timer: u.TickCounter = undefined,
 curr_wave: i32 = 0,
+num_enemies_alive: i32 = 0,
 // reinit stuff, never needs saving or copying, probably?:
 render_texture: ?Platform.RenderTexture2D = null,
 next_pool_id: u32 = 0, // i hate this, can we change it?
@@ -135,7 +147,7 @@ rng: std.Random.DefaultPrng = undefined,
 tilemap: TileMap = .{},
 packed_room: PackedRoom,
 
-pub fn init(packed_room: PackedRoom, seed: u64) Error!Room {
+pub fn init(packed_room: PackedRoom, difficulty: f32, seed: u64) Error!Room {
     const plat = getPlat();
 
     var ret: Room = .{
@@ -152,7 +164,7 @@ pub fn init(packed_room: PackedRoom, seed: u64) Error!Room {
         .tilemap = try TileMap.init(packed_room.tiles.constSlice(), packed_room.dims),
         .packed_room = packed_room,
     };
-    ret.waves = makeWaves(packed_room, ret.rng.random(), WavesParams.init(10));
+    ret.waves = makeWaves(packed_room, ret.rng.random(), WavesParams.init(difficulty));
 
     // everything is done except spawning stuff
     try ret.reset();
@@ -189,6 +201,8 @@ pub fn reset(self: *Room) Error!void {
     self.fog.clearAll();
     self.curr_tick = 0;
     self.rng.seed(self.seed);
+    self.first_wave_timer = u.TickCounter.init(10 * core.fups_per_sec);
+    self.curr_wave = 0;
 
     for (self.packed_room.thing_spawns.constSlice()) |spawn| {
         std.debug.print("Room init: spawning a {any}\n", .{spawn.kind});
@@ -245,6 +259,7 @@ pub fn queueSpawnThing(self: *Room, proto: *const Thing, pos: V2f) Error!?pool.I
         thing.spawn_state = .spawning;
         thing.pos = pos;
         try self.spawn_queue.append(thing.id);
+        if (thing.isEnemy()) self.num_enemies_alive += 1;
         return thing.id;
     }
     return null;
@@ -307,6 +322,15 @@ pub fn discardSpell(self: *Room, spell: Spell) void {
     self.discard.append(spell) catch @panic("discard ran out of space");
 }
 
+pub fn spawnCurrWave(self: *Room) Error!void {
+    assert(self.curr_wave < self.waves.len);
+    const wave = self.waves.get(u.as(usize, self.curr_wave));
+    for (wave.positions.constSlice()) |pos| {
+        _ = try self.queueSpawnThing(&wave.proto, pos);
+    }
+    self.curr_wave += 1;
+}
+
 pub fn update(self: *Room) Error!void {
     const plat = getPlat();
     self.ui_clicked = false;
@@ -330,7 +354,6 @@ pub fn update(self: *Room) Error!void {
             _ = try self.queueSpawnThingByKind(.troll, pos);
         }
     }
-
     for (self.spawn_queue.constSlice()) |id| {
         const t = self.getThingById(id);
         assert(t != null);
@@ -368,6 +391,21 @@ pub fn update(self: *Room) Error!void {
     }
 
     if (!self.edit_mode) {
+        // waves spawning
+        if (self.curr_wave < self.waves.len) {
+            // first wave spawns after fixed time
+            if (self.curr_wave == 0) {
+                if (self.first_wave_timer.tick(false)) {
+                    try self.spawnCurrWave();
+                }
+            } else if (self.num_enemies_alive == 0) {
+                try self.spawnCurrWave();
+            }
+        } else if (self.num_enemies_alive == 0) {
+            // TODO
+            // win the room
+        }
+        // spell slots
         {
             const old = self.spell_slots.selected;
             try self.spell_slots.update(self);
@@ -376,12 +414,12 @@ pub fn update(self: *Room) Error!void {
                 self.ui_clicked = true;
             }
         }
-
+        // things
         for (&self.things.items) |*thing| {
             if (!thing.isActive()) continue;
             try thing.update(self);
         }
-
+        // fog
         self.fog.clearVisible();
         if (self.getPlayer()) |player| {
             self.camera.pos = player.pos;
@@ -397,6 +435,7 @@ pub fn update(self: *Room) Error!void {
         assert(thing.spawn_state == .freeable);
         thing.deinit();
         self.things.free(id);
+        if (thing.isEnemy()) self.num_enemies_alive -= 1;
     }
     self.free_queue.len = 0;
 
@@ -428,6 +467,7 @@ pub fn render(self: *const Room) Error!void {
         plat.circlef(epos, 20, .{ .fill_color = Colorf.rgb(0.4, 0.3, 0.4) });
         plat.circlef(epos.add(v2f(0, 2)), 19, .{ .fill_color = Colorf.rgb(0.2, 0.1, 0.2) });
     }
+
     // waves
     if (debug.show_waves) {
         for (self.packed_room.waves, 0..) |buf, i| {
@@ -437,10 +477,13 @@ pub fn render(self: *const Room) Error!void {
         }
     }
 
-    if (self.getConstPlayer()) |player| {
-        if (self.spell_slots.getSelectedSlot()) |slot| {
-            assert(slot.spell != null);
-            try slot.spell.?.renderTargeting(self, player);
+    // spell targeting
+    if (!self.edit_mode) {
+        if (self.getConstPlayer()) |player| {
+            if (self.spell_slots.getSelectedSlot()) |slot| {
+                assert(slot.spell != null);
+                try slot.spell.?.renderTargeting(self, player);
+            }
         }
     }
 

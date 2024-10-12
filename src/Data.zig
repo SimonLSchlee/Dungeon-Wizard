@@ -93,6 +93,11 @@ pub const SpriteSheet = struct {
 };
 
 const test_levels = [_][]const u8{
+    \\#######
+    \\ 22    
+    \\1 p &# 
+    \\ 1     
+    ,
     \\#########################
     \\#                       #
     \\#                       #

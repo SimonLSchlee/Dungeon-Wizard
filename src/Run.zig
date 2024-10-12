@@ -57,7 +57,7 @@ pub fn init(seed: u64) Error!Run {
     }
     assert(ret.room_pool.len > 0);
     const pr = ret.room_pool.get(0);
-    ret.room = try Room.init(pr, seed);
+    ret.room = try Room.init(pr, 10, seed);
 
     return ret;
 }
