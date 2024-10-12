@@ -201,7 +201,7 @@ pub fn reset(self: *Room) Error!void {
     self.fog.clearAll();
     self.curr_tick = 0;
     self.rng.seed(self.seed);
-    self.first_wave_timer = u.TickCounter.init(10 * core.fups_per_sec);
+    self.first_wave_timer = u.TickCounter.init(5 * core.fups_per_sec);
     self.curr_wave = 0;
 
     for (self.packed_room.thing_spawns.constSlice()) |spawn| {
@@ -325,8 +325,9 @@ pub fn discardSpell(self: *Room, spell: Spell) void {
 pub fn spawnCurrWave(self: *Room) Error!void {
     assert(self.curr_wave < self.waves.len);
     const wave = self.waves.get(u.as(usize, self.curr_wave));
+    const spawner_proto = Thing.WaveSpawnerController.prototype(self.curr_wave, self);
     for (wave.positions.constSlice()) |pos| {
-        _ = try self.queueSpawnThing(&wave.proto, pos);
+        _ = try self.queueSpawnThing(&spawner_proto, pos);
     }
     self.curr_wave += 1;
 }

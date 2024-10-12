@@ -38,6 +38,7 @@ pub const Kind = enum {
     impling,
     projectile,
     shield,
+    spawner,
 };
 
 pub const Pool = pool.BoundedPool(Thing, Room.max_things_in_room);
@@ -76,6 +77,7 @@ controller: union(enum) {
     enemy: enemies.AIController,
     spell: Spell.Controller,
     projectile: ProjectileController,
+    wave_spawner: WaveSpawnerController,
 } = .none,
 renderer: union(enum) {
     none: void,
@@ -90,7 +92,7 @@ path: std.BoundedArray(V2f, 32) = .{},
 hitbox: ?HitBox = null,
 hurtbox: ?HurtBox = null,
 hp: ?HP = null,
-faction: Faction = .neutral,
+faction: Faction = .object,
 selectable: ?struct {
     // its a half capsule shape
     radius: f32 = 20,
@@ -212,6 +214,56 @@ pub const HurtBox = struct {
                 self.deferFree(room);
             }
         }
+    }
+};
+
+pub const WaveSpawnerController = struct {
+    timer: utl.TickCounter = utl.TickCounter.init(2 * core.fups_per_sec),
+    spawned: bool = false,
+    wave_idx: i32,
+
+    pub fn update(self: *Thing, room: *Room) Error!void {
+        const wave_spawner = &self.controller.wave_spawner;
+        if (wave_spawner.spawned) {
+            self.renderer.shape.poly_opt.fill_color = Colorf.white.fade(1 - wave_spawner.timer.remapTo0_1());
+            if (wave_spawner.timer.tick(false)) {
+                self.deferFree(room);
+            }
+        } else {
+            self.renderer.shape.poly_opt.fill_color = Colorf.white.fade(wave_spawner.timer.remapTo0_1());
+            if (wave_spawner.timer.tick(true)) {
+                wave_spawner.spawned = true;
+                const proto = &room.waves.get(utl.as(usize, wave_spawner.wave_idx)).proto;
+                _ = try room.queueSpawnThing(proto, self.pos);
+            }
+        }
+    }
+
+    pub fn prototype(wave_idx: i32, room: *Room) Thing {
+        const proto = room.waves.get(utl.as(usize, wave_idx)).proto;
+        return .{
+            .kind = .spawner,
+            .controller = .{
+                .wave_spawner = .{
+                    .wave_idx = wave_idx,
+                },
+            },
+            .renderer = .{
+                .shape = .{
+                    .kind = .{
+                        .circle = .{
+                            .radius = proto.renderer.creature.draw_radius,
+                        },
+                    },
+                    .poly_opt = .{
+                        .fill_color = .blank,
+                    },
+                    .draw_normal = false,
+                    .draw_under = true,
+                },
+            },
+            .faction = .enemy, // to ensure num_enemies_alive > 0
+        };
     }
 };
 
