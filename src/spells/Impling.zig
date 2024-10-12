@@ -96,6 +96,6 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     const impling = self.kind.impling;
     _ = impling;
     const target_pos = params.target.pos;
-    const thing = App.get().data.things.get(.impling).?;
-    _ = try room.queueSpawnThing(&thing, target_pos);
+    const spawner = Thing.SpawnerController.prototype(.impling);
+    _ = try room.queueSpawnThing(&spawner, target_pos);
 }
