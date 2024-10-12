@@ -244,6 +244,9 @@ pub fn renderTargeting(self: *const Spell, room: *const Room, caster: *const Thi
             if (targeting_data.radius_under_mouse) |r| {
                 plat.circlef(target_circle_pos, r, .{ .fill_color = targeting_data.color.fade(0.4) });
             }
+            if (targeting_data.target_mouse_pos) {
+                plat.circlef(target_circle_pos, 10, .{ .fill_color = targeting_data.color.fade(0.4) });
+            }
         },
         .self => {
             const draw_radius = caster.selectable.?.radius;
