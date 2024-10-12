@@ -128,6 +128,7 @@ ui_clicked: bool = false,
 curr_tick: i64 = 0,
 edit_mode: bool = false,
 waves: WavesArray = .{},
+difficulty: f32 = 0,
 first_wave_timer: u.TickCounter = undefined,
 curr_wave: i32 = 0,
 num_enemies_alive: i32 = 0,
@@ -163,8 +164,8 @@ pub fn init(packed_room: PackedRoom, difficulty: f32, seed: u64) Error!Room {
         .seed = seed,
         .tilemap = try TileMap.init(packed_room.tiles.constSlice(), packed_room.dims),
         .packed_room = packed_room,
+        .difficulty = difficulty,
     };
-    ret.waves = makeWaves(packed_room, ret.rng.random(), WavesParams.init(difficulty));
 
     // everything is done except spawning stuff
     try ret.reset();
@@ -204,6 +205,8 @@ pub fn reset(self: *Room) Error!void {
     self.first_wave_timer = u.TickCounter.init(5 * core.fups_per_sec);
     self.curr_wave = 0;
     self.num_enemies_alive = 0;
+
+    self.waves = makeWaves(self.packed_room, self.rng.random(), WavesParams.init(self.difficulty));
 
     for (self.packed_room.thing_spawns.constSlice()) |spawn| {
         std.debug.print("Room init: spawning a {any}\n", .{spawn.kind});
