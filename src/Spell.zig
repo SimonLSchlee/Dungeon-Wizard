@@ -20,9 +20,10 @@ const getPlat = App.getPlat;
 const Room = @import("Room.zig");
 const Thing = @import("Thing.zig");
 const TileMap = @import("TileMap.zig");
-const data = @import("data.zig");
+const Data = @import("Data.zig");
 const pool = @import("pool.zig");
 const Collision = @import("Collision.zig");
+const menuUI = @import("menuUI.zig");
 
 const Spell = @This();
 
@@ -311,5 +312,56 @@ pub fn renderTargeting(self: *const Spell, room: *const Room, caster: *const Thi
                 plat.circlef(thing.pos, draw_radius, .{ .fill_color = targeting_data.color.fade(0.5) });
             }
         },
+    }
+}
+
+pub fn textInRect(topleft: V2f, dims: V2f, rect_opt: draw.PolyOpt, text_padding: V2f, comptime fmt: []const u8, args: anytype, text_opt: draw.TextOpt) Error!void {
+    const plat = App.getPlat();
+    const half_dims = dims.scale(0.5);
+    const text_rel_pos = if (text_opt.center) half_dims else text_padding;
+    const text_dims = dims.sub(text_padding);
+    assert(text_dims.x > 0 and text_dims.y > 0);
+    const text = try utl.bufPrintLocal(fmt, args);
+    const fitted_text_opt = try plat.fitTextToRect(text_dims, text, text_opt);
+    plat.rectf(topleft, dims, rect_opt);
+    try plat.textf(topleft.add(text_rel_pos), fmt, args, fitted_text_opt);
+}
+
+pub fn renderInfo(self: *const Spell, rect: menuUI.ClickableRect) Error!void {
+    const plat = App.getPlat();
+    const data = App.get().data;
+    const title_rect_dims = v2f(rect.dims.x, rect.dims.y * 0.2);
+    const icon_rect_dims = v2f(rect.dims.x, rect.dims.y * 0.4);
+
+    const name: []const u8 = @tagName(self.kind);
+
+    plat.rectf(rect.pos, rect.dims, .{ .fill_color = .darkgray });
+    try textInRect(rect.pos, title_rect_dims, .{ .fill_color = null }, v2f(5, 5), "{s}", .{name}, .{ .color = .white });
+
+    const icon_center_pos = rect.pos.add(v2f(0, title_rect_dims.y)).add(icon_rect_dims.scale(0.5));
+    const kind = std.meta.activeTag(self.kind);
+    const spell_char = [1]u8{std.ascii.toUpper(name[0])};
+    // spell image
+    if (data.spell_icons_indices.get(kind)) |idx| {
+        const sheet = data.spell_icons;
+        const frame = sheet.frames[utl.as(usize, idx)];
+        plat.texturef(icon_center_pos, sheet.texture, .{
+            .origin = .center,
+            .src_pos = frame.pos.toV2f(),
+            .src_dims = frame.size.toV2f(),
+            .uniform_scaling = 4,
+        });
+    } else {
+        // spell letter
+        try plat.textf(
+            icon_center_pos,
+            "{s}",
+            .{&spell_char},
+            .{
+                .color = self.color,
+                .size = 40,
+                .center = true,
+            },
+        );
     }
 }

@@ -277,3 +277,29 @@ pub const TickCounter = struct {
         return remapClampf(0, as(f32, self.num_ticks), 0, 1, as(f32, self.curr_tick));
     }
 };
+
+pub fn BoundedString(max_len: usize) type {
+    const Error = error{
+        NoSpaceLeft,
+    };
+    return struct {
+        buf: [max_len]u8 = .{0} ** max_len,
+        len: usize = 0,
+
+        pub fn init(str: []const u8) !@This() {
+            var ret = @This(){};
+            if (str.len > max_len) {
+                return Error.NoSpaceLeft;
+            }
+            std.mem.copyForwards(u8, &ret.buf, str);
+            ret.len = str.len;
+            return ret;
+        }
+        pub fn slice(self: *@This()) []u8 {
+            return self.buf[0..self.len];
+        }
+        pub fn constSlice(self: *const @This()) []const u8 {
+            return self.buf[0..self.len];
+        }
+    };
+}

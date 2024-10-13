@@ -22,6 +22,15 @@ const Spell = @import("Spell.zig");
 const Thing = @import("Thing.zig");
 const Data = @import("Data.zig");
 const PackedRoom = @import("PackedRoom.zig");
+const menuUI = @import("menuUI.zig");
+
+pub const RewardUI = struct {
+    modal_topleft: V2f,
+    modal_dims: V2f,
+    modal_opt: draw.PolyOpt,
+    rects: std.BoundedArray(menuUI.ClickableRect, 8),
+    skip_button: menuUI.Button,
+};
 
 pub fn makeStarterDeck() Spell.SpellArray {
     var ret = Spell.SpellArray{};
@@ -57,6 +66,7 @@ pub fn makeStarterDeck() Spell.SpellArray {
 gold: i32 = 0,
 room: ?Room = null,
 reward: ?Spell.Reward = null,
+reward_ui: RewardUI = undefined,
 screen: enum {
     game,
     pause,
@@ -113,10 +123,11 @@ pub fn deinit(self: *Run) void {
 pub fn update(self: *Run) Error!void {
     const plat = getPlat();
 
+    assert(self.room != null);
+    const room = &self.room.?;
+
     switch (self.screen) {
         .game => {
-            assert(self.room != null);
-            const room = &self.room.?;
             if (plat.input_buffer.keyIsJustPressed(.f4)) {
                 try room.reset();
             }
@@ -134,6 +145,7 @@ pub fn update(self: *Run) Error!void {
             try room.update();
             if (room.progress_state == .won and self.reward == null) {
                 self.reward = Spell.Reward.init(self.rng.random());
+                self.reward_ui = self.makeRewardUI();
                 self.screen = .reward;
             }
         },
@@ -141,35 +153,119 @@ pub fn update(self: *Run) Error!void {
         .reward => {
             assert(self.reward != null);
             const reward = &self.reward.?;
-            _ = reward;
+            const reward_ui = self.reward_ui;
+            if (reward_ui.skip_button.isClicked()) {
+                self.screen = .game;
+            } else {
+                for (reward_ui.rects.constSlice(), 0..) |crect, i| {
+                    if (crect.isClicked()) {
+                        const spell = reward.spells.get(i);
+                        try self.deck.append(spell);
+                        // TODO ugh?
+                        room.init_params.deck.append(spell) catch unreachable;
+                        room.draw_pile.append(spell) catch unreachable;
+                        self.screen = .game;
+                        break;
+                    }
+                }
+            }
         },
         .shop => {},
         .dead => {},
     }
 }
 
+fn makeRewardUI(self: *Run) RewardUI {
+    const plat = App.getPlat();
+    assert(self.reward != null);
+    const reward = self.reward.?;
+    const slot_aspect = 0.7;
+    const modal_dims = v2f(plat.screen_dims_f.x * 0.75, plat.screen_dims_f.y * 0.6);
+    const modal_topleft = plat.screen_dims_f.sub(modal_dims).scale(0.5);
+    const modal_padding = plat.screen_dims_f.scale(0.08);
+    const slots_dims = modal_dims.sub(modal_padding.scale(2));
+    const slots_topleft = modal_topleft.add(modal_padding);
+    const slot_spacing = modal_padding.x * 0.3;
+    const num_slots_f = u.as(f32, reward.spells.len);
+    const slots_spacing_total = (num_slots_f - 1) * (slot_spacing);
+    const slot_width = (slots_dims.x - slots_spacing_total) / num_slots_f;
+    const slot_dims = v2f(slot_width, slot_width / slot_aspect);
+
+    const modal_opt = draw.PolyOpt{
+        .fill_color = Colorf.rgba(0.1, 0.1, 0.1, 0.8),
+        .outline_color = Colorf.rgba(0.1, 0.1, 0.2, 0.8),
+        .outline_thickness = 4,
+    };
+
+    var rects = std.BoundedArray(menuUI.ClickableRect, 8){};
+    for (0..reward.spells.len) |i| {
+        const offset = v2f(u.as(f32, i) * (slot_dims.x + slot_spacing), 0);
+        const pos = slots_topleft.add(offset);
+        rects.append(.{ .pos = pos, .dims = slot_dims }) catch unreachable;
+    }
+
+    const skip_btn_dims = modal_dims.scale(0.1);
+    const slots_bottom_y = slots_topleft.y + slots_dims.y;
+    const space_left_y = @max(slots_bottom_y - modal_topleft.y - modal_dims.y, 0);
+    const skip_btn_center = v2f(slots_topleft.x + slots_dims.x * 0.5, slots_bottom_y + space_left_y * 0.5);
+    var skip_button = menuUI.Button{
+        .rect = .{
+            .pos = skip_btn_center.sub(skip_btn_dims.scale(0.5)),
+            .dims = skip_btn_dims,
+        },
+        .poly_opt = .{ .fill_color = .orange },
+        .text_opt = .{ .center = true, .color = .black, .size = 30 },
+        .text_rel_pos = skip_btn_dims.scale(0.5),
+    };
+    skip_button.text = @TypeOf(skip_button.text).init("Skip") catch unreachable;
+
+    return .{
+        .modal_dims = modal_dims,
+        .modal_topleft = modal_topleft,
+        .modal_opt = modal_opt,
+        .rects = rects,
+        .skip_button = skip_button,
+    };
+}
+
 pub fn render(self: *Run) Error!void {
     const plat = getPlat();
 
+    // room is always present
+    assert(self.room != null);
+    const room = &self.room.?;
+    try room.render();
+    //const game_scale: i32 = 2;
+    //const game_dims_scaled_f = game_dims.scale(game_scale).toV2f();
+    //const topleft = p.screen_dims_f.sub(game_dims_scaled_f).scale(0.5);
+    const game_texture_opt = .{
+        .flip_y = true,
+    };
+    plat.texturef(.{}, room.render_texture.?.texture, game_texture_opt);
     plat.clear(Colorf.magenta);
+
     switch (self.screen) {
         .game => {
-            assert(self.room != null);
-            const room = &self.room.?;
-            try room.render();
-            //const game_scale: i32 = 2;
-            //const game_dims_scaled_f = game_dims.scale(game_scale).toV2f();
-            //const topleft = p.screen_dims_f.sub(game_dims_scaled_f).scale(0.5);
-            const game_texture_opt = .{
-                .flip_y = true,
-            };
-            plat.texturef(.{}, room.render_texture.?.texture, game_texture_opt);
+            // nothing else
         },
         .pause => {},
         .reward => {
             assert(self.reward != null);
             const reward = &self.reward.?;
-            _ = reward;
+            const reward_ui = self.reward_ui;
+            plat.rectf(reward_ui.modal_topleft, reward_ui.modal_dims, reward_ui.modal_opt);
+            for (reward_ui.rects.constSlice(), 0..) |crect, i| {
+                const spell = reward.spells.get(i);
+                var hovered_crect = crect;
+                if (crect.isHovered()) {
+                    const new_dims = crect.dims.scale(1.1);
+                    const new_pos = crect.pos.sub(new_dims.sub(crect.dims).scale(0.5));
+                    hovered_crect.pos = new_pos;
+                    hovered_crect.dims = new_dims;
+                }
+                try spell.renderInfo(hovered_crect);
+            }
+            try reward_ui.skip_button.render();
         },
         .shop => {},
         .dead => {},

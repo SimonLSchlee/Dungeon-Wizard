@@ -21,29 +21,6 @@ const sprites = @import("sprites.zig");
 const Spell = @import("Spell.zig");
 const Data = @This();
 
-pub fn BoundedString(max_len: usize) type {
-    return struct {
-        buf: [max_len]u8 = .{0} ** max_len,
-        len: usize = 0,
-
-        pub fn init(str: []const u8) Error!@This() {
-            var ret = @This(){};
-            if (str.len > max_len) {
-                return Error.NoSpaceLeft;
-            }
-            std.mem.copyForwards(u8, &ret.buf, str);
-            ret.len = str.len;
-            return ret;
-        }
-        pub fn slice(self: *@This()) []u8 {
-            return self.buf[0..self.len];
-        }
-        pub fn constSlice(self: *const @This()) []const u8 {
-            return self.buf[0..self.len];
-        }
-    };
-}
-
 pub fn EnumToBoundedStringArrayType(E: type) type {
     var max_len = 0;
     const info = @typeInfo(E);
@@ -52,7 +29,7 @@ pub fn EnumToBoundedStringArrayType(E: type) type {
             max_len = f.name.len;
         }
     }
-    return std.EnumArray(E, BoundedString(max_len));
+    return std.EnumArray(E, u.BoundedString(max_len));
 }
 
 pub fn enumToBoundedStringArray(E: type) EnumToBoundedStringArrayType(E) {
@@ -72,20 +49,20 @@ pub const SpriteSheet = struct {
         duration_ms: i64,
     };
     pub const Tag = struct {
-        name: BoundedString(16),
+        name: u.BoundedString(16),
         from_frame: i32,
         to_frame: i32,
     };
     pub const Meta = struct {
-        name: BoundedString(16) = .{},
+        name: u.BoundedString(16) = .{},
         data: union(enum) {
             int: i64,
             float: f32,
-            string: BoundedString(16),
+            string: u.BoundedString(16),
         } = undefined,
     };
 
-    name: BoundedString(64) = .{}, // filename without extension (.png)
+    name: u.BoundedString(64) = .{}, // filename without extension (.png)
     texture: Platform.Texture2D = undefined,
     frames: []Frame = &.{},
     tags: []Tag = &.{},
@@ -387,6 +364,7 @@ pub fn reload(self: *Data) Error!void {
             .impling = try @import("spells/Impling.zig").implingProto(),
         },
     );
+    self.char_to_thing = .{};
     inline for (self.things.values) |p| {
         const ch = @tagName(p.kind)[0];
         try self.char_to_thing.append(.{ .ch = ch, .kind = p.kind });
