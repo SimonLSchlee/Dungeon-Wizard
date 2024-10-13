@@ -23,18 +23,46 @@ const Thing = @import("Thing.zig");
 const Data = @import("Data.zig");
 const PackedRoom = @import("PackedRoom.zig");
 
-const Reward = struct {
-    spells: std.BoundedArray(Spell, 3),
-};
+pub fn makeStarterDeck() Spell.SpellArray {
+    var ret = Spell.SpellArray{};
+    // TODO placeholder
+    const unherring = Spell.getProto(.unherring);
+    const protec = Spell.getProto(.protec);
+    const frost = Spell.getProto(.frost_vom);
+    const blackmail = Spell.getProto(.blackmail);
+    const mint = Spell.getProto(.mint);
+    const impling = Spell.getProto(.impling);
+    const promptitude = Spell.getProto(.promptitude);
+    const flamey_explodey = Spell.getProto(.flamey_explodey);
+    const starter_deck = [_]struct { Spell, usize }{
+        .{ unherring, 3 },
+        .{ protec, 1 },
+        .{ frost, 1 },
+        .{ blackmail, 1 },
+        .{ mint, 3 },
+        .{ impling, 100 },
+        .{ promptitude, 1 },
+        .{ flamey_explodey, 1 },
+    };
+
+    deck: for (starter_deck) |t| {
+        for (0..t[1]) |_| {
+            ret.append(t[0]) catch break :deck;
+        }
+    }
+
+    return ret;
+}
 
 gold: i32 = 0,
 room: ?Room = null,
-reward: ?Reward = null,
+reward: ?Spell.Reward = null,
 screen: enum {
     game,
     pause,
     reward,
     shop,
+    dead,
 } = .game,
 seed: u64,
 rng: std.Random.DefaultPrng = undefined,
@@ -42,6 +70,7 @@ rooms_completed: std.BoundedArray(PackedRoom, 32) = .{},
 room_pool: std.BoundedArray(PackedRoom, 32) = .{},
 curr_room_num: usize = 0,
 player_thing: ?Thing = null,
+deck: Spell.SpellArray = .{},
 curr_tick: i64 = 0,
 
 pub fn init(seed: u64) Error!Run {
@@ -50,6 +79,7 @@ pub fn init(seed: u64) Error!Run {
     var ret: Run = .{
         .rng = std.Random.DefaultPrng.init(seed),
         .seed = seed,
+        .deck = makeStarterDeck(),
     };
     for (app.data.levels) |str| {
         const packed_room = try PackedRoom.init(str);
@@ -57,7 +87,12 @@ pub fn init(seed: u64) Error!Run {
     }
     assert(ret.room_pool.len > 0);
     const pr = ret.room_pool.get(0);
-    ret.room = try Room.init(pr, 10, seed);
+    ret.room = try Room.init(.{
+        .deck = ret.deck,
+        .difficulty = 10,
+        .packed_room = pr,
+        .seed = seed,
+    });
 
     return ret;
 }
@@ -85,7 +120,22 @@ pub fn update(self: *Run) Error!void {
             if (plat.input_buffer.keyIsJustPressed(.f4)) {
                 try room.reset();
             }
+            if (room.edit_mode) {
+                if (plat.input_buffer.getNumberKeyJustPressed()) |num| {
+                    const app = App.get();
+                    const n: usize = if (num == 0) 9 else num - 1;
+                    if (n < app.data.levels.len) {
+                        const s = app.data.levels[n];
+                        const packed_room = try PackedRoom.init(s);
+                        try room.reloadFromPackedRoom(packed_room);
+                    }
+                }
+            }
             try room.update();
+            if (room.progress_state == .won and self.reward == null) {
+                self.reward = Spell.Reward.init(self.rng.random());
+                self.screen = .reward;
+            }
         },
         .pause => {},
         .reward => {
@@ -94,6 +144,7 @@ pub fn update(self: *Run) Error!void {
             _ = reward;
         },
         .shop => {},
+        .dead => {},
     }
 }
 
@@ -121,6 +172,7 @@ pub fn render(self: *Run) Error!void {
             _ = reward;
         },
         .shop => {},
+        .dead => {},
     }
     { // gold
         const fill_color = Colorf.rgb(1, 0.9, 0);

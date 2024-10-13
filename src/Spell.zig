@@ -133,12 +133,54 @@ pub const Controller = struct {
     }
 };
 
-pub fn makeProto(kind: Kind, the_rest: Spell) Spell {
-    var ret = the_rest;
-    ret.kind = @unionInit(KindData, @tagName(kind), .{});
-    ret.cast_time_ticks = 30 * ret.cast_time;
+pub const max_spells_in_array = 256;
+pub const SpellArray = std.BoundedArray(Spell, max_spells_in_array);
+const WeightsArray = std.BoundedArray(f32, max_spells_in_array);
+
+const all_spells = blk: {
+    const kind_info = @typeInfo(Kind).@"enum";
+    var ret: [kind_info.fields.len]Spell = undefined;
+    for (kind_info.fields, 0..) |f, i| {
+        const kind: Kind = @enumFromInt(f.value);
+        const proto = getProto(kind);
+        ret[i] = proto;
+    }
+    break :blk ret;
+};
+
+const rarity_weight_base = std.EnumArray(Rarity, f32).init(.{
+    .pedestrian = 0.5,
+    .interesting = 0.30,
+    .exceptional = 0.15,
+    .brilliant = 0.05,
+});
+
+pub fn getSpellWeights(spells: []const Spell) WeightsArray {
+    var ret = WeightsArray{};
+    for (spells) |spell| {
+        ret.append(rarity_weight_base.get(spell.rarity)) catch unreachable;
+    }
     return ret;
 }
+
+pub const Reward = struct {
+    pub const base_spell_rewards: usize = 3;
+    spells: std.BoundedArray(Spell, 8) = .{},
+    selected_idx: ?i32 = null,
+
+    pub fn init(rng: std.Random) Reward {
+        var ret = Reward{};
+        var spell_pool = SpellArray{};
+        spell_pool.insertSlice(0, &all_spells) catch unreachable;
+        for (0..base_spell_rewards) |_| {
+            const weights = getSpellWeights(spell_pool.constSlice());
+            const idx = rng.weightedIndex(f32, weights.constSlice());
+            const spell = spell_pool.swapRemove(idx);
+            ret.spells.append(spell) catch unreachable;
+        }
+        return ret;
+    }
+};
 
 // only valid if spawn_state == .card
 id: Id = undefined,
@@ -154,6 +196,13 @@ cast_time: i8 = 1,
 cast_time_ticks: i64 = 30,
 color: Colorf = .black,
 targeting_data: TargetingData = .{},
+
+pub fn makeProto(kind: Kind, the_rest: Spell) Spell {
+    var ret = the_rest;
+    ret.kind = @unionInit(KindData, @tagName(kind), .{});
+    ret.cast_time_ticks = 30 * ret.cast_time;
+    return ret;
+}
 
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
     switch (self.kind) {

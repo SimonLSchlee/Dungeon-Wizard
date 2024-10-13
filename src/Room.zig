@@ -25,13 +25,19 @@ const TileMap = @import("TileMap.zig");
 const Fog = @import("Fog.zig");
 const gameUI = @import("gameUI.zig");
 const Spell = @import("Spell.zig");
+const Run = @import("Run.zig");
 const PackedRoom = @import("PackedRoom.zig");
 
 pub const max_things_in_room = 128;
-pub const max_spells_in_deck = 32;
 
 pub const ThingBoundedArray = std.BoundedArray(pool.Id, max_things_in_room);
-pub const SpellArray = std.BoundedArray(Spell, max_spells_in_deck);
+
+pub const InitParams = struct {
+    packed_room: PackedRoom,
+    difficulty: f32,
+    seed: u64,
+    deck: Spell.SpellArray,
+};
 
 pub const Wave = struct {
     proto: Thing = undefined,
@@ -121,14 +127,13 @@ free_queue: ThingBoundedArray = .{},
 moused_over_thing: ?Thing.Id = null,
 player_id: ?pool.Id = null,
 spell_slots: gameUI.SpellSlots = .{},
-deck: SpellArray = .{},
-discard: SpellArray = .{},
+draw_pile: Spell.SpellArray = .{},
+discard_pile: Spell.SpellArray = .{},
 fog: Fog = undefined,
 ui_clicked: bool = false,
 curr_tick: i64 = 0,
 edit_mode: bool = false,
 waves: WavesArray = .{},
-difficulty: f32 = 0,
 first_wave_timer: u.TickCounter = undefined,
 curr_wave: i32 = 0,
 num_enemies_alive: i32 = 0,
@@ -140,7 +145,6 @@ progress_state: enum {
 // reinit stuff, never needs saving or copying, probably?:
 render_texture: ?Platform.RenderTexture2D = null,
 next_pool_id: u32 = 0, // i hate this, can we change it?
-seed: u64 = 0,
 rng: std.Random.DefaultPrng = undefined,
 // fields to save/load for level loading
 //  - spawns, tiles, zones
@@ -151,25 +155,16 @@ rng: std.Random.DefaultPrng = undefined,
 // oh except, the tiles, (like, it IS used at runtime) ya know... so... no it should be just in Room
 //
 tilemap: TileMap = .{},
-packed_room: PackedRoom,
+init_params: InitParams,
 
-pub fn init(packed_room: PackedRoom, difficulty: f32, seed: u64) Error!Room {
+pub fn init(params: InitParams) Error!Room {
     const plat = getPlat();
 
     var ret: Room = .{
-        .next_pool_id = 1,
-        .things = Thing.Pool.init(0),
+        .next_pool_id = 0,
         .render_texture = plat.createRenderTexture("room", plat.screen_dims),
-        .camera = .{
-            .offset = plat.screen_dims_f.scale(0.5),
-            .zoom = 1,
-        },
         .fog = try Fog.init(),
-        .rng = std.Random.DefaultPrng.init(seed),
-        .seed = seed,
-        .tilemap = try TileMap.init(packed_room.tiles.constSlice(), packed_room.dims),
-        .packed_room = packed_room,
-        .difficulty = difficulty,
+        .init_params = params,
     };
 
     // everything is done except spawning stuff
@@ -198,22 +193,29 @@ fn clearThings(self: *Room) void {
     self.free_queue.len = 0;
     self.player_id = null;
     self.spell_slots = .{};
-    self.deck = .{};
-    self.discard = .{};
+    self.draw_pile = .{};
+    self.discard_pile = .{};
 }
 
 pub fn reset(self: *Room) Error!void {
+    const plat = getPlat();
     self.clearThings();
     self.fog.clearAll();
+    self.camera = .{
+        .offset = plat.screen_dims_f.scale(0.5),
+        .zoom = 1,
+    };
     self.curr_tick = 0;
-    self.rng.seed(self.seed);
+    self.rng = std.Random.DefaultPrng.init(self.init_params.seed);
     self.first_wave_timer = u.TickCounter.init(5 * core.fups_per_sec);
     self.curr_wave = 0;
     self.num_enemies_alive = 0;
+    self.draw_pile = self.init_params.deck;
+    self.tilemap.deinit();
+    self.tilemap = try TileMap.init(self.init_params.packed_room.tiles.constSlice(), self.init_params.packed_room.dims);
+    self.waves = makeWaves(self.init_params.packed_room, self.rng.random(), WavesParams.init(self.init_params.difficulty));
 
-    self.waves = makeWaves(self.packed_room, self.rng.random(), WavesParams.init(self.difficulty));
-
-    for (self.packed_room.thing_spawns.constSlice()) |spawn| {
+    for (self.init_params.packed_room.thing_spawns.constSlice()) |spawn| {
         std.debug.print("Room init: spawning a {any}\n", .{spawn.kind});
         if (try self.queueSpawnThingByKind(spawn.kind, spawn.pos)) |id| {
             if (spawn.kind == .player) {
@@ -221,31 +223,7 @@ pub fn reset(self: *Room) Error!void {
             }
         }
     }
-    // TODO placeholder
-    const unherring = Spell.getProto(.unherring);
-    const protec = Spell.getProto(.protec);
-    const frost = Spell.getProto(.frost_vom);
-    const blackmail = Spell.getProto(.blackmail);
-    const mint = Spell.getProto(.mint);
-    const impling = Spell.getProto(.impling);
-    const promptitude = Spell.getProto(.promptitude);
-    const flamey_explodey = Spell.getProto(.flamey_explodey);
-    const starter_deck = [_]struct { Spell, usize }{
-        .{ unherring, 5 },
-        .{ protec, 3 },
-        .{ frost, 1 },
-        .{ blackmail, 1 },
-        .{ mint, 1 },
-        .{ impling, 1 },
-        .{ promptitude, 1 },
-        .{ flamey_explodey, 100 },
-    };
 
-    deck: for (starter_deck) |t| {
-        for (0..t[1]) |_| {
-            self.deck.append(t[0]) catch break :deck;
-        }
-    }
     for (0..gameUI.SpellSlots.num_slots) |i| {
         if (self.drawSpell()) |spell| {
             self.spell_slots.fillSlot(spell, i);
@@ -253,11 +231,9 @@ pub fn reset(self: *Room) Error!void {
     }
 }
 
-fn reloadFromTilemapString(self: *Room, str: []const u8) Error!void {
+pub fn reloadFromPackedRoom(self: *Room, packed_room: PackedRoom) Error!void {
     self.tilemap.deinit();
-    const packed_room = try PackedRoom.init(str);
-    self.packed_room = packed_room;
-    self.tilemap = try TileMap.init(packed_room.tiles.constSlice(), packed_room.dims);
+    self.init_params.packed_room = packed_room;
     try self.reset();
 }
 
@@ -315,20 +291,20 @@ pub fn getConstPlayer(self: *const Room) ?*const Thing {
 }
 
 pub fn drawSpell(self: *Room) ?Spell {
-    if (self.deck.len > 0) {
-        const last = u.as(u32, self.deck.len - 1);
+    if (self.draw_pile.len > 0) {
+        const last = u.as(u32, self.draw_pile.len - 1);
         const idx = u.as(usize, self.rng.random().intRangeAtMost(u32, 0, last));
-        const spell = self.deck.swapRemove(idx);
+        const spell = self.draw_pile.swapRemove(idx);
         return spell;
     } else {
-        self.deck.insertSlice(0, self.discard.constSlice()) catch unreachable;
-        self.discard.len = 0;
+        self.draw_pile.insertSlice(0, self.discard_pile.constSlice()) catch unreachable;
+        self.discard_pile.len = 0;
     }
     return null;
 }
 
 pub fn discardSpell(self: *Room, spell: Spell) void {
-    self.discard.append(spell) catch @panic("discard ran out of space");
+    self.discard_pile.append(spell) catch @panic("discard pile ran out of space");
 }
 
 pub fn spawnCurrWave(self: *Room) Error!void {
@@ -350,14 +326,6 @@ pub fn update(self: *Room) Error!void {
     }
 
     if (self.edit_mode) {
-        if (plat.input_buffer.getNumberKeyJustPressed()) |num| {
-            const app = App.get();
-            const n: usize = if (num == 0) 9 else num - 1;
-            if (n < app.data.levels.len) {
-                const s = app.data.levels[n];
-                try self.reloadFromTilemapString(s);
-            }
-        }
         if (plat.input_buffer.mouseBtnIsJustPressed(.left)) {
             const pos = plat.screenPosToCamPos(self.camera, plat.input_buffer.getCurrMousePos());
             //std.debug.print("spawn sheep at {d:0.2}, {d:0.2}\n", .{ pos.x, pos.y });
@@ -484,7 +452,7 @@ pub fn render(self: *const Room) Error!void {
     try self.tilemap.debugDraw();
     //try self.tilemap.debugDrawGrid(self.camera);
     // exit
-    for (self.packed_room.exits.constSlice()) |epos| {
+    for (self.init_params.packed_room.exits.constSlice()) |epos| {
         const color = if (self.progress_state == .won) Colorf.rgb(0.2, 0.1, 0.2) else Colorf.rgb(0.4, 0.4, 0.4);
         plat.circlef(epos, 20, .{ .fill_color = Colorf.rgb(0.4, 0.3, 0.4) });
         plat.circlef(epos.add(v2f(0, 2)), 19, .{ .fill_color = color });
@@ -492,8 +460,8 @@ pub fn render(self: *const Room) Error!void {
 
     // waves
     if (debug.show_waves) {
-        for (self.packed_room.waves, 0..) |buf, i| {
-            for (buf.constSlice()) |pos| {
+        for (self.waves.constSlice(), 0..) |wave, i| {
+            for (wave.positions.constSlice()) |pos| {
                 try plat.textf(pos, "{}", .{i}, .{ .center = true, .color = .magenta });
             }
         }

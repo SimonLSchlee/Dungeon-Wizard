@@ -164,7 +164,7 @@ pub const SpellSlots = struct {
         {
             const last_rect = rects[rects.len - 1];
             const p = last_rect.pos.add(v2f(last_rect.dims.x + 10, 0));
-            try plat.textf(p, "deck: {}\ndiscard: {}\n", .{ room.deck.len, room.discard.len }, .{ .color = .white });
+            try plat.textf(p, "draw: {}\ndiscard: {}\n", .{ room.draw_pile.len, room.discard_pile.len }, .{ .color = .white });
         }
     }
 
