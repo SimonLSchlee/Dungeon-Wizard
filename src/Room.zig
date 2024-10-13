@@ -321,7 +321,7 @@ pub fn update(self: *Room) Error!void {
     const plat = getPlat();
     self.ui_clicked = false;
 
-    if (plat.input_buffer.keyIsJustPressed(.backtick)) {
+    if (debug.enable_debug_controls and plat.input_buffer.keyIsJustPressed(.backtick)) {
         self.edit_mode = !self.edit_mode;
     }
 
