@@ -333,7 +333,7 @@ pub fn update(self: *Room) Error!void {
             _ = try self.queueSpawnThingByKind(.troll, pos);
         }
     } else {
-        if (plat.input_buffer.keyIsJustPressed(.space) or plat.input_buffer.keyIsJustPressed(.escape)) {
+        if (plat.input_buffer.keyIsJustPressed(.space)) {
             self.paused = !self.paused;
         }
     }

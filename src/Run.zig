@@ -32,6 +32,11 @@ pub const RewardUI = struct {
     skip_button: menuUI.Button,
 };
 
+pub const GamePauseUI = struct {
+    deck_button: menuUI.Button,
+    pause_menu_button: menuUI.Button,
+};
+
 pub fn makeStarterDeck() Spell.SpellArray {
     var ret = Spell.SpellArray{};
     // TODO placeholder
@@ -67,9 +72,10 @@ gold: i32 = 0,
 room: ?Room = null,
 reward: ?Spell.Reward = null,
 reward_ui: RewardUI = undefined,
+game_pause_ui: GamePauseUI = undefined,
 screen: enum {
     game,
-    pause,
+    pause_menu,
     reward,
     shop,
     dead,
@@ -90,6 +96,7 @@ pub fn init(seed: u64) Error!Run {
         .rng = std.Random.DefaultPrng.init(seed),
         .seed = seed,
         .deck = makeStarterDeck(),
+        .game_pause_ui = makeGamePauseUI(),
     };
     for (app.data.levels) |str| {
         const packed_room = try PackedRoom.init(str);
@@ -141,6 +148,11 @@ pub fn update(self: *Run) Error!void {
                         try room.reloadFromPackedRoom(packed_room);
                     }
                 }
+            } else {
+                if (plat.input_buffer.keyIsJustPressed(.escape)) {
+                    room.paused = true;
+                    self.screen = .pause_menu;
+                }
             }
             try room.update();
             if (room.progress_state == .won and self.reward == null) {
@@ -148,8 +160,16 @@ pub fn update(self: *Run) Error!void {
                 self.reward_ui = self.makeRewardUI();
                 self.screen = .reward;
             }
+            if (room.paused) {
+                // update game pause ui
+            }
         },
-        .pause => {},
+        .pause_menu => {
+            if (plat.input_buffer.keyIsJustPressed(.space) or plat.input_buffer.keyIsJustPressed(.escape)) {
+                room.paused = false;
+                self.screen = .game;
+            }
+        },
         .reward => {
             assert(self.reward != null);
             const reward = &self.reward.?;
@@ -173,6 +193,39 @@ pub fn update(self: *Run) Error!void {
         .shop => {},
         .dead => {},
     }
+}
+
+fn makeGamePauseUI() GamePauseUI {
+    const plat = App.getPlat();
+    const screen_margin = v2f(30, 60);
+    const button_dims = v2f(100, 50);
+    const button_y = plat.screen_dims_f.y - screen_margin.y - button_dims.y;
+    var deck_button = menuUI.Button{
+        .rect = .{
+            .pos = v2f(screen_margin.x, button_y),
+            .dims = button_dims,
+        },
+        .poly_opt = .{ .fill_color = .orange },
+        .text_opt = .{ .center = true, .color = .black, .size = 30 },
+        .text_rel_pos = button_dims.scale(0.5),
+    };
+    deck_button.text = @TypeOf(deck_button.text).init("Deck") catch unreachable;
+
+    var pause_menu_button = menuUI.Button{
+        .rect = .{
+            .pos = v2f(plat.screen_dims_f.x - screen_margin.x - button_dims.x, button_y),
+            .dims = button_dims,
+        },
+        .poly_opt = .{ .fill_color = .orange },
+        .text_opt = .{ .center = true, .color = .black, .size = 30 },
+        .text_rel_pos = button_dims.scale(0.5),
+    };
+    pause_menu_button.text = @TypeOf(pause_menu_button.text).init("Menu") catch unreachable;
+
+    return .{
+        .deck_button = deck_button,
+        .pause_menu_button = pause_menu_button,
+    };
 }
 
 fn makeRewardUI(self: *Run) RewardUI {
@@ -246,9 +299,12 @@ pub fn render(self: *Run) Error!void {
 
     switch (self.screen) {
         .game => {
-            // nothing else
+            if (room.paused) {
+                try self.game_pause_ui.deck_button.render();
+                try self.game_pause_ui.pause_menu_button.render();
+            }
         },
-        .pause => {},
+        .pause_menu => {},
         .reward => {
             assert(self.reward != null);
             const reward = &self.reward.?;
@@ -274,7 +330,7 @@ pub fn render(self: *Run) Error!void {
         const fill_color = Colorf.rgb(1, 0.9, 0);
         const text_color = Colorf.rgb(0.44, 0.3, 0.0);
         const poly_opt = .{ .fill_color = fill_color, .outline_color = text_color, .outline_thickness = 10 };
-        const center = v2f(150, plat.screen_dims_f.y - 100);
+        const center = v2f(250, plat.screen_dims_f.y - 100);
         const num = 3;
         const lower = center.add(v2f(0, 7 * num));
         for (0..num) |i| {
