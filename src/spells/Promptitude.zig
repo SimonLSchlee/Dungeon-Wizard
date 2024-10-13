@@ -27,6 +27,12 @@ const TargetKind = Spell.TargetKind;
 const TargetingData = Spell.TargetingData;
 const Params = Spell.Params;
 
+pub const title = "Promptitude";
+pub const description =
+    \\Move and cast spells 2x faster,
+    \\for a short while.
+;
+
 pub const enum_name = "promptitude";
 pub const Controllers = [_]type{};
 

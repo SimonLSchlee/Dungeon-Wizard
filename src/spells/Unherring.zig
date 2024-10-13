@@ -26,6 +26,13 @@ const TargetKind = Spell.TargetKind;
 const TargetingData = Spell.TargetingData;
 const Params = Spell.Params;
 
+pub const title = "Unherring Missile";
+pub const description =
+    \\This little fish never misses!
+    \\Just point and click. Does
+    \\fish-type damage, of course.
+;
+
 pub const enum_name = "unherring";
 pub const Controllers = [_]type{Projectile};
 

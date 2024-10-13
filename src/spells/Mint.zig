@@ -27,6 +27,14 @@ const TargetKind = Spell.TargetKind;
 const TargetingData = Spell.TargetingData;
 const Params = Spell.Params;
 
+pub const title = "Mint 'Em";
+pub const description =
+    \\Cast a projectile which applies
+    \\temporary "mint" stacks on enemies.
+    \\Killing an enemy with "mint" stacks
+    \\yields that much gold.
+;
+
 pub const enum_name = "mint";
 pub const Controllers = [_]type{Projectile};
 

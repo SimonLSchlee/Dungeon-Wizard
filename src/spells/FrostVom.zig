@@ -27,6 +27,12 @@ const TargetKind = Spell.TargetKind;
 const TargetingData = Spell.TargetingData;
 const Params = Spell.Params;
 
+pub const title = "Frost Vomit";
+pub const description =
+    \\"Hurl" a freezing cone of ice
+    \\which stuns enemies temporarily.
+;
+
 pub const enum_name = "frost_vom";
 pub const Controllers = [_]type{Projectile};
 

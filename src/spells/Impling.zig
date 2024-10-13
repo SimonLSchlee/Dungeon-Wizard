@@ -27,6 +27,13 @@ const TargetKind = Spell.TargetKind;
 const TargetingData = Spell.TargetingData;
 const Params = Spell.Params;
 
+pub const title = "Invite Impling";
+pub const description =
+    \\Cordially request the presence of
+    \\a minor demon to aid your
+    \\endeavors.
+;
+
 pub const enum_name = "impling";
 pub const Controllers = [_]type{};
 

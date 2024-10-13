@@ -43,6 +43,34 @@ pub const SpellTypes = [_]type{
 
 pub const Kind = utl.EnumFromTypes(&SpellTypes, "enum_name");
 pub const KindData = utl.TaggedUnionFromTypes(&SpellTypes, "enum_name", Kind);
+const all_spells = blk: {
+    const kind_info = @typeInfo(Kind).@"enum";
+    var ret: [kind_info.fields.len]Spell = undefined;
+    for (kind_info.fields, 0..) |f, i| {
+        const kind: Kind = @enumFromInt(f.value);
+        const proto = getProto(kind);
+        ret[i] = proto;
+    }
+    break :blk ret;
+};
+const spell_names = blk: {
+    var ret: std.EnumArray(Kind, []const u8) = undefined;
+    for (std.meta.fields(Kind)) |f| {
+        const kind: Kind = @enumFromInt(f.value);
+        const T = GetKindType(kind);
+        ret.set(kind, T.title);
+    }
+    break :blk ret;
+};
+const spell_descriptions = blk: {
+    var ret: std.EnumArray(Kind, []const u8) = undefined;
+    for (std.meta.fields(Kind)) |f| {
+        const kind: Kind = @enumFromInt(f.value);
+        const T = GetKindType(kind);
+        ret.set(kind, T.description);
+    }
+    break :blk ret;
+};
 
 pub fn GetKindType(kind: Kind) type {
     const fields: []const std.builtin.Type.UnionField = std.meta.fields(KindData);
@@ -137,17 +165,6 @@ pub const Controller = struct {
 pub const max_spells_in_array = 256;
 pub const SpellArray = std.BoundedArray(Spell, max_spells_in_array);
 const WeightsArray = std.BoundedArray(f32, max_spells_in_array);
-
-const all_spells = blk: {
-    const kind_info = @typeInfo(Kind).@"enum";
-    var ret: [kind_info.fields.len]Spell = undefined;
-    for (kind_info.fields, 0..) |f, i| {
-        const kind: Kind = @enumFromInt(f.value);
-        const proto = getProto(kind);
-        ret[i] = proto;
-    }
-    break :blk ret;
-};
 
 const rarity_weight_base = std.EnumArray(Rarity, f32).init(.{
     .pedestrian = 0.5,
@@ -319,7 +336,7 @@ pub fn textInRect(topleft: V2f, dims: V2f, rect_opt: draw.PolyOpt, text_padding:
     const plat = App.getPlat();
     const half_dims = dims.scale(0.5);
     const text_rel_pos = if (text_opt.center) half_dims else text_padding;
-    const text_dims = dims.sub(text_padding);
+    const text_dims = dims.sub(text_padding.scale(2));
     assert(text_dims.x > 0 and text_dims.y > 0);
     const text = try utl.bufPrintLocal(fmt, args);
     const fitted_text_opt = try plat.fitTextToRect(text_dims, text, text_opt);
@@ -332,16 +349,20 @@ pub fn renderInfo(self: *const Spell, rect: menuUI.ClickableRect) Error!void {
     const data = App.get().data;
     const title_rect_dims = v2f(rect.dims.x, rect.dims.y * 0.2);
     const icon_rect_dims = v2f(rect.dims.x, rect.dims.y * 0.4);
+    const description_dims = v2f(rect.dims.x, rect.dims.y * 0.4);
 
-    const name: []const u8 = @tagName(self.kind);
+    const kind = std.meta.activeTag(self.kind);
+    const name = spell_names.get(kind);
 
     plat.rectf(rect.pos, rect.dims, .{ .fill_color = .darkgray });
     try textInRect(rect.pos, title_rect_dims, .{ .fill_color = null }, v2f(5, 5), "{s}", .{name}, .{ .color = .white });
 
     const icon_center_pos = rect.pos.add(v2f(0, title_rect_dims.y)).add(icon_rect_dims.scale(0.5));
-    const kind = std.meta.activeTag(self.kind);
     const spell_char = [1]u8{std.ascii.toUpper(name[0])};
     // spell image
+    plat.rectf(icon_center_pos.sub(icon_rect_dims.scale(0.5)), icon_rect_dims, .{ .fill_color = .black });
+    const icon_square_dim = @min(icon_rect_dims.x, icon_rect_dims.y);
+    const icon_square = V2f.splat(icon_square_dim);
     if (data.spell_icons_indices.get(kind)) |idx| {
         const sheet = data.spell_icons;
         const frame = sheet.frames[utl.as(usize, idx)];
@@ -349,7 +370,7 @@ pub fn renderInfo(self: *const Spell, rect: menuUI.ClickableRect) Error!void {
             .origin = .center,
             .src_pos = frame.pos.toV2f(),
             .src_dims = frame.size.toV2f(),
-            .uniform_scaling = 4,
+            .scaled_dims = icon_square,
         });
     } else {
         // spell letter
@@ -364,4 +385,7 @@ pub fn renderInfo(self: *const Spell, rect: menuUI.ClickableRect) Error!void {
             },
         );
     }
+    const description_text = spell_descriptions.get(kind);
+    const description_rect_topleft = rect.pos.add(v2f(0, title_rect_dims.y + icon_rect_dims.y));
+    try textInRect(description_rect_topleft, description_dims, .{ .fill_color = null }, v2f(10, 10), "{s}", .{description_text}, .{ .color = .white });
 }

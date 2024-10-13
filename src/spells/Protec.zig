@@ -27,6 +27,13 @@ const TargetKind = Spell.TargetKind;
 const TargetingData = Spell.TargetingData;
 const Params = Spell.Params;
 
+pub const title = "Protec";
+pub const description =
+    \\Become invincible to the next
+    \\instance of damage your receive.
+    \\Lasts 5 seconds.
+;
+
 pub const enum_name = "protec";
 pub const Controllers = [_]type{};
 

@@ -27,6 +27,12 @@ const TargetKind = Spell.TargetKind;
 const TargetingData = Spell.TargetingData;
 const Params = Spell.Params;
 
+pub const title = "Blackmail";
+pub const description =
+    \\Intimidate an enemy into becoming
+    \\your ally. For a while, at least.
+;
+
 pub const enum_name = "blackmail";
 pub const Controllers = [_]type{};
 
