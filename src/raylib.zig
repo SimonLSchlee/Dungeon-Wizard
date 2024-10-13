@@ -250,6 +250,7 @@ const key_map = std.EnumArray(Key, c_int).init(.{
     .right = r.KEY_RIGHT,
     .up = r.KEY_UP,
     .down = r.KEY_DOWN,
+    .escape = r.KEY_ESCAPE,
     .f1 = r.KEY_F1,
     .f2 = r.KEY_F2,
     .f3 = r.KEY_F3,

@@ -132,6 +132,7 @@ discard_pile: Spell.SpellArray = .{},
 fog: Fog = undefined,
 ui_clicked: bool = false,
 curr_tick: i64 = 0,
+paused: bool = false,
 edit_mode: bool = false,
 waves: WavesArray = .{},
 first_wave_timer: u.TickCounter = undefined,
@@ -331,6 +332,10 @@ pub fn update(self: *Room) Error!void {
             //std.debug.print("spawn sheep at {d:0.2}, {d:0.2}\n", .{ pos.x, pos.y });
             _ = try self.queueSpawnThingByKind(.troll, pos);
         }
+    } else {
+        if (plat.input_buffer.keyIsJustPressed(.space) or plat.input_buffer.keyIsJustPressed(.escape)) {
+            self.paused = !self.paused;
+        }
     }
     for (self.spawn_queue.constSlice()) |id| {
         const t = self.getThingById(id);
@@ -368,7 +373,7 @@ pub fn update(self: *Room) Error!void {
         }
     }
 
-    if (!self.edit_mode) {
+    if (!self.edit_mode and !self.paused) {
         // waves spawning
         if (self.curr_wave < self.waves.len) {
             // first wave spawns after fixed time
@@ -535,6 +540,14 @@ pub fn render(self: *const Room) Error!void {
         try plat.textf(p, txt, .{}, opt);
     } else {
         try self.spell_slots.render(self);
+        if (self.paused) {
+            const opt: draw.TextOpt = .{ .center = true, .size = 50, .color = .white };
+            const txt = "[paused]";
+            const dims = (try plat.measureText(txt, opt)).add(v2f(10, 4));
+            const p: V2f = v2f(plat.screen_dims_f.x * 0.5, plat.screen_dims_f.y - 50);
+            plat.rectf(p.sub(dims.scale(0.5)), dims, .{ .fill_color = Colorf.black.fade(0.5) });
+            try plat.textf(p, txt, .{}, opt);
+        }
     }
     if (debug.show_num_enemies) {
         try plat.textf(v2f(10, 10), "num_enemies_alive: {}", .{self.num_enemies_alive}, .{ .color = .white });

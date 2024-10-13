@@ -68,6 +68,7 @@ pub const Key = enum(u32) {
     right,
     up,
     down,
+    escape,
     f1,
     f2,
     f3,
