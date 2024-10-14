@@ -242,3 +242,89 @@ pub const SpellSlots = struct {
         }
     }
 };
+
+pub const ExitDoor = struct {
+    pub const RewardPreview = enum {
+        none,
+        gold,
+        item,
+        shop,
+        end,
+    };
+    pub const ChallengePreview = enum {
+        none,
+        boss,
+    };
+
+    const radius = 24;
+    const select_radius = 28;
+    const closed_color = Colorf.rgb(0.4, 0.4, 0.4);
+    const rim_color = Colorf.rgb(0.4, 0.3, 0.4);
+    const open_color_1 = Colorf.rgb(0.2, 0.1, 0.2);
+    const open_color_2 = Colorf.rgb(0.4, 0.1, 0.4);
+    const open_hover_color = Colorf.rgb(0.4, 0.1, 0.4);
+
+    pos: V2f,
+    reward_preview: RewardPreview = .none,
+    challenge_preview: ChallengePreview = .none,
+    selected: bool = false,
+
+    pub fn updateSelected(self: *ExitDoor, room: *Room) Error!bool {
+        //const plat = App.getPlat();
+        if (room.getConstPlayer()) |p| {
+            if (p.path.len > 0) {
+                const last_path_pos = p.path.buffer[p.path.len - 1];
+                self.selected = last_path_pos.dist(self.pos) <= ExitDoor.radius + 10;
+                if (self.selected) {
+                    if (p.pos.dist(self.pos) <= select_radius) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    pub fn render(self: *const ExitDoor, room: *const Room) Error!void {
+        const plat = App.getPlat();
+
+        // rim
+        plat.circlef(self.pos, ExitDoor.radius, .{ .fill_color = ExitDoor.rim_color });
+        // fill
+        if (room.progress_state == .won) {
+            const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
+            const tick_60 = @mod(room.curr_tick, 360);
+            const f = u.pi * u.as(f32, tick_60) / 360;
+            const t = @sin(f);
+            var opt = draw.PolyOpt{
+                .fill_color = open_color_1.lerp(open_color_2, t),
+                .outline_color = rim_color,
+            };
+            if (mouse_pos.dist(self.pos) <= select_radius) {
+                opt.fill_color = open_hover_color;
+            }
+            plat.circlef(self.pos.add(v2f(0, 2)), radius - 1, opt);
+        } else {
+            const opt = draw.PolyOpt{
+                .fill_color = closed_color,
+                .outline_color = rim_color,
+            };
+            plat.circlef(self.pos.add(v2f(0, 2)), radius - 1, opt);
+        }
+    }
+    pub fn renderOver(self: *const ExitDoor, room: *const Room) Error!void {
+        const plat = App.getPlat();
+        if (room.progress_state == .won) {
+            const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
+            if (self.selected or mouse_pos.dist(self.pos) <= select_radius) {
+                const tick_60 = @mod(room.curr_tick, 60);
+                const f = u.pi * u.as(f32, tick_60) / 60;
+                const t = @sin(f);
+                const range = 20;
+                const base = self.pos.sub(v2f(0, 100 + range * t));
+                const end = base.add(v2f(0, 70));
+                plat.arrowf(base, end, 15, .white);
+            }
+        }
+    }
+};

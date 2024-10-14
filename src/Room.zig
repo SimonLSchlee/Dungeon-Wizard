@@ -37,6 +37,7 @@ pub const InitParams = struct {
     difficulty: f32,
     seed: u64,
     deck: Spell.SpellArray,
+    exits: std.BoundedArray(gameUI.ExitDoor, 4),
 };
 
 pub const Wave = struct {
@@ -142,6 +143,7 @@ progress_state: enum {
     none,
     lost,
     won,
+    exited,
 } = .none,
 // reinit stuff, never needs saving or copying, probably?:
 render_texture: ?Platform.RenderTexture2D = null,
@@ -381,16 +383,25 @@ pub fn update(self: *Room) Error!void {
         }
         // check if won or lost
         if (self.getPlayer()) |player| {
-            if (player.hp) |hp| {
-                if (hp.curr > 0) {
-                    if (self.curr_wave >= self.waves.len and self.num_enemies_alive == 0) {
+            assert(player.hp != null);
+            const hp = player.hp.?;
+            switch (self.progress_state) {
+                .none => {
+                    if (hp.curr <= 0) {
+                        self.progress_state = .lost;
+                    } else if (self.curr_wave >= self.waves.len and self.num_enemies_alive == 0) {
                         self.progress_state = .won;
-                    } else {
-                        self.progress_state = .none;
                     }
-                } else {
-                    self.progress_state = .lost;
-                }
+                },
+                .lost => {},
+                .won => {
+                    for (self.init_params.exits.slice()) |*exit| {
+                        if (try exit.updateSelected(self)) {
+                            self.progress_state = .exited;
+                        }
+                    }
+                },
+                .exited => {},
             }
         }
         // spell slots
@@ -450,10 +461,8 @@ pub fn render(self: *const Room) Error!void {
     try self.tilemap.debugDraw();
     //try self.tilemap.debugDrawGrid(self.camera);
     // exit
-    for (self.init_params.packed_room.exits.constSlice()) |epos| {
-        const color = if (self.progress_state == .won) Colorf.rgb(0.2, 0.1, 0.2) else Colorf.rgb(0.4, 0.4, 0.4);
-        plat.circlef(epos, 20, .{ .fill_color = Colorf.rgb(0.4, 0.3, 0.4) });
-        plat.circlef(epos.add(v2f(0, 2)), 19, .{ .fill_color = color });
+    for (self.init_params.exits.constSlice()) |exit| {
+        try exit.render(self);
     }
 
     // waves
@@ -507,6 +516,9 @@ pub fn render(self: *const Room) Error!void {
         }
         for (thing_arr.constSlice()) |thing| {
             try thing.renderOver(self);
+        }
+        for (self.init_params.exits.constSlice()) |exit| {
+            try exit.renderOver(self);
         }
     }
 

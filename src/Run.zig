@@ -23,6 +23,7 @@ const Thing = @import("Thing.zig");
 const Data = @import("Data.zig");
 const PackedRoom = @import("PackedRoom.zig");
 const menuUI = @import("menuUI.zig");
+const gameUI = @import("gameUI.zig");
 
 pub const RewardUI = struct {
     modal_topleft: V2f,
@@ -101,26 +102,16 @@ pub fn init(seed: u64) Error!Run {
         try ret.packed_room_data_indices.append(i);
     }
     assert(ret.packed_room_data_indices.len > 0);
-    ret.rng.random().shuffleWithIndex(usize, ret.packed_room_data_indices.slice(), u32);
 
     try ret.loadRoomFromCurrIdx();
 
     return ret;
 }
 
-pub fn loadRoomFromCurrIdx(self: *Run) Error!void {
-    const data = App.get().data;
+pub fn deinit(self: *Run) void {
     if (self.room) |*room| {
         room.deinit();
     }
-    const idx = self.packed_room_data_indices.get(self.curr_room_idx);
-    const packed_room = data.rooms.get(idx);
-    self.room = try Room.init(.{
-        .deck = self.deck,
-        .difficulty = 10,
-        .packed_room = packed_room,
-        .seed = self.seed,
-    });
 }
 
 pub fn reset(self: *Run) Error!*Run {
@@ -130,10 +121,29 @@ pub fn reset(self: *Run) Error!*Run {
     return self;
 }
 
-pub fn deinit(self: *Run) void {
+pub fn loadRoomFromCurrIdx(self: *Run) Error!void {
+    const data = App.get().data;
     if (self.room) |*room| {
         room.deinit();
     }
+    const idx = self.packed_room_data_indices.get(self.curr_room_idx);
+    const packed_room = data.rooms.get(idx);
+    const exit_doors = self.makeExitDoors(packed_room);
+    self.room = try Room.init(.{
+        .deck = self.deck,
+        .difficulty = 10,
+        .packed_room = packed_room,
+        .seed = self.seed,
+        .exits = exit_doors,
+    });
+}
+
+pub fn makeExitDoors(_: *Run, packed_room: PackedRoom) std.BoundedArray(gameUI.ExitDoor, 4) {
+    var ret = std.BoundedArray(gameUI.ExitDoor, 4){};
+    for (packed_room.exits.constSlice()) |pos| {
+        ret.append(.{ .pos = pos }) catch unreachable;
+    }
+    return ret;
 }
 
 pub fn update(self: *Run) Error!void {
@@ -291,7 +301,7 @@ fn makeRewardUI(self: *Run) RewardUI {
 
 pub fn render(self: *Run) Error!void {
     const plat = getPlat();
-
+    plat.clear(Colorf.magenta);
     // room is always present
     assert(self.room != null);
     const room = &self.room.?;
@@ -303,7 +313,6 @@ pub fn render(self: *Run) Error!void {
         .flip_y = true,
     };
     plat.texturef(.{}, room.render_texture.?.texture, game_texture_opt);
-    plat.clear(Colorf.magenta);
 
     switch (self.screen) {
         .game => {

@@ -75,7 +75,7 @@ const test_rooms_strings = [_][]const u8{
     \\           
     \\  p &#     
     \\           
-    \\           
+    \\  g        
     \\           
     ,
     \\#########################
@@ -95,6 +95,13 @@ const test_rooms_strings = [_][]const u8{
 };
 
 const rooms_strings = [_][]const u8{
+    \\###########
+    \\           
+    \\  p &#     
+    \\    &      
+    \\           
+    \\           
+    ,
     \\#########################
     \\#                       #
     \\#                       #
