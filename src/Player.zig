@@ -61,16 +61,14 @@ pub const InputController = struct {
     const BufferedSpell = struct {
         spell: Spell,
         params: Spell.Params,
+        slot_idx: i32,
     };
 
     state: State = .none,
+    spell_buffered: ?BufferedSpell = null,
     spell_casting: ?BufferedSpell = null,
     cast_counter: utl.TickCounter = .{},
     ticks_in_state: i64 = 0,
-
-    pub fn canCastSpell(controller: *const InputController) bool {
-        return controller.spell_casting == null;
-    }
 
     pub fn update(self: *Thing, room: *Room) Error!void {
         assert(self.spawn_state == .spawned);
@@ -82,23 +80,29 @@ pub const InputController = struct {
             try self.findPath(room, mouse_pos);
         }
 
-        if (controller.canCastSpell()) {
-            if (room.spell_slots.getSelectedSlot()) |slot| {
-                if (!room.ui_clicked and plat.input_buffer.mouseBtnIsJustPressed(.left)) {
-                    assert(slot.spell != null);
-                    const spell = slot.spell.?;
-                    const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
-                    if (spell.getTargetParams(room, self, mouse_pos)) |params| {
-                        self.path.len = 0; // cancel the current path on cast, but you can buffer a new one
-                        room.spell_slots.clearSlot(slot.idx);
-                        room.discardSpell(spell);
-                        controller.spell_casting = .{
-                            .spell = spell,
-                            .params = params,
-                        };
-                        controller.cast_counter = utl.TickCounter.init(spell.cast_time_ticks);
-                    }
+        if (room.spell_slots.getSelectedSlot()) |slot| {
+            if (!room.ui_clicked and plat.input_buffer.mouseBtnIsJustPressed(.left)) {
+                assert(slot.spell != null);
+                const spell = slot.spell.?;
+                const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
+                if (spell.getTargetParams(room, self, mouse_pos)) |params| {
+                    self.path.len = 0; // cancel the current path on cast, but you can buffer a new one
+                    const bspell = BufferedSpell{
+                        .spell = spell,
+                        .params = params,
+                        .slot_idx = utl.as(i32, slot.idx),
+                    };
+                    controller.spell_buffered = bspell;
                 }
+            }
+        }
+        if (controller.spell_buffered) |buffered| {
+            if (controller.spell_casting == null) {
+                room.spell_slots.clearSlot(utl.as(usize, buffered.slot_idx));
+                room.discardSpell(buffered.spell);
+                controller.spell_casting = buffered;
+                controller.cast_counter = utl.TickCounter.init(buffered.spell.cast_time_ticks);
+                controller.spell_buffered = null;
             }
         }
 
