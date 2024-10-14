@@ -510,12 +510,30 @@ pub fn render(self: *const Room) Error!void {
         }
     }
 
-    // spell targeting
+    // spell targeting, movement
     if (!self.edit_mode) {
         if (self.getConstPlayer()) |player| {
             if (self.spell_slots.getSelectedSlot()) |slot| {
                 assert(slot.spell != null);
                 try slot.spell.?.renderTargeting(self, player);
+            }
+            if (player.controller.player.show_move_timer.running and player.path.len > 0) {
+                const move_pos = player.path.get(player.path.len - 1);
+                const f = player.controller.player.show_move_timer.remapTo0_1();
+                const t = @sin(f * 3);
+                const range = -10;
+                const y_off = range * t;
+                var points: [3]V2f = .{
+                    v2f(0, 0),
+                    v2f(8, -10),
+                    v2f(-8, -10),
+                };
+                for (&points) |*p| {
+                    p.* = p.add(move_pos);
+                    p.y += y_off;
+                }
+                plat.circlef(move_pos, 10, .{ .fill_color = Colorf.green.fade(0.6 * (1 - f)) });
+                plat.trianglef(points, .{ .fill_color = Colorf.green.fade(1 - f) });
             }
         }
     }

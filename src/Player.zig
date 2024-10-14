@@ -69,15 +69,18 @@ pub const InputController = struct {
     spell_casting: ?BufferedSpell = null,
     cast_counter: utl.TickCounter = .{},
     ticks_in_state: i64 = 0,
+    show_move_timer: utl.TickCounter = utl.TickCounter.initStopped(60),
 
     pub fn update(self: *Thing, room: *Room) Error!void {
         assert(self.spawn_state == .spawned);
         const plat = getPlat();
         const controller = &self.controller.player;
 
+        _ = controller.show_move_timer.tick(false);
         if (plat.input_buffer.mouseBtnIsDown(.right)) {
             const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
             try self.findPath(room, mouse_pos);
+            controller.show_move_timer.restart();
         }
 
         if (room.spell_slots.getSelectedSlot()) |slot| {
