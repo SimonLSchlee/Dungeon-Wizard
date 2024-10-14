@@ -263,6 +263,7 @@ pub const ExitDoor = struct {
     const open_color_1 = Colorf.rgb(0.2, 0.1, 0.2);
     const open_color_2 = Colorf.rgb(0.4, 0.1, 0.4);
     const open_hover_color = Colorf.rgb(0.4, 0.1, 0.4);
+    const arrow_hover_color = Colorf.rgb(0.7, 0.5, 0.7);
 
     pos: V2f,
     reward_preview: RewardPreview = .none,
@@ -320,10 +321,14 @@ pub const ExitDoor = struct {
                 const tick_60 = @mod(room.curr_tick, 60);
                 const f = u.pi * u.as(f32, tick_60) / 60;
                 const t = @sin(f);
+                var color = arrow_hover_color;
+                if (self.selected) {
+                    color = Colorf.white;
+                }
                 const range = 20;
                 const base = self.pos.sub(v2f(0, 100 + range * t));
                 const end = base.add(v2f(0, 70));
-                plat.arrowf(base, end, 15, .white);
+                plat.arrowf(base, end, 15, color);
             }
         }
     }

@@ -139,11 +139,11 @@ waves: WavesArray = .{},
 first_wave_timer: u.TickCounter = undefined,
 curr_wave: i32 = 0,
 num_enemies_alive: i32 = 0,
-progress_state: enum {
+progress_state: union(enum) {
     none,
     lost,
     won,
-    exited,
+    exited: gameUI.ExitDoor,
 } = .none,
 // reinit stuff, never needs saving or copying, probably?:
 render_texture: ?Platform.RenderTexture2D = null,
@@ -397,7 +397,7 @@ pub fn update(self: *Room) Error!void {
                 .won => {
                     for (self.init_params.exits.slice()) |*exit| {
                         if (try exit.updateSelected(self)) {
-                            self.progress_state = .exited;
+                            self.progress_state = .{ .exited = exit.* };
                         }
                     }
                 },

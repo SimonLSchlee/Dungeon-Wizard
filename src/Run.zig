@@ -87,6 +87,12 @@ packed_room_data_indices: std.BoundedArray(usize, 32) = .{},
 curr_room_idx: usize = 0,
 player_thing: ?Thing = null,
 deck: Spell.SpellArray = .{},
+load_timer: u.TickCounter = u.TickCounter.init(20),
+load_state: enum {
+    none,
+    fade_in,
+    fade_out,
+} = .fade_in,
 curr_tick: i64 = 0,
 
 pub fn init(seed: u64) Error!Run {
@@ -102,7 +108,6 @@ pub fn init(seed: u64) Error!Run {
         try ret.packed_room_data_indices.append(i);
     }
     assert(ret.packed_room_data_indices.len > 0);
-
     try ret.loadRoomFromCurrIdx();
 
     return ret;
@@ -149,6 +154,17 @@ pub fn makeExitDoors(_: *Run, packed_room: PackedRoom) std.BoundedArray(gameUI.E
 pub fn update(self: *Run) Error!void {
     const plat = getPlat();
 
+    switch (self.load_state) {
+        .none => {},
+        .fade_in => if (self.load_timer.tick(true)) {
+            self.load_state = .none;
+        },
+        .fade_out => if (self.load_timer.tick(true)) {
+            self.curr_room_idx += 1;
+            try self.loadRoomFromCurrIdx();
+            self.load_state = .fade_in;
+        },
+    }
     assert(self.room != null);
     const room = &self.room.?;
 
@@ -173,13 +189,23 @@ pub fn update(self: *Run) Error!void {
                 }
             }
             try room.update();
-            if (room.progress_state == .won and self.reward == null) {
-                self.reward = Spell.Reward.init(self.rng.random());
-                self.reward_ui = self.makeRewardUI();
-                self.screen = .reward;
+            switch (room.progress_state) {
+                .none => {},
+                .lost => {},
+                .won => {
+                    if (self.reward == null) {
+                        self.reward = Spell.Reward.init(self.rng.random());
+                        self.reward_ui = self.makeRewardUI();
+                        self.screen = .reward;
+                    }
+                },
+                .exited => |exit_door| {
+                    _ = exit_door;
+                    self.load_state = .fade_out;
+                },
             }
             if (room.paused) {
-                // update game pause ui
+                // TODO update game pause ui
             }
         },
         .pause_menu => {
