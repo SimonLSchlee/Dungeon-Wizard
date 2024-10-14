@@ -19,6 +19,7 @@ const Thing = @import("Thing.zig");
 const Room = @import("Room.zig");
 const sprites = @import("sprites.zig");
 const Spell = @import("Spell.zig");
+const PackedRoom = @import("PackedRoom.zig");
 const Data = @This();
 
 pub fn EnumToBoundedStringArrayType(E: type) type {
@@ -69,55 +70,58 @@ pub const SpriteSheet = struct {
     meta: []Meta = &.{},
 };
 
-const test_levels = [_][]const u8{
-    \\#######
-    \\ 22    
-    \\1 p &# 
-    \\ 1     
+const test_rooms_strings = [_][]const u8{
+    \\###########
+    \\           
+    \\  p &#     
+    \\           
+    \\           
+    \\           
     ,
     \\#########################
     \\#                       #
     \\#                       #
-    \\#    ##        ###      #
+    \\#    ## 2      ###      #
     \\#                       #
-    \\#          #            #
-    \\#          #            #
-    \\#   ##   p         ##   #
+    \\#     1    #            #
+    \\#          #     3      #
+    \\#   ##   p    s    ##   #
     \\#                       #
-    \\#    g     i    #       #
-    \\#               #       #
+    \\#     3 2       #       #
+    \\#     s    1    #       #
+    \\#                       #
+    \\#########################
+    ,
+};
+
+const rooms_strings = [_][]const u8{
+    \\#########################
+    \\#                       #
+    \\#                       #
+    \\#    ## 2      ###      #
+    \\#                       #
+    \\#     1    #            #
+    \\#          #     3      #
+    \\#   ##   p    s    ##   #
+    \\#                       #
+    \\#     3 2       #       #
+    \\#     s    1    #       #
     \\#                       #
     \\#########################
     ,
     \\#########################
-    \\# t                     #
-    \\#             g         #
-    \\#    ##        ###      #
     \\#                       #
-    \\# s        #g           #
-    \\#       p  #            #
-    \\#   ##             ##   #
     \\#                       #
-    \\#    s          #       #
-    \\#               #       #
-    \\#                g      #
+    \\#    ## 2      ###      #
+    \\#                       #
+    \\#     1    #            #
+    \\#          #     3      #
+    \\#   ##   p    s    ##   #
+    \\#                       #
+    \\#     3 2       #       #
+    \\#     s    1    #       #
+    \\#                       #
     \\#########################
-    ,
-    \\#######################################################
-    \\##           ###    ##          ####                 ##
-    \\#         ##  #          # ##   #       ####    ### ###
-    \\####     ##   #         ####        # ####           ##
-    \\#######  t      ##      #                       #######
-    \\#AAAAA##         ####      #####     ##      ####BBBBB#
-    \\#AAAAA p     #         ########      #   #   ####BBBBB#
-    \\#AAAAA    #    ##   ############     #####       BBBBB#
-    \\#AAAAA##    #   #      ########     ##           BBBBB#
-    \\#AAAAA##    ##     ##     ### ##  ##         ####BBBBB#
-    \\#######     ###            #       # # ###   ##########
-    \\####  #   #         ##        #        ##      ########
-    \\#      #  ##     ### ##     ###   ##     #            #
-    \\#   #           #     ##     ####  ####        #    ###
-    \\#######################################################
     ,
 };
 
@@ -127,15 +131,14 @@ pub const CreatureSpriteSheetArray = std.EnumArray(sprites.CreatureAnim.AnimKind
 pub const AllCreatureSpriteSheetArrays = std.EnumArray(sprites.CreatureAnim.Kind, CreatureSpriteSheetArray);
 pub const SpellIconsFrameIndexArray = std.EnumArray(Spell.Kind, ?i32);
 
-levels: []const []const u8 = undefined,
-things: std.EnumMap(Thing.Kind, Thing) = undefined,
-char_to_thing: std.BoundedArray(struct { ch: u8, kind: Thing.Kind }, 24) = undefined,
-//sprite_sheets: std.StringArrayHashMap(sprites.SpriteSheet) = undefined,
+creatures: std.EnumArray(Thing.CreatureKind, Thing) = undefined,
 creature_sprite_sheets: AllCreatureSpriteSheetArrays = undefined,
 creature_anims: AllCreatureAnimArrays = undefined,
 spell_icons: SpriteSheet = undefined,
 spell_icons_indices: SpellIconsFrameIndexArray = undefined,
 sounds: std.EnumArray(SFX, ?Platform.Sound) = undefined,
+test_rooms: std.BoundedArray(PackedRoom, 32) = .{},
+rooms: std.BoundedArray(PackedRoom, 32) = .{},
 
 pub const SFX = enum {
     thwack,
@@ -354,8 +357,7 @@ pub fn loadCreatureSpriteSheets(self: *Data) Error!void {
 pub fn reload(self: *Data) Error!void {
     loadSpriteSheets(self) catch std.debug.print("WARNING: failed to load all sprites\n", .{});
     loadSounds(self) catch std.debug.print("WARNING: failed to load all sounds\n", .{});
-    self.levels = &test_levels;
-    self.things = @TypeOf(self.things).init(
+    self.creatures = @TypeOf(self.creatures).init(
         .{
             .player = try @import("player.zig").protoype(),
             .troll = try @import("enemies.zig").troll(),
@@ -364,9 +366,12 @@ pub fn reload(self: *Data) Error!void {
             .impling = try @import("spells/Impling.zig").implingProto(),
         },
     );
-    self.char_to_thing = .{};
-    inline for (self.things.values) |p| {
-        const ch = @tagName(p.kind)[0];
-        try self.char_to_thing.append(.{ .ch = ch, .kind = p.kind });
+    self.test_rooms = .{};
+    for (test_rooms_strings) |s| {
+        try self.test_rooms.append(try PackedRoom.init(s));
+    }
+    self.rooms = .{};
+    for (rooms_strings) |s| {
+        try self.rooms.append(try PackedRoom.init(s));
     }
 }

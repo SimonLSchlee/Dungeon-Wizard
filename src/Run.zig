@@ -54,7 +54,7 @@ pub fn makeStarterDeck() Spell.SpellArray {
         .{ frost, 1 },
         .{ blackmail, 1 },
         .{ mint, 3 },
-        .{ impling, 100 },
+        .{ impling, 1 },
         .{ promptitude, 1 },
         .{ flamey_explodey, 1 },
     };
@@ -82,9 +82,8 @@ screen: enum {
 } = .game,
 seed: u64,
 rng: std.Random.DefaultPrng = undefined,
-rooms_completed: std.BoundedArray(PackedRoom, 32) = .{},
-room_pool: std.BoundedArray(PackedRoom, 32) = .{},
-curr_room_num: usize = 0,
+packed_room_data_indices: std.BoundedArray(usize, 32) = .{},
+curr_room_idx: usize = 0,
 player_thing: ?Thing = null,
 deck: Spell.SpellArray = .{},
 curr_tick: i64 = 0,
@@ -98,20 +97,30 @@ pub fn init(seed: u64) Error!Run {
         .deck = makeStarterDeck(),
         .game_pause_ui = makeGamePauseUI(),
     };
-    for (app.data.levels) |str| {
-        const packed_room = try PackedRoom.init(str);
-        ret.room_pool.append(packed_room) catch break;
+    for (0..app.data.rooms.len) |i| {
+        try ret.packed_room_data_indices.append(i);
     }
-    assert(ret.room_pool.len > 0);
-    const pr = ret.room_pool.get(0);
-    ret.room = try Room.init(.{
-        .deck = ret.deck,
-        .difficulty = 10,
-        .packed_room = pr,
-        .seed = seed,
-    });
+    assert(ret.packed_room_data_indices.len > 0);
+    ret.rng.random().shuffleWithIndex(usize, ret.packed_room_data_indices.slice(), u32);
+
+    try ret.loadRoomFromCurrIdx();
 
     return ret;
+}
+
+pub fn loadRoomFromCurrIdx(self: *Run) Error!void {
+    const data = App.get().data;
+    if (self.room) |*room| {
+        room.deinit();
+    }
+    const idx = self.packed_room_data_indices.get(self.curr_room_idx);
+    const packed_room = data.rooms.get(idx);
+    self.room = try Room.init(.{
+        .deck = self.deck,
+        .difficulty = 10,
+        .packed_room = packed_room,
+        .seed = self.seed,
+    });
 }
 
 pub fn reset(self: *Run) Error!*Run {
@@ -142,9 +151,8 @@ pub fn update(self: *Run) Error!void {
                 if (plat.input_buffer.getNumberKeyJustPressed()) |num| {
                     const app = App.get();
                     const n: usize = if (num == 0) 9 else num - 1;
-                    if (n < app.data.levels.len) {
-                        const s = app.data.levels[n];
-                        const packed_room = try PackedRoom.init(s);
+                    if (n < app.data.test_rooms.len) {
+                        const packed_room = app.data.test_rooms.get(n);
                         try room.reloadFromPackedRoom(packed_room);
                     }
                 }

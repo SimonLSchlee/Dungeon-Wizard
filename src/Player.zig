@@ -25,7 +25,8 @@ pub const enum_name = "player";
 
 pub fn protoype() Error!Thing {
     return Thing{
-        .kind = .player,
+        .kind = .creature,
+        .creature_kind = .player,
         .spawn_state = .instance,
         .coll_radius = 20,
         .vision_range = 300,

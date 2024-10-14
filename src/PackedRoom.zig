@@ -23,16 +23,24 @@ const Tile = TileMap.Tile;
 const PackedRoom = @This();
 
 pub const ThingSpawn = struct {
-    kind: Thing.Kind,
+    kind: Thing.CreatureKind,
     pos: V2f,
 };
 
 pub const WavePositionsArray = std.BoundedArray(V2f, 16);
 
-pub const tile_sz: i64 = 64;
-pub const tile_sz_f: f32 = tile_sz;
-pub const tile_dims = V2f.splat(tile_sz);
-pub const tile_dims_2 = V2f.splat(tile_sz_f * 0.5);
+const char_to_thing = blk: {
+    var ret: [256]?Thing.CreatureKind = .{null} ** 256;
+    for (std.meta.fields(Thing.CreatureKind)) |f| {
+        const ch = f.name[0];
+        const kind: Thing.CreatureKind = @enumFromInt(f.value);
+        if (ret[ch] != null) {
+            @compileError("Two CreatureKinds have same first letter");
+        }
+        ret[ch] = kind;
+    }
+    break :blk ret;
+};
 
 exits: std.BoundedArray(V2f, 8) = .{},
 waves: [10]WavePositionsArray = .{.{}} ** 10,
@@ -71,14 +79,8 @@ pub fn init(str: []const u8) Error!PackedRoom {
                     if (std.ascii.isDigit(ch)) {
                         const idx = std.fmt.parseInt(usize, &.{ch}, 10) catch unreachable;
                         ret.waves[idx].append(curr_pos) catch std.log.warn("Out of waves!", .{});
-                    } else {
-                        const data = App.get().data;
-                        for (data.char_to_thing.constSlice()) |s| {
-                            if (ch == s.ch) {
-                                ret.thing_spawns.append(.{ .kind = s.kind, .pos = curr_pos }) catch std.log.warn("Out of spawns!", .{});
-                                break;
-                            }
-                        }
+                    } else if (char_to_thing[ch]) |kind| {
+                        ret.thing_spawns.append(.{ .kind = kind, .pos = curr_pos }) catch std.log.warn("Out of spawns!", .{});
                     }
                 },
             }

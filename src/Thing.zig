@@ -31,14 +31,18 @@ pub const StatusEffect = @import("StatusEffect.zig");
 pub const Collision = @import("Collision.zig");
 
 pub const Kind = enum {
+    creature,
+    projectile,
+    shield,
+    spawner,
+};
+
+pub const CreatureKind = enum {
     player,
     troll,
     gobbow,
     sharpboi,
     impling,
-    projectile,
-    shield,
-    spawner,
 };
 
 pub const Pool = pool.BoundedPool(Thing, Room.max_things_in_room);
@@ -55,6 +59,7 @@ spawn_state: enum {
 } = .instance,
 //
 kind: Kind = undefined,
+creature_kind: ?CreatureKind = null,
 pos: V2f = .{},
 vel: V2f = .{},
 dir: V2f = V2f.right,
@@ -253,7 +258,7 @@ pub const SpawnerController = struct {
         fade_in_creature,
         fade_out_circle,
     } = .fade_in_circle,
-    creature_kind: Kind,
+    creature_kind: CreatureKind,
 
     pub fn update(self: *Thing, room: *Room) Error!void {
         const spawner = &self.controller.spawner;
@@ -268,7 +273,7 @@ pub const SpawnerController = struct {
             .fade_in_creature => {
                 self.renderer.spawner.sprite_tint = Colorf.black.fade(0).lerp(Colorf.white, spawner.timer.remapTo0_1());
                 if (spawner.timer.tick(true)) {
-                    _ = try room.queueSpawnThingByKind(spawner.creature_kind, self.pos);
+                    _ = try room.queueSpawnCreatureByKind(spawner.creature_kind, self.pos);
                     spawner.state = .fade_out_circle;
                 }
             },
@@ -282,13 +287,13 @@ pub const SpawnerController = struct {
         }
     }
 
-    pub fn prototype(thing_kind: Kind) Thing {
-        const proto: Thing = App.get().data.things.get(thing_kind).?;
+    pub fn prototype(creature_kind: CreatureKind) Thing {
+        const proto: Thing = App.get().data.creatures.get(creature_kind);
         return .{
             .kind = .spawner,
             .controller = .{
                 .spawner = .{
-                    .creature_kind = thing_kind,
+                    .creature_kind = creature_kind,
                 },
             },
             .renderer = .{
@@ -508,9 +513,9 @@ pub fn update(self: *Thing, room: *Room) Error!void {
                 }
                 switch (status.kind) {
                     .blackmailed => if (status.stacks == 0) {
-                        if (App.get().data.things.get(self.kind)) |proto| {
-                            self.faction = proto.faction;
-                        }
+                        assert(self.creature_kind != null);
+                        const proto = App.get().data.creatures.get(self.creature_kind.?);
+                        self.faction = proto.faction;
                     },
                     else => {},
                 }

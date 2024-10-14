@@ -57,10 +57,10 @@ const WavesParams = struct {
             .difficulty = difficulty,
         };
         const enemy_prototypes = [_]Thing{
-            data.things.get(.troll).?,
-            data.things.get(.gobbow).?,
-            data.things.get(.sharpboi).?,
-            // data.things.get(.acolyte),
+            data.creatures.get(.troll),
+            data.creatures.get(.gobbow),
+            data.creatures.get(.sharpboi),
+            // data.creatures.get(.acolyte),
         };
         for (enemy_prototypes) |p| {
             ret.protos.append(p) catch unreachable;
@@ -214,7 +214,7 @@ pub fn reset(self: *Room) Error!void {
 
     for (self.init_params.packed_room.thing_spawns.constSlice()) |spawn| {
         std.debug.print("Room init: spawning a {any}\n", .{spawn.kind});
-        if (try self.queueSpawnThingByKind(spawn.kind, spawn.pos)) |id| {
+        if (try self.queueSpawnCreatureByKind(spawn.kind, spawn.pos)) |id| {
             if (spawn.kind == .player) {
                 self.player_id = id;
             }
@@ -247,12 +247,10 @@ pub fn queueSpawnThing(self: *Room, proto: *const Thing, pos: V2f) Error!?pool.I
     return null;
 }
 
-pub fn queueSpawnThingByKind(self: *Room, kind: Thing.Kind, pos: V2f) Error!?pool.Id {
+pub fn queueSpawnCreatureByKind(self: *Room, kind: Thing.CreatureKind, pos: V2f) Error!?pool.Id {
     const app = App.get();
-    if (app.data.things.getPtr(kind)) |proto| {
-        return self.queueSpawnThing(proto, pos);
-    }
-    return null;
+    const proto = app.data.creatures.getPtr(kind);
+    return self.queueSpawnThing(proto, pos);
 }
 
 pub fn getThingById(self: *Room, id: pool.Id) ?*Thing {
@@ -307,7 +305,7 @@ pub fn discardSpell(self: *Room, spell: Spell) void {
 pub fn spawnCurrWave(self: *Room) Error!void {
     assert(self.curr_wave < self.waves.len);
     const wave = self.waves.get(u.as(usize, self.curr_wave));
-    const spawner_proto = Thing.SpawnerController.prototype(wave.proto.kind);
+    const spawner_proto = Thing.SpawnerController.prototype(wave.proto.creature_kind.?);
     for (wave.positions.constSlice()) |pos| {
         _ = try self.queueSpawnThing(&spawner_proto, pos);
     }
@@ -326,7 +324,7 @@ pub fn update(self: *Room) Error!void {
         if (plat.input_buffer.mouseBtnIsJustPressed(.left)) {
             const pos = plat.screenPosToCamPos(self.camera, plat.input_buffer.getCurrMousePos());
             //std.debug.print("spawn sheep at {d:0.2}, {d:0.2}\n", .{ pos.x, pos.y });
-            _ = try self.queueSpawnThingByKind(.troll, pos);
+            _ = try self.queueSpawnCreatureByKind(.troll, pos);
         }
     } else {
         if (plat.input_buffer.keyIsJustPressed(.space)) {

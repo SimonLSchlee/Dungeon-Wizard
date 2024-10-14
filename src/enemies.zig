@@ -302,9 +302,13 @@ pub const AIController = struct {
 
 pub fn troll() Error!Thing {
     return Thing{
-        .kind = .troll,
+        .kind = .creature,
+        .creature_kind = .troll,
         .spawn_state = .instance,
         .coll_radius = 20,
+        .accel_params = .{
+            .max_speed = 0.7,
+        },
         .vision_range = 160,
         .coll_mask = Thing.Collision.Mask.initMany(&.{ .creature, .tile }),
         .coll_layer = Thing.Collision.Mask.initMany(&.{.creature}),
@@ -333,13 +337,14 @@ pub fn troll() Error!Thing {
         },
         .hp = Thing.HP.init(50),
         .faction = .enemy,
-        .enemy_difficulty = 2,
+        .enemy_difficulty = 2.5,
     };
 }
 
 pub fn gobbow() Error!Thing {
     return Thing{
-        .kind = .gobbow,
+        .kind = .creature,
+        .creature_kind = .gobbow,
         .spawn_state = .instance,
         .coll_radius = 15,
         .vision_range = 160,
@@ -372,8 +377,12 @@ pub fn gobbow() Error!Thing {
 
 pub fn sharpboi() Error!Thing {
     return Thing{
-        .kind = .sharpboi,
+        .kind = .creature,
+        .creature_kind = .sharpboi,
         .spawn_state = .instance,
+        .accel_params = .{
+            .max_speed = 0.9,
+        },
         .coll_radius = 15,
         .vision_range = 160,
         .coll_mask = Thing.Collision.Mask.initMany(&.{ .creature, .tile }),
@@ -406,6 +415,6 @@ pub fn sharpboi() Error!Thing {
         },
         .hp = Thing.HP.init(35),
         .faction = .enemy,
-        .enemy_difficulty = 2.5,
+        .enemy_difficulty = 2.2,
     };
 }

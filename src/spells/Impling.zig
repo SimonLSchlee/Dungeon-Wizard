@@ -54,7 +54,8 @@ pub const proto = Spell.makeProto(
 
 pub fn implingProto() Error!Thing {
     return Thing{
-        .kind = .impling,
+        .kind = .creature,
+        .creature_kind = .impling,
         .spawn_state = .instance,
         .coll_radius = 15,
         .vision_range = 160,
