@@ -139,7 +139,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     const start_rads = target_dir.toAngleRadians() - frost_vom.arc_rads * 0.5;
     const end_rads = start_rads + frost_vom.arc_rads;
 
-    var vom = Thing{
+    const vom = Thing{
         .kind = .projectile,
         .dir = target_dir,
         .coll_radius = 5,
@@ -171,7 +171,5 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             },
         },
     };
-    try vom.init();
-    defer vom.deinit();
     _ = try room.queueSpawnThing(&vom, caster.pos);
 }

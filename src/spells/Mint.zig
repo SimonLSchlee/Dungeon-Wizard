@@ -95,7 +95,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     const target_pos = params.target.pos;
     const target_dir = if (target_pos.sub(caster.pos).normalizedChecked()) |d| d else V2f.right;
 
-    var coin = Thing{
+    const coin = Thing{
         .kind = .projectile,
         .dir = target_dir,
         .vel = target_dir.scale(mint.max_speed),
@@ -126,7 +126,5 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             .radius = mint.radius,
         },
     };
-    try coin.init();
-    defer coin.deinit();
     _ = try room.queueSpawnThing(&coin, caster.pos);
 }

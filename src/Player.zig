@@ -24,7 +24,7 @@ const Player = @This();
 pub const enum_name = "player";
 
 pub fn protoype() Error!Thing {
-    var ret = Thing{
+    return Thing{
         .kind = .player,
         .spawn_state = .instance,
         .coll_radius = 20,
@@ -49,8 +49,6 @@ pub fn protoype() Error!Thing {
         .hp = Thing.HP.init(50),
         .faction = .player,
     };
-    try ret.init();
-    return ret;
 }
 
 pub const InputController = struct {

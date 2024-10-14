@@ -33,7 +33,7 @@ const EnemyProjectile = enum {
 };
 
 fn gobbowArrow(self: *const Thing, room: *Room) Error!void {
-    var arrow = Thing{
+    const arrow = Thing{
         .kind = .projectile,
         .coll_radius = 5,
         .vel = self.dir.scale(4),
@@ -57,8 +57,6 @@ fn gobbowArrow(self: *const Thing, room: *Room) Error!void {
             .rel_pos = self.dir.scale(28),
         },
     };
-    try arrow.init();
-    defer arrow.deinit();
     assert(try room.queueSpawnThing(&arrow, self.pos) != null);
 }
 
@@ -303,7 +301,7 @@ pub const AIController = struct {
 };
 
 pub fn troll() Error!Thing {
-    var ret = Thing{
+    return Thing{
         .kind = .troll,
         .spawn_state = .instance,
         .coll_radius = 20,
@@ -337,12 +335,10 @@ pub fn troll() Error!Thing {
         .faction = .enemy,
         .enemy_difficulty = 2,
     };
-    try ret.init();
-    return ret;
 }
 
 pub fn gobbow() Error!Thing {
-    var ret = Thing{
+    return Thing{
         .kind = .gobbow,
         .spawn_state = .instance,
         .coll_radius = 15,
@@ -372,12 +368,10 @@ pub fn gobbow() Error!Thing {
         .faction = .enemy,
         .enemy_difficulty = 1.5,
     };
-    try ret.init();
-    return ret;
 }
 
 pub fn sharpboi() Error!Thing {
-    var ret = Thing{
+    return Thing{
         .kind = .sharpboi,
         .spawn_state = .instance,
         .coll_radius = 15,
@@ -414,6 +408,4 @@ pub fn sharpboi() Error!Thing {
         .faction = .enemy,
         .enemy_difficulty = 2.5,
     };
-    try ret.init();
-    return ret;
 }

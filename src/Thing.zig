@@ -67,9 +67,8 @@ vision_range: f32 = 0,
 accel_params: AccelParams = .{},
 dir_accel_params: DirAccelParams = .{},
 dbg: struct {
-    coords_searched: std.ArrayList(V2i) = undefined,
+    coords_searched: std.BoundedArray(V2i, 128) = .{},
     last_tick_hitbox_was_active: i64 = -10000,
-    last_tick_hurtbox_was_hit: i64 = -10000,
 } = .{},
 controller: union(enum) {
     none: void,
@@ -560,7 +559,7 @@ pub fn renderOver(self: *const Thing, room: *const Room) Error!void {
     }
     if (debug.show_thing_coords_searched) {
         if (self.path.len > 0) {
-            for (self.dbg.coords_searched.items) |coord| {
+            for (self.dbg.coords_searched.constSlice()) |coord| {
                 plat.circlef(TileMap.tileCoordToCenterPos(coord), 10, .{ .outline_color = Colorf.white, .fill_color = null });
             }
         }
@@ -592,22 +591,12 @@ pub fn deferFree(self: *Thing, room: *Room) void {
     room.free_queue.append(self.id) catch @panic("out of free_queue space!");
 }
 
-pub fn init(self: *Thing) Error!void {
-    self.dbg.coords_searched = @TypeOf(self.dbg.coords_searched).init(getPlat().heap);
-}
-
-pub fn deinit(self: *Thing) void {
-    self.dbg.coords_searched.deinit();
-}
-
 // copy retaining original id, alloc state and spawn_state
 pub fn copyTo(self: *const Thing, other: *Thing) Error!void {
     const id = other.id;
     const alloc_state = other.alloc_state;
     const spawn_state = other.spawn_state;
     other.* = self.*;
-    // TODO clone allocated stuff
-    other.dbg.coords_searched = try self.dbg.coords_searched.clone();
     other.id = id;
     other.alloc_state = alloc_state;
     other.spawn_state = spawn_state;

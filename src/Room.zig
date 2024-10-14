@@ -184,10 +184,6 @@ pub fn deinit(self: *Room) void {
 }
 
 fn clearThings(self: *Room) void {
-    for (&self.things.items) |*thing| {
-        if (thing.alloc_state != .allocated) continue;
-        thing.deinit();
-    }
     self.things = Thing.Pool.init(self.next_pool_id);
     self.next_pool_id += 1;
     self.spawn_queue.len = 0;
@@ -427,7 +423,6 @@ pub fn update(self: *Room) Error!void {
         const thing = t.?;
         assert(thing.alloc_state == .allocated);
         assert(thing.spawn_state == .freeable);
-        thing.deinit();
         self.things.free(id);
         if (thing.isEnemy()) self.num_enemies_alive -= 1;
     }

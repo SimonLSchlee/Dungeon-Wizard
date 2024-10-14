@@ -108,7 +108,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     }
     const target = _target.?;
 
-    var herring = Thing{
+    const herring = Thing{
         .kind = .projectile,
         .coll_radius = 5,
         .accel_params = .{
@@ -128,7 +128,5 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             .poly_opt = .{ .fill_color = Colorf.white },
         } },
     };
-    try herring.init();
-    defer herring.deinit();
     _ = try room.queueSpawnThing(&herring, caster.pos);
 }

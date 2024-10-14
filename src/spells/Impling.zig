@@ -53,7 +53,7 @@ pub const proto = Spell.makeProto(
 );
 
 pub fn implingProto() Error!Thing {
-    var ret = Thing{
+    return Thing{
         .kind = .impling,
         .spawn_state = .instance,
         .coll_radius = 15,
@@ -93,8 +93,6 @@ pub fn implingProto() Error!Thing {
         .hp = Thing.HP.init(25),
         .faction = .ally,
     };
-    try ret.init();
-    return ret;
 }
 
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {

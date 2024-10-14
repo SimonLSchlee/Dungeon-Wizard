@@ -287,7 +287,7 @@ pub fn isLOSBetween(self: *const TileMap, _a: V2f, _b: V2f) bool {
     return true;
 }
 
-pub fn findPathThetaStar(self: *const TileMap, allocator: std.mem.Allocator, start: V2f, goal: V2f, radius: f32, coords_searched: *std.ArrayList(V2i)) Error!std.BoundedArray(V2f, 32) {
+pub fn findPathThetaStar(self: *const TileMap, allocator: std.mem.Allocator, start: V2f, goal: V2f, radius: f32, coords_searched: *std.BoundedArray(V2i, 128)) Error!std.BoundedArray(V2f, 32) {
     const ThetaStar = struct {
         const PqEl = struct {
             p: V2i,
@@ -332,14 +332,14 @@ pub fn findPathThetaStar(self: *const TileMap, allocator: std.mem.Allocator, sta
             .best_g = 0,
         },
     );
-    coords_searched.clearAndFree();
+    coords_searched.len = 0;
 
     while (queue.items.len > 0) {
         const curr = queue.remove();
         const curr_seen = seen.getPtr(curr.p).?;
         if (curr_seen.visited) continue;
         curr_seen.visited = true;
-        try coords_searched.append(curr.p);
+        coords_searched.append(curr.p) catch {};
 
         if (curr.p.eql(goal_coord)) {
             break;

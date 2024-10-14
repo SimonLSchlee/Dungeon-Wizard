@@ -112,7 +112,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     const target_pos = params.target.pos;
     const target_dir = if (target_pos.sub(caster.pos).normalizedChecked()) |d| d else V2f.right;
 
-    var ball = Thing{
+    const ball = Thing{
         .kind = .projectile,
         .dir = target_dir,
         .vel = target_dir.scale(flamey_explodey.max_speed),
@@ -144,7 +144,5 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             .radius = flamey_explodey.ball_radius,
         },
     };
-    try ball.init();
-    defer ball.deinit();
     _ = try room.queueSpawnThing(&ball, caster.pos);
 }
