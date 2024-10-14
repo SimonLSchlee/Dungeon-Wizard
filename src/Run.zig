@@ -38,7 +38,7 @@ pub const GamePauseUI = struct {
     pause_menu_button: menuUI.Button,
 };
 
-pub fn makeStarterDeck() Spell.SpellArray {
+pub fn makeStarterDeck(dbg: bool) Spell.SpellArray {
     var ret = Spell.SpellArray{};
     // TODO placeholder
     const unherring = Spell.getProto(.unherring);
@@ -49,18 +49,26 @@ pub fn makeStarterDeck() Spell.SpellArray {
     const impling = Spell.getProto(.impling);
     const promptitude = Spell.getProto(.promptitude);
     const flamey_explodey = Spell.getProto(.flamey_explodey);
-    const starter_deck = [_]struct { Spell, usize }{
-        .{ unherring, 3 },
-        .{ protec, 1 },
-        .{ frost, 1 },
-        .{ blackmail, 1 },
-        .{ mint, 3 },
-        .{ impling, 1 },
-        .{ promptitude, 1 },
-        .{ flamey_explodey, 1 },
-    };
 
-    deck: for (starter_deck) |t| {
+    const deck_cards = if (dbg)
+        &[_]struct { Spell, usize }{
+            .{ unherring, 1 },
+            .{ protec, 1 },
+            .{ frost, 1 },
+            .{ blackmail, 1 },
+            .{ mint, 1 },
+            .{ impling, 1 },
+            .{ promptitude, 1 },
+            .{ flamey_explodey, 1 },
+        }
+    else
+        &[_]struct { Spell, usize }{
+            .{ unherring, 4 },
+            .{ protec, 2 },
+            .{ frost, 1 },
+        };
+
+    deck: for (deck_cards) |t| {
         for (0..t[1]) |_| {
             ret.append(t[0]) catch break :deck;
         }
@@ -101,7 +109,7 @@ pub fn init(seed: u64) Error!Run {
     var ret: Run = .{
         .rng = std.Random.DefaultPrng.init(seed),
         .seed = seed,
-        .deck = makeStarterDeck(),
+        .deck = makeStarterDeck(false),
         .game_pause_ui = makeGamePauseUI(),
     };
     for (0..app.data.rooms.len) |i| {
@@ -136,7 +144,7 @@ pub fn loadRoomFromCurrIdx(self: *Run) Error!void {
     const exit_doors = self.makeExitDoors(packed_room);
     self.room = try Room.init(.{
         .deck = self.deck,
-        .difficulty = 10,
+        .difficulty = 4 + 4 + u.as(f32, self.curr_room_idx) * 3,
         .packed_room = packed_room,
         .seed = self.seed,
         .exits = exit_doors,
@@ -162,6 +170,7 @@ pub fn update(self: *Run) Error!void {
         .fade_out => if (self.load_timer.tick(true)) {
             self.curr_room_idx += 1;
             try self.loadRoomFromCurrIdx();
+            self.reward = null;
             self.load_state = .fade_in;
         },
     }
