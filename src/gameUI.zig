@@ -86,7 +86,7 @@ pub const SpellSlots = struct {
         const rects = getSlotRects();
 
         const slots_are_enabled = if (room.getConstPlayer()) |p|
-            p.controller.player.spell_casting == null
+            p.hp.?.curr > 0
         else
             false;
 
