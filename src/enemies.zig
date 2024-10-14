@@ -337,7 +337,7 @@ pub fn troll() Error!Thing {
         },
         .hp = Thing.HP.init(50),
         .faction = .enemy,
-        .enemy_difficulty = 2.5,
+        .enemy_difficulty = 2,
     };
 }
 
@@ -415,6 +415,6 @@ pub fn sharpboi() Error!Thing {
         },
         .hp = Thing.HP.init(35),
         .faction = .enemy,
-        .enemy_difficulty = 2.2,
+        .enemy_difficulty = 2.5,
     };
 }

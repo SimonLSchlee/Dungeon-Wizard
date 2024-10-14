@@ -142,11 +142,14 @@ pub fn loadRoomFromCurrIdx(self: *Run) Error!void {
     const idx = self.packed_room_data_indices.get(self.curr_room_idx);
     const packed_room = data.rooms.get(idx);
     const exit_doors = self.makeExitDoors(packed_room);
+    const waves_params = Room.WavesParams{
+        .difficulty = 6 + u.as(f32, self.curr_room_idx) * 2,
+    };
     self.room = try Room.init(.{
         .deck = self.deck,
-        .difficulty = 4 + 4 + u.as(f32, self.curr_room_idx) * 3,
+        .waves_params = waves_params,
         .packed_room = packed_room,
-        .seed = self.seed,
+        .seed = self.seed + self.curr_room_idx,
         .exits = exit_doors,
     });
 }
@@ -393,5 +396,16 @@ pub fn render(self: *Run) Error!void {
             .color = text_color,
             .size = 25,
         });
+    }
+    switch (self.load_state) {
+        .none => {},
+        .fade_in => {
+            const color = Colorf.black.fade(1 - self.load_timer.remapTo0_1());
+            plat.rectf(.{}, plat.screen_dims_f, .{ .fill_color = color });
+        },
+        .fade_out => {
+            const color = Colorf.black.fade(self.load_timer.remapTo0_1());
+            plat.rectf(.{}, plat.screen_dims_f, .{ .fill_color = color });
+        },
     }
 }

@@ -34,64 +34,91 @@ pub const ThingBoundedArray = std.BoundedArray(pool.Id, max_things_in_room);
 
 pub const InitParams = struct {
     packed_room: PackedRoom,
-    difficulty: f32,
+    waves_params: WavesParams,
     seed: u64,
     deck: Spell.SpellArray,
     exits: std.BoundedArray(gameUI.ExitDoor, 4),
 };
 
-pub const Wave = struct {
-    proto: Thing = undefined,
-    positions: PackedRoom.WavePositionsArray = .{},
-};
-pub const WavesArray = std.BoundedArray(Wave, 10);
+pub const WavesParams = struct {
+    const all_enemy_kinds = [_]Thing.CreatureKind{
+        .troll,
+        .gobbow,
+        .sharpboi,
+    };
+    const max_max_kinds_per_wave = 4;
 
-const WavesParams = struct {
-    protos: std.BoundedArray(Thing, 8),
     difficulty: f32,
-    difficulty_error: f32 = 4,
-
-    pub fn init(difficulty: f32) WavesParams {
-        const data = App.get().data;
-        var ret = WavesParams{
-            .protos = .{},
-            .difficulty = difficulty,
-        };
-        const enemy_prototypes = [_]Thing{
-            data.creatures.get(.troll),
-            data.creatures.get(.gobbow),
-            data.creatures.get(.sharpboi),
-            // data.creatures.get(.acolyte),
-        };
-        for (enemy_prototypes) |p| {
-            ret.protos.append(p) catch unreachable;
-        }
-        return ret;
-    }
+    difficulty_error: f32 = 2,
+    max_kinds_per_wave: usize = 2,
+    min_waves: usize = 2,
+    max_waves: usize = 4,
+    enemy_kinds: []const Thing.CreatureKind = &all_enemy_kinds,
 };
+
+pub const Wave = struct {
+    const Spawn = struct {
+        proto: Thing = undefined,
+        pos: V2f,
+    };
+    total_difficulty: f32 = 0,
+    spawns: std.BoundedArray(Spawn, 16) = .{},
+};
+pub const WavesArray = std.BoundedArray(Wave, 8);
 
 fn makeWaves(packed_room: PackedRoom, rng: std.Random, params: WavesParams) WavesArray {
-    var difficulty_left = params.difficulty;
+    const data = App.get().data;
     var ret = WavesArray{};
+
+    var difficulty_left = params.difficulty;
     std.debug.print("\n\n#############\n", .{});
-    std.debug.print("Making waves! difficulty: {d:.1}, error: {d:.1}\n", .{ params.difficulty, params.difficulty_error });
-    for (packed_room.waves, 0..) |wave_positions, i| {
+    std.debug.print("Making waves! difficulty: {d:.1}\n", .{params.difficulty});
+    const num_waves = rng.intRangeLessThan(usize, params.min_waves, params.max_waves);
+    const difficulty_per_wave = params.difficulty / u.as(f32, num_waves);
+    const difficulty_error_per_wave = params.difficulty_error / u.as(f32, num_waves);
+    std.debug.print("num_waves: {}, difficulty per wave: {d:.1}\n", .{ num_waves, difficulty_per_wave });
+
+    var all_spawn_positions = std.BoundedArray(V2f, 16){};
+    for (packed_room.waves) |wave_positions| {
         if (wave_positions.len == 0) continue;
-        var wave = Wave{};
-        wave.positions = wave_positions;
-        while (difficulty_left > params.difficulty_error) {
-            const idx = rng.intRangeLessThan(usize, 0, params.protos.len);
-            const proto = params.protos.buffer[idx];
-            const wave_difficulty = proto.enemy_difficulty * u.as(f32, wave_positions.len);
-            if (wave_difficulty > difficulty_left + params.difficulty_error) continue;
-            difficulty_left -= wave_difficulty;
-            wave.proto = proto;
-            std.debug.print("  {}: selected {any}, total difficulty: {d:.2}\n", .{ i, wave.proto.kind, wave_difficulty });
-            std.debug.print("    {d:.2} difficulty left\n", .{difficulty_left});
-            ret.append(wave) catch unreachable;
-            break;
-        }
+        all_spawn_positions.insertSlice(all_spawn_positions.len, wave_positions.constSlice()) catch unreachable;
     }
+    std.debug.print("  total spawn positions: {}\n", .{all_spawn_positions.len});
+
+    for (0..num_waves) |i| {
+        var difficulty_left_in_wave = difficulty_per_wave;
+        var wave = Wave{};
+
+        var enemy_protos: std.BoundedArray(Thing, WavesParams.max_max_kinds_per_wave) = .{};
+        for (0..params.max_kinds_per_wave) |_| {
+            const idx = rng.uintLessThan(usize, params.enemy_kinds.len);
+            const kind = params.enemy_kinds[idx];
+            enemy_protos.append(data.creatures.get(kind)) catch unreachable;
+            std.debug.print("  enemy kind: {any}\n", .{kind});
+        }
+
+        rng.shuffleWithIndex(V2f, all_spawn_positions.slice(), u32);
+        var curr_spawn_pos_idx: usize = 0;
+        std.debug.print(" Wave {}:\n", .{i});
+        while (difficulty_left_in_wave > difficulty_error_per_wave and curr_spawn_pos_idx < all_spawn_positions.len) {
+            const idx = rng.uintLessThan(usize, enemy_protos.len);
+            const proto = enemy_protos.get(idx);
+            wave.total_difficulty += proto.enemy_difficulty;
+            difficulty_left_in_wave -= proto.enemy_difficulty;
+            wave.spawns.append(.{
+                .pos = all_spawn_positions.buffer[curr_spawn_pos_idx],
+                .proto = proto,
+            }) catch unreachable;
+            std.debug.print("  {any}\n", .{proto.creature_kind.?});
+            curr_spawn_pos_idx += 1;
+        }
+
+        std.debug.print("  = wave difficulty: {d:.2}\n", .{wave.total_difficulty});
+        difficulty_left -= wave.total_difficulty;
+        ret.append(wave) catch unreachable;
+        if (difficulty_left < params.difficulty_error) break;
+    }
+
     std.debug.print("#############\n\n", .{});
     return ret;
 }
@@ -212,7 +239,7 @@ pub fn reset(self: *Room) Error!void {
     self.draw_pile = self.init_params.deck;
     self.tilemap.deinit();
     self.tilemap = try TileMap.init(self.init_params.packed_room.tiles.constSlice(), self.init_params.packed_room.dims);
-    self.waves = makeWaves(self.init_params.packed_room, self.rng.random(), WavesParams.init(self.init_params.difficulty));
+    self.waves = makeWaves(self.init_params.packed_room, self.rng.random(), self.init_params.waves_params);
 
     for (self.init_params.packed_room.thing_spawns.constSlice()) |spawn| {
         std.debug.print("Room init: spawning a {any}\n", .{spawn.kind});
@@ -307,9 +334,9 @@ pub fn discardSpell(self: *Room, spell: Spell) void {
 pub fn spawnCurrWave(self: *Room) Error!void {
     assert(self.curr_wave < self.waves.len);
     const wave = self.waves.get(u.as(usize, self.curr_wave));
-    const spawner_proto = Thing.SpawnerController.prototype(wave.proto.creature_kind.?);
-    for (wave.positions.constSlice()) |pos| {
-        _ = try self.queueSpawnThing(&spawner_proto, pos);
+    for (wave.spawns.constSlice()) |spawn| {
+        const spawner_proto = Thing.SpawnerController.prototype(spawn.proto.creature_kind.?);
+        _ = try self.queueSpawnThing(&spawner_proto, spawn.pos);
     }
     self.curr_wave += 1;
 }
@@ -318,8 +345,17 @@ pub fn update(self: *Room) Error!void {
     const plat = getPlat();
     self.ui_clicked = false;
 
-    if (debug.enable_debug_controls and plat.input_buffer.keyIsJustPressed(.backtick)) {
-        self.edit_mode = !self.edit_mode;
+    if (debug.enable_debug_controls) {
+        if (plat.input_buffer.keyIsJustPressed(.backtick)) {
+            self.edit_mode = !self.edit_mode;
+        }
+        if (plat.input_buffer.keyIsJustPressed(.k)) {
+            for (&self.things.items) |*thing| {
+                if (!thing.isActive()) continue;
+                if (!thing.isEnemy()) continue;
+                thing.deferFree(self);
+            }
+        }
     }
 
     if (self.edit_mode) {
@@ -468,8 +504,8 @@ pub fn render(self: *const Room) Error!void {
     // waves
     if (debug.show_waves) {
         for (self.waves.constSlice(), 0..) |wave, i| {
-            for (wave.positions.constSlice()) |pos| {
-                try plat.textf(pos, "{}", .{i}, .{ .center = true, .color = .magenta });
+            for (wave.spawns.constSlice()) |spawn| {
+                try plat.textf(spawn.pos, "{}", .{i}, .{ .center = true, .color = .magenta });
             }
         }
     }
