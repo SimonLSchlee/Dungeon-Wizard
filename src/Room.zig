@@ -42,6 +42,7 @@ pub const InitParams = struct {
 
 pub const WavesParams = struct {
     const all_enemy_kinds = [_]Thing.CreatureKind{
+        .bat,
         .troll,
         .gobbow,
         .sharpboi,
@@ -88,18 +89,19 @@ fn makeWaves(packed_room: PackedRoom, rng: std.Random, params: WavesParams) Wave
     for (0..num_waves) |i| {
         var difficulty_left_in_wave = difficulty_per_wave;
         var wave = Wave{};
+        std.debug.print(" Wave {}:\n", .{i});
 
         var enemy_protos: std.BoundedArray(Thing, WavesParams.max_max_kinds_per_wave) = .{};
         for (0..params.max_kinds_per_wave) |_| {
             const idx = rng.uintLessThan(usize, params.enemy_kinds.len);
             const kind = params.enemy_kinds[idx];
             enemy_protos.append(data.creatures.get(kind)) catch unreachable;
-            std.debug.print("  enemy kind: {any}\n", .{kind});
+            std.debug.print("  possible enemy: {any}\n", .{kind});
         }
 
         rng.shuffleWithIndex(V2f, all_spawn_positions.slice(), u32);
         var curr_spawn_pos_idx: usize = 0;
-        std.debug.print(" Wave {}:\n", .{i});
+
         while (difficulty_left_in_wave > difficulty_error_per_wave and curr_spawn_pos_idx < all_spawn_positions.len) {
             const idx = rng.uintLessThan(usize, enemy_protos.len);
             const proto = enemy_protos.get(idx);
@@ -109,7 +111,7 @@ fn makeWaves(packed_room: PackedRoom, rng: std.Random, params: WavesParams) Wave
                 .pos = all_spawn_positions.buffer[curr_spawn_pos_idx],
                 .proto = proto,
             }) catch unreachable;
-            std.debug.print("  {any}\n", .{proto.creature_kind.?});
+            std.debug.print("  spawn: {any}\n", .{proto.creature_kind.?});
             curr_spawn_pos_idx += 1;
         }
 

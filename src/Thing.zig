@@ -43,6 +43,7 @@ pub const CreatureKind = enum {
     gobbow,
     sharpboi,
     impling,
+    bat,
 };
 
 pub const Pool = pool.BoundedPool(Thing, Room.max_things_in_room);

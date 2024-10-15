@@ -15,14 +15,15 @@ const v2f = V2f.v2f;
 const V2i = @import("V2i.zig");
 const v2i = V2i.v2i;
 
-const Thing = @This();
 const App = @import("App.zig");
 const getPlat = App.getPlat;
 const Data = @import("Data.zig");
+const Thing = @import("Thing.zig");
 
 pub const CreatureAnim = struct {
     pub const Kind = enum {
         wizard,
+        bat,
         troll,
         gobbow,
         sharpboi,

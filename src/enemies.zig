@@ -300,6 +300,47 @@ pub const AIController = struct {
     }
 };
 
+pub fn bat() Error!Thing {
+    return Thing{
+        .kind = .creature,
+        .creature_kind = .bat,
+        .spawn_state = .instance,
+        .coll_radius = 5,
+        .accel_params = .{
+            .max_speed = 0.9,
+        },
+        .vision_range = 160,
+        .coll_mask = Thing.Collision.Mask.initMany(&.{ .creature, .tile }),
+        .coll_layer = Thing.Collision.Mask.initMany(&.{.creature}),
+        .controller = .{ .enemy = .{
+            .attack_cooldown = utl.TickCounter.initStopped(60),
+        } },
+        .renderer = .{ .creature = .{
+            .draw_color = .yellow,
+            .draw_radius = 10,
+        } },
+        .animator = .{ .creature = .{
+            .creature_kind = .bat,
+        } },
+        .hitbox = .{
+            .mask = Thing.Faction.opposing_masks.get(.enemy),
+            .radius = 10,
+            .rel_pos = V2f.right.scale(60),
+            .effect = .{ .damage = 4 },
+        },
+        .hurtbox = .{
+            .radius = 10,
+        },
+        .selectable = .{
+            .height = 17 * 4, // TODO pixellszslz
+            .radius = 6 * 4,
+        },
+        .hp = Thing.HP.init(9),
+        .faction = .enemy,
+        .enemy_difficulty = 0.5,
+    };
+}
+
 pub fn troll() Error!Thing {
     return Thing{
         .kind = .creature,

@@ -75,7 +75,7 @@ const test_rooms_strings = [_][]const u8{
     \\           
     \\  p &#     
     \\           
-    \\  g        
+    \\  b   b    
     \\           
     ,
     \\#########################
@@ -85,10 +85,10 @@ const test_rooms_strings = [_][]const u8{
     \\#                       #
     \\#     1    #            #
     \\#          #     3      #
-    \\#   ##   p    s    ##   #
+    \\#   ##   p    b    ##   #
     \\#                       #
     \\#     3 2       #       #
-    \\#     s    1    #       #
+    \\#     b    1    #       #
     \\#                       #
     \\#########################
     ,
@@ -397,6 +397,7 @@ pub fn reload(self: *Data) Error!void {
     self.creatures = @TypeOf(self.creatures).init(
         .{
             .player = try @import("player.zig").protoype(),
+            .bat = try @import("enemies.zig").bat(),
             .troll = try @import("enemies.zig").troll(),
             .gobbow = try @import("enemies.zig").gobbow(),
             .sharpboi = try @import("enemies.zig").sharpboi(),
