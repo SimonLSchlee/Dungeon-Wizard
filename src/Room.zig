@@ -156,6 +156,7 @@ spawn_queue: ThingBoundedArray = .{},
 free_queue: ThingBoundedArray = .{},
 moused_over_thing: ?Thing.Id = null,
 player_id: ?pool.Id = null,
+player_destination_ui_timer: u.TickCounter = u.TickCounter.initStopped(60),
 spell_slots: gameUI.SpellSlots = .{},
 draw_pile: Spell.SpellArray = .{},
 discard_pile: Spell.SpellArray = .{},
@@ -252,11 +253,7 @@ pub fn reset(self: *Room) Error!void {
         }
     }
 
-    for (0..gameUI.SpellSlots.num_slots) |i| {
-        if (self.drawSpell()) |spell| {
-            self.spell_slots.fillSlot(spell, i);
-        }
-    }
+    self.spell_slots = gameUI.SpellSlots.init(self);
 }
 
 pub fn reloadFromPackedRoom(self: *Room, packed_room: PackedRoom) Error!void {
@@ -381,8 +378,9 @@ pub fn update(self: *Room) Error!void {
     }
     self.spawn_queue.len = 0;
 
-    {
-        const mouse_pos = plat.screenPosToCamPos(self.camera, plat.input_buffer.getCurrMousePos());
+    // input and player controls
+    const mouse_pos = plat.screenPosToCamPos(self.camera, plat.input_buffer.getCurrMousePos());
+    { // get any "thing" that is moused over
         self.moused_over_thing = null;
         var best_y = -std.math.inf(f32);
         for (&self.things.items) |*thing| {
@@ -403,6 +401,50 @@ pub fn update(self: *Room) Error!void {
             {
                 best_y = thing.pos.y;
                 self.moused_over_thing = thing.id;
+            }
+        }
+    }
+    // update spell slots, and player input
+    {
+        const spell_slots = &self.spell_slots;
+        spell_slots.updateSelected(self);
+        if (!self.paused) {
+            spell_slots.updateTimerAndDrawSpell(self);
+        }
+        // player thing
+        if (self.getPlayer()) |player| {
+            const controller = &player.controller.player;
+            // tick this here even though its on the player controller
+            _ = self.player_destination_ui_timer.tick(false);
+            if (plat.input_buffer.mouseBtnIsDown(.right)) {
+                try player.findPath(self, mouse_pos);
+                self.player_destination_ui_timer.restart();
+            }
+
+            if (spell_slots.getSelectedSlot()) |slot| {
+                const cast_method = spell_slots.selected_method;
+                const do_cast = switch (cast_method) {
+                    .left_click => !self.ui_clicked and plat.input_buffer.mouseBtnIsJustPressed(.left),
+                    .quick_press => true,
+                    .quick_release => !plat.input_buffer.keyIsDown(gameUI.SpellSlots.idx_to_key[slot.idx]),
+                };
+                if (do_cast) {
+                    assert(slot.spell != null);
+                    const spell = slot.spell.?;
+                    if (spell.getTargetParams(self, player, mouse_pos)) |params| {
+                        player.path.len = 0; // cancel the current path on cast, but you can buffer a new one
+                        const bspell = Spell.BufferedSpell{
+                            .spell = spell,
+                            .params = params,
+                            .slot_idx = u.as(i32, slot.idx),
+                        };
+                        controller.spell_buffered = bspell;
+                        spell_slots.state = .{ .buffered = slot.idx };
+                    } else if (cast_method == .quick_press or cast_method == .quick_release) {
+                        spell_slots.state = .none;
+                        controller.spell_buffered = null;
+                    }
+                }
             }
         }
     }
@@ -440,15 +482,6 @@ pub fn update(self: *Room) Error!void {
                     }
                 },
                 .exited => {},
-            }
-        }
-        // spell slots
-        {
-            const old = self.spell_slots.selected_idx;
-            try self.spell_slots.update(self);
-            const new = self.spell_slots.selected_idx;
-            if (old != new) {
-                self.ui_clicked = true;
             }
         }
         // things
@@ -519,9 +552,9 @@ pub fn render(self: *const Room) Error!void {
                 assert(slot.spell != null);
                 try slot.spell.?.renderTargeting(self, player);
             }
-            if (player.controller.player.show_move_timer.running and player.path.len > 0) {
+            if (self.player_destination_ui_timer.running and player.path.len > 0) {
                 const move_pos = player.path.get(player.path.len - 1);
-                const f = player.controller.player.show_move_timer.remapTo0_1();
+                const f = self.player_destination_ui_timer.remapTo0_1();
                 const t = @sin(f * 3);
                 const range = -10;
                 const y_off = range * t;

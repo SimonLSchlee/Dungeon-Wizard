@@ -200,6 +200,12 @@ pub const Reward = struct {
     }
 };
 
+pub const BufferedSpell = struct {
+    spell: Spell,
+    params: Params,
+    slot_idx: i32,
+};
+
 // only valid if spawn_state == .card
 id: Id = undefined,
 alloc_state: pool.AllocState = undefined,

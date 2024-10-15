@@ -59,55 +59,17 @@ pub const InputController = struct {
         cast,
         walk,
     };
-    const BufferedSpell = struct {
-        spell: Spell,
-        params: Spell.Params,
-        slot_idx: i32,
-    };
 
     state: State = .none,
-    spell_buffered: ?BufferedSpell = null,
-    spell_casting: ?BufferedSpell = null,
+    spell_casting: ?Spell.BufferedSpell = null,
+    spell_buffered: ?Spell.BufferedSpell = null,
     cast_counter: utl.TickCounter = .{},
     ticks_in_state: i64 = 0,
-    show_move_timer: utl.TickCounter = utl.TickCounter.initStopped(60),
 
     pub fn update(self: *Thing, room: *Room) Error!void {
         assert(self.spawn_state == .spawned);
-        const plat = getPlat();
         const controller = &self.controller.player;
 
-        _ = controller.show_move_timer.tick(false);
-        if (plat.input_buffer.mouseBtnIsDown(.right)) {
-            const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
-            try self.findPath(room, mouse_pos);
-            controller.show_move_timer.restart();
-        }
-
-        if (room.spell_slots.getSelectedSlot()) |slot| {
-            const cast_method = room.spell_slots.selected_method;
-            const do_cast = switch (cast_method) {
-                .left_click => !room.ui_clicked and plat.input_buffer.mouseBtnIsJustPressed(.left),
-                .quick_press => true,
-                .quick_release => !plat.input_buffer.keyIsDown(gameUI.SpellSlots.idx_to_key[slot.idx]),
-            };
-            if (do_cast) {
-                assert(slot.spell != null);
-                const spell = slot.spell.?;
-                const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
-                if (spell.getTargetParams(room, self, mouse_pos)) |params| {
-                    self.path.len = 0; // cancel the current path on cast, but you can buffer a new one
-                    const bspell = BufferedSpell{
-                        .spell = spell,
-                        .params = params,
-                        .slot_idx = utl.as(i32, slot.idx),
-                    };
-                    controller.spell_buffered = bspell;
-                } else if (cast_method == .quick_press or cast_method == .quick_release) {
-                    room.spell_slots.selected_idx = null;
-                }
-            }
-        }
         if (controller.spell_buffered) |buffered| {
             if (controller.spell_casting == null) {
                 room.spell_slots.clearSlot(utl.as(usize, buffered.slot_idx));

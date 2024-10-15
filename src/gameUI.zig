@@ -27,7 +27,7 @@ pub const SpellSlots = struct {
     pub const Slot = struct {
         idx: usize,
         spell: ?Spell = null,
-        draw_counter: u.TickCounter = u.TickCounter.init(90),
+        draw_counter: u.TickCounter = u.TickCounter.initStopped(90),
     };
     pub const num_slots = 4;
     pub const idx_to_key = [num_slots]core.Key{ .q, .w, .e, .r };
@@ -53,9 +53,22 @@ pub const SpellSlots = struct {
         }
         break :blk ret;
     },
-
-    selected_idx: ?usize = null,
+    state: union(enum) {
+        none,
+        selected: usize,
+        buffered: usize,
+    } = .none,
     selected_method: Options.CastMethod = .left_click,
+
+    pub fn init(room: *Room) SpellSlots {
+        var ret = SpellSlots{};
+        for (&ret.slots) |*slot| {
+            if (room.drawSpell()) |spell| {
+                slot.spell = spell;
+            }
+        }
+        return ret;
+    }
 
     pub fn getSlotRects() [num_slots]geom.Rectf {
         const plat = App.getPlat();
@@ -76,9 +89,12 @@ pub const SpellSlots = struct {
     }
 
     pub fn getSelectedSlot(self: *const SpellSlots) ?Slot {
-        if (self.selected_idx) |i| {
-            assert(self.slots[i].spell != null);
-            return self.slots[i];
+        switch (self.state) {
+            .selected => |i| {
+                assert(self.slots[i].spell != null);
+                return self.slots[i];
+            },
+            else => {},
         }
         return null;
     }
@@ -104,10 +120,18 @@ pub const SpellSlots = struct {
                 key_color = .white;
                 if (slots_are_enabled) {
                     border_color = .blue;
-                    if (self.selected_idx) |idx| {
-                        if (idx == i) {
-                            border_color = Colorf.orange;
-                        }
+                    switch (self.state) {
+                        .selected => |idx| {
+                            if (idx == i) {
+                                border_color = Colorf.orange;
+                            }
+                        },
+                        .buffered => |idx| {
+                            if (idx == i) {
+                                border_color = Colorf.green;
+                            }
+                        },
+                        else => {},
                     }
                 }
                 const name: []const u8 = @tagName(spell.kind);
@@ -177,23 +201,35 @@ pub const SpellSlots = struct {
         assert(slot.spell != null);
         slot.spell = null;
         slot.draw_counter.restart();
-        if (self.selected_idx) |idx| {
-            if (idx == slot_idx) {
-                self.selected_idx = null;
+        switch (self.state) {
+            .selected => |idx| {
+                if (idx == slot_idx) {
+                    self.state = .none;
+                }
+            },
+            .buffered => |idx| {
+                if (idx == slot_idx) {
+                    self.state = .none;
+                }
+            },
+            else => {},
+        }
+    }
+
+    pub fn updateTimerAndDrawSpell(self: *SpellSlots, room: *Room) void {
+        for (&self.slots) |*slot| {
+            // only tick and draw into empty slots!
+            if (slot.spell == null) {
+                if (slot.draw_counter.tick(false)) {
+                    if (room.drawSpell()) |spell| {
+                        slot.spell = spell;
+                    }
+                }
             }
         }
     }
 
-    pub fn fillSlot(self: *SpellSlots, spell: Spell, slot_idx: usize) void {
-        assert(slot_idx < num_slots);
-        if (self.selected_idx) |s| {
-            assert(s != slot_idx);
-        }
-        const slot = &self.slots[slot_idx];
-        slot.spell = spell;
-    }
-
-    pub fn update(self: *SpellSlots, room: *Room) Error!void {
+    pub fn updateSelected(self: *SpellSlots, room: *Room) void {
         const plat = App.getPlat();
         const rects = getSlotRects();
         const mouse_pressed = plat.input_buffer.mouseBtnIsJustPressed(.left);
@@ -212,6 +248,7 @@ pub const SpellSlots = struct {
                     if (selection_idx == null and mouse_pressed) {
                         const mouse_pos = plat.input_buffer.getCurrMousePos();
                         if (geom.pointIsInRectf(mouse_pos, rect)) {
+                            room.ui_clicked = true;
                             selection_idx = i;
                             break;
                         }
@@ -224,26 +261,14 @@ pub const SpellSlots = struct {
                         }
                     }
                 }
-            } else if (slot.draw_counter.tick(false)) {
-                if (room.drawSpell()) |spell| {
-                    slot.spell = spell;
-                }
             }
         }
-        if (selection_idx) |new| blk: {
-            if (self.selected_idx) |old| {
-                if (new == old) {
-                    // NOTE: this is spam-click/button unfriendly, and cancel is anyway easy with RMB
-                    //self.selected = null;
-                    break :blk;
-                }
-            }
-            self.selected_idx = new;
+
+        if (selection_idx) |new| {
+            self.state = .{ .selected = new };
             self.selected_method = cast_method;
-        } else if (self.selected_idx) |_| {
-            if (plat.input_buffer.mouseBtnIsJustPressed(.right)) {
-                self.selected_idx = null;
-            }
+        } else if (plat.input_buffer.mouseBtnIsJustPressed(.right)) {
+            self.state = .none;
         }
     }
 };
