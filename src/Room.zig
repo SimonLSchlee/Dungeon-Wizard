@@ -156,7 +156,8 @@ spawn_queue: ThingBoundedArray = .{},
 free_queue: ThingBoundedArray = .{},
 moused_over_thing: ?Thing.Id = null,
 player_id: ?pool.Id = null,
-player_destination_ui_timer: u.TickCounter = u.TickCounter.initStopped(60),
+move_press_ui_timer: u.TickCounter = u.TickCounter.initStopped(60),
+move_release_ui_timer: u.TickCounter = u.TickCounter.initStopped(60),
 spell_slots: gameUI.SpellSlots = .{},
 draw_pile: Spell.SpellArray = .{},
 discard_pile: Spell.SpellArray = .{},
@@ -415,11 +416,18 @@ pub fn update(self: *Room) Error!void {
         if (self.getPlayer()) |player| {
             const controller = &player.controller.player;
             // tick this here even though its on the player controller
-            _ = self.player_destination_ui_timer.tick(false);
+
+            if (plat.input_buffer.mouseBtnIsJustPressed(.right)) {
+                self.move_press_ui_timer.restart();
+            }
             if (plat.input_buffer.mouseBtnIsDown(.right)) {
                 controller.spell_buffered = null;
                 try player.findPath(self, mouse_pos);
-                self.player_destination_ui_timer.restart();
+                _ = self.move_press_ui_timer.tick(true);
+                self.move_release_ui_timer.restart();
+            } else {
+                _ = self.move_press_ui_timer.tick(false);
+                _ = self.move_release_ui_timer.tick(false);
             }
 
             if (spell_slots.getSelectedSlot()) |slot| {
@@ -553,12 +561,13 @@ pub fn render(self: *const Room) Error!void {
                 assert(slot.spell != null);
                 try slot.spell.?.renderTargeting(self, player);
             }
-            if (self.player_destination_ui_timer.running and player.path.len > 0) {
+            if (self.move_release_ui_timer.running and player.path.len > 0) {
                 const move_pos = player.path.get(player.path.len - 1);
-                const f = self.player_destination_ui_timer.remapTo0_1();
-                const t = @sin(f * 3);
-                const range = -10;
-                const y_off = range * t;
+                const release_f = self.move_release_ui_timer.remapTo0_1();
+                const bounce_f = self.move_press_ui_timer.remapTo0_1();
+                const bounce_t = @sin(bounce_f * 3);
+                const bounce_range = 10;
+                const y_off = -bounce_range * bounce_t;
                 var points: [3]V2f = .{
                     v2f(0, 0),
                     v2f(8, -10),
@@ -568,8 +577,8 @@ pub fn render(self: *const Room) Error!void {
                     p.* = p.add(move_pos);
                     p.y += y_off;
                 }
-                plat.circlef(move_pos, 10, .{ .fill_color = Colorf.green.fade(0.6 * (1 - f)) });
-                plat.trianglef(points, .{ .fill_color = Colorf.green.fade(1 - f) });
+                plat.circlef(move_pos, 10, .{ .outline_color = Colorf.green.fade(0.6 * (1 - release_f)), .fill_color = null });
+                plat.trianglef(points, .{ .fill_color = Colorf.green.fade(1 - release_f) });
             }
         }
     }
