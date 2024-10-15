@@ -417,6 +417,7 @@ pub fn update(self: *Room) Error!void {
             // tick this here even though its on the player controller
             _ = self.player_destination_ui_timer.tick(false);
             if (plat.input_buffer.mouseBtnIsDown(.right)) {
+                controller.spell_buffered = null;
                 try player.findPath(self, mouse_pos);
                 self.player_destination_ui_timer.restart();
             }
