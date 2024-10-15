@@ -33,7 +33,7 @@ pub fn getPlat() *Platform {
 _arena: std.heap.ArenaAllocator = undefined,
 arena: std.mem.Allocator = undefined,
 data: *Data = undefined,
-options: Options = .{},
+options: Options = undefined,
 screen: enum {
     run,
 } = .run,
@@ -45,6 +45,7 @@ export fn appInit(plat: *Platform) *anyopaque {
 
     var app = plat.heap.create(App) catch @panic("Out of memory");
     app.* = .{};
+    app.options = Options.initTryLoad();
     app._arena = std.heap.ArenaAllocator.init(plat.heap);
     app.arena = app._arena.allocator();
     app.data = Data.init() catch @panic("Failed to init data");
