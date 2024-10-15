@@ -28,6 +28,11 @@ pub const Layer = enum {
 };
 pub const Mask = std.EnumSet(Layer);
 
+kind: union(enum) {
+    none,
+    tile: V2i,
+    thing: Thing.Id,
+} = .none,
 pos: V2f = .{},
 normal: V2f = V2f.right,
 pen_dist: f32 = 0,
@@ -147,6 +152,7 @@ pub fn getNextCircleCollisionWithThings(pos: V2f, radius: f32, mask: Mask, ignor
             const dist = pos.dist(coll.pos);
             if (best_coll == null or dist < best_dist) {
                 best_coll = coll;
+                best_coll.?.kind = .{ .thing = thing.id };
                 best_dist = dist;
             }
         }
@@ -200,6 +206,7 @@ pub fn getPointCollisionInTile(point: V2f, tile: TileMap.Tile, passable_neighbor
         break :blk dif;
     };
     return Collision{
+        .kind = .{ .tile = tile.coord },
         .normal = normal,
         .pen_dist = pen_dist,
         .pos = point.add(normal.scale(pen_dist)),
@@ -263,6 +270,7 @@ pub fn getCircleCollisionWithTiles(pos: V2f, radius: f32, tilemap: *const TileMa
             const dist = pos_to_intersect.length();
             if (dist < radius) {
                 coll = Collision{
+                    .kind = .{ .tile = tile.coord },
                     .normal = v2f(edge_v.y, -edge_v.x).normalized(),
                     .pen_dist = @max(radius - dist, 0),
                     .pos = intersect_pos,
@@ -288,6 +296,7 @@ pub fn getCircleCollisionWithTiles(pos: V2f, radius: f32, tilemap: *const TileMa
                     }
                 };
                 coll = Collision{
+                    .kind = .{ .tile = tile.coord },
                     .normal = normal,
                     .pen_dist = @max(radius - dist, 0),
                     .pos = corner_pos,

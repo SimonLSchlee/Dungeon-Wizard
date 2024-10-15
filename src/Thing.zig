@@ -639,6 +639,14 @@ pub fn moveAndCollide(self: *Thing, room: *Room) void {
             if (coll.pen_dist > 0) {
                 self.pos = coll.pos.add(coll.normal.scale(self.coll_radius + 1));
             }
+            switch (coll.kind) {
+                .thing => |id| {
+                    if (room.getThingById(id)) |thing| {
+                        thing.updateVel(coll.normal.neg(), .{ .accel = self.vel.length() * 0.5, .max_speed = self.accel_params.max_speed * 0.5 });
+                    }
+                },
+                else => {},
+            }
             // remove -normal component from vel, isn't necessary with current implementation
             //const d = coll_normal.dot(self.vel);
             //self.vel = self.vel.sub(coll_normal.scale(d + 0.1));

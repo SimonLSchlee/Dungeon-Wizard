@@ -305,7 +305,7 @@ pub fn bat() Error!Thing {
         .kind = .creature,
         .creature_kind = .bat,
         .spawn_state = .instance,
-        .coll_radius = 5,
+        .coll_radius = 9,
         .accel_params = .{
             .max_speed = 0.9,
         },
