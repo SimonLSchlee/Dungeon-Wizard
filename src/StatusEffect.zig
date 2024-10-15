@@ -24,7 +24,7 @@ const data = @import("data.zig");
 const Thing = @import("Thing.zig");
 const sprites = @import("sprites.zig");
 
-const player = @import("Player.zig");
+const player = @import("player.zig");
 const enemies = @import("enemies.zig");
 const Spell = @import("Spell.zig");
 
