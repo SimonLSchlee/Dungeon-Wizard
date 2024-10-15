@@ -13,6 +13,7 @@ const V2f = @import("V2f.zig");
 const v2f = V2f.v2f;
 const V2i = @import("V2i.zig");
 const v2i = V2i.v2i;
+const debug = @import("debug.zig");
 
 const Run = @This();
 const App = @import("App.zig");
@@ -149,7 +150,7 @@ pub fn loadRoomFromCurrIdx(self: *Run) Error!void {
         .deck = self.deck,
         .waves_params = waves_params,
         .packed_room = packed_room,
-        .seed = self.seed + self.curr_room_idx,
+        .seed = self.rng.random().int(u64),
         .exits = exit_doors,
     });
 }
@@ -160,6 +161,12 @@ pub fn makeExitDoors(_: *Run, packed_room: PackedRoom) std.BoundedArray(gameUI.E
         ret.append(.{ .pos = pos }) catch unreachable;
     }
     return ret;
+}
+
+pub fn makeSpellReward(self: *Run) void {
+    self.reward = Spell.Reward.init(self.rng.random());
+    self.reward_ui = self.makeRewardUI();
+    self.screen = .reward;
 }
 
 pub fn update(self: *Run) Error!void {
@@ -182,19 +189,25 @@ pub fn update(self: *Run) Error!void {
 
     switch (self.screen) {
         .game => {
-            if (plat.input_buffer.keyIsJustPressed(.f4)) {
-                try room.reset();
-            }
-            if (room.edit_mode) {
-                if (plat.input_buffer.getNumberKeyJustPressed()) |num| {
-                    const app = App.get();
-                    const n: usize = if (num == 0) 9 else num - 1;
-                    if (n < app.data.test_rooms.len) {
-                        const packed_room = app.data.test_rooms.get(n);
-                        try room.reloadFromPackedRoom(packed_room);
+            if (debug.enable_debug_controls) {
+                if (plat.input_buffer.keyIsJustPressed(.f4)) {
+                    try room.reset();
+                }
+                if (plat.input_buffer.keyIsJustPressed(.o)) {
+                    self.makeSpellReward();
+                }
+                if (room.edit_mode) {
+                    if (plat.input_buffer.getNumberKeyJustPressed()) |num| {
+                        const app = App.get();
+                        const n: usize = if (num == 0) 9 else num - 1;
+                        if (n < app.data.test_rooms.len) {
+                            const packed_room = app.data.test_rooms.get(n);
+                            try room.reloadFromPackedRoom(packed_room);
+                        }
                     }
                 }
-            } else {
+            }
+            if (!room.edit_mode) {
                 if (plat.input_buffer.keyIsJustPressed(.escape)) {
                     room.paused = true;
                     self.screen = .pause_menu;
@@ -206,9 +219,7 @@ pub fn update(self: *Run) Error!void {
                 .lost => {},
                 .won => {
                     if (self.reward == null) {
-                        self.reward = Spell.Reward.init(self.rng.random());
-                        self.reward_ui = self.makeRewardUI();
-                        self.screen = .reward;
+                        self.makeSpellReward();
                     }
                 },
                 .exited => |exit_door| {
