@@ -210,8 +210,8 @@ spawn_state: enum {
 } = .instance,
 kind: KindData = undefined,
 rarity: Rarity = .pedestrian,
-cast_time: i8 = 1,
-cast_time_ticks: i64 = 30,
+cast_time: i32 = 1,
+cast_time_ticks: i32 = 30,
 color: Colorf = .black,
 targeting_data: TargetingData = .{},
 
