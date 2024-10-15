@@ -68,7 +68,6 @@ pub fn implingProto() Error!Thing {
         .controller = .{ .enemy = .{
             .attack_range = 30,
             .attack_cooldown = utl.TickCounter.initStopped(50),
-            .attack_type = .melee,
             .LOS_thiccness = 20,
         } },
         .renderer = .{ .creature = .{

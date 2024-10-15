@@ -21,7 +21,9 @@ const Thing = @import("Thing.zig");
 const Room = @import("Room.zig");
 
 const AttackType = union(enum) {
-    melee: void,
+    melee: struct {
+        lunge_accel: ?Thing.AccelParams = null,
+    },
     projectile: EnemyProjectile,
     charge: struct {
         charge_hitbox_activated: bool = false,
@@ -105,7 +107,7 @@ pub const AIController = struct {
     attack_range: f32 = 40,
     attack_cooldown: utl.TickCounter = utl.TickCounter.initStopped(60),
     can_turn_during_attack: bool = true,
-    attack_type: AttackType = .melee,
+    attack_type: AttackType = .{ .melee = .{} },
     LOS_thiccness: f32 = 10,
 
     pub fn update(self: *Thing, room: *Room) Error!void {
@@ -197,11 +199,20 @@ pub const AIController = struct {
                 }
 
                 switch (ai.attack_type) {
-                    .melee => {
+                    .melee => |m| {
                         self.updateVel(.{}, .{});
                         const events = self.animator.creature.play(.attack, .{ .loop = true });
                         if (events.contains(.end)) {
+                            self.updateVel(.{}, .{});
                             //std.debug.print("attack end\n", .{});
+                            if (self.hitbox) |*hitbox| {
+                                hitbox.active = false;
+                            }
+                            if (m.lunge_accel) |accel_params| {
+                                self.coll_mask.insert(.creature);
+                                self.coll_layer.insert(.creature);
+                                self.updateVel(.{}, .{ .friction = accel_params.max_speed });
+                            }
                             ai.attack_cooldown.restart();
                             // must re-enter attack via pursue (once cooldown expires)
                             ai.ticks_in_state = 0;
@@ -220,6 +231,11 @@ pub const AIController = struct {
                                 if (App.get().data.sounds.get(.thwack)) |s| {
                                     App.getPlat().playSound(s);
                                 }
+                            }
+                            if (m.lunge_accel) |accel_params| {
+                                self.coll_mask.remove(.creature);
+                                self.coll_layer.remove(.creature);
+                                self.updateVel(self.dir, accel_params);
                             }
                         }
                     },
@@ -257,7 +273,7 @@ pub const AIController = struct {
 
                         if (target.pos.sub(self.pos).dot(self.dir) > 0) {
                             const old_speed = self.vel.length();
-                            self.updateVel(self.dir, .{ .accel = 0.2, .max_speed = 2.5 });
+                            self.updateVel(self.dir, .{ .accel = 0.05, .max_speed = 2.5 });
                             if (old_speed < 1 and self.vel.length() >= 1) {
                                 //std.debug.print("hit targetu\n", .{});
                                 hitbox.mask = Thing.Faction.opposing_masks.get(self.faction);
@@ -271,7 +287,7 @@ pub const AIController = struct {
                             // gone past target, stop!
                             self.updateVel(.{}, .{ .max_speed = 2.5, .friction = 0.03 });
                         }
-                        if (ch.charge_hitbox_activated and (!hitbox.active or self.vel.length() < 0.01)) {
+                        if ((ch.charge_hitbox_activated and !hitbox.active) or self.vel.length() < 0.01) {
                             hitbox.active = false;
                             self.coll_mask.insert(.creature);
                             self.coll_layer.insert(.creature);
@@ -429,9 +445,15 @@ pub fn sharpboi() Error!Thing {
         .coll_mask = Thing.Collision.Mask.initMany(&.{ .creature, .tile }),
         .coll_layer = Thing.Collision.Mask.initMany(&.{.creature}),
         .controller = .{ .enemy = .{
-            .attack_range = 150,
-            .attack_cooldown = utl.TickCounter.initStopped(120),
-            .attack_type = .{ .charge = .{} },
+            .attack_range = 120,
+            .attack_cooldown = utl.TickCounter.initStopped(140),
+            .attack_type = .{ .melee = .{
+                .lunge_accel = .{
+                    .accel = 5,
+                    .max_speed = 5,
+                    .friction = 0,
+                },
+            } },
             .LOS_thiccness = 30,
         } },
         .renderer = .{ .creature = .{
@@ -446,6 +468,8 @@ pub fn sharpboi() Error!Thing {
             .radius = 15,
             .rel_pos = V2f.right.scale(40),
             .effect = .{ .damage = 9 },
+            .deactivate_on_update = false,
+            .deactivate_on_hit = true,
         },
         .hurtbox = .{
             .radius = 15,
