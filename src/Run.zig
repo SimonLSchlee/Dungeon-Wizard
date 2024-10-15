@@ -130,8 +130,9 @@ pub fn deinit(self: *Run) void {
 
 pub fn reset(self: *Run) Error!*Run {
     self.deinit();
-    self.* = .{};
-    try self.init();
+    var rng = std.Random.DefaultPrng.init(u.as(u64, std.time.microTimestamp()));
+    const seed = rng.random().int(u64);
+    self.* = try init(seed);
     return self;
 }
 
@@ -144,7 +145,7 @@ pub fn loadRoomFromCurrIdx(self: *Run) Error!void {
     const packed_room = data.rooms.get(idx);
     const exit_doors = self.makeExitDoors(packed_room);
     const waves_params = Room.WavesParams{
-        .difficulty = 6 + u.as(f32, self.curr_room_idx) * 2,
+        .difficulty = 4 + u.as(f32, self.curr_room_idx) * 2,
     };
     self.room = try Room.init(.{
         .deck = self.deck,
@@ -190,6 +191,9 @@ pub fn update(self: *Run) Error!void {
     switch (self.screen) {
         .game => {
             if (debug.enable_debug_controls) {
+                if (plat.input_buffer.keyIsJustPressed(.f3)) {
+                    _ = try self.reset();
+                }
                 if (plat.input_buffer.keyIsJustPressed(.f4)) {
                     try room.reset();
                 }
