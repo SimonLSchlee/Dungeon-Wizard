@@ -17,6 +17,7 @@ const v2i = V2i.v2i;
 const App = @This();
 const Run = @import("Run.zig");
 const Data = @import("Data.zig");
+const Options = @import("Options.zig");
 
 var _app: ?*App = null;
 var _plat: ?*Platform = null;
@@ -32,6 +33,7 @@ pub fn getPlat() *Platform {
 _arena: std.heap.ArenaAllocator = undefined,
 arena: std.mem.Allocator = undefined,
 data: *Data = undefined,
+options: Options = .{},
 screen: enum {
     run,
 } = .run,

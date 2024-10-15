@@ -21,6 +21,7 @@ const Data = @import("Data.zig");
 const Room = @import("Room.zig");
 const Thing = @import("Thing.zig");
 const Spell = @import("Spell.zig");
+const Options = @import("Options.zig");
 
 pub const SpellSlots = struct {
     pub const Slot = struct {
@@ -52,7 +53,9 @@ pub const SpellSlots = struct {
         }
         break :blk ret;
     },
-    selected: ?usize = null,
+
+    selected_idx: ?usize = null,
+    selected_method: Options.CastMethod = .left_click,
 
     pub fn getSlotRects() [num_slots]geom.Rectf {
         const plat = App.getPlat();
@@ -73,7 +76,7 @@ pub const SpellSlots = struct {
     }
 
     pub fn getSelectedSlot(self: *const SpellSlots) ?Slot {
-        if (self.selected) |i| {
+        if (self.selected_idx) |i| {
             assert(self.slots[i].spell != null);
             return self.slots[i];
         }
@@ -101,8 +104,8 @@ pub const SpellSlots = struct {
                 key_color = .white;
                 if (slots_are_enabled) {
                     border_color = .blue;
-                    if (self.selected) |selected| {
-                        if (selected == i) {
+                    if (self.selected_idx) |idx| {
+                        if (idx == i) {
                             border_color = Colorf.orange;
                         }
                     }
@@ -174,16 +177,16 @@ pub const SpellSlots = struct {
         assert(slot.spell != null);
         slot.spell = null;
         slot.draw_counter.restart();
-        if (self.selected) |selected_idx| {
-            if (selected_idx == slot_idx) {
-                self.selected = null;
+        if (self.selected_idx) |idx| {
+            if (idx == slot_idx) {
+                self.selected_idx = null;
             }
         }
     }
 
     pub fn fillSlot(self: *SpellSlots, spell: Spell, slot_idx: usize) void {
         assert(slot_idx < num_slots);
-        if (self.selected) |s| {
+        if (self.selected_idx) |s| {
             assert(s != slot_idx);
         }
         const slot = &self.slots[slot_idx];
@@ -199,23 +202,24 @@ pub const SpellSlots = struct {
         else
             false;
 
-        var selection: ?usize = null;
+        var selection_idx: ?usize = null;
+        var cast_method: Options.CastMethod = .left_click;
         for (0..num_slots) |i| {
             const rect = rects[i];
             const slot = &self.slots[i];
             if (slot.spell != null) {
                 if (slots_are_enabled) {
-                    if (selection == null and mouse_pressed) {
+                    if (selection_idx == null and mouse_pressed) {
                         const mouse_pos = plat.input_buffer.getCurrMousePos();
-
                         if (geom.pointIsInRectf(mouse_pos, rect)) {
-                            selection = i;
+                            selection_idx = i;
                             break;
                         }
                     } else {
                         const key = idx_to_key[i];
                         if (plat.input_buffer.keyIsJustPressed(key)) {
-                            selection = i;
+                            selection_idx = i;
+                            cast_method = App.get().options.cast_method;
                             break;
                         }
                     }
@@ -226,18 +230,19 @@ pub const SpellSlots = struct {
                 }
             }
         }
-        if (selection) |new| blk: {
-            if (self.selected) |old| {
+        if (selection_idx) |new| blk: {
+            if (self.selected_idx) |old| {
                 if (new == old) {
                     // NOTE: this is spam-click/button unfriendly, and cancel is anyway easy with RMB
                     //self.selected = null;
                     break :blk;
                 }
             }
-            self.selected = new;
-        } else if (self.selected) |_| {
+            self.selected_idx = new;
+            self.selected_method = cast_method;
+        } else if (self.selected_idx) |_| {
             if (plat.input_buffer.mouseBtnIsJustPressed(.right)) {
-                self.selected = null;
+                self.selected_idx = null;
             }
         }
     }

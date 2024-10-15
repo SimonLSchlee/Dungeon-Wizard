@@ -444,9 +444,9 @@ pub fn update(self: *Room) Error!void {
         }
         // spell slots
         {
-            const old = self.spell_slots.selected;
+            const old = self.spell_slots.selected_idx;
             try self.spell_slots.update(self);
-            const new = self.spell_slots.selected;
+            const new = self.spell_slots.selected_idx;
             if (old != new) {
                 self.ui_clicked = true;
             }

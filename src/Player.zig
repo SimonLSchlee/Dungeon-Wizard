@@ -19,6 +19,7 @@ const getPlat = App.getPlat;
 const Thing = @import("Thing.zig");
 const Room = @import("Room.zig");
 const Spell = @import("Spell.zig");
+const gameUI = @import("gameUI.zig");
 const Player = @This();
 
 pub const enum_name = "player";
@@ -84,7 +85,13 @@ pub const InputController = struct {
         }
 
         if (room.spell_slots.getSelectedSlot()) |slot| {
-            if (!room.ui_clicked and plat.input_buffer.mouseBtnIsJustPressed(.left)) {
+            const cast_method = room.spell_slots.selected_method;
+            const do_cast = switch (cast_method) {
+                .left_click => !room.ui_clicked and plat.input_buffer.mouseBtnIsJustPressed(.left),
+                .quick_press => true,
+                .quick_release => !plat.input_buffer.keyIsDown(gameUI.SpellSlots.idx_to_key[slot.idx]),
+            };
+            if (do_cast) {
                 assert(slot.spell != null);
                 const spell = slot.spell.?;
                 const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
@@ -96,6 +103,8 @@ pub const InputController = struct {
                         .slot_idx = utl.as(i32, slot.idx),
                     };
                     controller.spell_buffered = bspell;
+                } else if (cast_method == .quick_press or cast_method == .quick_release) {
+                    room.spell_slots.selected_idx = null;
                 }
             }
         }
