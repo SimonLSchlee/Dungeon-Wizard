@@ -18,6 +18,18 @@ const Run = @This();
 const App = @import("App.zig");
 const getPlat = App.getPlat;
 
+pub fn textInRect(topleft: V2f, dims: V2f, rect_opt: draw.PolyOpt, text_padding: V2f, comptime fmt: []const u8, args: anytype, text_opt: draw.TextOpt) Error!void {
+    const plat = App.getPlat();
+    const half_dims = dims.scale(0.5);
+    const text_rel_pos = if (text_opt.center) half_dims else text_padding;
+    const text_dims = dims.sub(text_padding.scale(2));
+    assert(text_dims.x > 0 and text_dims.y > 0);
+    const text = try utl.bufPrintLocal(fmt, args);
+    const fitted_text_opt = try plat.fitTextToRect(text_dims, text, text_opt);
+    plat.rectf(topleft, dims, rect_opt);
+    try plat.textf(topleft.add(text_rel_pos), fmt, args, fitted_text_opt);
+}
+
 pub const ClickableRect = struct {
     pos: V2f = .{},
     dims: V2f = v2f(200, 100),

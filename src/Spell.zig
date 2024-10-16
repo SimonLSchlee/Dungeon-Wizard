@@ -125,6 +125,103 @@ pub const TargetingData = struct {
         radius: f32,
         radians: f32,
     } = null,
+
+    pub fn getParams(targeting_data: *const TargetingData, room: *Room, caster: *const Thing, mouse_pos: V2f) ?Params {
+        switch (targeting_data.kind) {
+            .pos => {
+                const caster_to_mouse = mouse_pos.sub(caster.pos);
+                const target_dir = if (caster_to_mouse.normalizedChecked()) |d| d else V2f.right;
+                const mouse_pos_dist = if (targeting_data.fixed_range) targeting_data.max_range else @min(targeting_data.max_range, caster_to_mouse.length());
+                const target_pos = caster.pos.add(target_dir.scale(mouse_pos_dist));
+                return .{
+                    .target = .{ .pos = target_pos },
+                    .face_dir = target_pos.sub(caster.pos).normalizedChecked() orelse caster.dir,
+                };
+            },
+            .self => {
+                return .{
+                    .target = .self,
+                };
+            },
+            .thing => {
+                // TODO is it bad if moused_over_thing blocks selecting a valid target?
+                if (room.moused_over_thing) |id| {
+                    if (room.getThingById(id)) |thing| {
+                        if (targeting_data.target_faction_mask.contains(thing.faction)) {
+                            return .{
+                                .target = .{ .thing = thing.id },
+                                .face_dir = thing.pos.sub(caster.pos).normalizedChecked() orelse caster.dir,
+                            };
+                        }
+                    }
+                }
+            },
+        }
+        return null;
+    }
+
+    pub fn render(targeting_data: *const TargetingData, room: *const Room, caster: *const Thing) Error!void {
+        const plat = App.getPlat();
+        const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
+
+        switch (targeting_data.kind) {
+            .pos => {
+                const caster_to_mouse = mouse_pos.sub(caster.pos);
+                const target_dir = if (caster_to_mouse.normalizedChecked()) |d| d else V2f.right;
+                const mouse_pos_dist = if (targeting_data.fixed_range) targeting_data.max_range else @min(targeting_data.max_range, caster_to_mouse.length());
+                var target_hit_pos = caster.pos.add(target_dir.scale(mouse_pos_dist));
+                var target_circle_pos = target_hit_pos;
+                if (targeting_data.ray_to_mouse) |ray| {
+                    const ray_radius = ray.thickness * 0.5;
+                    var coll: ?Collision = null;
+                    if (caster_to_mouse.lengthSquared() > 0.001) {
+                        coll = Collision.getNextSweptCircleCollision(caster.pos, caster_to_mouse, ray_radius, Collision.Mask.initFull(), &.{caster.id}, room);
+                        if (coll) |c| {
+                            target_hit_pos = c.pos;
+                            target_circle_pos = c.pos.add(c.normal.scale(ray_radius));
+                        }
+                    }
+                    plat.linef(caster.pos, target_circle_pos, ray.thickness, targeting_data.color);
+                    plat.circlef(target_circle_pos, ray_radius, .{ .fill_color = targeting_data.color });
+                    //if (coll) |c| {
+                    //    plat.circlef(c.pos, 3, .{ .fill_color = .red });
+                    //}
+                }
+                if (targeting_data.cone_from_self_to_mouse) |cone| {
+                    const start_rads = target_dir.toAngleRadians() - cone.radians * 0.5;
+                    const end_rads = start_rads + cone.radians;
+                    //try plat.textf(caster.pos.add(V2f.right.scale(cone.radius * 0.5).rotRadians(start_rads)), "{d:.3}", .{start_rads}, .{ .color = .white });
+                    plat.sectorf(
+                        caster.pos,
+                        cone.radius,
+                        start_rads,
+                        end_rads,
+                        .{ .fill_color = targeting_data.color.fade(0.5) },
+                    );
+                }
+                if (targeting_data.radius_under_mouse) |r| {
+                    plat.circlef(target_circle_pos, r, .{ .fill_color = targeting_data.color.fade(0.4) });
+                }
+                if (targeting_data.target_mouse_pos) {
+                    plat.circlef(target_circle_pos, 10, .{ .fill_color = targeting_data.color.fade(0.4) });
+                }
+            },
+            .self => {
+                const draw_radius = caster.selectable.?.radius;
+                plat.circlef(caster.pos, draw_radius, .{ .fill_color = targeting_data.color.fade(0.4) });
+            },
+            .thing => {
+                for (&room.things.items) |*thing| {
+                    if (!thing.isActive()) continue;
+                    if (thing.selectable == null) continue;
+                    if (!targeting_data.target_faction_mask.contains(thing.faction)) continue;
+                    const selectable = thing.selectable.?;
+                    const draw_radius = if (mouse_pos.dist(thing.pos) < selectable.radius) selectable.radius else selectable.radius - 10;
+                    plat.circlef(thing.pos, draw_radius, .{ .fill_color = targeting_data.color.fade(0.5) });
+                }
+            },
+        }
+    }
 };
 
 pub const Controller = struct {
@@ -239,103 +336,12 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     }
 }
 
-pub fn getTargetParams(self: *const Spell, room: *Room, caster: *const Thing, mouse_pos: V2f) ?Params {
-    const targeting_data = self.targeting_data;
-    switch (targeting_data.kind) {
-        .pos => {
-            const caster_to_mouse = mouse_pos.sub(caster.pos);
-            const target_dir = if (caster_to_mouse.normalizedChecked()) |d| d else V2f.right;
-            const mouse_pos_dist = if (targeting_data.fixed_range) targeting_data.max_range else @min(targeting_data.max_range, caster_to_mouse.length());
-            const target_pos = caster.pos.add(target_dir.scale(mouse_pos_dist));
-            return .{
-                .target = .{ .pos = target_pos },
-                .face_dir = target_pos.sub(caster.pos).normalizedChecked() orelse caster.dir,
-            };
-        },
-        .self => {
-            return .{
-                .target = .self,
-            };
-        },
-        .thing => {
-            // TODO is it bad if moused_over_thing blocks selecting a valid target?
-            if (room.moused_over_thing) |id| {
-                if (room.getThingById(id)) |thing| {
-                    if (targeting_data.target_faction_mask.contains(thing.faction)) {
-                        return .{
-                            .target = .{ .thing = thing.id },
-                            .face_dir = thing.pos.sub(caster.pos).normalizedChecked() orelse caster.dir,
-                        };
-                    }
-                }
-            }
-        },
-    }
-    return null;
+pub inline fn getTargetParams(self: *const Spell, room: *Room, caster: *const Thing, mouse_pos: V2f) ?Params {
+    return self.targeting_data.getParams(room, caster, mouse_pos);
 }
 
-pub fn renderTargeting(self: *const Spell, room: *const Room, caster: *const Thing) Error!void {
-    const plat = App.getPlat();
-    const targeting_data = self.targeting_data;
-    const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
-
-    switch (targeting_data.kind) {
-        .pos => {
-            const caster_to_mouse = mouse_pos.sub(caster.pos);
-            const target_dir = if (caster_to_mouse.normalizedChecked()) |d| d else V2f.right;
-            const mouse_pos_dist = if (targeting_data.fixed_range) targeting_data.max_range else @min(targeting_data.max_range, caster_to_mouse.length());
-            var target_hit_pos = caster.pos.add(target_dir.scale(mouse_pos_dist));
-            var target_circle_pos = target_hit_pos;
-            if (targeting_data.ray_to_mouse) |ray| {
-                const ray_radius = ray.thickness * 0.5;
-                var coll: ?Collision = null;
-                if (caster_to_mouse.lengthSquared() > 0.001) {
-                    coll = Collision.getNextSweptCircleCollision(caster.pos, caster_to_mouse, ray_radius, Collision.Mask.initFull(), &.{caster.id}, room);
-                    if (coll) |c| {
-                        target_hit_pos = c.pos;
-                        target_circle_pos = c.pos.add(c.normal.scale(ray_radius));
-                    }
-                }
-                plat.linef(caster.pos, target_circle_pos, ray.thickness, targeting_data.color);
-                plat.circlef(target_circle_pos, ray_radius, .{ .fill_color = targeting_data.color });
-                //if (coll) |c| {
-                //    plat.circlef(c.pos, 3, .{ .fill_color = .red });
-                //}
-            }
-            if (targeting_data.cone_from_self_to_mouse) |cone| {
-                const start_rads = target_dir.toAngleRadians() - cone.radians * 0.5;
-                const end_rads = start_rads + cone.radians;
-                //try plat.textf(caster.pos.add(V2f.right.scale(cone.radius * 0.5).rotRadians(start_rads)), "{d:.3}", .{start_rads}, .{ .color = .white });
-                plat.sectorf(
-                    caster.pos,
-                    cone.radius,
-                    start_rads,
-                    end_rads,
-                    .{ .fill_color = targeting_data.color.fade(0.5) },
-                );
-            }
-            if (targeting_data.radius_under_mouse) |r| {
-                plat.circlef(target_circle_pos, r, .{ .fill_color = targeting_data.color.fade(0.4) });
-            }
-            if (targeting_data.target_mouse_pos) {
-                plat.circlef(target_circle_pos, 10, .{ .fill_color = targeting_data.color.fade(0.4) });
-            }
-        },
-        .self => {
-            const draw_radius = caster.selectable.?.radius;
-            plat.circlef(caster.pos, draw_radius, .{ .fill_color = targeting_data.color.fade(0.4) });
-        },
-        .thing => {
-            for (&room.things.items) |*thing| {
-                if (!thing.isActive()) continue;
-                if (thing.selectable == null) continue;
-                if (!targeting_data.target_faction_mask.contains(thing.faction)) continue;
-                const selectable = thing.selectable.?;
-                const draw_radius = if (mouse_pos.dist(thing.pos) < selectable.radius) selectable.radius else selectable.radius - 10;
-                plat.circlef(thing.pos, draw_radius, .{ .fill_color = targeting_data.color.fade(0.5) });
-            }
-        },
-    }
+pub inline fn renderTargeting(self: *const Spell, room: *const Room, caster: *const Thing) Error!void {
+    return self.targeting_data.render(room, caster);
 }
 
 pub fn textInRect(topleft: V2f, dims: V2f, rect_opt: draw.PolyOpt, text_padding: V2f, comptime fmt: []const u8, args: anytype, text_opt: draw.TextOpt) Error!void {
@@ -361,7 +367,7 @@ pub fn renderInfo(self: *const Spell, rect: menuUI.ClickableRect) Error!void {
     const name = spell_names.get(kind);
 
     plat.rectf(rect.pos, rect.dims, .{ .fill_color = .darkgray });
-    try textInRect(rect.pos, title_rect_dims, .{ .fill_color = null }, v2f(5, 5), "{s}", .{name}, .{ .color = .white });
+    try menuUI.textInRect(rect.pos, title_rect_dims, .{ .fill_color = null }, v2f(5, 5), "{s}", .{name}, .{ .color = .white });
 
     const icon_center_pos = rect.pos.add(v2f(0, title_rect_dims.y)).add(icon_rect_dims.scale(0.5));
     const spell_char = [1]u8{std.ascii.toUpper(name[0])};
@@ -393,5 +399,5 @@ pub fn renderInfo(self: *const Spell, rect: menuUI.ClickableRect) Error!void {
     }
     const description_text = spell_descriptions.get(kind);
     const description_rect_topleft = rect.pos.add(v2f(0, title_rect_dims.y + icon_rect_dims.y));
-    try textInRect(description_rect_topleft, description_dims, .{ .fill_color = null }, v2f(10, 10), "{s}", .{description_text}, .{ .color = .white });
+    try menuUI.textInRect(description_rect_topleft, description_dims, .{ .fill_color = null }, v2f(10, 10), "{s}", .{description_text}, .{ .color = .white });
 }
