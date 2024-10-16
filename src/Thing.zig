@@ -77,9 +77,10 @@ dbg: struct {
     coords_searched: std.BoundedArray(V2i, 128) = .{},
     last_tick_hitbox_was_active: i64 = -10000,
 } = .{},
+player_input: ?player.Input = null,
 controller: union(enum) {
     none: void,
-    player: player.InputController,
+    player: player.Controller,
     enemy: enemies.AIController,
     spell: Spell.Controller,
     item: Item.Controller,

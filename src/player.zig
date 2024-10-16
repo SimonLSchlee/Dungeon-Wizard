@@ -19,6 +19,7 @@ const getPlat = App.getPlat;
 const Thing = @import("Thing.zig");
 const Room = @import("Room.zig");
 const Spell = @import("Spell.zig");
+const Item = @import("Item.zig");
 const gameUI = @import("gameUI.zig");
 const Player = @This();
 
@@ -33,6 +34,7 @@ pub fn protoype() Error!Thing {
         .vision_range = 300,
         .coll_mask = Thing.Collision.Mask.initMany(&.{ .creature, .tile }),
         .coll_layer = Thing.Collision.Mask.initMany(&.{.creature}),
+        .player_input = Input{},
         .controller = .{ .player = .{} },
         .renderer = .{ .creature = .{
             .draw_color = .cyan,
@@ -53,7 +55,93 @@ pub fn protoype() Error!Thing {
     };
 }
 
-pub const InputController = struct {
+pub const Action = struct {
+    pub const Kind = enum {
+        spell,
+        item,
+    };
+    pub const KindData = union(Kind) {
+        spell: Spell,
+        item: Item,
+    };
+    pub const Buffered = struct {
+        action: KindData,
+        params: Spell.Params,
+        slot_idx: i32,
+    };
+};
+
+pub const Input = struct {
+    pub fn update(self: *Thing, room: *Room) Error!void {
+        assert(self.spawn_state == .spawned);
+        const plat = App.getPlat();
+        const controller = &self.controller.player;
+        const ui_slots = &room.ui_slots;
+        const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
+
+        // tick this here even though its on the player controller
+        if (plat.input_buffer.mouseBtnIsJustPressed(.right)) {
+            room.move_press_ui_timer.restart();
+        }
+        if (plat.input_buffer.mouseBtnIsDown(.right)) {
+            controller.action_buffered = null;
+            try self.findPath(room, mouse_pos);
+            _ = room.move_press_ui_timer.tick(true);
+            room.move_release_ui_timer.restart();
+        } else {
+            _ = room.move_press_ui_timer.tick(false);
+            _ = room.move_release_ui_timer.tick(false);
+        }
+
+        if (ui_slots.getSelectedSlot()) |slot| {
+            const cast_method = ui_slots.selected_method;
+            const do_cast = switch (cast_method) {
+                .left_click => !room.ui_clicked and plat.input_buffer.mouseBtnIsJustPressed(.left),
+                .quick_press => true,
+                .quick_release => !plat.input_buffer.keyIsDown(slot.key),
+            };
+            if (do_cast) {
+                const _params: ?Spell.Params = blk: switch (slot.kind) {
+                    inline else => |_action| {
+                        assert(_action != null);
+                        const action = _action.?;
+                        break :blk action.getTargetParams(room, self, mouse_pos);
+                    },
+                };
+                if (_params) |params| {
+                    self.path.len = 0; // cancel the current path on cast, but you can buffer a new one
+                    var baction = Action.Buffered{
+                        .action = undefined,
+                        .params = params,
+                        .slot_idx = utl.as(i32, slot.idx),
+                    };
+                    switch (slot.kind) {
+                        .item => |item| {
+                            baction.action = .{ .item = item.? };
+                            ui_slots.state = .{ .item = .{
+                                .idx = slot.idx,
+                                .select_kind = .buffered,
+                            } };
+                        },
+                        .spell => |spell| {
+                            baction.action = .{ .spell = spell.? };
+                            ui_slots.state = .{ .spell = .{
+                                .idx = slot.idx,
+                                .select_kind = .buffered,
+                            } };
+                        },
+                    }
+                    controller.action_buffered = baction;
+                } else if (cast_method == .quick_press or cast_method == .quick_release) {
+                    ui_slots.state = .none;
+                    controller.action_buffered = null;
+                }
+            }
+        }
+    }
+};
+
+pub const Controller = struct {
     const State = enum {
         none,
         cast,
@@ -61,8 +149,8 @@ pub const InputController = struct {
     };
 
     state: State = .none,
-    spell_casting: ?Spell.BufferedSpell = null,
-    spell_buffered: ?Spell.BufferedSpell = null,
+    action_casting: ?Action.Buffered = null,
+    action_buffered: ?Action.Buffered = null,
     cast_counter: utl.TickCounter = .{},
     ticks_in_state: i64 = 0,
 
@@ -70,13 +158,20 @@ pub const InputController = struct {
         assert(self.spawn_state == .spawned);
         const controller = &self.controller.player;
 
-        if (controller.spell_buffered) |buffered| {
-            if (controller.spell_casting == null) {
-                room.ui_slots.clearSpellSlot(utl.as(usize, buffered.slot_idx));
-                room.discardSpell(buffered.spell);
-                controller.spell_casting = buffered;
-                controller.cast_counter = utl.TickCounter.init(buffered.spell.cast_time_ticks);
-                controller.spell_buffered = null;
+        if (controller.action_buffered) |buffered| {
+            if (controller.action_casting == null) {
+                switch (buffered.action) {
+                    .item => |_| {
+                        room.ui_slots.clearItemSlot(utl.as(usize, buffered.slot_idx));
+                    },
+                    .spell => |spell| {
+                        room.ui_slots.clearSpellSlot(utl.as(usize, buffered.slot_idx));
+                        room.discardSpell(spell);
+                        controller.cast_counter = utl.TickCounter.init(spell.cast_time_ticks);
+                    },
+                }
+                controller.action_casting = buffered;
+                controller.action_buffered = null;
             }
         }
 
@@ -93,7 +188,7 @@ pub const InputController = struct {
 
             controller.state = state: switch (controller.state) {
                 .none => {
-                    if (controller.spell_casting != null) {
+                    if (controller.action_casting != null) {
                         controller.ticks_in_state = 0;
                         continue :state .cast;
                     }
@@ -106,7 +201,7 @@ pub const InputController = struct {
                     break :state .none;
                 },
                 .walk => {
-                    if (controller.spell_casting != null) {
+                    if (controller.action_casting != null) {
                         controller.ticks_in_state = 0;
                         continue :state .cast;
                     }
@@ -122,16 +217,19 @@ pub const InputController = struct {
                     break :state .walk;
                 },
                 .cast => {
-                    assert(controller.spell_casting != null);
-                    const s = controller.spell_casting.?;
+                    assert(controller.action_casting != null);
+                    const s = controller.action_casting.?;
                     if (controller.ticks_in_state == 0) {
                         if (s.params.face_dir) |dir| {
                             self.dir = dir;
                         }
                     }
                     if (controller.cast_counter.tick(false)) {
-                        try s.spell.cast(self, room, s.params);
-                        controller.spell_casting = null;
+                        switch (controller.action_casting.?.action) {
+                            .item => |item| try item.use(self, room, s.params),
+                            .spell => |spell| try spell.cast(self, room, s.params),
+                        }
+                        controller.action_casting = null;
                         controller.ticks_in_state = 0;
                         continue :state .none;
                     }

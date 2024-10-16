@@ -24,6 +24,7 @@ const Spell = @import("Spell.zig");
 const Options = @import("Options.zig");
 const sprites = @import("sprites.zig");
 const Item = @import("Item.zig");
+const player = @import("player.zig");
 
 pub const Slots = struct {
     pub const SelectionKind = enum {
@@ -36,10 +37,8 @@ pub const Slots = struct {
         });
     };
     pub const Slot = struct {
-        pub const Kind = enum {
-            spell,
-            item,
-        };
+        pub const Kind = player.Action.Kind;
+
         idx: usize,
         key: core.Key,
         key_str: [3]u8,
@@ -170,6 +169,22 @@ pub const Slots = struct {
             },
         }
         return null;
+    }
+
+    pub fn clearItemSlot(self: *Slots, slot_idx: usize) void {
+        assert(slot_idx < self.items.len);
+        const slot = &self.items.slice()[slot_idx];
+        assert(std.meta.activeTag(slot.kind) == .item);
+        assert(slot.kind.item != null);
+        slot.kind.item = null;
+        switch (self.state) {
+            .item => |s| {
+                if (s.idx == slot_idx) {
+                    self.state = .none;
+                }
+            },
+            else => {},
+        }
     }
 
     pub fn clearSpellSlot(self: *Slots, slot_idx: usize) void {

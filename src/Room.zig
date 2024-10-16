@@ -413,62 +413,8 @@ pub fn update(self: *Room) Error!void {
         if (!self.paused) {
             slots.updateTimerAndDrawSpell(self);
         }
-        // player thing
         if (self.getPlayer()) |player| {
-            const controller = &player.controller.player;
-            // tick this here even though its on the player controller
-
-            if (plat.input_buffer.mouseBtnIsJustPressed(.right)) {
-                self.move_press_ui_timer.restart();
-            }
-            if (plat.input_buffer.mouseBtnIsDown(.right)) {
-                controller.spell_buffered = null;
-                try player.findPath(self, mouse_pos);
-                _ = self.move_press_ui_timer.tick(true);
-                self.move_release_ui_timer.restart();
-            } else {
-                _ = self.move_press_ui_timer.tick(false);
-                _ = self.move_release_ui_timer.tick(false);
-            }
-
-            if (slots.getSelectedSlot()) |slot| {
-                const cast_method = slots.selected_method;
-                const do_cast = switch (cast_method) {
-                    .left_click => !self.ui_clicked and plat.input_buffer.mouseBtnIsJustPressed(.left),
-                    .quick_press => true,
-                    .quick_release => !plat.input_buffer.keyIsDown(slot.key),
-                };
-                if (do_cast) {
-                    switch (slot.kind) {
-                        .spell => |_spell| {
-                            assert(_spell != null);
-                            const spell = _spell.?;
-                            if (spell.getTargetParams(self, player, mouse_pos)) |params| {
-                                player.path.len = 0; // cancel the current path on cast, but you can buffer a new one
-                                const bspell = Spell.BufferedSpell{
-                                    .spell = spell,
-                                    .params = params,
-                                    .slot_idx = u.as(i32, slot.idx),
-                                };
-                                controller.spell_buffered = bspell;
-                                slots.state = .{ .spell = .{
-                                    .idx = slot.idx,
-                                    .select_kind = .buffered,
-                                } };
-                            } else if (cast_method == .quick_press or cast_method == .quick_release) {
-                                slots.state = .none;
-                                controller.spell_buffered = null;
-                            }
-                        },
-                        .item => |_item| {
-                            assert(_item != null);
-                            const item = _item.?;
-                            _ = item;
-                            // TODO
-                        },
-                    }
-                }
-            }
+            try @TypeOf(player.player_input.?).update(player, self);
         }
     }
 

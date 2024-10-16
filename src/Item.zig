@@ -54,13 +54,13 @@ pub const PotionHP = struct {
         },
     );
 
-    hp_restored: i32 = 30,
+    hp_restored: f32 = 30,
 
     pub fn use(self: *const Item, user: *Thing, _: *Room, params: Spell.Params) Error!void {
         assert(std.meta.activeTag(params.target) == Item.TargetKind.self);
-        const hp_up = self.kind.hp_up;
+        const pot_hp = self.kind.pot_hp;
         if (user.hp) |*hp| {
-            hp.heal(hp_up.hp_restored);
+            hp.heal(pot_hp.hp_restored);
         }
     }
 };
@@ -199,12 +199,6 @@ pub const Reward = struct {
     }
 };
 
-pub const BufferedItem = struct {
-    item: Item,
-    params: Params,
-    slot_idx: i32,
-};
-
 // only valid if spawn_state == .card
 id: Id = undefined,
 alloc_state: pool.AllocState = undefined,
@@ -229,10 +223,18 @@ pub fn use(self: *const Item, caster: *Thing, room: *Room, params: Params) Error
         inline else => |k| {
             const K = @TypeOf(k);
             if (std.meta.hasMethod(K, "use")) {
-                try K.cast(self, caster, room, params);
+                try K.use(self, caster, room, params);
             }
         },
     }
+}
+
+pub inline fn getTargetParams(self: *const Item, room: *Room, caster: *const Thing, mouse_pos: V2f) ?Params {
+    return self.targeting_data.getParams(room, caster, mouse_pos);
+}
+
+pub inline fn renderTargeting(self: *const Item, room: *const Room, caster: *const Thing) Error!void {
+    return self.targeting_data.render(room, caster);
 }
 
 pub fn getRenderIconInfo(self: *const Item) sprites.RenderIconInfo {
