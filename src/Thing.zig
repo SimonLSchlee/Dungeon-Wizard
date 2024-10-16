@@ -27,6 +27,7 @@ const sprites = @import("sprites.zig");
 const player = @import("player.zig");
 const enemies = @import("enemies.zig");
 const Spell = @import("Spell.zig");
+const Item = @import("Item.zig");
 pub const StatusEffect = @import("StatusEffect.zig");
 pub const Collision = @import("Collision.zig");
 
@@ -81,6 +82,7 @@ controller: union(enum) {
     player: player.InputController,
     enemy: enemies.AIController,
     spell: Spell.Controller,
+    item: Item.Controller,
     projectile: ProjectileController,
     spawner: SpawnerController,
 } = .none,
@@ -145,6 +147,9 @@ pub const HP = struct {
             .curr = max,
             .max = max,
         };
+    }
+    pub fn heal(self: *HP, amount: f32) void {
+        self.curr = @min(self.curr + amount, self.max);
     }
 };
 

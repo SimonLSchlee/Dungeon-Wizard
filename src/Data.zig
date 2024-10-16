@@ -19,6 +19,7 @@ const Thing = @import("Thing.zig");
 const Room = @import("Room.zig");
 const sprites = @import("sprites.zig");
 const Spell = @import("Spell.zig");
+const Item = @import("Item.zig");
 const PackedRoom = @import("PackedRoom.zig");
 const Data = @This();
 
@@ -210,6 +211,7 @@ creatures: std.EnumArray(Thing.CreatureKind, Thing) = undefined,
 creature_sprite_sheets: AllCreatureSpriteSheetArrays = undefined,
 creature_anims: AllCreatureAnimArrays = undefined,
 spell_icons: IconSprites(Spell.Kind) = undefined,
+item_icons: IconSprites(Item.Kind) = undefined,
 sounds: std.EnumArray(SFX, ?Platform.Sound) = undefined,
 test_rooms: std.BoundedArray(PackedRoom, 32) = .{},
 rooms: std.BoundedArray(PackedRoom, 32) = .{},
@@ -333,6 +335,12 @@ pub fn loadSpriteSheetFromJson(json_file: std.fs.File, assets_images_rel_dir_pat
     return sheet;
 }
 
+pub fn loadItemIcons(self: *Data) Error!void {
+    const icons_json = std.fs.cwd().openFile("assets/images/ui/item_icons.json", .{}) catch return Error.FileSystemFail;
+    const sheet = try loadSpriteSheetFromJson(icons_json, "ui");
+    self.item_icons = try @TypeOf(self.item_icons).init(sheet);
+}
+
 pub fn loadSpellIcons(self: *Data) Error!void {
     const icons_json = std.fs.cwd().openFile("assets/images/ui/spell_icons.json", .{}) catch return Error.FileSystemFail;
     const sheet = try loadSpriteSheetFromJson(icons_json, "ui");
@@ -342,6 +350,7 @@ pub fn loadSpellIcons(self: *Data) Error!void {
 pub fn loadSpriteSheets(self: *Data) Error!void {
     try self.loadCreatureSpriteSheets();
     try self.loadSpellIcons();
+    try self.loadItemIcons();
 }
 
 pub fn loadCreatureSpriteSheets(self: *Data) Error!void {

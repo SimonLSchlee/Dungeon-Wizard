@@ -25,6 +25,7 @@ const TileMap = @import("TileMap.zig");
 const Fog = @import("Fog.zig");
 const gameUI = @import("gameUI.zig");
 const Spell = @import("Spell.zig");
+const Item = @import("Item.zig");
 const Run = @import("Run.zig");
 const PackedRoom = @import("PackedRoom.zig");
 
@@ -254,7 +255,7 @@ pub fn reset(self: *Room) Error!void {
         }
     }
 
-    self.ui_slots = gameUI.Slots.init(self, 4, 4);
+    self.ui_slots = gameUI.Slots.init(self, 4, 4, &.{Item.PotionHP.proto});
 }
 
 pub fn reloadFromPackedRoom(self: *Room, packed_room: PackedRoom) Error!void {

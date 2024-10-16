@@ -23,8 +23,7 @@ const Thing = @import("Thing.zig");
 const Spell = @import("Spell.zig");
 const Options = @import("Options.zig");
 const sprites = @import("sprites.zig");
-
-pub const Item = struct {};
+const Item = @import("Item.zig");
 
 pub const Slots = struct {
     pub const SelectionKind = enum {
@@ -95,9 +94,10 @@ pub const Slots = struct {
     } = .none,
     selected_method: Options.CastMethod = .left_click,
 
-    pub fn init(room: *Room, num_spell_slots: usize, num_item_slots: usize) Slots {
+    pub fn init(room: *Room, num_spell_slots: usize, num_item_slots: usize, items: []const Item) Slots {
         assert(num_spell_slots < max_spell_slots);
         assert(num_item_slots < max_item_slots);
+        assert(items.len < num_item_slots);
 
         var ret = Slots{};
         for (0..num_spell_slots) |i| {
@@ -122,8 +122,10 @@ pub const Slots = struct {
                 .kind = .{ .item = null },
                 .cooldown_timer = null,
             };
-            // TODO item
             ret.items.append(slot) catch unreachable;
+        }
+        for (items, 0..) |item, i| {
+            ret.items.buffer[i].kind.item = item;
         }
 
         return ret;
@@ -298,6 +300,7 @@ pub const Slots = struct {
         for (slots, 0..) |slot, i| {
             const rect = rects.get(i);
             const slot_center_pos = rect.pos.add(rect.dims.scale(0.5));
+            const slot_icon_square_dims = V2f.splat(@min(rect.dims.x, rect.dims.y));
             var key_color = Colorf.gray;
             var border_color = Colorf.darkgray;
 
@@ -321,15 +324,11 @@ pub const Slots = struct {
                 },
                 .item => |_item| {
                     if (_item) |item| {
-                        _ = item;
                         if (slots_are_enabled) {
-                            border_color = .white;
+                            border_color = .blue;
                             key_color = .white;
                         }
-                        // TODO rest
-                        break :blk null;
-                    } else {
-                        // TODO ??
+                        break :blk item.getRenderIconInfo();
                     }
                     break :blk null;
                 },
@@ -346,7 +345,7 @@ pub const Slots = struct {
                             .origin = .center,
                             .src_pos = frame.pos.toV2f(),
                             .src_dims = frame.size.toV2f(),
-                            .uniform_scaling = 4,
+                            .scaled_dims = slot_icon_square_dims.sub(V2f.splat(slot_icon_square_dims.x * 0.1)),
                         });
                     },
                     .letter => |letter| {
@@ -356,7 +355,7 @@ pub const Slots = struct {
                             .{&letter.str},
                             .{
                                 .color = letter.color,
-                                .size = 40,
+                                .size = utl.as(u32, @floor(slot_icon_square_dims.y)),
                                 .center = true,
                             },
                         );
