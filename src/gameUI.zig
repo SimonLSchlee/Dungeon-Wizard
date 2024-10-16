@@ -1,5 +1,5 @@
 const std = @import("std");
-const u = @import("util.zig");
+const utl = @import("util.zig");
 
 pub const Platform = @import("raylib.zig");
 const core = @import("core.zig");
@@ -27,7 +27,7 @@ pub const SpellSlots = struct {
     pub const Slot = struct {
         idx: usize,
         spell: ?Spell = null,
-        draw_counter: u.TickCounter = u.TickCounter.initStopped(90),
+        draw_counter: utl.TickCounter = utl.TickCounter.initStopped(90),
     };
     pub const num_slots = 4;
     pub const idx_to_key = [num_slots]core.Key{ .q, .w, .e, .r };
@@ -72,19 +72,9 @@ pub const SpellSlots = struct {
 
     pub fn getSlotRects() [num_slots]geom.Rectf {
         const plat = App.getPlat();
-        const center_pos: V2f = v2f(plat.screen_dims_f.x * 0.5, plat.screen_dims_f.y - 50);
-        const total_width = num_slots * slot_dims.x + (num_slots - 1) * slot_spacing;
-        const top_left = center_pos.sub(v2f(total_width * 0.5, slot_dims.y));
+        const center_pos: V2f = v2f(plat.screen_dims_f.x * 0.5, plat.screen_dims_f.y - 50 - slot_dims.y * 0.5);
         var ret: [num_slots]geom.Rectf = undefined;
-
-        for (0..num_slots) |i| {
-            const offset = v2f(u.as(f32, i) * (slot_dims.x + slot_spacing), 0);
-            const pos = top_left.add(offset);
-            ret[i] = .{
-                .pos = pos,
-                .dims = slot_dims,
-            };
-        }
+        layoutRectsFixedSize(num_slots, slot_dims, center_pos, .{ .space_between = slot_spacing }, &ret);
         return ret;
     }
 
@@ -141,7 +131,7 @@ pub const SpellSlots = struct {
                 // spell image
                 if (data.spell_icons_indices.get(kind)) |idx| {
                     const sheet = data.spell_icons;
-                    const frame = sheet.frames[u.as(usize, idx)];
+                    const frame = sheet.frames[utl.as(usize, idx)];
                     plat.texturef(slot_center_pos, sheet.texture, .{
                         .origin = .center,
                         .src_pos = frame.pos.toV2f(),
@@ -162,9 +152,7 @@ pub const SpellSlots = struct {
                     );
                 }
             } else if (slot.draw_counter.running) {
-                const num_ticks_f = u.as(f32, slot.draw_counter.num_ticks);
-                const curr_tick_f = u.as(f32, slot.draw_counter.curr_tick);
-                const rads = u.remapClampf(0, num_ticks_f, 0, u.tau, curr_tick_f);
+                const rads = slot.draw_counter.remapTo0_1() * utl.tau;
                 const radius = slot_dims.x * 0.5 * 0.7;
                 //std.debug.print("{d:.2}\n", .{rads});
                 plat.sectorf(slot_center_pos, radius, 0, rads, .{ .fill_color = .blue });
@@ -325,7 +313,7 @@ pub const ExitDoor = struct {
         if (room.progress_state == .won) {
             const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
             const tick_60 = @mod(room.curr_tick, 360);
-            const f = u.pi * u.as(f32, tick_60) / 360;
+            const f = utl.pi * utl.as(f32, tick_60) / 360;
             const t = @sin(f);
             var opt = draw.PolyOpt{
                 .fill_color = open_color_1.lerp(open_color_2, t),
@@ -349,7 +337,7 @@ pub const ExitDoor = struct {
             const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
             if (self.selected or mouse_pos.dist(self.pos) <= select_radius) {
                 const tick_60 = @mod(room.curr_tick, 60);
-                const f = u.pi * u.as(f32, tick_60) / 60;
+                const f = utl.pi * utl.as(f32, tick_60) / 60;
                 const t = @sin(f);
                 var color = arrow_hover_color;
                 if (self.selected) {
@@ -363,3 +351,43 @@ pub const ExitDoor = struct {
         }
     }
 };
+
+pub const LayoutParams = struct {
+    direction: enum {
+        horizontal,
+        vertical,
+    } = .horizontal,
+    space_between: f32 = 10,
+};
+
+pub fn layoutRectsFixedSize(num: usize, dims: V2f, center_pos: V2f, layout: LayoutParams, buf: []geom.Rectf) void {
+    assert(num <= buf.len);
+    if (num == 0) return;
+    const dir_idx: usize = switch (layout.direction) {
+        .horizontal => 0,
+        .vertical => 1,
+    };
+    const other_idx = (dir_idx + 1) % 2;
+    const dims_arr = dims.toArr();
+    const total_size_in_dir = utl.as(f32, num - 1) * (dims_arr[dir_idx] + layout.space_between) + dims_arr[dir_idx];
+    const total_dims_arr = blk: {
+        var ret: [2]f32 = undefined;
+        ret[dir_idx] = total_size_in_dir;
+        ret[other_idx] = dims_arr[other_idx];
+        break :blk ret;
+    };
+    const total_dims_v = V2f.fromArr(total_dims_arr);
+    const top_left = center_pos.sub(total_dims_v.scale(0.5));
+    const inc_v_arr = blk: {
+        var ret: [2]f32 = .{ 0, 0 };
+        ret[dir_idx] = dims_arr[dir_idx] + layout.space_between;
+        break :blk ret;
+    };
+    const inc_v = V2f.fromArr(inc_v_arr);
+    for (0..num) |i| {
+        buf[i] = .{
+            .pos = top_left.add(inc_v.scale(utl.as(f32, i))),
+            .dims = dims,
+        };
+    }
+}
