@@ -20,6 +20,21 @@ const getPlat = App.getPlat;
 const Data = @import("Data.zig");
 const Thing = @import("Thing.zig");
 
+pub const RenderFrame = struct {
+    pos: V2i,
+    size: V2i,
+    texture: Platform.Texture2D,
+    origin: draw.TextureOrigin,
+};
+
+pub const RenderIconInfo = union(enum) {
+    letter: struct {
+        str: [1]u8,
+        color: Colorf,
+    },
+    frame: RenderFrame,
+};
+
 pub const CreatureAnim = struct {
     pub const Kind = enum {
         wizard,
@@ -46,12 +61,6 @@ pub const CreatureAnim = struct {
         };
         kind: Event.Kind,
         frame: i32 = 0,
-    };
-    pub const RenderFrame = struct {
-        pos: V2i,
-        size: V2i,
-        texture: Platform.Texture2D,
-        origin: draw.TextureOrigin,
     };
 
     pub const kind_strings: Data.EnumToBoundedStringArrayType(Kind) = Data.enumToBoundedStringArray(Kind);
@@ -90,7 +99,7 @@ pub const CreatureAnim = struct {
         assert(dir_index >= 0 and dir_index < self.num_dirs);
         const frame_idx = utl.as(usize, dir_index * self.num_frames + anim_frame);
         const ssframe: Data.SpriteSheet.Frame = sprite_sheet.frames[frame_idx];
-        const rframe = CreatureAnim.RenderFrame{
+        const rframe = RenderFrame{
             .pos = ssframe.pos,
             .size = ssframe.size,
             .texture = sprite_sheet.texture,
@@ -115,7 +124,7 @@ pub const CreatureAnimator = struct {
     tick_in_frame: i32 = 0,
     anim_tick: i32 = 0,
 
-    pub fn getCurrRenderFrame(self: *const CreatureAnimator, dir: V2f) CreatureAnim.RenderFrame {
+    pub fn getCurrRenderFrame(self: *const CreatureAnimator, dir: V2f) RenderFrame {
         const anim: CreatureAnim = App.get().data.getCreatureAnim(self.creature_kind, self.curr_anim).?;
         return anim.getRenderFrame(dir, self.curr_anim_frame);
     }

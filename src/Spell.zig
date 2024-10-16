@@ -24,6 +24,7 @@ const Data = @import("Data.zig");
 const pool = @import("pool.zig");
 const Collision = @import("Collision.zig");
 const menuUI = @import("menuUI.zig");
+const sprites = @import("sprites.zig");
 
 const Spell = @This();
 
@@ -356,9 +357,22 @@ pub fn textInRect(topleft: V2f, dims: V2f, rect_opt: draw.PolyOpt, text_padding:
     try plat.textf(topleft.add(text_rel_pos), fmt, args, fitted_text_opt);
 }
 
+pub fn getRenderIconInfo(self: *const Spell) sprites.RenderIconInfo {
+    const data = App.get().data;
+    const kind = std.meta.activeTag(self.kind);
+    if (data.spell_icons.getRenderFrame(kind)) |render_frame| {
+        return .{ .frame = render_frame };
+    } else {
+        const name = spell_names.get(kind);
+        return .{ .letter = .{
+            .str = [1]u8{std.ascii.toUpper(name[0])},
+            .color = self.color,
+        } };
+    }
+}
+
 pub fn renderInfo(self: *const Spell, rect: menuUI.ClickableRect) Error!void {
     const plat = App.getPlat();
-    const data = App.get().data;
     const title_rect_dims = v2f(rect.dims.x, rect.dims.y * 0.2);
     const icon_rect_dims = v2f(rect.dims.x, rect.dims.y * 0.4);
     const description_dims = v2f(rect.dims.x, rect.dims.y * 0.4);
@@ -370,32 +384,32 @@ pub fn renderInfo(self: *const Spell, rect: menuUI.ClickableRect) Error!void {
     try menuUI.textInRect(rect.pos, title_rect_dims, .{ .fill_color = null }, v2f(5, 5), "{s}", .{name}, .{ .color = .white });
 
     const icon_center_pos = rect.pos.add(v2f(0, title_rect_dims.y)).add(icon_rect_dims.scale(0.5));
-    const spell_char = [1]u8{std.ascii.toUpper(name[0])};
     // spell image
     plat.rectf(icon_center_pos.sub(icon_rect_dims.scale(0.5)), icon_rect_dims, .{ .fill_color = .black });
     const icon_square_dim = @min(icon_rect_dims.x, icon_rect_dims.y);
     const icon_square = V2f.splat(icon_square_dim);
-    if (data.spell_icons_indices.get(kind)) |idx| {
-        const sheet = data.spell_icons;
-        const frame = sheet.frames[utl.as(usize, idx)];
-        plat.texturef(icon_center_pos, sheet.texture, .{
-            .origin = .center,
-            .src_pos = frame.pos.toV2f(),
-            .src_dims = frame.size.toV2f(),
-            .scaled_dims = icon_square,
-        });
-    } else {
-        // spell letter
-        try plat.textf(
-            icon_center_pos,
-            "{s}",
-            .{&spell_char},
-            .{
-                .color = self.color,
-                .size = 40,
-                .center = true,
-            },
-        );
+
+    switch (self.getRenderIconInfo()) {
+        .frame => |frame| {
+            plat.texturef(icon_center_pos, frame.texture, .{
+                .origin = .center,
+                .src_pos = frame.pos.toV2f(),
+                .src_dims = frame.size.toV2f(),
+                .scaled_dims = icon_square,
+            });
+        },
+        .letter => |letter| {
+            try plat.textf(
+                icon_center_pos,
+                "{s}",
+                .{&letter.str},
+                .{
+                    .color = letter.color,
+                    .size = 40,
+                    .center = true,
+                },
+            );
+        },
     }
     const description_text = spell_descriptions.get(kind);
     const description_rect_topleft = rect.pos.add(v2f(0, title_rect_dims.y + icon_rect_dims.y));

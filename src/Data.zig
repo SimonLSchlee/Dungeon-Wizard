@@ -166,13 +166,50 @@ pub const CreatureAnimArray = std.EnumArray(sprites.CreatureAnim.AnimKind, ?spri
 pub const AllCreatureAnimArrays = std.EnumArray(sprites.CreatureAnim.Kind, CreatureAnimArray);
 pub const CreatureSpriteSheetArray = std.EnumArray(sprites.CreatureAnim.AnimKind, ?SpriteSheet);
 pub const AllCreatureSpriteSheetArrays = std.EnumArray(sprites.CreatureAnim.Kind, CreatureSpriteSheetArray);
-pub const SpellIconsFrameIndexArray = std.EnumArray(Spell.Kind, ?i32);
+
+fn IconSprites(EnumType: type) type {
+    return struct {
+        pub const IconsFrameIndexArray = std.EnumArray(EnumType, ?i32);
+
+        sprite_sheet: SpriteSheet = undefined,
+        icon_indices: IconsFrameIndexArray = undefined,
+
+        pub fn init(sprite_sheet: SpriteSheet) Error!@This() {
+            var ret = @This(){
+                .sprite_sheet = sprite_sheet,
+                .icon_indices = IconsFrameIndexArray.initFill(null),
+            };
+            tags: for (sprite_sheet.tags) |t| {
+                inline for (@typeInfo(EnumType).@"enum".fields) |f| {
+                    if (std.mem.eql(u8, f.name, t.name.constSlice())) {
+                        const kind = std.meta.stringToEnum(EnumType, f.name).?;
+                        ret.icon_indices.set(kind, t.from_frame);
+                        continue :tags;
+                    }
+                }
+            }
+            return ret;
+        }
+        pub fn getRenderFrame(self: @This(), kind: EnumType) ?sprites.RenderFrame {
+            if (self.icon_indices.get(kind)) |idx| {
+                const sheet = self.sprite_sheet;
+                const frame = sheet.frames[u.as(usize, idx)];
+                return .{
+                    .pos = frame.pos,
+                    .size = frame.size,
+                    .texture = sheet.texture,
+                    .origin = .center,
+                };
+            }
+            return null;
+        }
+    };
+}
 
 creatures: std.EnumArray(Thing.CreatureKind, Thing) = undefined,
 creature_sprite_sheets: AllCreatureSpriteSheetArrays = undefined,
 creature_anims: AllCreatureAnimArrays = undefined,
-spell_icons: SpriteSheet = undefined,
-spell_icons_indices: SpellIconsFrameIndexArray = undefined,
+spell_icons: IconSprites(Spell.Kind) = undefined,
 sounds: std.EnumArray(SFX, ?Platform.Sound) = undefined,
 test_rooms: std.BoundedArray(PackedRoom, 32) = .{},
 rooms: std.BoundedArray(PackedRoom, 32) = .{},
@@ -297,20 +334,9 @@ pub fn loadSpriteSheetFromJson(json_file: std.fs.File, assets_images_rel_dir_pat
 }
 
 pub fn loadSpellIcons(self: *Data) Error!void {
-    self.spell_icons_indices = @TypeOf(self.spell_icons_indices).initFill(null);
     const icons_json = std.fs.cwd().openFile("assets/images/ui/spell_icons.json", .{}) catch return Error.FileSystemFail;
     const sheet = try loadSpriteSheetFromJson(icons_json, "ui");
-    self.spell_icons = sheet;
-
-    tags: for (sheet.tags) |t| {
-        inline for (@typeInfo(Spell.Kind).@"enum".fields) |f| {
-            if (std.mem.eql(u8, f.name, t.name.constSlice())) {
-                const kind: Spell.Kind = std.meta.stringToEnum(Spell.Kind, f.name).?;
-                self.spell_icons_indices.set(kind, t.from_frame);
-                continue :tags;
-            }
-        }
-    }
+    self.spell_icons = try @TypeOf(self.spell_icons).init(sheet);
 }
 
 pub fn loadSpriteSheets(self: *Data) Error!void {

@@ -22,6 +22,7 @@ const Room = @import("Room.zig");
 const Thing = @import("Thing.zig");
 const Spell = @import("Spell.zig");
 const Options = @import("Options.zig");
+const sprites = @import("sprites.zig");
 
 pub const Item = struct {};
 
@@ -272,7 +273,6 @@ pub const Slots = struct {
 
     fn renderSlots(self: *const Slots, slots: []const Slot, kind: Slot.Kind, slots_are_enabled: bool) Error!void {
         const plat = App.getPlat();
-        const data = App.get().data;
         const rects = self.getSlotRects(kind);
         var slot_selected_or_buffered: ?struct { idx: usize, color: Colorf } = null;
         switch (self.state) {
@@ -300,70 +300,68 @@ pub const Slots = struct {
             const slot_center_pos = rect.pos.add(rect.dims.scale(0.5));
             var key_color = Colorf.gray;
             var border_color = Colorf.darkgray;
-            var fallback_char: ?[1]u8 = null;
-            var fallback_char_color: Colorf = undefined;
-            var frame: ?Data.SpriteSheet.Frame = null;
-            var texture: Platform.Texture2D = undefined;
 
             plat.rectf(rect.pos, rect.dims, .{ .fill_color = Colorf.rgb(0.07, 0.05, 0.05) });
 
-            switch (slot.kind) {
-                .spell => |_spell| if (_spell) |spell| {
-                    if (slots_are_enabled) {
-                        border_color = .blue;
-                        key_color = .white;
+            const _render_info: ?sprites.RenderIconInfo = blk: switch (slot.kind) {
+                .spell => |_spell| {
+                    if (_spell) |spell| {
+                        if (slots_are_enabled) {
+                            border_color = .blue;
+                            key_color = .white;
+                        }
+                        break :blk spell.getRenderIconInfo();
+                    } else if (slot.cooldown_timer.?.running) {
+                        const rads = slot.cooldown_timer.?.remapTo0_1() * utl.tau;
+                        const radius = rect.dims.x * 0.5 * 0.7;
+                        //std.debug.print("{d:.2}\n", .{rads});
+                        plat.sectorf(slot_center_pos, radius, 0, rads, .{ .fill_color = .blue });
                     }
-                    const name: []const u8 = @tagName(spell.kind);
-                    const spell_kind = std.meta.activeTag(spell.kind);
-                    fallback_char = .{std.ascii.toUpper(name[0])};
-                    fallback_char_color = spell.color;
-                    if (data.spell_icons_indices.get(spell_kind)) |idx| {
-                        const sheet = data.spell_icons;
-                        frame = sheet.frames[utl.as(usize, idx)];
-                        texture = sheet.texture;
-                    }
-                } else if (slot.cooldown_timer.?.running) {
-                    const rads = slot.cooldown_timer.?.remapTo0_1() * utl.tau;
-                    const radius = rect.dims.x * 0.5 * 0.7;
-                    //std.debug.print("{d:.2}\n", .{rads});
-                    plat.sectorf(slot_center_pos, radius, 0, rads, .{ .fill_color = .blue });
+                    break :blk null;
                 },
-                .item => |_item| if (_item) |item| {
-                    _ = item;
-                    if (slots_are_enabled) {
-                        border_color = .white;
-                        key_color = .white;
+                .item => |_item| {
+                    if (_item) |item| {
+                        _ = item;
+                        if (slots_are_enabled) {
+                            border_color = .white;
+                            key_color = .white;
+                        }
+                        // TODO rest
+                        break :blk null;
+                    } else {
+                        // TODO ??
                     }
-                    // TODO rest
-                } else {
-                    // TODO ??
+                    break :blk null;
                 },
-            }
+            };
             if (slot_selected_or_buffered) |s| {
                 if (s.idx == i) {
                     border_color = s.color;
                 }
             }
-
-            if (frame) |f| {
-                plat.texturef(slot_center_pos, texture, .{
-                    .origin = .center,
-                    .src_pos = f.pos.toV2f(),
-                    .src_dims = f.size.toV2f(),
-                    .uniform_scaling = 4,
-                });
-            } else if (fallback_char) |char| {
-                // spell letter
-                try plat.textf(
-                    slot_center_pos,
-                    "{s}",
-                    .{&char},
-                    .{
-                        .color = fallback_char_color,
-                        .size = 40,
-                        .center = true,
+            if (_render_info) |render_info| {
+                switch (render_info) {
+                    .frame => |frame| {
+                        plat.texturef(slot_center_pos, frame.texture, .{
+                            .origin = .center,
+                            .src_pos = frame.pos.toV2f(),
+                            .src_dims = frame.size.toV2f(),
+                            .uniform_scaling = 4,
+                        });
                     },
-                );
+                    .letter => |letter| {
+                        try plat.textf(
+                            slot_center_pos,
+                            "{s}",
+                            .{&letter.str},
+                            .{
+                                .color = letter.color,
+                                .size = 40,
+                                .center = true,
+                            },
+                        );
+                    },
+                }
             }
             // border
             plat.rectf(
