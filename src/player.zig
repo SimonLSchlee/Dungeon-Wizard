@@ -72,7 +72,7 @@ pub const InputController = struct {
 
         if (controller.spell_buffered) |buffered| {
             if (controller.spell_casting == null) {
-                room.spell_slots.clearSlot(utl.as(usize, buffered.slot_idx));
+                room.ui_slots.clearSpellSlot(utl.as(usize, buffered.slot_idx));
                 room.discardSpell(buffered.spell);
                 controller.spell_casting = buffered;
                 controller.cast_counter = utl.TickCounter.init(buffered.spell.cast_time_ticks);

@@ -158,7 +158,7 @@ moused_over_thing: ?Thing.Id = null,
 player_id: ?pool.Id = null,
 move_press_ui_timer: u.TickCounter = u.TickCounter.initStopped(60),
 move_release_ui_timer: u.TickCounter = u.TickCounter.initStopped(60),
-spell_slots: gameUI.SpellSlots = .{},
+ui_slots: gameUI.Slots = .{},
 draw_pile: Spell.SpellArray = .{},
 discard_pile: Spell.SpellArray = .{},
 fog: Fog = undefined,
@@ -222,7 +222,7 @@ fn clearThings(self: *Room) void {
     self.spawn_queue.len = 0;
     self.free_queue.len = 0;
     self.player_id = null;
-    self.spell_slots = .{};
+    self.ui_slots = .{};
     self.draw_pile = .{};
     self.discard_pile = .{};
 }
@@ -254,7 +254,7 @@ pub fn reset(self: *Room) Error!void {
         }
     }
 
-    self.spell_slots = gameUI.SpellSlots.init(self);
+    self.ui_slots = gameUI.Slots.init(self, 4, 4);
 }
 
 pub fn reloadFromPackedRoom(self: *Room, packed_room: PackedRoom) Error!void {
@@ -407,10 +407,10 @@ pub fn update(self: *Room) Error!void {
     }
     // update spell slots, and player input
     {
-        const spell_slots = &self.spell_slots;
-        spell_slots.updateSelected(self);
+        const slots = &self.ui_slots;
+        slots.updateSelected(self);
         if (!self.paused) {
-            spell_slots.updateTimerAndDrawSpell(self);
+            slots.updateTimerAndDrawSpell(self);
         }
         // player thing
         if (self.getPlayer()) |player| {
@@ -430,28 +430,41 @@ pub fn update(self: *Room) Error!void {
                 _ = self.move_release_ui_timer.tick(false);
             }
 
-            if (spell_slots.getSelectedSlot()) |slot| {
-                const cast_method = spell_slots.selected_method;
+            if (slots.getSelectedSlot()) |slot| {
+                const cast_method = slots.selected_method;
                 const do_cast = switch (cast_method) {
                     .left_click => !self.ui_clicked and plat.input_buffer.mouseBtnIsJustPressed(.left),
                     .quick_press => true,
-                    .quick_release => !plat.input_buffer.keyIsDown(gameUI.SpellSlots.idx_to_key[slot.idx]),
+                    .quick_release => !plat.input_buffer.keyIsDown(slot.key),
                 };
                 if (do_cast) {
-                    assert(slot.spell != null);
-                    const spell = slot.spell.?;
-                    if (spell.getTargetParams(self, player, mouse_pos)) |params| {
-                        player.path.len = 0; // cancel the current path on cast, but you can buffer a new one
-                        const bspell = Spell.BufferedSpell{
-                            .spell = spell,
-                            .params = params,
-                            .slot_idx = u.as(i32, slot.idx),
-                        };
-                        controller.spell_buffered = bspell;
-                        spell_slots.state = .{ .buffered = slot.idx };
-                    } else if (cast_method == .quick_press or cast_method == .quick_release) {
-                        spell_slots.state = .none;
-                        controller.spell_buffered = null;
+                    switch (slot.kind) {
+                        .spell => |_spell| {
+                            assert(_spell != null);
+                            const spell = _spell.?;
+                            if (spell.getTargetParams(self, player, mouse_pos)) |params| {
+                                player.path.len = 0; // cancel the current path on cast, but you can buffer a new one
+                                const bspell = Spell.BufferedSpell{
+                                    .spell = spell,
+                                    .params = params,
+                                    .slot_idx = u.as(i32, slot.idx),
+                                };
+                                controller.spell_buffered = bspell;
+                                slots.state = .{ .spell = .{
+                                    .idx = slot.idx,
+                                    .select_kind = .buffered,
+                                } };
+                            } else if (cast_method == .quick_press or cast_method == .quick_release) {
+                                slots.state = .none;
+                                controller.spell_buffered = null;
+                            }
+                        },
+                        .item => |_item| {
+                            assert(_item != null);
+                            const item = _item.?;
+                            _ = item;
+                            // TODO
+                        },
                     }
                 }
             }
@@ -557,9 +570,15 @@ pub fn render(self: *const Room) Error!void {
     // spell targeting, movement
     if (!self.edit_mode) {
         if (self.getConstPlayer()) |player| {
-            if (self.spell_slots.getSelectedSlot()) |slot| {
-                assert(slot.spell != null);
-                try slot.spell.?.renderTargeting(self, player);
+            if (self.ui_slots.getSelectedSlot()) |slot| {
+                switch (slot.kind) {
+                    .spell => |_spell| if (_spell) |spell| {
+                        try spell.renderTargeting(self, player);
+                    },
+                    else => {
+                        // TODO
+                    },
+                }
             }
             if (self.move_release_ui_timer.running and player.path.len > 0) {
                 const move_pos = player.path.get(player.path.len - 1);
@@ -643,7 +662,7 @@ pub fn render(self: *const Room) Error!void {
         plat.rectf(p.sub(dims.scale(0.5)), dims, .{ .fill_color = Colorf.black.fade(0.5) });
         try plat.textf(p, txt, .{}, opt);
     } else {
-        try self.spell_slots.render(self);
+        try self.ui_slots.render(self);
         if (self.paused) {
             const opt: draw.TextOpt = .{ .center = true, .size = 50, .color = .white };
             const txt = "[paused]";
