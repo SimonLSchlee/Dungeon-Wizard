@@ -220,7 +220,7 @@ pub const Slots = struct {
         }
     }
 
-    fn updateSelectedSlots(self: *Slots, slots: []Slot, kind: Slot.Kind) bool {
+    fn updateSelectedSlots(self: *Slots, room: *const Room, caster: *const Thing, slots: []Slot, kind: Slot.Kind) bool {
         const plat = App.getPlat();
         const rects = self.getSlotRects(kind);
         const mouse_pressed = plat.input_buffer.mouseBtnIsJustPressed(.left);
@@ -232,7 +232,10 @@ pub const Slots = struct {
             const rect = rects.get(i);
             const slot = &slots[i];
             switch (slot.kind) {
-                inline else => |k| if (k == null) continue,
+                .item => |_item| if (_item) |item| {
+                    if (!item.canUse(room, caster)) continue;
+                } else continue,
+                .spell => |_spell| if (_spell == null) continue,
             }
             if (mouse_pressed) {
                 const mouse_pos = plat.input_buffer.getCurrMousePos();
@@ -272,7 +275,12 @@ pub const Slots = struct {
 
     pub fn updateSelected(self: *Slots, room: *Room) void {
         const plat = App.getPlat();
-        if (room.getConstPlayer()) |p| if (p.hp.?.curr <= 0) {
+        const caster = blk: {
+            if (room.getConstPlayer()) |p| {
+                if (p.hp.?.curr > 0) {
+                    break :blk p;
+                }
+            }
             self.state = .none;
             return;
         };
@@ -281,14 +289,14 @@ pub const Slots = struct {
             return;
         }
 
-        const clicked_a = self.updateSelectedSlots(self.spells.slice(), .spell);
-        const clicked_b = self.updateSelectedSlots(self.items.slice(), .item);
+        const clicked_a = self.updateSelectedSlots(room, caster, self.spells.slice(), .spell);
+        const clicked_b = self.updateSelectedSlots(room, caster, self.items.slice(), .item);
         if (clicked_a or clicked_b) {
             room.ui_clicked = true;
         }
     }
 
-    fn renderSlots(self: *const Slots, slots: []const Slot, kind: Slot.Kind, slots_are_enabled: bool) Error!void {
+    fn renderSlots(self: *const Slots, room: *const Room, caster: *const Thing, slots: []const Slot, kind: Slot.Kind, slots_are_enabled: bool) Error!void {
         const plat = App.getPlat();
         const rects = self.getSlotRects(kind);
         var slot_selected_or_buffered: ?struct { idx: usize, color: Colorf } = null;
@@ -339,7 +347,7 @@ pub const Slots = struct {
                 },
                 .item => |_item| {
                     if (_item) |item| {
-                        if (slots_are_enabled) {
+                        if (slots_are_enabled and item.canUse(room, caster)) {
                             border_color = .blue;
                             key_color = .white;
                         }
@@ -399,13 +407,18 @@ pub const Slots = struct {
 
     pub fn render(self: *const Slots, room: *const Room) Error!void {
         const plat = App.getPlat();
-        const slots_are_enabled = if (room.getConstPlayer()) |p|
-            p.hp.?.curr > 0
-        else
-            false;
+        const caster = blk: {
+            if (room.getConstPlayer()) |p| {
+                if (p.hp.?.curr > 0) {
+                    break :blk p;
+                }
+            }
+            return;
+        };
+        const slots_are_enabled = caster.hp.?.curr > 0;
 
-        try self.renderSlots(self.spells.constSlice(), .spell, slots_are_enabled);
-        try self.renderSlots(self.items.constSlice(), .item, slots_are_enabled);
+        try self.renderSlots(room, caster, self.spells.constSlice(), .spell, slots_are_enabled);
+        try self.renderSlots(room, caster, self.items.constSlice(), .item, slots_are_enabled);
 
         {
             const rects = self.getSlotRects(.spell);

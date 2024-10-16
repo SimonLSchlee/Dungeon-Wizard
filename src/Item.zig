@@ -63,6 +63,13 @@ pub const PotionHP = struct {
             hp.heal(pot_hp.hp_restored);
         }
     }
+
+    pub fn canUse(_: *const Item, _: *const Room, caster: *const Thing) bool {
+        if (caster.hp) |hp| {
+            return (hp.curr < hp.max);
+        }
+        return false;
+    }
 };
 
 pub const ItemTypes = [_]type{
@@ -227,6 +234,18 @@ pub fn use(self: *const Item, caster: *Thing, room: *Room, params: Params) Error
             }
         },
     }
+}
+
+pub fn canUse(self: *const Item, room: *const Room, caster: *const Thing) bool {
+    switch (self.kind) {
+        inline else => |k| {
+            const K = @TypeOf(k);
+            if (std.meta.hasMethod(K, "canUse")) {
+                return K.canUse(self, room, caster);
+            }
+        },
+    }
+    return true;
 }
 
 pub inline fn getTargetParams(self: *const Item, room: *Room, caster: *const Thing, mouse_pos: V2f) ?Params {
