@@ -1,0 +1,128 @@
+{ "frames": [
+   {
+    "filename": "idle-E 0",
+    "frame": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "idle-E 1",
+    "frame": { "x": 16, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "idle-E 2",
+    "frame": { "x": 32, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "idle-E 3",
+    "frame": { "x": 48, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "idle-E 4",
+    "frame": { "x": 64, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "idle-E 5",
+    "frame": { "x": 80, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "idle-W 0",
+    "frame": { "x": 0, "y": 24, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "idle-W 1",
+    "frame": { "x": 16, "y": 24, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "idle-W 2",
+    "frame": { "x": 32, "y": 24, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "idle-W 3",
+    "frame": { "x": 48, "y": 24, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "idle-W 4",
+    "frame": { "x": 64, "y": 24, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "idle-W 5",
+    "frame": { "x": 80, "y": 24, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   }
+ ],
+ "meta": {
+  "app": "https://www.aseprite.org/",
+  "version": "1.3.6-arm64",
+  "image": "acolyte-idle.png",
+  "format": "RGBA8888",
+  "size": { "w": 96, "h": 48 },
+  "scale": "1",
+  "frameTags": [
+   { "name": "idle-E", "from": 0, "to": 5, "direction": "forward", "color": "#000000ff" },
+   { "name": "idle-W", "from": 6, "to": 11, "direction": "forward", "color": "#000000ff" }
+  ],
+  "layers": [
+   { "name": "data", "opacity": 255, "blendMode": "normal", "cels": [{ "frame": 12, "data": "pivot-y=20" }] },
+   { "name": "legs", "opacity": 255, "blendMode": "normal" },
+   { "name": "nonlegs", "opacity": 255, "blendMode": "normal" }
+  ]
+ }
+}
