@@ -25,9 +25,6 @@ const AttackType = union(enum) {
         lunge_accel: ?Thing.AccelParams = null,
     },
     projectile: EnemyProjectile,
-    charge: struct {
-        charge_hitbox_activated: bool = false,
-    },
 };
 
 const EnemyProjectile = enum {
@@ -79,7 +76,7 @@ pub fn getThingsInRadius(self: *Thing, room: *Room, radius: f32, buf: []*Thing) 
     return num;
 }
 
-pub fn getNearestTarget(self: *Thing, room: *Room) ?*Thing {
+pub fn getNearestOpposingThing(self: *Thing, room: *Room) ?*Thing {
     var closest_dist = std.math.inf(f32);
     var closest: ?*Thing = null;
     for (&room.things.items) |*other| {
@@ -96,7 +93,6 @@ pub fn getNearestTarget(self: *Thing, room: *Room) ?*Thing {
 }
 
 pub const AIController = struct {
-    wander_dir: V2f = .{},
     state: enum {
         idle,
         pursue,
@@ -112,7 +108,7 @@ pub const AIController = struct {
 
     pub fn update(self: *Thing, room: *Room) Error!void {
         assert(self.spawn_state == .spawned);
-        const nearest_target = getNearestTarget(self, room);
+        const nearest_target = getNearestOpposingThing(self, room);
         const ai = &self.controller.enemy;
 
         // always go for the nearest targeet
@@ -261,57 +257,12 @@ pub const AIController = struct {
                             }
                         }
                     },
-                    .charge => |*ch| {
-                        if (ai.ticks_in_state == 0) {
-                            ai.can_turn_during_attack = false;
-                            ch.charge_hitbox_activated = false;
-                            self.coll_mask.remove(.creature);
-                            self.coll_layer.remove(.creature);
-                        }
-                        const hitbox = &self.hitbox.?;
-                        _ = self.animator.creature.play(.charge, .{ .loop = true });
-
-                        if (target.pos.sub(self.pos).dot(self.dir) > 0) {
-                            const old_speed = self.vel.length();
-                            self.updateVel(self.dir, .{ .accel = 0.05, .max_speed = 2.5 });
-                            if (old_speed < 1 and self.vel.length() >= 1) {
-                                //std.debug.print("hit targetu\n", .{});
-                                hitbox.mask = Thing.Faction.opposing_masks.get(self.faction);
-                                hitbox.deactivate_on_update = false;
-                                hitbox.deactivate_on_hit = true;
-                                hitbox.rel_pos = self.dir.scale(hitbox.rel_pos.length());
-                                hitbox.active = true;
-                                ch.charge_hitbox_activated = true;
-                            }
-                        } else {
-                            // gone past target, stop!
-                            self.updateVel(.{}, .{ .max_speed = 2.5, .friction = 0.03 });
-                        }
-                        if ((ch.charge_hitbox_activated and !hitbox.active) or self.vel.length() < 0.01) {
-                            hitbox.active = false;
-                            self.coll_mask.insert(.creature);
-                            self.coll_layer.insert(.creature);
-                            ai.attack_cooldown.restart();
-                            // must re-enter attack via pursue (once cooldown expires)
-                            ai.ticks_in_state = 0;
-                            continue :state .pursue;
-                        }
-                    },
                 }
                 break :state .attack;
             },
         };
         ai.ticks_in_state += 1;
-        //std.debug.print("{any}\n", .{ai.state});
 
-        if (false) {
-            const coll = Thing.getCircleCollisionWithTiles(self.pos.add(self.vel), self.coll_radius, room);
-            if (coll.collided) {
-                if (coll.normal.dot(ai.wander_dir) < 0) {
-                    ai.wander_dir = V2f.randomDir();
-                }
-            }
-        }
         self.moveAndCollide(room);
     }
 };
