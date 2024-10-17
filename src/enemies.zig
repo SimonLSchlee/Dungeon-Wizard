@@ -444,9 +444,9 @@ pub fn bat() Error!Thing {
             .height = 17 * 4, // TODO pixellszslz
             .radius = 6 * 4,
         },
-        .hp = Thing.HP.init(9),
+        .hp = Thing.HP.init(5),
         .faction = .enemy,
-        .enemy_difficulty = 0.5,
+        .enemy_difficulty = 0.25,
     };
 }
 
@@ -485,9 +485,9 @@ pub fn troll() Error!Thing {
             .height = 20 * 4, // TODO pixellszslz
             .radius = 9 * 4,
         },
-        .hp = Thing.HP.init(50),
+        .hp = Thing.HP.init(40),
         .faction = .enemy,
-        .enemy_difficulty = 2,
+        .enemy_difficulty = 2.5,
     };
 }
 
@@ -501,7 +501,7 @@ pub fn gobbow() Error!Thing {
         .coll_mask = Thing.Collision.Mask.initMany(&.{ .creature, .tile }),
         .coll_layer = Thing.Collision.Mask.initMany(&.{.creature}),
         .controller = .{ .enemy = .{
-            .attack_range = 300,
+            .attack_range = 270,
             .attack_cooldown = utl.TickCounter.initStopped(60),
             .attack_type = .{ .projectile = .arrow },
         } },
@@ -538,7 +538,7 @@ pub fn sharpboi() Error!Thing {
         .coll_mask = Thing.Collision.Mask.initMany(&.{ .creature, .tile }),
         .coll_layer = Thing.Collision.Mask.initMany(&.{.creature}),
         .controller = .{ .enemy = .{
-            .attack_range = 120,
+            .attack_range = 110,
             .attack_cooldown = utl.TickCounter.initStopped(140),
             .attack_type = .{ .melee = .{
                 .lunge_accel = .{
@@ -560,7 +560,7 @@ pub fn sharpboi() Error!Thing {
             .mask = Thing.Faction.opposing_masks.get(.enemy),
             .radius = 15,
             .rel_pos = V2f.right.scale(40),
-            .effect = .{ .damage = 9 },
+            .effect = .{ .damage = 8 },
             .deactivate_on_update = false,
             .deactivate_on_hit = true,
         },
@@ -571,7 +571,7 @@ pub fn sharpboi() Error!Thing {
             .height = 18 * 4, // TODO pixellszslz
             .radius = 8 * 4,
         },
-        .hp = Thing.HP.init(35),
+        .hp = Thing.HP.init(25),
         .faction = .enemy,
         .enemy_difficulty = 2.5,
     };

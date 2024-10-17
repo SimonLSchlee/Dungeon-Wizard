@@ -55,7 +55,7 @@ pub fn protoype() Error!Thing {
             .height = 15 * 4, // TODO pixellszslz
             .radius = 6 * 4,
         },
-        .hp = Thing.HP.init(50),
+        .hp = Thing.HP.init(40),
         .faction = .player,
     };
 }

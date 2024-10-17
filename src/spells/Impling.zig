@@ -81,7 +81,7 @@ pub fn implingProto() Error!Thing {
             .mask = Thing.Faction.opposing_masks.get(.ally),
             .radius = 20,
             .rel_pos = V2f.right.scale(30),
-            .effect = .{ .damage = 12 },
+            .effect = .{ .damage = 9 },
         },
         .hurtbox = .{
             .radius = 15,
@@ -90,7 +90,7 @@ pub fn implingProto() Error!Thing {
             .height = 13 * 4, // TODO pixellszslz
             .radius = 8 * 4,
         },
-        .hp = Thing.HP.init(25),
+        .hp = Thing.HP.init(20),
         .faction = .ally,
     };
 }

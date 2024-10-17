@@ -48,7 +48,7 @@ pub const proto = Spell.makeProto(
 );
 
 hit_effect: Thing.HitEffect = .{
-    .damage = 10,
+    .damage = 6,
 },
 
 pub const Projectile = struct {
