@@ -95,7 +95,7 @@ seed: u64,
 rng: std.Random.DefaultPrng = undefined,
 packed_room_data_indices: std.BoundedArray(usize, 32) = .{},
 curr_room_idx: usize = 0,
-player_thing: ?Thing = null,
+player_thing: Thing = undefined,
 deck: Spell.SpellArray = .{},
 load_timer: u.TickCounter = u.TickCounter.init(20),
 load_state: enum {
@@ -113,6 +113,7 @@ pub fn init(seed: u64) Error!Run {
         .seed = seed,
         .deck = makeStarterDeck(false),
         .game_pause_ui = makeGamePauseUI(),
+        .player_thing = app.data.creatures.get(.player),
     };
     for (0..app.data.rooms.len) |i| {
         try ret.packed_room_data_indices.append(i);
@@ -154,6 +155,7 @@ pub fn loadRoomFromCurrIdx(self: *Run) Error!void {
         .packed_room = packed_room,
         .seed = self.rng.random().int(u64),
         .exits = exit_doors,
+        .player = self.player_thing,
     });
 }
 
@@ -233,6 +235,7 @@ pub fn update(self: *Run) Error!void {
                 .exited => |exit_door| {
                     _ = exit_door;
                     self.load_state = .fade_out;
+                    self.player_thing.hp = room.getConstPlayer().?.hp.?;
                 },
             }
             if (room.paused) {

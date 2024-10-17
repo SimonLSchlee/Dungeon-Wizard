@@ -35,6 +35,7 @@ pub const ThingBoundedArray = std.BoundedArray(pool.Id, max_things_in_room);
 
 pub const InitParams = struct {
     packed_room: PackedRoom,
+    player: Thing,
     waves_params: WavesParams,
     seed: u64,
     deck: Spell.SpellArray,
@@ -249,10 +250,10 @@ pub fn reset(self: *Room) Error!void {
 
     for (self.init_params.packed_room.thing_spawns.constSlice()) |spawn| {
         std.debug.print("Room init: spawning a {any}\n", .{spawn.kind});
-        if (try self.queueSpawnCreatureByKind(spawn.kind, spawn.pos)) |id| {
-            if (spawn.kind == .player) {
-                self.player_id = id;
-            }
+        if (spawn.kind == .player) {
+            self.player_id = try self.queueSpawnThing(&self.init_params.player, spawn.pos);
+        } else {
+            _ = try self.queueSpawnCreatureByKind(spawn.kind, spawn.pos);
         }
     }
 
