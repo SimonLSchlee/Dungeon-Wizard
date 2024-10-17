@@ -196,7 +196,7 @@ pub const Controller = struct {
                         controller.ticks_in_state = 0;
                         continue :state .walk;
                     }
-                    self.updateVel(.{}, .{});
+                    self.updateVel(.{}, self.accel_params);
                     _ = self.animator.creature.play(.idle, .{ .loop = true });
                     break :state .none;
                 },
@@ -233,7 +233,7 @@ pub const Controller = struct {
                         controller.ticks_in_state = 0;
                         continue :state .none;
                     }
-                    self.updateVel(.{}, .{});
+                    self.updateVel(.{}, self.accel_params);
                     _ = self.animator.creature.play(.cast, .{ .loop = true });
                     break :state .cast;
                 },

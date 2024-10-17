@@ -741,8 +741,8 @@ pub fn updateDir(self: *Thing, desired_dir: V2f, params: DirAccelParams) void {
 }
 
 pub const AccelParams = struct {
-    accel: f32 = 0.05,
-    friction: f32 = 0.02,
+    accel: f32 = 0.125,
+    friction: f32 = 0.09,
     max_speed: f32 = 0.8,
 };
 
