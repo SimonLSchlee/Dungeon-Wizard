@@ -22,6 +22,7 @@ const Thing = @import("../Thing.zig");
 const TileMap = @import("../TileMap.zig");
 const StatusEffect = @import("../StatusEffect.zig");
 
+const Collision = @import("../Collision.zig");
 const Spell = @import("../Spell.zig");
 const TargetKind = Spell.TargetKind;
 const TargetingData = Spell.TargetingData;
@@ -52,6 +53,7 @@ pub const proto = Spell.makeProto(
             .fixed_range = false,
             .max_range = base_range,
             .ray_to_mouse = .{
+                .ends_at_coll_mask = Collision.Mask.initMany(&.{ .creature, .tile }),
                 .thickness = base_ball_radius * 2, // TODO use radius below?
             },
             .radius_under_mouse = base_explode_radius,

@@ -118,6 +118,7 @@ pub const TargetingData = struct {
     max_range: f32 = std.math.inf(f32),
     show_max_range_ring: bool = false,
     ray_to_mouse: ?struct {
+        ends_at_coll_mask: Collision.Mask = Collision.Mask.initEmpty(),
         thickness: f32 = 1,
     } = null,
     target_faction_mask: Thing.Faction.Mask = .{},
@@ -188,7 +189,7 @@ pub const TargetingData = struct {
                     const ray_radius = ray.thickness * 0.5;
                     var coll: ?Collision = null;
                     if (caster_to_mouse.lengthSquared() > 0.001) {
-                        coll = Collision.getNextSweptCircleCollision(caster.pos, capped_vec, ray_radius, Collision.Mask.initFull(), &.{caster.id}, room);
+                        coll = Collision.getNextSweptCircleCollision(caster.pos, capped_vec, ray_radius, ray.ends_at_coll_mask, &.{caster.id}, room);
                         if (coll) |c| {
                             target_hit_pos = c.pos;
                             target_circle_pos = c.pos.add(c.normal.scale(ray_radius));
