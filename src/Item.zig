@@ -38,7 +38,8 @@ pub const Id = pool.Id;
 pub const PotionHP = struct {
     pub const title = "Hp Potion";
     pub const description =
-        \\Restore 30 HP instantly (self only).
+        \\Restore 30% of total HP instantly.
+        \\(self only)
     ;
 
     pub const enum_name = "pot_hp";
@@ -54,13 +55,13 @@ pub const PotionHP = struct {
         },
     );
 
-    hp_restored: f32 = 30,
+    hp_restored_percent: f32 = 30,
 
     pub fn use(self: *const Item, user: *Thing, _: *Room, params: Spell.Params) Error!void {
         assert(std.meta.activeTag(params.target) == Item.TargetKind.self);
         const pot_hp = self.kind.pot_hp;
         if (user.hp) |*hp| {
-            hp.heal(pot_hp.hp_restored);
+            hp.heal(hp.max * (pot_hp.hp_restored_percent * 0.01));
         }
     }
 
