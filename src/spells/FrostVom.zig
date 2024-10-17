@@ -55,7 +55,7 @@ pub const proto = Spell.makeProto(
 );
 
 hit_effect: Thing.HitEffect = .{
-    .damage = 8,
+    .damage = 9,
     .status_stacks = StatusEffect.StacksArray.initDefault(0, .{ .frozen = 3 }),
 },
 radius: f32 = cone_radius,

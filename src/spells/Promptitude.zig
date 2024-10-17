@@ -39,7 +39,7 @@ pub const Controllers = [_]type{};
 pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
     .{
-        .cast_time = 2,
+        .cast_time = 3,
         .color = StatusEffect.proto_array.get(.promptitude).color,
         .targeting_data = .{
             .kind = .self,

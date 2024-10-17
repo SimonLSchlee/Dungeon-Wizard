@@ -335,7 +335,7 @@ spawn_state: enum {
 kind: KindData = undefined,
 rarity: Rarity = .pedestrian,
 obtainableness: std.EnumSet(Obtainableness) = std.EnumSet(Obtainableness).initMany(&.{ .room_reward, .shop }),
-cast_time: i32 = 1,
+cast_time: i32 = 2,
 cast_time_ticks: i32 = 30,
 color: Colorf = .black,
 targeting_data: TargetingData = .{},
