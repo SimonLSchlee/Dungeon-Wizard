@@ -291,7 +291,9 @@ pub const SpawnerController = struct {
             .fade_in_creature => {
                 self.renderer.spawner.sprite_tint = Colorf.black.fade(0).lerp(Colorf.white, spawner.timer.remapTo0_1());
                 if (spawner.timer.tick(true)) {
-                    _ = try room.queueSpawnCreatureByKind(spawner.creature_kind, self.pos);
+                    var proto = App.get().data.creatures.get(spawner.creature_kind);
+                    proto.faction = self.faction;
+                    _ = try room.queueSpawnThing(&proto, self.pos);
                     spawner.state = .fade_out_circle;
                 }
             },
