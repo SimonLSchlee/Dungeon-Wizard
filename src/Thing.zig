@@ -45,6 +45,7 @@ pub const CreatureKind = enum {
     sharpboi,
     impling,
     bat,
+    acolyte,
 };
 
 pub const Pool = pool.BoundedPool(Thing, Room.max_things_in_room);
@@ -82,6 +83,7 @@ controller: union(enum) {
     none: void,
     player: player.Controller,
     enemy: enemies.AIController,
+    acolyte_enemy: enemies.AcolyteAIController,
     spell: Spell.Controller,
     item: Item.Controller,
     projectile: ProjectileController,
@@ -573,6 +575,20 @@ pub fn renderOver(self: *const Thing, room: *const Room) Error!void {
         if (self.path.len > 0) {
             for (self.dbg.coords_searched.constSlice()) |coord| {
                 plat.circlef(TileMap.tileCoordToCenterPos(coord), 10, .{ .outline_color = Colorf.white, .fill_color = null });
+            }
+        }
+    }
+    if (debug.show_hiding_places) {
+        if (std.meta.activeTag(self.controller) == .acolyte_enemy) {
+            const ai = self.controller.acolyte_enemy;
+            for (ai.hiding_places.constSlice()) |h| {
+                const self_to_pos = h.pos.sub(self.pos).normalizedOrZero();
+                const len = @max(ai.to_enemy.length() - ai.flee_range, 0);
+                const to_enemy_n = ai.to_enemy.setLengthOrZero(len);
+                const dir_f = self_to_pos.dot(to_enemy_n.neg());
+                const f = h.flee_from_dist + dir_f; // - h.fleer_dist;
+                try plat.textf(h.pos, "{d:.2}", .{f}, .{ .center = true, .color = .white, .size = 14 });
+                //plat.circlef(h.pos, 10, .{ .outline_color = Colorf.white, .fill_color = null });
             }
         }
     }

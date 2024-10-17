@@ -475,3 +475,11 @@ pub fn debugDraw(self: *const TileMap) Error!void {
         plat.rectf(tileCoordToPos(tile.coord), tile_dims, .{ .fill_color = color });
     }
 }
+
+pub fn render(self: *const TileMap) Error!void {
+    const plat = getPlat();
+    for (self.tiles.values()) |tile| {
+        const color = if (tile.passable) Colorf.lightgray else Colorf.rgb(0.1, 0.1, 0.1);
+        plat.rectf(tileCoordToPos(tile.coord), tile_dims, .{ .fill_color = color });
+    }
+}

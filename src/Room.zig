@@ -493,12 +493,12 @@ pub fn render(self: *const Room) Error!void {
     }
 
     plat.startRenderToTexture(self.render_texture.?);
-    plat.clear(Colorf.darkgray);
+    plat.clear(Colorf.rgb(0.4, 0.4, 0.4));
     plat.setBlend(.render_tex_alpha);
 
     plat.startCamera2D(self.camera);
 
-    try self.tilemap.debugDraw();
+    try self.tilemap.render();
     //try self.tilemap.debugDrawGrid(self.camera);
     // exit
     for (self.init_params.exits.constSlice()) |exit| {

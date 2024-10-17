@@ -30,6 +30,11 @@ pub fn protoype() Error!Thing {
         .kind = .creature,
         .creature_kind = .player,
         .spawn_state = .instance,
+        .accel_params = .{
+            .accel = 0.15,
+            .friction = 0.09,
+            .max_speed = 1.2,
+        },
         .coll_radius = 20,
         .vision_range = 300,
         .coll_mask = Thing.Collision.Mask.initMany(&.{ .creature, .tile }),
@@ -180,11 +185,6 @@ pub const Controller = struct {
             const input_dir = p.sub(self.pos).normalizedOrZero();
 
             const accel_dir: V2f = input_dir;
-            const accel_params: Thing.AccelParams = .{
-                .accel = 0.15,
-                .friction = 0.09,
-                .max_speed = 1.2,
-            };
 
             controller.state = state: switch (controller.state) {
                 .none => {
@@ -196,7 +196,7 @@ pub const Controller = struct {
                         controller.ticks_in_state = 0;
                         continue :state .walk;
                     }
-                    self.updateVel(.{}, accel_params);
+                    self.updateVel(.{}, .{});
                     _ = self.animator.creature.play(.idle, .{ .loop = true });
                     break :state .none;
                 },
@@ -209,7 +209,7 @@ pub const Controller = struct {
                         controller.ticks_in_state = 0;
                         continue :state .none;
                     }
-                    self.updateVel(accel_dir, accel_params);
+                    self.updateVel(accel_dir, self.accel_params);
                     if (!self.vel.isZero()) {
                         self.dir = self.vel.normalized();
                     }
@@ -233,7 +233,7 @@ pub const Controller = struct {
                         controller.ticks_in_state = 0;
                         continue :state .none;
                     }
-                    self.updateVel(.{}, accel_params);
+                    self.updateVel(.{}, .{});
                     _ = self.animator.creature.play(.cast, .{ .loop = true });
                     break :state .cast;
                 },

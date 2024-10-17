@@ -72,12 +72,19 @@ pub const SpriteSheet = struct {
 };
 
 const test_rooms_strings = [_][]const u8{
-    \\###########
-    \\           
-    \\  p &#     
-    \\           
-    \\  b   b    
-    \\           
+    \\#########################
+    \\#         ##        ### #
+    \\#   ##    ##          # #
+    \\##  ###       ###       #
+    \\#                a   ## #
+    \\#      a  ##        ### #
+    \\#         ##       ##   #
+    \\#   ##             ##   #
+    \\#      ##   p           #
+    \\#  ##  ##       #a  ### #
+    \\#  ##           #   ### #
+    \\#                       #
+    \\#########################
     ,
     \\#########################
     \\#                       #
@@ -436,6 +443,7 @@ pub fn reload(self: *Data) Error!void {
             .troll = try @import("enemies.zig").troll(),
             .gobbow = try @import("enemies.zig").gobbow(),
             .sharpboi = try @import("enemies.zig").sharpboi(),
+            .acolyte = try @import("enemies.zig").acolyte(),
             .impling = try @import("spells/Impling.zig").implingProto(),
         },
     );

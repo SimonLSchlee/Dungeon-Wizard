@@ -19,6 +19,7 @@ const App = @import("App.zig");
 const getPlat = App.getPlat;
 const Thing = @import("Thing.zig");
 const Room = @import("Room.zig");
+const TileMap = @import("TileMap.zig");
 
 const AttackType = union(enum) {
     melee: struct {
@@ -267,6 +268,142 @@ pub const AIController = struct {
     }
 };
 
+pub const HidingPlacesArray = std.BoundedArray(struct { pos: V2f, fleer_dist: f32, flee_from_dist: f32 }, 64);
+pub fn getHidingPlaces(room: *const Room, fleer_pos: V2f, flee_from_pos: V2f, min_flee_dist: f32) Error!HidingPlacesArray {
+    const plat = getPlat();
+    const tilemap = &room.tilemap;
+    const start_coord = TileMap.posToTileCoord(fleer_pos);
+    var places = HidingPlacesArray{};
+    var queue = std.BoundedArray(V2i, 128){};
+    var seen = std.AutoArrayHashMap(V2i, void).init(plat.heap);
+    defer seen.deinit();
+    try seen.put(start_coord, {});
+    queue.append(start_coord) catch unreachable;
+
+    while (queue.len > 0) {
+        const curr = queue.orderedRemove(0);
+        const pos = TileMap.tileCoordToCenterPos(curr);
+        const flee_from_dist = pos.dist(flee_from_pos);
+        const fleer_dist = pos.dist(fleer_pos);
+        if (fleer_dist > min_flee_dist) {
+            places.append(.{ .pos = pos, .fleer_dist = fleer_dist, .flee_from_dist = flee_from_dist }) catch {};
+        }
+        if (places.len >= places.buffer.len) break;
+
+        for (TileMap.neighbor_dirs) |dir| {
+            const dir_v = TileMap.neighbor_dirs_coords.get(dir);
+            const next = curr.add(dir_v);
+            //std.debug.print("neighbor {}, {}\n", .{ next.p.x, next.p.y });
+            if (tilemap.tiles.get(next)) |tile| {
+                if (!tile.passable) continue;
+            }
+            if (seen.get(next)) |_| continue;
+            try seen.put(next, {});
+            queue.append(next) catch break;
+        }
+    }
+    return places;
+}
+
+pub const AcolyteAIController = struct {
+    wander_dir: V2f = .{},
+    state: enum {
+        idle,
+        flee,
+        cast,
+    } = .idle,
+    ticks_in_state: i64 = 0,
+    flee_range: f32 = 250,
+    cast_cooldown: utl.TickCounter = utl.TickCounter.initStopped(5 * core.fups_per_sec),
+    flee_cooldown: utl.TickCounter = utl.TickCounter.initStopped(1 * core.fups_per_sec),
+    // debug
+    hiding_places: HidingPlacesArray = .{},
+    to_enemy: V2f = .{},
+
+    pub fn update(self: *Thing, room: *Room) Error!void {
+        assert(self.spawn_state == .spawned);
+        const nearest_enemy = getNearestOpposingThing(self, room);
+        const ai = &self.controller.acolyte_enemy;
+
+        self.renderer.creature.draw_color = Colorf.yellow;
+        _ = ai.cast_cooldown.tick(false);
+        _ = ai.flee_cooldown.tick(false);
+        ai.state = state: switch (ai.state) {
+            .idle => {
+                if (!ai.flee_cooldown.running) {
+                    if (nearest_enemy) |e| {
+                        if (e.pos.dist(self.pos) <= ai.flee_range) {
+                            ai.ticks_in_state = 0;
+                            continue :state .flee;
+                        }
+                    }
+                }
+                if (!ai.cast_cooldown.running) {
+                    // TODO genericiszesez?
+                    if (room.num_enemies_alive < 10) {
+                        ai.ticks_in_state = 0;
+                        continue :state .cast;
+                    }
+                }
+                self.updateVel(.{}, .{});
+                _ = self.animator.creature.play(.idle, .{ .loop = true });
+                break :state .idle;
+            },
+            .flee => {
+                if (ai.ticks_in_state == 0) {
+                    assert(nearest_enemy != null);
+                    const flee_from_pos = nearest_enemy.?.pos;
+                    ai.hiding_places = try getHidingPlaces(room, self.pos, flee_from_pos, ai.flee_range);
+                    ai.to_enemy = flee_from_pos.sub(self.pos);
+                    if (ai.hiding_places.len > 0) {
+                        var best_f: f32 = -std.math.inf(f32);
+                        var best_pos: ?V2f = null;
+                        for (ai.hiding_places.constSlice()) |h| {
+                            const self_to_pos = h.pos.sub(self.pos).normalizedOrZero();
+                            const len = @max(ai.to_enemy.length() - ai.flee_range, 0);
+                            const to_enemy_n = ai.to_enemy.setLengthOrZero(len);
+                            const dir_f = self_to_pos.dot(to_enemy_n.neg());
+                            const f = h.flee_from_dist + dir_f;
+                            if (best_pos == null or f > best_f) {
+                                best_f = f;
+                                best_pos = h.pos;
+                            }
+                        }
+                        if (best_pos) |pos| {
+                            try self.findPath(room, pos);
+                        }
+                    }
+                }
+                _ = self.animator.creature.play(.move, .{ .loop = true });
+                const p = self.followPathGetNextPoint(10);
+                self.updateVel(p.sub(self.pos).normalizedOrZero(), self.accel_params);
+                if (!self.vel.isAlmostZero()) {
+                    self.dir = self.vel.normalized();
+                }
+                if (self.path.len == 0) {
+                    ai.flee_cooldown.restart();
+                    ai.ticks_in_state = 0;
+                    continue :state .idle;
+                }
+                break :state .flee;
+            },
+            .cast => {
+                if (ai.ticks_in_state == 60) {
+                    ai.cast_cooldown.restart();
+                    ai.ticks_in_state = 0;
+                    continue :state .idle;
+                }
+                self.updateVel(.{}, .{});
+                _ = self.animator.creature.play(.cast, .{ .loop = true });
+                break :state .cast;
+            },
+        };
+        ai.ticks_in_state += 1;
+
+        self.moveAndCollide(room);
+    }
+};
+
 pub fn bat() Error!Thing {
     return Thing{
         .kind = .creature,
@@ -432,5 +569,41 @@ pub fn sharpboi() Error!Thing {
         .hp = Thing.HP.init(35),
         .faction = .enemy,
         .enemy_difficulty = 2.5,
+    };
+}
+
+pub fn acolyte() Error!Thing {
+    return Thing{
+        .kind = .creature,
+        .creature_kind = .acolyte,
+        .spawn_state = .instance,
+        .accel_params = .{
+            .accel = 0.3,
+            .friction = 0.09,
+            .max_speed = 1.25,
+        },
+        .coll_radius = 15,
+        .vision_range = 160,
+        .coll_mask = Thing.Collision.Mask.initMany(&.{ .creature, .tile }),
+        .coll_layer = Thing.Collision.Mask.initMany(&.{.creature}),
+        .controller = .{ .acolyte_enemy = .{} },
+        .renderer = .{ .creature = .{
+            .draw_color = .yellow,
+            .draw_radius = 15,
+        } },
+        .animator = .{ .creature = .{
+            .creature_kind = .acolyte,
+        } },
+        .hitbox = null,
+        .hurtbox = .{
+            .radius = 15,
+        },
+        .selectable = .{
+            .height = 12 * 4, // TODO pixellszslz
+            .radius = 6 * 4,
+        },
+        .hp = Thing.HP.init(30),
+        .faction = .enemy,
+        .enemy_difficulty = 3,
     };
 }
