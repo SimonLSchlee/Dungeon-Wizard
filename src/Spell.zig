@@ -179,14 +179,16 @@ pub const TargetingData = struct {
             .pos => {
                 const caster_to_mouse = mouse_pos.sub(caster.pos);
                 const target_dir = if (caster_to_mouse.normalizedChecked()) |d| d else V2f.right;
-                const mouse_pos_dist = if (targeting_data.fixed_range) targeting_data.max_range else @min(targeting_data.max_range, caster_to_mouse.length());
-                var target_hit_pos = caster.pos.add(target_dir.scale(mouse_pos_dist));
+                const max_radius = targeting_data.max_range + caster.coll_radius;
+                const capped_dist = if (targeting_data.fixed_range) max_radius else @min(max_radius, caster_to_mouse.length());
+                const capped_vec = target_dir.scale(capped_dist);
+                var target_hit_pos = caster.pos.add(capped_vec);
                 var target_circle_pos = target_hit_pos;
                 if (targeting_data.ray_to_mouse) |ray| {
                     const ray_radius = ray.thickness * 0.5;
                     var coll: ?Collision = null;
                     if (caster_to_mouse.lengthSquared() > 0.001) {
-                        coll = Collision.getNextSweptCircleCollision(caster.pos, caster_to_mouse, ray_radius, Collision.Mask.initFull(), &.{caster.id}, room);
+                        coll = Collision.getNextSweptCircleCollision(caster.pos, capped_vec, ray_radius, Collision.Mask.initFull(), &.{caster.id}, room);
                         if (coll) |c| {
                             target_hit_pos = c.pos;
                             target_circle_pos = c.pos.add(c.normal.scale(ray_radius));
