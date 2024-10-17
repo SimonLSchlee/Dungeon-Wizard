@@ -2,7 +2,7 @@ const std = @import("std");
 
 pub const assert = std.debug.assert;
 
-pub const enable_debug_controls = true;
+pub const enable_debug_controls = false;
 
 pub const show_thing_paths = false;
 pub const show_thing_coords_searched = false;
