@@ -43,11 +43,13 @@ const base_range = 200;
 pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
     .{
-        .cast_time = 1,
+        .cast_time = 3,
         .color = draw.Coloru.rgb(194, 222, 49).toColorf(),
         .targeting_data = .{
             .kind = .pos,
             .target_mouse_pos = true,
+            .max_range = 200,
+            .show_max_range_ring = true,
         },
     },
 );

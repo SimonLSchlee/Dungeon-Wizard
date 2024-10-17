@@ -44,6 +44,8 @@ pub const proto = Spell.makeProto(
         .targeting_data = .{
             .kind = .thing,
             .target_faction_mask = Thing.Faction.Mask.initOne(.enemy),
+            .max_range = 150,
+            .show_max_range_ring = true,
         },
     },
 );

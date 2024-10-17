@@ -115,7 +115,8 @@ pub const TargetingData = struct {
     kind: TargetKind = .self,
     color: Colorf = .cyan,
     fixed_range: bool = false,
-    max_range: f32 = 999999,
+    max_range: f32 = std.math.inf(f32),
+    show_max_range_ring: bool = false,
     ray_to_mouse: ?struct {
         thickness: f32 = 1,
     } = null,
@@ -148,6 +149,11 @@ pub const TargetingData = struct {
                 // TODO is it bad if moused_over_thing blocks selecting a valid target?
                 if (room.moused_over_thing) |id| {
                     if (room.getThingById(id)) |thing| {
+                        // TODO different range calculation? sort that out and make consistent
+                        const range = @max(caster.pos.dist(thing.pos) - caster.coll_radius - thing.coll_radius, 0);
+                        if (range > targeting_data.max_range) {
+                            return null;
+                        }
                         if (targeting_data.target_faction_mask.contains(thing.faction)) {
                             return .{
                                 .target = .{ .thing = thing.id },
@@ -164,6 +170,10 @@ pub const TargetingData = struct {
     pub fn render(targeting_data: *const TargetingData, room: *const Room, caster: *const Thing) Error!void {
         const plat = App.getPlat();
         const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
+
+        if (targeting_data.show_max_range_ring and targeting_data.max_range < 99999) {
+            plat.circlef(caster.pos, targeting_data.max_range + caster.coll_radius, .{ .outline_color = targeting_data.color.fade(0.5), .fill_color = null });
+        }
 
         switch (targeting_data.kind) {
             .pos => {
@@ -216,6 +226,8 @@ pub const TargetingData = struct {
                     if (!thing.isActive()) continue;
                     if (thing.selectable == null) continue;
                     if (!targeting_data.target_faction_mask.contains(thing.faction)) continue;
+                    const range = @max(caster.pos.dist(thing.pos) - caster.coll_radius - thing.coll_radius, 0);
+                    if (range > targeting_data.max_range) continue;
                     const selectable = thing.selectable.?;
                     const draw_radius = if (mouse_pos.dist(thing.pos) < selectable.radius) selectable.radius else selectable.radius - 10;
                     plat.circlef(thing.pos, draw_radius, .{ .fill_color = targeting_data.color.fade(0.5) });
