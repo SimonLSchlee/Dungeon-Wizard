@@ -268,7 +268,7 @@ pub const AIController = struct {
     }
 };
 
-pub const HidingPlacesArray = std.BoundedArray(struct { pos: V2f, fleer_dist: f32, flee_from_dist: f32 }, 64);
+pub const HidingPlacesArray = std.BoundedArray(struct { pos: V2f, fleer_dist: f32, flee_from_dist: f32 }, 32);
 pub fn getHidingPlaces(room: *const Room, fleer_pos: V2f, flee_from_pos: V2f, min_flee_dist: f32) Error!HidingPlacesArray {
     const plat = getPlat();
     const tilemap = &room.tilemap;
@@ -389,6 +389,11 @@ pub const AcolyteAIController = struct {
             },
             .cast => {
                 if (ai.ticks_in_state == 60) {
+                    const dir = (if (nearest_enemy) |e| e.pos.sub(self.pos) else self.pos.neg()).normalizedOrZero();
+                    const spawn_pos = self.pos.add(dir.scale(self.coll_radius * 2));
+                    var spawner = Thing.SpawnerController.prototype(.bat);
+                    spawner.faction = self.faction;
+                    _ = try room.queueSpawnThing(&spawner, spawn_pos);
                     ai.cast_cooldown.restart();
                     ai.ticks_in_state = 0;
                     continue :state .idle;
