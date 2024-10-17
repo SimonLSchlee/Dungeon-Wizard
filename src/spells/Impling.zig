@@ -62,7 +62,6 @@ pub fn implingProto() Error!Thing {
         .coll_mask = Thing.Collision.Mask.initMany(&.{ .creature, .tile }),
         .coll_layer = Thing.Collision.Mask.initMany(&.{.creature}),
         .accel_params = .{
-            .accel = 0.07,
             .max_speed = 1.0,
         },
         .controller = .{ .enemy = .{
