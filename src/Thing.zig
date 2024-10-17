@@ -211,13 +211,22 @@ pub const HurtBox = struct {
             status_protect.stacks -= 1;
             return;
         }
-        if (self.hp) |*hp| {
-            hp.curr = utl.clampf(hp.curr - effect.damage, 0, hp.max);
+        { // compute and apply the damage
+            var damage = effect.damage;
+            if (self.statuses.get(.exposed).stacks > 0) {
+                damage *= 1.3;
+            }
+            if (self.hp) |*hp| {
+                hp.curr = utl.clampf(hp.curr - damage, 0, hp.max);
+            }
         }
+        // then apply statuses
         for (&self.statuses.values) |*status| {
             const stacks = effect.status_stacks.get(status.kind);
             status.stacks += stacks;
         }
+        // then kill
+        // TODO elsewhere, better?
         if (self.hp) |hp| {
             if (hp.curr == 0) {
                 const mint_status = self.statuses.get(.mint);
@@ -426,7 +435,11 @@ pub const CreatureRenderer = struct {
 
         const animator = self.animator.creature;
         const frame = animator.getCurrRenderFrame(self.dir);
-        const tint: Colorf = if (self.statuses.get(.frozen).stacks > 0) StatusEffect.proto_array.get(.frozen).color else .white;
+        const tint: Colorf = blk: {
+            if (self.statuses.get(.frozen).stacks > 0) break :blk StatusEffect.proto_array.get(.frozen).color;
+            if (self.statuses.get(.exposed).stacks > 0) break :blk StatusEffect.proto_array.get(.exposed).color.lerp(.white, 0.25);
+            break :blk .white;
+        };
         const opt = draw.TextureOpt{
             .origin = frame.origin,
             .src_pos = frame.pos.toV2f(),

@@ -66,6 +66,12 @@ const protos = [_]ComptimeProto{
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(0.95, 0.9, 1.0),
     },
+    .{
+        .enum_name = "exposed",
+        .cd = 1 * core.fups_per_sec,
+        .cd_type = .remove_one_stack,
+        .color = Colorf.rgb(0.15, 0.1, 0.2),
+    },
 };
 
 const Kind = blk: {
