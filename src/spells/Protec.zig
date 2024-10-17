@@ -40,6 +40,7 @@ pub const Controllers = [_]type{};
 pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
     .{
+        .obtainableness = std.EnumSet(Spell.Obtainableness).initOne(.starter),
         .color = StatusEffect.proto_array.get(.protected).color,
         .targeting_data = .{
             .kind = .self,

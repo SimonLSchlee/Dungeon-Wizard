@@ -39,6 +39,7 @@ pub const Controllers = [_]type{Projectile};
 pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
     .{
+        .obtainableness = std.EnumSet(Spell.Obtainableness).initOne(.starter),
         .color = .red,
         .targeting_data = .{
             .kind = .thing,

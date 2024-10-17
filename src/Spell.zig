@@ -287,7 +287,11 @@ pub const Reward = struct {
     pub fn init(rng: std.Random) Reward {
         var ret = Reward{};
         var spell_pool = SpellArray{};
-        spell_pool.insertSlice(0, &all_spells) catch unreachable;
+        for (all_spells) |spell| {
+            if (spell.obtainableness.contains(.room_reward)) {
+                spell_pool.append(spell) catch unreachable;
+            }
+        }
         for (0..base_spell_rewards) |_| {
             const weights = getSpellWeights(spell_pool.constSlice());
             const idx = rng.weightedIndex(f32, weights.constSlice());
@@ -296,6 +300,12 @@ pub const Reward = struct {
         }
         return ret;
     }
+};
+
+pub const Obtainableness = enum {
+    starter,
+    room_reward,
+    shop,
 };
 
 // only valid if spawn_state == .card
@@ -308,6 +318,7 @@ spawn_state: enum {
 } = .instance,
 kind: KindData = undefined,
 rarity: Rarity = .pedestrian,
+obtainableness: std.EnumSet(Obtainableness) = std.EnumSet(Obtainableness).initMany(&.{ .room_reward, .shop }),
 cast_time: i32 = 1,
 cast_time_ticks: i32 = 30,
 color: Colorf = .black,
