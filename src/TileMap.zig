@@ -222,7 +222,10 @@ pub fn tileCoordIsPassable(self: *const TileMap, coord: V2i) bool {
 
 pub fn isLOSBetweenThicc(self: *const TileMap, a: V2f, b: V2f, thickness: f32) bool {
     const a_to_b = a.sub(b);
-    const n = a_to_b.rot90CW().normalized();
+    const n = a_to_b.rot90CW().normalizedOrZero();
+    if (n.isZero()) {
+        return self.isLOSBetween(a, b);
+    }
     const offset = n.scale(thickness * 0.5);
     const a_right = a.add(offset);
     const b_right = b.add(offset);
