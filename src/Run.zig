@@ -200,6 +200,9 @@ pub fn update(self: *Run) Error!void {
                 if (plat.input_buffer.keyIsJustPressed(.o)) {
                     self.makeSpellReward();
                 }
+                if (plat.input_buffer.keyIsJustPressed(.l)) {
+                    self.load_state = .fade_out;
+                }
                 if (room.edit_mode) {
                     if (plat.input_buffer.getNumberKeyJustPressed()) |num| {
                         const app = App.get();
