@@ -34,6 +34,7 @@ _arena: std.heap.ArenaAllocator = undefined,
 arena: std.mem.Allocator = undefined,
 data: *Data = undefined,
 options: Options = undefined,
+curr_tick: i64 = 0,
 screen: enum {
     run,
 } = .run,
@@ -44,11 +45,13 @@ export fn appInit(plat: *Platform) *anyopaque {
     _plat = plat;
 
     var app = plat.heap.create(App) catch @panic("Out of memory");
-    app.* = .{};
-    app.options = Options.initTryLoad();
+    app.* = .{
+        .options = Options.initTryLoad(),
+        .data = Data.init() catch @panic("Failed to init data"),
+    };
+    // TODO unused rn
     app._arena = std.heap.ArenaAllocator.init(plat.heap);
     app.arena = app._arena.allocator();
-    app.data = Data.init() catch @panic("Failed to init data");
 
     // populate _app here, Room.init() uses it
     _app = app;
@@ -89,11 +92,16 @@ pub fn deinit(self: *App) void {
 }
 
 fn update(self: *App) Error!void {
+    // TODO hack to stop stack getting too massive on run + room init
+    if (self.curr_tick == 0) {
+        try self.run.startRun();
+    }
     switch (self.screen) {
         .run => {
             try self.run.update();
         },
     }
+    self.curr_tick += 1;
 }
 
 fn render(self: *App) Error!void {

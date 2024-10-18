@@ -174,8 +174,6 @@ pub fn init(seed: u64) Error!Run {
     try places.append(.{ .room = .{ .difficulty = places.get(places.len - 2).room.difficulty, .kind = .boss } });
     ret.places = places;
 
-    try ret.loadPlaceFromCurrIdx();
-
     return ret;
 }
 
@@ -191,6 +189,10 @@ pub fn reset(self: *Run) Error!*Run {
     const seed = rng.random().int(u64);
     self.* = try init(seed);
     return self;
+}
+
+pub fn startRun(self: *Run) Error!void {
+    try self.loadPlaceFromCurrIdx();
 }
 
 pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
