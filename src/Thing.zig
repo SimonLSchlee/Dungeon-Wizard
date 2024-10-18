@@ -164,6 +164,7 @@ pub const HitEffect = struct {
 
 pub const HitBox = struct {
     rel_pos: V2f = .{},
+    sweep_to_rel_pos: ?V2f = null,
     radius: f32 = 0,
     mask: Faction.Mask = Faction.Mask.initEmpty(),
     active: bool = false,
@@ -177,24 +178,36 @@ pub const HitBox = struct {
         // for debug vis
         self.dbg.last_tick_hitbox_was_active = room.curr_tick;
 
-        const pos = self.pos.add(hitbox.rel_pos);
+        const start_pos = self.pos.add(hitbox.rel_pos);
+        const maybe_ray_v: ?V2f = if (hitbox.sweep_to_rel_pos) |e| e.sub(hitbox.rel_pos) else null;
         for (&room.things.items) |*thing| {
             if (!thing.isActive()) continue;
-
             if (thing.hurtbox == null) continue;
             var hurtbox = &thing.hurtbox.?;
             if (!hitbox.mask.contains(thing.faction)) continue;
             const hurtbox_pos = thing.pos.add(hurtbox.rel_pos);
-            const dist = pos.dist(hurtbox_pos);
-            if (dist > hitbox.radius + hurtbox.radius) continue;
-            // hit!
-            hurtbox.hit(thing, room, hitbox.effect);
-            //std.debug.print("{any}: I hit {any}\n", .{ self.kind, thing.kind });
-            if (hitbox.deactivate_on_hit) {
-                hitbox.active = false;
-                break;
+
+            const effective_radius = hitbox.radius + hurtbox.radius;
+            const did_hit = blk: {
+                if (maybe_ray_v) |ray_v| {
+                    if (Collision.getRayCircleCollision(start_pos, ray_v, hurtbox_pos, effective_radius)) |_| {
+                        break :blk true;
+                    }
+                } else {
+                    const dist = start_pos.dist(hurtbox_pos);
+                    break :blk dist <= effective_radius;
+                }
+                break :blk false;
+            };
+            if (did_hit) {
+                hurtbox.hit(thing, room, hitbox.effect);
+                if (hitbox.deactivate_on_hit) {
+                    hitbox.active = false;
+                    break;
+                }
             }
         }
+
         if (hitbox.deactivate_on_update) {
             hitbox.active = false;
         }
