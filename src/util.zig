@@ -200,7 +200,7 @@ pub fn EnumFromTypes(Types: []const type, enum_name_field: []const u8) type {
     }
     return @Type(.{
         .@"enum" = .{
-            .tag_type = u32,
+            .tag_type = std.math.IntFittingRange(0, fields.len),
             .fields = &fields,
             .decls = &.{},
             .is_exhaustive = true,

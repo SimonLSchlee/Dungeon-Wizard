@@ -90,7 +90,7 @@ const Kind = blk: {
     }
     break :blk @Type(.{
         .@"enum" = .{
-            .tag_type = u32,
+            .tag_type = std.math.IntFittingRange(0, fields.len),
             .fields = &fields,
             .decls = &.{},
             .is_exhaustive = true,
