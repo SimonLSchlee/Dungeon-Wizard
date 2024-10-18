@@ -26,6 +26,7 @@ const PackedRoom = @import("PackedRoom.zig");
 const menuUI = @import("menuUI.zig");
 const gameUI = @import("gameUI.zig");
 const Shop = @import("Shop.zig");
+const Item = @import("Item.zig");
 
 pub const Reward = struct {
     const base_spells: usize = 3;
@@ -126,6 +127,7 @@ places: Place.Array = .{},
 curr_place_idx: usize = 0,
 player_thing: Thing = undefined,
 deck: Spell.SpellArray = .{},
+slots_init_params: gameUI.Slots.InitParams = .{},
 load_timer: u.TickCounter = u.TickCounter.init(20),
 load_state: enum {
     none,
@@ -144,6 +146,16 @@ pub fn init(seed: u64) Error!Run {
         .game_pause_ui = makeGamePauseUI(),
         .player_thing = app.data.creatures.get(.player),
     };
+
+    // TODO elsewhererre?
+    ret.slots_init_params.items = @TypeOf(ret.slots_init_params.items).fromSlice(&.{
+        Item.getProto(.pot_hp),
+        null,
+        null,
+        null,
+    }) catch unreachable;
+
+    // init places
     var places = Place.Array{};
     for (0..app.data.normal_rooms.len) |i| {
         try places.append(.{ .room = .{ .difficulty = 0, .kind = .{ .normal = i } } });
@@ -206,6 +218,7 @@ pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
                 .seed = self.rng.random().int(u64),
                 .exits = exit_doors,
                 .player = self.player_thing,
+                .slots_params = self.slots_init_params,
             });
             // TODO hacky
             // update once to clear fog
@@ -280,6 +293,11 @@ pub fn gameUpdate(self: *Run) Error!void {
         .exited => |exit_door| {
             _ = exit_door;
             self.player_thing.hp = room.getConstPlayer().?.hp.?;
+            // TODO make it betterrrs?
+            self.slots_init_params.items = .{};
+            for (room.ui_slots.items.constSlice()) |slot| {
+                self.slots_init_params.items.append(slot.kind.item) catch unreachable;
+            }
             self.loadNextPlace();
         },
     }
@@ -334,9 +352,34 @@ pub fn shopUpdate(self: *Run) Error!void {
         if (plat.input_buffer.keyIsJustPressed(.f4)) {
             _ = try shop.reset();
         }
+        if (plat.input_buffer.keyIsJustPressed(.k)) {
+            self.gold += 100;
+        }
     }
 
-    try shop.update(self);
+    if (try shop.update(self)) |product| {
+        const price = product.price.gold;
+        assert(self.gold >= price);
+        self.gold -= price;
+        switch (product.kind) {
+            .spell => |spell| {
+                assert(self.deck.len < self.deck.buffer.len);
+                self.deck.append(spell) catch unreachable;
+            },
+            .item => |item| {
+                assert(self.slots_init_params.items.len < self.slots_init_params.items.buffer.len);
+                self.gold -= price;
+                for (self.slots_init_params.items.slice()) |*item_slot| {
+                    if (item_slot.* == null) {
+                        item_slot.* = item;
+                        break;
+                    }
+                } else {
+                    unreachable;
+                }
+            },
+        }
+    }
     if (shop.state == .done) {
         self.loadNextPlace();
     }

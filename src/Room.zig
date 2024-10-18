@@ -40,6 +40,7 @@ pub const InitParams = struct {
     seed: u64,
     deck: Spell.SpellArray,
     exits: std.BoundedArray(gameUI.ExitDoor, 4),
+    slots_params: gameUI.Slots.InitParams,
 };
 
 pub const WavesParams = struct {
@@ -257,7 +258,7 @@ pub fn reset(self: *Room) Error!void {
         }
     }
 
-    self.ui_slots = gameUI.Slots.init(self, 4, 4, &.{Item.PotionHP.proto});
+    self.ui_slots = gameUI.Slots.init(self, self.init_params.slots_params);
 }
 
 pub fn reloadFromPackedRoom(self: *Room, packed_room: PackedRoom) Error!void {

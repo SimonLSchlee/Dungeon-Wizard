@@ -28,7 +28,7 @@ const gameUI = @import("gameUI.zig");
 const Item = @import("Item.zig");
 const Shop = @This();
 
-const ShopProduct = struct {
+const Product = struct {
     kind: union(enum) {
         spell: Spell,
         item: Item,
@@ -36,11 +36,15 @@ const ShopProduct = struct {
     price: union(enum) {
         gold: i32,
     },
+};
+
+const ProductSlot = struct {
+    product: ?Product,
     rect: menuUI.ClickableRect,
 };
 
 render_texture: Platform.RenderTexture2D,
-products: std.BoundedArray(ShopProduct, 12) = .{},
+products: std.BoundedArray(ProductSlot, 12) = .{},
 proceed_button: menuUI.Button,
 rng: std.Random.DefaultPrng,
 state: enum {
@@ -98,8 +102,10 @@ pub fn init(seed: u64) Error!Shop {
         for (spells.constSlice(), 0..) |spell, i| {
             const rect = spell_rects.get(i);
             ret.products.append(.{
-                .kind = .{ .spell = spell },
-                .price = .{ .gold = 30 },
+                .product = .{
+                    .kind = .{ .spell = spell },
+                    .price = .{ .gold = 30 },
+                },
                 .rect = .{ .dims = rect.dims, .pos = rect.pos },
             }) catch unreachable;
         }
@@ -129,8 +135,10 @@ pub fn init(seed: u64) Error!Shop {
         for (items.constSlice(), 0..) |item, i| {
             const rect = item_rects.get(i);
             ret.products.append(.{
-                .kind = .{ .item = item },
-                .price = .{ .gold = 30 },
+                .product = .{
+                    .kind = .{ .item = item },
+                    .price = .{ .gold = 30 },
+                },
                 .rect = .{ .dims = rect.dims, .pos = rect.pos },
             }) catch unreachable;
         }
@@ -152,13 +160,53 @@ pub fn reset(self: *Shop) Error!*Shop {
     return self;
 }
 
-pub fn update(self: *Shop, run: *Run) Error!void {
+pub fn canBuy(run: *const Run, product: Product) bool {
+    const price = product.price.gold;
+    if (run.gold < price) return false;
+    switch (product.kind) {
+        .spell => |_| {
+            if (run.deck.len >= run.deck.buffer.len) return false;
+        },
+        .item => |_| {
+            if (run.slots_init_params.items.len >= run.slots_init_params.items.buffer.len) return false;
+            for (run.slots_init_params.items.constSlice()) |maybe_item| {
+                if (maybe_item == null) break;
+            } else {
+                return false;
+            }
+        },
+    }
+    return true;
+}
+
+pub fn update(self: *Shop, run: *const Run) Error!?Product {
     const plat = getPlat();
     _ = plat;
-    _ = run;
+    var ret: ?Product = null;
+
+    for (self.products.slice()) |*slot| {
+        if (slot.product == null) continue;
+        const product = slot.product.?;
+        var hovered_crect = slot.rect;
+        if (hovered_crect.isHovered()) {
+            const new_dims = slot.rect.dims.scale(1.1);
+            const new_pos = slot.rect.pos.sub(new_dims.sub(slot.rect.dims).scale(0.5));
+            hovered_crect.pos = new_pos;
+            hovered_crect.dims = new_dims;
+        }
+        if (hovered_crect.isClicked()) {
+            if (canBuy(run, product)) {
+                ret = product;
+                slot.product = null;
+                break;
+            }
+        }
+    }
+
     if (self.proceed_button.isClicked()) {
         self.state = .done;
     }
+    return ret;
 }
 
 pub fn render(self: *Shop, run: *Run) Error!void {
@@ -171,14 +219,17 @@ pub fn render(self: *Shop, run: *Run) Error!void {
 
     try plat.textf(v2f(plat.screen_dims_f.x * 0.5, 50), "Shoppy woppy", .{}, .{ .center = true, .color = .white, .size = 45 });
 
-    for (self.products.constSlice()) |product| {
-        var hovered_crect = product.rect;
+    for (self.products.constSlice()) |slot| {
+        plat.rectf(slot.rect.pos, slot.rect.dims, .{ .fill_color = .darkgray });
+        var hovered_crect = slot.rect;
         if (hovered_crect.isHovered()) {
-            const new_dims = product.rect.dims.scale(1.1);
-            const new_pos = product.rect.pos.sub(new_dims.sub(product.rect.dims).scale(0.5));
+            const new_dims = slot.rect.dims.scale(1.1);
+            const new_pos = slot.rect.pos.sub(new_dims.sub(slot.rect.dims).scale(0.5));
             hovered_crect.pos = new_pos;
             hovered_crect.dims = new_dims;
         }
+        if (slot.product == null) continue;
+        const product = slot.product.?;
         switch (product.kind) {
             .spell => |spell| {
                 try spell.renderInfo(hovered_crect);

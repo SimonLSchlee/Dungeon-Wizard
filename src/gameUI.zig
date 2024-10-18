@@ -48,6 +48,10 @@ pub const Slots = struct {
         },
         cooldown_timer: ?utl.TickCounter,
     };
+    pub const InitParams = struct {
+        num_spell_slots: usize = 4, // populated from deck
+        items: std.BoundedArray(?Item, max_item_slots) = .{},
+    };
 
     pub const max_spell_slots = 6;
     pub const max_item_slots = 8;
@@ -93,13 +97,11 @@ pub const Slots = struct {
     } = .none,
     selected_method: Options.CastMethod = .left_click,
 
-    pub fn init(room: *Room, num_spell_slots: usize, num_item_slots: usize, items: []const Item) Slots {
-        assert(num_spell_slots < max_spell_slots);
-        assert(num_item_slots < max_item_slots);
-        assert(items.len < num_item_slots);
+    pub fn init(room: *Room, params: InitParams) Slots {
+        assert(params.num_spell_slots < max_spell_slots);
 
         var ret = Slots{};
-        for (0..num_spell_slots) |i| {
+        for (0..params.num_spell_slots) |i| {
             var slot = Slot{
                 .idx = i,
                 .key = spell_idx_to_key[i],
@@ -113,18 +115,15 @@ pub const Slots = struct {
             ret.spells.append(slot) catch unreachable;
         }
 
-        for (0..num_item_slots) |i| {
+        for (params.items.constSlice(), 0..) |maybe_item, i| {
             const slot = Slot{
                 .idx = i,
                 .key = item_idx_to_key[i],
                 .key_str = item_idx_to_key_str[i],
-                .kind = .{ .item = null },
+                .kind = .{ .item = maybe_item },
                 .cooldown_timer = null,
             };
             ret.items.append(slot) catch unreachable;
-        }
-        for (items, 0..) |item, i| {
-            ret.items.buffer[i].kind.item = item;
         }
 
         return ret;
