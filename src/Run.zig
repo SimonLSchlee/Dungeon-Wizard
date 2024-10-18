@@ -25,6 +25,7 @@ const Data = @import("Data.zig");
 const PackedRoom = @import("PackedRoom.zig");
 const menuUI = @import("menuUI.zig");
 const gameUI = @import("gameUI.zig");
+const Shop = @import("Shop.zig");
 
 pub const RewardUI = struct {
     modal_topleft: V2f,
@@ -102,6 +103,7 @@ pub const Place = union(PlaceKind) {
 gold: i32 = 0,
 room: ?Room = null,
 reward: ?Spell.Reward = null,
+shop: ?Shop = null,
 reward_ui: RewardUI = undefined,
 game_pause_ui: GamePauseUI = undefined,
 screen: enum {
@@ -175,6 +177,10 @@ pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
         room.deinit();
         self.room = null;
     }
+    if (self.shop) |*shop| {
+        shop.deinit();
+        self.shop = null;
+    }
     switch (self.places.get(self.curr_place_idx)) {
         .room => |r| {
             const packed_room = switch (r.kind) {
@@ -201,7 +207,7 @@ pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
         },
         .shop => |s| {
             _ = s.num;
-            // TODO generate shop
+            self.shop = try Shop.init(self.rng.random().int(u64));
             self.screen = .shop;
         },
     }
@@ -231,17 +237,8 @@ pub fn gameUpdate(self: *Run) Error!void {
     const room = &self.room.?;
 
     if (debug.enable_debug_controls) {
-        if (plat.input_buffer.keyIsJustPressed(.f3)) {
-            _ = try self.reset();
-        }
         if (plat.input_buffer.keyIsJustPressed(.f4)) {
             try room.reset();
-        }
-        if (plat.input_buffer.keyIsJustPressed(.o)) {
-            self.makeSpellReward();
-        }
-        if (plat.input_buffer.keyIsJustPressed(.l)) {
-            self.loadNextPlace();
         }
         if (room.edit_mode) {
             if (plat.input_buffer.getNumberKeyJustPressed()) |num| {
@@ -318,11 +315,20 @@ pub fn rewardUpdate(self: *Run) Error!void {
 }
 
 pub fn shopUpdate(self: *Run) Error!void {
-    const plat = getPlat();
-    if (plat.input_buffer.mouseBtnIsJustPressed(.left)) {
+    const plat = App.getPlat();
+    assert(self.shop != null);
+    const shop = &self.shop.?;
+
+    if (debug.enable_debug_controls) {
+        if (plat.input_buffer.keyIsJustPressed(.f4)) {
+            _ = try shop.reset();
+        }
+    }
+
+    try shop.update(self);
+    if (shop.state == .done) {
         self.loadNextPlace();
     }
-    // TODO
 }
 
 pub fn deadUpdate(self: *Run) Error!void {
@@ -333,6 +339,20 @@ pub fn deadUpdate(self: *Run) Error!void {
 }
 
 pub fn update(self: *Run) Error!void {
+    const plat = App.getPlat();
+
+    if (debug.enable_debug_controls) {
+        if (plat.input_buffer.keyIsJustPressed(.f3)) {
+            _ = try self.reset();
+        }
+        if (plat.input_buffer.keyIsJustPressed(.o)) {
+            self.makeSpellReward();
+        }
+        if (plat.input_buffer.keyIsJustPressed(.l)) {
+            self.loadNextPlace();
+        }
+    }
+
     switch (self.load_state) {
         .none => switch (self.screen) {
             .game => try self.gameUpdate(),
@@ -483,7 +503,13 @@ pub fn render(self: *Run) Error!void {
             try reward_ui.skip_button.render();
         },
         .shop => {
-            try plat.textf(plat.screen_dims_f.scale(0.5), "Shop placeholder, click to proceed", .{}, .{ .center = true, .color = .white });
+            assert(self.shop != null);
+            const shop = &self.shop.?;
+            try shop.render(self);
+            const shop_texture_opt = .{
+                .flip_y = true,
+            };
+            plat.texturef(.{}, shop.render_texture.texture, shop_texture_opt);
         },
         .dead => {},
     }
