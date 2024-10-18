@@ -40,7 +40,7 @@ const ShopProduct = struct {
 };
 
 render_texture: Platform.RenderTexture2D,
-items: std.BoundedArray(ShopProduct, 12) = .{},
+products: std.BoundedArray(ShopProduct, 12) = .{},
 proceed_button: menuUI.Button,
 rng: std.Random.DefaultPrng,
 state: enum {
@@ -71,8 +71,70 @@ pub fn init(seed: u64) Error!Shop {
         .rng = std.Random.DefaultPrng.init(seed),
     };
 
-    // TODO
-    ret.items.len = 0;
+    {
+        const max_num_spells = 4;
+        const num_spells = 4;
+        const spell_width: f32 = 250;
+        const spell_spacing = 25;
+        const spell_product_dims = v2f(spell_width, spell_width / 0.7);
+        const spells_center = v2f(plat.screen_dims_f.x * 0.5, 100 + spell_product_dims.y * 0.5);
+        const spells_bottom_y = spells_center.y + spell_product_dims.y * 0.5;
+        var spells = std.BoundedArray(Spell, max_num_spells){};
+        spells.resize(num_spells) catch unreachable;
+        const num_spells_generated = Spell.makeShopSpells(ret.rng.random(), spells.slice());
+        spells.resize(num_spells_generated) catch unreachable;
+        var spell_rects = std.BoundedArray(geom.Rectf, max_num_spells){};
+        spell_rects.resize(num_spells_generated) catch unreachable;
+        gameUI.layoutRectsFixedSize(
+            spells.len,
+            spell_product_dims,
+            spells_center,
+            .{
+                .direction = .horizontal,
+                .space_between = spell_spacing,
+            },
+            spell_rects.slice(),
+        );
+        for (spells.constSlice(), 0..) |spell, i| {
+            const rect = spell_rects.get(i);
+            ret.products.append(.{
+                .kind = .{ .spell = spell },
+                .price = .{ .gold = 30 },
+                .rect = .{ .dims = rect.dims, .pos = rect.pos },
+            }) catch unreachable;
+        }
+
+        const max_num_items = 4;
+        const num_items = 3;
+        const item_width: f32 = 250;
+        const item_spacing = 25;
+        const item_product_dims = v2f(item_width, item_width / 0.7);
+        const items_center = v2f(plat.screen_dims_f.x * 0.5, spells_bottom_y + 50 + item_product_dims.y * 0.5);
+        var items = std.BoundedArray(Item, max_num_items){};
+        items.resize(num_items) catch unreachable;
+        const num_items_generated = Item.makeShopItems(ret.rng.random(), items.slice());
+        items.resize(num_items_generated) catch unreachable;
+        var item_rects = std.BoundedArray(geom.Rectf, max_num_items){};
+        item_rects.resize(num_items_generated) catch unreachable;
+        gameUI.layoutRectsFixedSize(
+            items.len,
+            item_product_dims,
+            items_center,
+            .{
+                .direction = .horizontal,
+                .space_between = item_spacing,
+            },
+            item_rects.slice(),
+        );
+        for (items.constSlice(), 0..) |item, i| {
+            const rect = item_rects.get(i);
+            ret.products.append(.{
+                .kind = .{ .item = item },
+                .price = .{ .gold = 30 },
+                .rect = .{ .dims = rect.dims, .pos = rect.pos },
+            }) catch unreachable;
+        }
+    }
 
     return ret;
 }
@@ -104,8 +166,30 @@ pub fn render(self: *Shop, run: *Run) Error!void {
     _ = run;
 
     plat.startRenderToTexture(self.render_texture);
-    plat.clear(Colorf.rgb(0.4, 0.4, 0.4));
+    plat.clear(Colorf.rgb(0.2, 0.2, 0.2));
     plat.setBlend(.render_tex_alpha);
+
+    try plat.textf(v2f(plat.screen_dims_f.x * 0.5, 50), "Shoppy woppy", .{}, .{ .center = true, .color = .white, .size = 45 });
+
+    for (self.products.constSlice()) |product| {
+        var hovered_crect = product.rect;
+        if (hovered_crect.isHovered()) {
+            const new_dims = product.rect.dims.scale(1.1);
+            const new_pos = product.rect.pos.sub(new_dims.sub(product.rect.dims).scale(0.5));
+            hovered_crect.pos = new_pos;
+            hovered_crect.dims = new_dims;
+        }
+        switch (product.kind) {
+            .spell => |spell| {
+                try spell.renderInfo(hovered_crect);
+            },
+            .item => |item| {
+                try item.renderInfo(hovered_crect);
+            },
+        }
+        const price_pos = hovered_crect.pos.add(hovered_crect.dims).sub(v2f(50, 40));
+        try plat.textf(price_pos, "${}", .{product.price.gold}, .{ .center = true, .color = .yellow, .size = 40 });
+    }
 
     try self.proceed_button.render();
 

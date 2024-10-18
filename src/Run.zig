@@ -27,6 +27,13 @@ const menuUI = @import("menuUI.zig");
 const gameUI = @import("gameUI.zig");
 const Shop = @import("Shop.zig");
 
+pub const Reward = struct {
+    const base_spells: usize = 3;
+    const max_spells = 8;
+
+    spells: std.BoundedArray(Spell, max_spells) = .{},
+};
+
 pub const RewardUI = struct {
     modal_topleft: V2f,
     modal_dims: V2f,
@@ -102,7 +109,7 @@ pub const Place = union(PlaceKind) {
 
 gold: i32 = 0,
 room: ?Room = null,
-reward: ?Spell.Reward = null,
+reward: ?Reward = null,
 shop: ?Shop = null,
 reward_ui: RewardUI = undefined,
 game_pause_ui: GamePauseUI = undefined,
@@ -221,8 +228,12 @@ pub fn makeExitDoors(_: *Run, packed_room: PackedRoom) std.BoundedArray(gameUI.E
     return ret;
 }
 
-pub fn makeSpellReward(self: *Run) void {
-    self.reward = Spell.Reward.init(self.rng.random());
+pub fn makeReward(self: *Run) void {
+    var reward = Reward{};
+    reward.spells.resize(Reward.base_spells) catch unreachable;
+    const num_generated = Spell.makeRoomReward(self.rng.random(), reward.spells.slice());
+    reward.spells.resize(num_generated) catch unreachable;
+    self.reward = reward;
     self.reward_ui = self.makeRewardUI();
     self.screen = .reward;
 }
@@ -263,7 +274,7 @@ pub fn gameUpdate(self: *Run) Error!void {
         .lost => {},
         .won => {
             if (self.reward == null and self.places.get(self.curr_place_idx).room.kind == .normal) {
-                self.makeSpellReward();
+                self.makeReward();
             }
         },
         .exited => |exit_door| {
@@ -346,7 +357,7 @@ pub fn update(self: *Run) Error!void {
             _ = try self.reset();
         }
         if (plat.input_buffer.keyIsJustPressed(.o)) {
-            self.makeSpellReward();
+            self.makeReward();
         }
         if (plat.input_buffer.keyIsJustPressed(.l)) {
             self.loadNextPlace();

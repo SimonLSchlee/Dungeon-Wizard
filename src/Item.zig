@@ -29,6 +29,7 @@ const Spell = @import("Spell.zig");
 const Params = Spell.Params;
 const TargetKind = Spell.TargetKind;
 const TargetingData = Spell.TargetingData;
+pub const Obtainableness = Spell.Obtainableness;
 
 const Item = @This();
 
@@ -57,7 +58,7 @@ pub const PotionHP = struct {
 
     hp_restored_percent: f32 = 30,
 
-    pub fn use(self: *const Item, user: *Thing, _: *Room, params: Spell.Params) Error!void {
+    pub fn use(self: *const Item, user: *Thing, _: *Room, params: Params) Error!void {
         assert(std.meta.activeTag(params.target) == Item.TargetKind.self);
         const pot_hp = self.kind.pot_hp;
         if (user.hp) |*hp| {
@@ -189,28 +190,38 @@ pub fn getItemWeights(items: []const Item) WeightsArray {
     return ret;
 }
 
-pub const Reward = struct {
-    pub const base_item_rewards: usize = 2;
-    items: std.BoundedArray(Item, 8) = .{},
-
-    pub fn init(rng: std.Random) Reward {
-        var ret = Reward{};
-        var item_pool = ItemArray{};
-        item_pool.insertSlice(0, &all_items) catch unreachable;
-        for (0..base_item_rewards) |_| {
-            const weights = getItemWeights(item_pool.constSlice());
-            const idx = rng.weightedIndex(f32, weights.constSlice());
-            const spell = item_pool.swapRemove(idx);
-            ret.items.append(spell) catch unreachable;
+pub fn generateRandom(rng: std.Random, mask: Obtainableness.Mask, allow_duplicates: bool, buf: []Item) usize {
+    var num: usize = 0;
+    var item_pool = ItemArray{};
+    for (all_items) |item| {
+        if (item.obtainableness.intersectWith(mask).count() > 0) {
+            item_pool.append(item) catch unreachable;
         }
-        return ret;
     }
-};
+    for (0..buf.len) |i| {
+        if (item_pool.len == 0) break;
+        const weights = getItemWeights(item_pool.constSlice());
+        const idx = rng.weightedIndex(f32, weights.constSlice());
+        const item = if (allow_duplicates) item_pool.get(idx) else item_pool.swapRemove(idx);
+        buf[i] = item;
+        num += 1;
+    }
+    return num;
+}
+
+pub fn makeRoomReward(rng: std.Random, buf: []Item) usize {
+    return generateRandom(rng, Obtainableness.Mask.initOne(.room_reward), false, buf);
+}
+
+pub fn makeShopItems(rng: std.Random, buf: []Item) usize {
+    return generateRandom(rng, Obtainableness.Mask.initOne(.shop), false, buf);
+}
 
 // only valid if spawn_state == .card
 id: Id = undefined,
 alloc_state: pool.AllocState = undefined,
 //
+obtainableness: Obtainableness.Mask = Obtainableness.Mask.initMany(&.{ .room_reward, .shop }),
 spawn_state: enum {
     instance, // not in any pool
     allocated, // a card allocated in a pool
@@ -271,18 +282,47 @@ pub fn getRenderIconInfo(self: *const Item) sprites.RenderIconInfo {
     }
 }
 
-pub fn renderInfo(self: *const Spell, rect: geom.Rectf) Error!void {
+pub fn renderInfo(self: *const Item, rect: menuUI.ClickableRect) Error!void {
     const plat = App.getPlat();
     const title_rect_dims = v2f(rect.dims.x, rect.dims.y * 0.2);
+    const icon_rect_dims = v2f(rect.dims.x, rect.dims.y * 0.4);
     const description_dims = v2f(rect.dims.x, rect.dims.y * 0.4);
 
     const kind = std.meta.activeTag(self.kind);
     const name = item_names.get(kind);
 
     plat.rectf(rect.pos, rect.dims, .{ .fill_color = .darkgray });
-    try menuUI.textInRect(rect.pos, title_rect_dims, .{ .fill_color = null }, v2f(5, 5), "{s}", .{name}, .{ .color = .white, .center = false });
+    try menuUI.textInRect(rect.pos, title_rect_dims, .{ .fill_color = null }, v2f(5, 5), "{s}", .{name}, .{ .color = .white });
 
+    const icon_center_pos = rect.pos.add(v2f(0, title_rect_dims.y)).add(icon_rect_dims.scale(0.5));
+    // item image
+    plat.rectf(icon_center_pos.sub(icon_rect_dims.scale(0.5)), icon_rect_dims, .{ .fill_color = .black });
+    const icon_square_dim = @min(icon_rect_dims.x, icon_rect_dims.y);
+    const icon_square = V2f.splat(icon_square_dim);
+
+    switch (self.getRenderIconInfo()) {
+        .frame => |frame| {
+            plat.texturef(icon_center_pos, frame.texture, .{
+                .origin = .center,
+                .src_pos = frame.pos.toV2f(),
+                .src_dims = frame.size.toV2f(),
+                .scaled_dims = icon_square,
+            });
+        },
+        .letter => |letter| {
+            try plat.textf(
+                icon_center_pos,
+                "{s}",
+                .{&letter.str},
+                .{
+                    .color = letter.color,
+                    .size = 40,
+                    .center = true,
+                },
+            );
+        },
+    }
     const description_text = item_descriptions.get(kind);
-    const description_rect_topleft = rect.pos.add(v2f(0, title_rect_dims.y));
+    const description_rect_topleft = rect.pos.add(v2f(0, title_rect_dims.y + icon_rect_dims.y));
     try menuUI.textInRect(description_rect_topleft, description_dims, .{ .fill_color = null }, v2f(10, 10), "{s}", .{description_text}, .{ .color = .white });
 }

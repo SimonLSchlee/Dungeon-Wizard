@@ -295,30 +295,36 @@ pub fn getSpellWeights(spells: []const Spell) WeightsArray {
     return ret;
 }
 
-pub const Reward = struct {
-    pub const base_spell_rewards: usize = 3;
-    spells: std.BoundedArray(Spell, 8) = .{},
-    selected_idx: ?i32 = null,
-
-    pub fn init(rng: std.Random) Reward {
-        var ret = Reward{};
-        var spell_pool = SpellArray{};
-        for (all_spells) |spell| {
-            if (spell.obtainableness.contains(.room_reward)) {
-                spell_pool.append(spell) catch unreachable;
-            }
+pub fn generateRandom(rng: std.Random, mask: Obtainableness.Mask, allow_duplicates: bool, buf: []Spell) usize {
+    var num: usize = 0;
+    var spell_pool = SpellArray{};
+    for (all_spells) |spell| {
+        if (spell.obtainableness.intersectWith(mask).count() > 0) {
+            spell_pool.append(spell) catch unreachable;
         }
-        for (0..base_spell_rewards) |_| {
-            const weights = getSpellWeights(spell_pool.constSlice());
-            const idx = rng.weightedIndex(f32, weights.constSlice());
-            const spell = spell_pool.swapRemove(idx);
-            ret.spells.append(spell) catch unreachable;
-        }
-        return ret;
     }
-};
+    for (0..buf.len) |i| {
+        if (spell_pool.len == 0) break;
+        const weights = getSpellWeights(spell_pool.constSlice());
+        const idx = rng.weightedIndex(f32, weights.constSlice());
+        const spell = if (allow_duplicates) spell_pool.get(idx) else spell_pool.swapRemove(idx);
+        buf[i] = spell;
+        num += 1;
+    }
+    return num;
+}
+
+pub fn makeRoomReward(rng: std.Random, buf: []Spell) usize {
+    return generateRandom(rng, Obtainableness.Mask.initOne(.room_reward), false, buf);
+}
+
+pub fn makeShopSpells(rng: std.Random, buf: []Spell) usize {
+    return generateRandom(rng, Obtainableness.Mask.initOne(.shop), false, buf);
+}
 
 pub const Obtainableness = enum {
+    pub const Mask = std.EnumSet(Obtainableness);
+
     starter,
     room_reward,
     shop,
@@ -334,7 +340,7 @@ spawn_state: enum {
 } = .instance,
 kind: KindData = undefined,
 rarity: Rarity = .pedestrian,
-obtainableness: std.EnumSet(Obtainableness) = std.EnumSet(Obtainableness).initMany(&.{ .room_reward, .shop }),
+obtainableness: Obtainableness.Mask = Obtainableness.Mask.initMany(&.{ .room_reward, .shop }),
 cast_time: i32 = 2,
 cast_time_ticks: i32 = 30,
 color: Colorf = .black,
