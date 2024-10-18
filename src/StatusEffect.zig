@@ -72,6 +72,12 @@ const protos = [_]ComptimeProto{
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(0.15, 0.1, 0.2),
     },
+    .{
+        .enum_name = "stunned",
+        .cd = 1 * core.fups_per_sec,
+        .cd_type = .remove_one_stack,
+        .color = Colorf.rgb(0.9, 0.8, 0.7),
+    },
 };
 
 const Kind = blk: {
