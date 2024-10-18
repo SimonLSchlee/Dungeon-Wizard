@@ -104,7 +104,7 @@ pub fn init(seed: u64) Error!Shop {
             ret.products.append(.{
                 .product = .{
                     .kind = .{ .spell = spell },
-                    .price = .{ .gold = 30 },
+                    .price = .{ .gold = 10 },
                 },
                 .rect = .{ .dims = rect.dims, .pos = rect.pos },
             }) catch unreachable;

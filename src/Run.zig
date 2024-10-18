@@ -31,8 +31,11 @@ const Item = @import("Item.zig");
 pub const Reward = struct {
     const base_spells: usize = 3;
     const max_spells = 8;
+    const base_items = 1;
+    const max_items = 8;
 
     spells: std.BoundedArray(Spell, max_spells) = .{},
+    items: std.BoundedArray(Item, max_items) = .{},
 };
 
 pub const RewardUI = struct {
@@ -242,10 +245,17 @@ pub fn makeExitDoors(_: *Run, packed_room: PackedRoom) std.BoundedArray(gameUI.E
 }
 
 pub fn makeReward(self: *Run) void {
+    const random = self.rng.random();
     var reward = Reward{};
     reward.spells.resize(Reward.base_spells) catch unreachable;
-    const num_generated = Spell.makeRoomReward(self.rng.random(), reward.spells.slice());
-    reward.spells.resize(num_generated) catch unreachable;
+    const num_spells_generated = Spell.makeRoomReward(random, reward.spells.slice());
+    reward.spells.resize(num_spells_generated) catch unreachable;
+    const num_items = random.uintAtMost(usize, Reward.base_items);
+    if (num_items > 0) {
+        reward.items.resize(num_items) catch unreachable;
+        const num_items_generated = Item.makeRoomReward(random, reward.items.slice());
+        reward.items.resize(num_items_generated) catch unreachable;
+    }
     self.reward = reward;
     self.reward_ui = self.makeRewardUI();
     self.screen = .reward;
@@ -286,8 +296,11 @@ pub fn gameUpdate(self: *Run) Error!void {
         .none => {},
         .lost => {},
         .won => {
-            if (self.reward == null and self.places.get(self.curr_place_idx).room.kind == .normal) {
+            const curr_room_place = self.places.get(self.curr_place_idx).room;
+            if (self.reward == null and curr_room_place.kind == .normal) {
                 self.makeReward();
+                // TODO bettterrr?
+                self.gold += u.as(i32, @floor(curr_room_place.difficulty));
             }
         },
         .exited => |exit_door| {
