@@ -71,7 +71,7 @@ pub const SpriteSheet = struct {
     meta: []Meta = &.{},
 };
 
-const test_rooms_strings = [_][]const u8{
+const test_rooms_strs = [_][]const u8{
     \\#########################
     \\#         ##        ### #
     \\#   ##    ##          # #
@@ -102,7 +102,7 @@ const test_rooms_strings = [_][]const u8{
     ,
 };
 
-const first_room =
+const first_room_str =
     \\###############
     \\#             #
     \\#   #  #  #   #
@@ -112,7 +112,20 @@ const first_room =
     \\###############
 ;
 
-const rooms_strings = [_][]const u8{
+const boss_room_str =
+    \\###############
+    \\###    &    ###
+    \\##  2     2  ##
+    \\#   ##   ##   #
+    \\#   ## 0 ##  ##
+    \\# 1         1 #
+    \\#   # # # #   #
+    \\##  3     3  ##
+    \\###    p    ###
+    \\###############
+;
+
+const normal_room_strs = [_][]const u8{
     \\############
     \\#          #
     \\#     1    #
@@ -233,8 +246,11 @@ creature_anims: AllCreatureAnimArrays = undefined,
 spell_icons: IconSprites(Spell.Kind) = undefined,
 item_icons: IconSprites(Item.Kind) = undefined,
 sounds: std.EnumArray(SFX, ?Platform.Sound) = undefined,
+// roooms
 test_rooms: std.BoundedArray(PackedRoom, 32) = .{},
-rooms: std.BoundedArray(PackedRoom, 32) = .{},
+normal_rooms: std.BoundedArray(PackedRoom, 32) = .{},
+boss_room: PackedRoom = undefined,
+first_room: PackedRoom = undefined,
 
 pub const SFX = enum {
     thwack,
@@ -461,11 +477,13 @@ pub fn reload(self: *Data) Error!void {
         },
     );
     self.test_rooms = .{};
-    for (test_rooms_strings) |s| {
+    for (test_rooms_strs) |s| {
         try self.test_rooms.append(try PackedRoom.init(s));
     }
-    self.rooms = .{};
-    for (rooms_strings) |s| {
-        try self.rooms.append(try PackedRoom.init(s));
+    self.normal_rooms = .{};
+    for (normal_room_strs) |s| {
+        try self.normal_rooms.append(try PackedRoom.init(s));
     }
+    self.first_room = try PackedRoom.init(first_room_str);
+    self.boss_room = try PackedRoom.init(boss_room_str);
 }

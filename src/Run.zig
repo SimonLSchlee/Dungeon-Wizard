@@ -79,6 +79,26 @@ pub fn makeStarterDeck(dbg: bool) Spell.SpellArray {
     return ret;
 }
 
+pub const PlaceKind = enum {
+    room,
+    shop,
+};
+pub const Place = union(PlaceKind) {
+    pub const Array = std.BoundedArray(Place, 32);
+
+    room: struct {
+        kind: union(enum) {
+            first,
+            normal: usize,
+            boss,
+        },
+        difficulty: f32,
+    },
+    shop: struct {
+        num: usize,
+    },
+};
+
 gold: i32 = 0,
 room: ?Room = null,
 reward: ?Spell.Reward = null,
@@ -93,8 +113,8 @@ screen: enum {
 } = .game,
 seed: u64,
 rng: std.Random.DefaultPrng = undefined,
-packed_room_data_indices: std.BoundedArray(usize, 32) = .{},
-curr_room_idx: usize = 0,
+places: Place.Array = .{},
+curr_place_idx: usize = 0,
 player_thing: Thing = undefined,
 deck: Spell.SpellArray = .{},
 load_timer: u.TickCounter = u.TickCounter.init(20),
@@ -115,11 +135,22 @@ pub fn init(seed: u64) Error!Run {
         .game_pause_ui = makeGamePauseUI(),
         .player_thing = app.data.creatures.get(.player),
     };
-    for (0..app.data.rooms.len) |i| {
-        try ret.packed_room_data_indices.append(i);
+    var places = Place.Array{};
+    for (0..app.data.normal_rooms.len) |i| {
+        try places.append(.{ .room = .{ .difficulty = 0, .kind = .{ .normal = i } } });
     }
-    assert(ret.packed_room_data_indices.len > 0);
-    try ret.loadRoomFromCurrIdx();
+    assert(places.len >= 2);
+    ret.rng.random().shuffleWithIndex(Place, places.slice(), u32);
+    for (places.slice(), 0..) |*place, i| {
+        place.room.difficulty = 4 + u.as(f32, i) * 2;
+    }
+    try places.insert(places.len / 2, .{ .shop = .{ .num = 0 } });
+    try places.insert(0, .{ .room = .{ .difficulty = 0, .kind = .first } });
+    try places.append(.{ .shop = .{ .num = 1 } });
+    try places.append(.{ .room = .{ .difficulty = places.get(places.len - 2).room.difficulty, .kind = .boss } });
+    ret.places = places;
+
+    try ret.loadPlaceFromCurrIdx();
 
     return ret;
 }
@@ -138,25 +169,42 @@ pub fn reset(self: *Run) Error!*Run {
     return self;
 }
 
-pub fn loadRoomFromCurrIdx(self: *Run) Error!void {
+pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
     const data = App.get().data;
     if (self.room) |*room| {
         room.deinit();
+        self.room = null;
     }
-    const idx = self.packed_room_data_indices.get(self.curr_room_idx);
-    const packed_room = data.rooms.get(idx);
-    const exit_doors = self.makeExitDoors(packed_room);
-    const waves_params = Room.WavesParams{
-        .difficulty = 4 + u.as(f32, self.curr_room_idx) * 2,
-    };
-    self.room = try Room.init(.{
-        .deck = self.deck,
-        .waves_params = waves_params,
-        .packed_room = packed_room,
-        .seed = self.rng.random().int(u64),
-        .exits = exit_doors,
-        .player = self.player_thing,
-    });
+    switch (self.places.get(self.curr_place_idx)) {
+        .room => |r| {
+            const packed_room = switch (r.kind) {
+                .first => data.first_room,
+                .normal => |idx| data.normal_rooms.get(idx),
+                .boss => data.boss_room,
+            };
+            const exit_doors = self.makeExitDoors(packed_room);
+            const waves_params = Room.WavesParams{
+                .difficulty = r.difficulty,
+            };
+            self.room = try Room.init(.{
+                .deck = self.deck,
+                .waves_params = waves_params,
+                .packed_room = packed_room,
+                .seed = self.rng.random().int(u64),
+                .exits = exit_doors,
+                .player = self.player_thing,
+            });
+            // TODO hacky
+            // update once to clear fog
+            try self.room.?.update();
+            self.screen = .game;
+        },
+        .shop => |s| {
+            _ = s.num;
+            // TODO generate shop
+            self.screen = .shop;
+        },
+    }
 }
 
 pub fn makeExitDoors(_: *Run, packed_room: PackedRoom) std.BoundedArray(gameUI.ExitDoor, 4) {
@@ -173,103 +221,135 @@ pub fn makeSpellReward(self: *Run) void {
     self.screen = .reward;
 }
 
-pub fn update(self: *Run) Error!void {
-    const plat = getPlat();
+fn loadNextPlace(self: *Run) void {
+    self.load_state = .fade_out;
+}
 
-    switch (self.load_state) {
+pub fn gameUpdate(self: *Run) Error!void {
+    const plat = getPlat();
+    assert(self.room != null);
+    const room = &self.room.?;
+
+    if (debug.enable_debug_controls) {
+        if (plat.input_buffer.keyIsJustPressed(.f3)) {
+            _ = try self.reset();
+        }
+        if (plat.input_buffer.keyIsJustPressed(.f4)) {
+            try room.reset();
+        }
+        if (plat.input_buffer.keyIsJustPressed(.o)) {
+            self.makeSpellReward();
+        }
+        if (plat.input_buffer.keyIsJustPressed(.l)) {
+            self.loadNextPlace();
+        }
+        if (room.edit_mode) {
+            if (plat.input_buffer.getNumberKeyJustPressed()) |num| {
+                const app = App.get();
+                const n: usize = if (num == 0) 9 else num - 1;
+                if (n < app.data.test_rooms.len) {
+                    const packed_room = app.data.test_rooms.get(n);
+                    try room.reloadFromPackedRoom(packed_room);
+                }
+            }
+        }
+    }
+    if (!room.edit_mode) {
+        if (plat.input_buffer.keyIsJustPressed(.escape)) {
+            room.paused = true;
+            self.screen = .pause_menu;
+        }
+    }
+    try room.update();
+    switch (room.progress_state) {
         .none => {},
+        .lost => {},
+        .won => {
+            if (self.reward == null and self.places.get(self.curr_place_idx).room.kind == .normal) {
+                self.makeSpellReward();
+            }
+        },
+        .exited => |exit_door| {
+            _ = exit_door;
+            self.player_thing.hp = room.getConstPlayer().?.hp.?;
+            self.loadNextPlace();
+        },
+    }
+    if (room.paused) {
+        // TODO update game pause ui
+    }
+}
+
+pub fn pauseMenuUpdate(self: *Run) Error!void {
+    const plat = getPlat();
+    // TODO could pause in shop or w/e
+    assert(self.room != null);
+    const room = &self.room.?;
+    if (plat.input_buffer.keyIsJustPressed(.space) or plat.input_buffer.keyIsJustPressed(.escape)) {
+        room.paused = false;
+        self.screen = .game;
+    }
+}
+
+pub fn rewardUpdate(self: *Run) Error!void {
+    const plat = getPlat();
+    _ = plat;
+    // TODO could get rewards not in room?
+    assert(self.room != null);
+    const room = &self.room.?;
+    assert(self.reward != null);
+    const reward = &self.reward.?;
+    const reward_ui = self.reward_ui;
+    if (reward_ui.skip_button.isClicked()) {
+        self.screen = .game;
+    } else {
+        for (reward_ui.rects.constSlice(), 0..) |crect, i| {
+            if (crect.isClicked()) {
+                const spell = reward.spells.get(i);
+                try self.deck.append(spell);
+                // TODO ugh?
+                room.init_params.deck.append(spell) catch unreachable;
+                room.draw_pile.append(spell) catch unreachable;
+                self.screen = .game;
+                break;
+            }
+        }
+    }
+}
+
+pub fn shopUpdate(self: *Run) Error!void {
+    const plat = getPlat();
+    if (plat.input_buffer.mouseBtnIsJustPressed(.left)) {
+        self.loadNextPlace();
+    }
+    // TODO
+}
+
+pub fn deadUpdate(self: *Run) Error!void {
+    const plat = getPlat();
+    _ = plat;
+    _ = self;
+    // TODO
+}
+
+pub fn update(self: *Run) Error!void {
+    switch (self.load_state) {
+        .none => switch (self.screen) {
+            .game => try self.gameUpdate(),
+            .pause_menu => try self.pauseMenuUpdate(),
+            .reward => try self.rewardUpdate(),
+            .shop => try self.shopUpdate(),
+            .dead => try self.deadUpdate(),
+        },
         .fade_in => if (self.load_timer.tick(true)) {
             self.load_state = .none;
         },
         .fade_out => if (self.load_timer.tick(true)) {
-            self.curr_room_idx += 1;
-            try self.loadRoomFromCurrIdx();
+            self.curr_place_idx += 1;
+            try self.loadPlaceFromCurrIdx();
             self.reward = null;
             self.load_state = .fade_in;
         },
-    }
-    assert(self.room != null);
-    const room = &self.room.?;
-
-    switch (self.screen) {
-        .game => {
-            if (debug.enable_debug_controls) {
-                if (plat.input_buffer.keyIsJustPressed(.f3)) {
-                    _ = try self.reset();
-                }
-                if (plat.input_buffer.keyIsJustPressed(.f4)) {
-                    try room.reset();
-                }
-                if (plat.input_buffer.keyIsJustPressed(.o)) {
-                    self.makeSpellReward();
-                }
-                if (plat.input_buffer.keyIsJustPressed(.l)) {
-                    self.load_state = .fade_out;
-                }
-                if (room.edit_mode) {
-                    if (plat.input_buffer.getNumberKeyJustPressed()) |num| {
-                        const app = App.get();
-                        const n: usize = if (num == 0) 9 else num - 1;
-                        if (n < app.data.test_rooms.len) {
-                            const packed_room = app.data.test_rooms.get(n);
-                            try room.reloadFromPackedRoom(packed_room);
-                        }
-                    }
-                }
-            }
-            if (!room.edit_mode) {
-                if (plat.input_buffer.keyIsJustPressed(.escape)) {
-                    room.paused = true;
-                    self.screen = .pause_menu;
-                }
-            }
-            try room.update();
-            switch (room.progress_state) {
-                .none => {},
-                .lost => {},
-                .won => {
-                    if (self.reward == null) {
-                        self.makeSpellReward();
-                    }
-                },
-                .exited => |exit_door| {
-                    _ = exit_door;
-                    self.load_state = .fade_out;
-                    self.player_thing.hp = room.getConstPlayer().?.hp.?;
-                },
-            }
-            if (room.paused) {
-                // TODO update game pause ui
-            }
-        },
-        .pause_menu => {
-            if (plat.input_buffer.keyIsJustPressed(.space) or plat.input_buffer.keyIsJustPressed(.escape)) {
-                room.paused = false;
-                self.screen = .game;
-            }
-        },
-        .reward => {
-            assert(self.reward != null);
-            const reward = &self.reward.?;
-            const reward_ui = self.reward_ui;
-            if (reward_ui.skip_button.isClicked()) {
-                self.screen = .game;
-            } else {
-                for (reward_ui.rects.constSlice(), 0..) |crect, i| {
-                    if (crect.isClicked()) {
-                        const spell = reward.spells.get(i);
-                        try self.deck.append(spell);
-                        // TODO ugh?
-                        room.init_params.deck.append(spell) catch unreachable;
-                        room.draw_pile.append(spell) catch unreachable;
-                        self.screen = .game;
-                        break;
-                    }
-                }
-            }
-        },
-        .shop => {},
-        .dead => {},
     }
 }
 
@@ -363,19 +443,21 @@ pub fn render(self: *Run) Error!void {
     const plat = getPlat();
     plat.clear(Colorf.magenta);
     // room is always present
-    assert(self.room != null);
-    const room = &self.room.?;
-    try room.render();
-    //const game_scale: i32 = 2;
-    //const game_dims_scaled_f = game_dims.scale(game_scale).toV2f();
-    //const topleft = p.screen_dims_f.sub(game_dims_scaled_f).scale(0.5);
-    const game_texture_opt = .{
-        .flip_y = true,
-    };
-    plat.texturef(.{}, room.render_texture.?.texture, game_texture_opt);
+    if (self.room) |room| {
+        try room.render();
+        //const game_scale: i32 = 2;
+        //const game_dims_scaled_f = game_dims.scale(game_scale).toV2f();
+        //const topleft = p.screen_dims_f.sub(game_dims_scaled_f).scale(0.5);
+        const game_texture_opt = .{
+            .flip_y = true,
+        };
+        plat.texturef(.{}, room.render_texture.?.texture, game_texture_opt);
+    }
 
     switch (self.screen) {
         .game => {
+            assert(self.room != null);
+            const room = &self.room.?;
             if (room.paused) {
                 try self.game_pause_ui.deck_button.render();
                 try self.game_pause_ui.pause_menu_button.render();
@@ -400,7 +482,9 @@ pub fn render(self: *Run) Error!void {
             }
             try reward_ui.skip_button.render();
         },
-        .shop => {},
+        .shop => {
+            try plat.textf(plat.screen_dims_f.scale(0.5), "Shop placeholder, click to proceed", .{}, .{ .center = true, .color = .white });
+        },
         .dead => {},
     }
     { // gold
