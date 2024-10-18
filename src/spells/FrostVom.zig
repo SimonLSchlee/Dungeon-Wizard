@@ -42,7 +42,7 @@ const cone_rads: f32 = utl.pi / 3;
 pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
     .{
-        .cast_time = 2,
+        .cast_time = 3,
         .color = StatusEffect.proto_array.get(.frozen).color,
         .targeting_data = .{
             .kind = .pos,

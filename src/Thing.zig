@@ -230,6 +230,8 @@ pub const HurtBox = struct {
         if (self.hp) |hp| {
             if (hp.curr == 0) {
                 const mint_status = self.statuses.get(.mint);
+                // TODO maybe dont access Run here, more testable/reproduceableeeu?
+                // e.g. have something like Room.rewards and add it there, and Run will grab it later
                 const run = &App.get().run;
                 run.gold += mint_status.stacks;
 

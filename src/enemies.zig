@@ -416,7 +416,7 @@ pub fn bat() Error!Thing {
         .spawn_state = .instance,
         .coll_radius = 9,
         .accel_params = .{
-            .max_speed = 0.9,
+            .max_speed = 1,
         },
         .vision_range = 160,
         .coll_mask = Thing.Collision.Mask.initMany(&.{ .creature, .tile }),
