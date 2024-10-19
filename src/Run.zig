@@ -29,6 +29,17 @@ const Shop = @import("Shop.zig");
 const Item = @import("Item.zig");
 
 pub const Reward = struct {
+    pub const UI = struct {
+        modal_topleft: V2f,
+        modal_dims: V2f,
+        modal_opt: draw.PolyOpt,
+        title_center: V2f,
+        title_opt: draw.TextOpt,
+        spell_rects: std.BoundedArray(menuUI.ClickableRect, max_spells),
+        item_rects: std.BoundedArray(menuUI.ClickableRect, max_items),
+        skip_or_continue_button: menuUI.Button,
+    };
+
     const base_spells: usize = 3;
     const max_spells = 8;
     const base_items = 1;
@@ -36,14 +47,6 @@ pub const Reward = struct {
 
     spells: std.BoundedArray(Spell, max_spells) = .{},
     items: std.BoundedArray(Item, max_items) = .{},
-};
-
-pub const RewardUI = struct {
-    modal_topleft: V2f,
-    modal_dims: V2f,
-    modal_opt: draw.PolyOpt,
-    rects: std.BoundedArray(menuUI.ClickableRect, 8),
-    skip_button: menuUI.Button,
 };
 
 pub const GamePauseUI = struct {
@@ -115,7 +118,7 @@ gold: i32 = 0,
 room: ?Room = null,
 reward: ?Reward = null,
 shop: ?Shop = null,
-reward_ui: RewardUI = undefined,
+reward_ui: Reward.UI = undefined,
 game_pause_ui: GamePauseUI = undefined,
 screen: enum {
     game,
@@ -259,8 +262,51 @@ pub fn makeReward(self: *Run) void {
         reward.items.resize(num_items_generated) catch unreachable;
     }
     self.reward = reward;
-    self.reward_ui = self.makeRewardUI();
+    self.reward_ui = makeRewardUI(&reward);
     self.screen = .reward;
+}
+
+pub fn canPickupProduct(self: *const Run, product: *const Shop.Product) bool {
+    switch (product.kind) {
+        .spell => |_| {
+            if (self.deck.len >= self.deck.buffer.len) return false;
+        },
+        .item => |_| {
+            if (self.slots_init_params.items.len >= self.slots_init_params.items.buffer.len) return false;
+            for (self.slots_init_params.items.constSlice()) |maybe_item| {
+                if (maybe_item == null) break;
+            } else {
+                return false;
+            }
+        },
+    }
+    return true;
+}
+
+pub fn pickupProduct(self: *Run, product: *const Shop.Product) void {
+    assert(self.canPickupProduct(product));
+    switch (product.kind) {
+        .spell => |spell| {
+            assert(self.deck.len < self.deck.buffer.len);
+            self.deck.append(spell) catch unreachable;
+            // TODO ugh?
+            if (self.room) |*room| {
+                room.init_params.deck.append(spell) catch unreachable;
+                room.draw_pile.append(spell) catch unreachable;
+            }
+        },
+        .item => |item| {
+            assert(self.slots_init_params.items.len < self.slots_init_params.items.buffer.len);
+            for (self.slots_init_params.items.slice()) |*item_slot| {
+                if (item_slot.* == null) {
+                    item_slot.* = item;
+                    break;
+                }
+            } else {
+                unreachable;
+            }
+        },
+    }
 }
 
 fn loadNextPlace(self: *Run) void {
@@ -336,22 +382,33 @@ pub fn rewardUpdate(self: *Run) Error!void {
     const plat = getPlat();
     _ = plat;
     // TODO could get rewards not in room?
-    assert(self.room != null);
-    const room = &self.room.?;
     assert(self.reward != null);
     const reward = &self.reward.?;
     const reward_ui = self.reward_ui;
-    if (reward_ui.skip_button.isClicked()) {
+    if (reward_ui.skip_or_continue_button.isClicked()) {
         self.screen = .game;
     } else {
-        for (reward_ui.rects.constSlice(), 0..) |crect, i| {
+        for (reward_ui.spell_rects.constSlice(), 0..) |crect, i| {
             if (crect.isClicked()) {
                 const spell = reward.spells.get(i);
-                try self.deck.append(spell);
-                // TODO ugh?
-                room.init_params.deck.append(spell) catch unreachable;
-                room.draw_pile.append(spell) catch unreachable;
-                self.screen = .game;
+                const product = Shop.Product{ .kind = .{ .spell = spell } };
+                if (self.canPickupProduct(&product)) {
+                    self.pickupProduct(&product);
+                    reward.spells.len = 0;
+                }
+                self.reward_ui = makeRewardUI(reward);
+                break;
+            }
+        }
+        for (reward_ui.item_rects.constSlice(), 0..) |crect, i| {
+            if (crect.isClicked()) {
+                const item = reward.items.get(i);
+                const product = Shop.Product{ .kind = .{ .item = item } };
+                if (self.canPickupProduct(&product)) {
+                    self.pickupProduct(&product);
+                }
+                _ = reward.items.orderedRemove(i);
+                self.reward_ui = makeRewardUI(reward);
                 break;
             }
         }
@@ -372,27 +429,11 @@ pub fn shopUpdate(self: *Run) Error!void {
         }
     }
 
-    if (try shop.update(self)) |product| {
+    if (try shop.update(self)) |*product| {
         const price = product.price.gold;
         assert(self.gold >= price);
         self.gold -= price;
-        switch (product.kind) {
-            .spell => |spell| {
-                assert(self.deck.len < self.deck.buffer.len);
-                self.deck.append(spell) catch unreachable;
-            },
-            .item => |item| {
-                assert(self.slots_init_params.items.len < self.slots_init_params.items.buffer.len);
-                for (self.slots_init_params.items.slice()) |*item_slot| {
-                    if (item_slot.* == null) {
-                        item_slot.* = item;
-                        break;
-                    }
-                } else {
-                    unreachable;
-                }
-            },
-        }
+        self.pickupProduct(product);
     }
     if (shop.state == .done) {
         self.loadNextPlace();
@@ -474,39 +515,56 @@ fn makeGamePauseUI() GamePauseUI {
     };
 }
 
-fn makeRewardUI(self: *Run) RewardUI {
+fn makeRewardUI(reward: *const Reward) Reward.UI {
     const plat = App.getPlat();
-    assert(self.reward != null);
-    const reward = self.reward.?;
-    const slot_aspect = 0.7;
     const modal_dims = v2f(plat.screen_dims_f.x * 0.75, plat.screen_dims_f.y * 0.6);
     const modal_topleft = plat.screen_dims_f.sub(modal_dims).scale(0.5);
-    const modal_padding = plat.screen_dims_f.scale(0.08);
-    const slots_dims = modal_dims.sub(modal_padding.scale(2));
-    const slots_topleft = modal_topleft.add(modal_padding);
-    const slot_spacing = modal_padding.x * 0.3;
-    const num_slots_f = u.as(f32, reward.spells.len);
-    const slots_spacing_total = (num_slots_f - 1) * (slot_spacing);
-    const slot_width = (slots_dims.x - slots_spacing_total) / num_slots_f;
-    const slot_dims = v2f(slot_width, slot_width / slot_aspect);
-
     const modal_opt = draw.PolyOpt{
         .fill_color = Colorf.rgba(0.1, 0.1, 0.1, 0.8),
         .outline_color = Colorf.rgba(0.1, 0.1, 0.2, 0.8),
         .outline_thickness = 4,
     };
+    var curr_row_y = modal_topleft.y + 10;
+    const center_x = modal_topleft.x + modal_dims.x * 0.5;
 
-    var rects = std.BoundedArray(menuUI.ClickableRect, 8){};
-    for (0..reward.spells.len) |i| {
-        const offset = v2f(u.as(f32, i) * (slot_dims.x + slot_spacing), 0);
-        const pos = slots_topleft.add(offset);
-        rects.append(.{ .pos = pos, .dims = slot_dims }) catch unreachable;
+    // title
+    const title_center = v2f(curr_row_y + 20, center_x);
+    const title_opt = draw.TextOpt{
+        .size = 40,
+        .color = .white,
+        .center = true,
+    };
+    curr_row_y += 50;
+
+    // spells
+    const spell_dims = v2f(250, 250.0 / 0.7);
+    var spell_grects = std.BoundedArray(geom.Rectf, Reward.max_spells){};
+    spell_grects.resize(reward.spells.len) catch unreachable;
+    if (spell_grects.len > 0) {
+        gameUI.layoutRectsFixedSize(spell_grects.len, spell_dims, v2f(center_x, curr_row_y + spell_dims.y * 0.5), .{ .direction = .horizontal, .space_between = 20 }, spell_grects.slice());
     }
+    // TODO ARARGHH
+    var spell_rects = std.BoundedArray(menuUI.ClickableRect, Reward.max_spells){};
+    for (spell_grects.constSlice()) |r| {
+        spell_rects.append(.{ .dims = r.dims, .pos = r.pos }) catch unreachable;
+    }
+    curr_row_y += spell_dims.y + 20;
 
-    const skip_btn_dims = modal_dims.scale(0.1);
-    const slots_bottom_y = slots_topleft.y + slots_dims.y;
-    const space_left_y = @max(slots_bottom_y - modal_topleft.y - modal_dims.y, 0);
-    const skip_btn_center = v2f(slots_topleft.x + slots_dims.x * 0.5, slots_bottom_y + space_left_y * 0.5);
+    const item_dims = v2f(100, 100);
+    var item_grects = std.BoundedArray(geom.Rectf, Reward.max_spells){};
+    item_grects.resize(reward.items.len) catch unreachable;
+    if (item_grects.len > 0) {
+        gameUI.layoutRectsFixedSize(item_grects.len, item_dims, v2f(center_x, curr_row_y + item_dims.y * 0.5), .{ .direction = .horizontal, .space_between = 20 }, item_grects.slice());
+    }
+    // TODO ARARGHH
+    var item_rects = std.BoundedArray(menuUI.ClickableRect, Reward.max_spells){};
+    for (item_grects.constSlice()) |r| {
+        item_rects.append(.{ .dims = r.dims, .pos = r.pos }) catch unreachable;
+    }
+    curr_row_y += item_dims.y + 20;
+
+    const skip_btn_dims = v2f(200, 100);
+    const skip_btn_center = v2f(center_x, curr_row_y + skip_btn_dims.y * 0.5);
     var skip_button = menuUI.Button{
         .rect = .{
             .pos = skip_btn_center.sub(skip_btn_dims.scale(0.5)),
@@ -516,14 +574,22 @@ fn makeRewardUI(self: *Run) RewardUI {
         .text_opt = .{ .center = true, .color = .black, .size = 30 },
         .text_rel_pos = skip_btn_dims.scale(0.5),
     };
-    skip_button.text = @TypeOf(skip_button.text).init("Skip") catch unreachable;
+    if (reward.items.len == 0 and reward.spells.len == 0) {
+        skip_button.poly_opt.fill_color = .cyan;
+        skip_button.text = @TypeOf(skip_button.text).init("Continue") catch unreachable;
+    } else {
+        skip_button.text = @TypeOf(skip_button.text).init("Skip") catch unreachable;
+    }
 
     return .{
         .modal_dims = modal_dims,
         .modal_topleft = modal_topleft,
         .modal_opt = modal_opt,
-        .rects = rects,
-        .skip_button = skip_button,
+        .title_center = title_center,
+        .title_opt = title_opt,
+        .spell_rects = spell_rects,
+        .item_rects = item_rects,
+        .skip_or_continue_button = skip_button,
     };
 }
 
@@ -557,7 +623,8 @@ pub fn render(self: *Run) Error!void {
             const reward = &self.reward.?;
             const reward_ui = self.reward_ui;
             plat.rectf(reward_ui.modal_topleft, reward_ui.modal_dims, reward_ui.modal_opt);
-            for (reward_ui.rects.constSlice(), 0..) |crect, i| {
+            try plat.textf(reward_ui.title_center, "Choose 1", .{}, reward_ui.title_opt);
+            for (reward_ui.spell_rects.constSlice(), 0..) |crect, i| {
                 const spell = reward.spells.get(i);
                 var hovered_crect = crect;
                 if (crect.isHovered()) {
@@ -568,7 +635,19 @@ pub fn render(self: *Run) Error!void {
                 }
                 try spell.renderInfo(hovered_crect);
             }
-            try reward_ui.skip_button.render();
+            for (reward_ui.item_rects.constSlice(), 0..) |crect, i| {
+                const item = reward.items.get(i);
+                var hovered_crect = crect;
+                if (crect.isHovered()) {
+                    const new_dims = crect.dims.scale(1.1);
+                    const new_pos = crect.pos.sub(new_dims.sub(crect.dims).scale(0.5));
+                    hovered_crect.pos = new_pos;
+                    hovered_crect.dims = new_dims;
+                }
+                plat.rectf(hovered_crect.pos, hovered_crect.dims, .{ .fill_color = .darkgray });
+                try item.renderIcon(hovered_crect);
+            }
+            try reward_ui.skip_or_continue_button.render();
         },
         .shop => {
             assert(self.shop != null);

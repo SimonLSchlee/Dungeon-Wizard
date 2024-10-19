@@ -282,6 +282,33 @@ pub fn getRenderIconInfo(self: *const Item) sprites.RenderIconInfo {
     }
 }
 
+pub fn renderIcon(self: *const Item, rect: menuUI.ClickableRect) Error!void {
+    const icon_center_pos = rect.pos.add(rect.dims.scale(0.5));
+    const plat = App.getPlat();
+    switch (self.getRenderIconInfo()) {
+        .frame => |frame| {
+            plat.texturef(icon_center_pos, frame.texture, .{
+                .origin = .center,
+                .src_pos = frame.pos.toV2f(),
+                .src_dims = frame.size.toV2f(),
+                .scaled_dims = rect.dims,
+            });
+        },
+        .letter => |letter| {
+            try plat.textf(
+                icon_center_pos,
+                "{s}",
+                .{&letter.str},
+                .{
+                    .color = letter.color,
+                    .size = utl.as(u32, rect.dims.y),
+                    .center = true,
+                },
+            );
+        },
+    }
+}
+
 pub fn renderInfo(self: *const Item, rect: menuUI.ClickableRect) Error!void {
     const plat = App.getPlat();
     const title_rect_dims = v2f(rect.dims.x, rect.dims.y * 0.2);
@@ -295,33 +322,15 @@ pub fn renderInfo(self: *const Item, rect: menuUI.ClickableRect) Error!void {
     try menuUI.textInRect(rect.pos, title_rect_dims, .{ .fill_color = null }, v2f(5, 5), "{s}", .{name}, .{ .color = .white });
 
     const icon_center_pos = rect.pos.add(v2f(0, title_rect_dims.y)).add(icon_rect_dims.scale(0.5));
+    const icon_top_left = icon_center_pos.sub(icon_rect_dims.scale(0.5));
     // item image
-    plat.rectf(icon_center_pos.sub(icon_rect_dims.scale(0.5)), icon_rect_dims, .{ .fill_color = .black });
+    plat.rectf(icon_top_left, icon_rect_dims, .{ .fill_color = .black });
     const icon_square_dim = @min(icon_rect_dims.x, icon_rect_dims.y);
     const icon_square = V2f.splat(icon_square_dim);
+    const icon_square_top_left = icon_center_pos.sub(icon_square.scale(0.5));
 
-    switch (self.getRenderIconInfo()) {
-        .frame => |frame| {
-            plat.texturef(icon_center_pos, frame.texture, .{
-                .origin = .center,
-                .src_pos = frame.pos.toV2f(),
-                .src_dims = frame.size.toV2f(),
-                .scaled_dims = icon_square,
-            });
-        },
-        .letter => |letter| {
-            try plat.textf(
-                icon_center_pos,
-                "{s}",
-                .{&letter.str},
-                .{
-                    .color = letter.color,
-                    .size = 40,
-                    .center = true,
-                },
-            );
-        },
-    }
+    try self.renderIcon(.{ .pos = icon_square_top_left, .dims = icon_square });
+
     const description_text = item_descriptions.get(kind);
     const description_rect_topleft = rect.pos.add(v2f(0, title_rect_dims.y + icon_rect_dims.y));
     try menuUI.textInRect(description_rect_topleft, description_dims, .{ .fill_color = null }, v2f(10, 10), "{s}", .{description_text}, .{ .color = .white });

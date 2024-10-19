@@ -28,14 +28,14 @@ const gameUI = @import("gameUI.zig");
 const Item = @import("Item.zig");
 const Shop = @This();
 
-const Product = struct {
+pub const Product = struct {
     kind: union(enum) {
         spell: Spell,
         item: Item,
     },
     price: union(enum) {
         gold: i32,
-    },
+    } = .{ .gold = 10 },
 };
 
 const ProductSlot = struct {
@@ -160,23 +160,9 @@ pub fn reset(self: *Shop) Error!*Shop {
     return self;
 }
 
-pub fn canBuy(run: *const Run, product: Product) bool {
+pub fn canBuy(run: *const Run, product: *const Product) bool {
     const price = product.price.gold;
-    if (run.gold < price) return false;
-    switch (product.kind) {
-        .spell => |_| {
-            if (run.deck.len >= run.deck.buffer.len) return false;
-        },
-        .item => |_| {
-            if (run.slots_init_params.items.len >= run.slots_init_params.items.buffer.len) return false;
-            for (run.slots_init_params.items.constSlice()) |maybe_item| {
-                if (maybe_item == null) break;
-            } else {
-                return false;
-            }
-        },
-    }
-    return true;
+    return run.gold >= price and run.canPickupProduct(product);
 }
 
 pub fn update(self: *Shop, run: *const Run) Error!?Product {
@@ -186,7 +172,7 @@ pub fn update(self: *Shop, run: *const Run) Error!?Product {
 
     for (self.products.slice()) |*slot| {
         if (slot.product == null) continue;
-        const product = slot.product.?;
+        const product = &slot.product.?;
         var hovered_crect = slot.rect;
         if (hovered_crect.isHovered()) {
             const new_dims = slot.rect.dims.scale(1.1);
@@ -196,7 +182,7 @@ pub fn update(self: *Shop, run: *const Run) Error!?Product {
         }
         if (hovered_crect.isClicked()) {
             if (canBuy(run, product)) {
-                ret = product;
+                ret = product.*;
                 slot.product = null;
                 break;
             }
