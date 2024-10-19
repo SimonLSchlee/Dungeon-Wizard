@@ -517,24 +517,24 @@ fn makeGamePauseUI() GamePauseUI {
 
 fn makeRewardUI(reward: *const Reward) Reward.UI {
     const plat = App.getPlat();
-    const modal_dims = v2f(plat.screen_dims_f.x * 0.75, plat.screen_dims_f.y * 0.6);
+    const modal_dims = v2f(plat.screen_dims_f.x * 0.8, plat.screen_dims_f.y * 0.8);
     const modal_topleft = plat.screen_dims_f.sub(modal_dims).scale(0.5);
     const modal_opt = draw.PolyOpt{
         .fill_color = Colorf.rgba(0.1, 0.1, 0.1, 0.8),
         .outline_color = Colorf.rgba(0.1, 0.1, 0.2, 0.8),
         .outline_thickness = 4,
     };
-    var curr_row_y = modal_topleft.y + 10;
+    var curr_row_y = modal_topleft.y + 20;
     const center_x = modal_topleft.x + modal_dims.x * 0.5;
 
     // title
-    const title_center = v2f(curr_row_y + 20, center_x);
+    const title_center = v2f(center_x, curr_row_y + 40);
     const title_opt = draw.TextOpt{
         .size = 40,
         .color = .white,
         .center = true,
     };
-    curr_row_y += 50;
+    curr_row_y += 80;
 
     // spells
     const spell_dims = v2f(250, 250.0 / 0.7);
@@ -548,7 +548,7 @@ fn makeRewardUI(reward: *const Reward) Reward.UI {
     for (spell_grects.constSlice()) |r| {
         spell_rects.append(.{ .dims = r.dims, .pos = r.pos }) catch unreachable;
     }
-    curr_row_y += spell_dims.y + 20;
+    curr_row_y += spell_dims.y + 40;
 
     const item_dims = v2f(100, 100);
     var item_grects = std.BoundedArray(geom.Rectf, Reward.max_spells){};
@@ -561,9 +561,9 @@ fn makeRewardUI(reward: *const Reward) Reward.UI {
     for (item_grects.constSlice()) |r| {
         item_rects.append(.{ .dims = r.dims, .pos = r.pos }) catch unreachable;
     }
-    curr_row_y += item_dims.y + 20;
+    curr_row_y += item_dims.y + 40;
 
-    const skip_btn_dims = v2f(200, 100);
+    const skip_btn_dims = v2f(150, 70);
     const skip_btn_center = v2f(center_x, curr_row_y + skip_btn_dims.y * 0.5);
     var skip_button = menuUI.Button{
         .rect = .{
@@ -637,8 +637,10 @@ pub fn render(self: *Run) Error!void {
             }
             for (reward_ui.item_rects.constSlice(), 0..) |crect, i| {
                 const item = reward.items.get(i);
+                var show_tooltip = false;
                 var hovered_crect = crect;
                 if (crect.isHovered()) {
+                    show_tooltip = true;
                     const new_dims = crect.dims.scale(1.1);
                     const new_pos = crect.pos.sub(new_dims.sub(crect.dims).scale(0.5));
                     hovered_crect.pos = new_pos;
@@ -646,6 +648,9 @@ pub fn render(self: *Run) Error!void {
                 }
                 plat.rectf(hovered_crect.pos, hovered_crect.dims, .{ .fill_color = .darkgray });
                 try item.renderIcon(hovered_crect);
+                if (show_tooltip) {
+                    try item.renderToolTip(hovered_crect.pos.add(v2f(hovered_crect.dims.x, 0)));
+                }
             }
             try reward_ui.skip_or_continue_button.render();
         },

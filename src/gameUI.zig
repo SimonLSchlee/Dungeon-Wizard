@@ -47,6 +47,7 @@ pub const Slots = struct {
             item: ?Item,
         },
         cooldown_timer: ?utl.TickCounter,
+        hover_timer: utl.TickCounter,
     };
     pub const InitParams = struct {
         num_spell_slots: usize = 4, // populated from deck
@@ -108,6 +109,7 @@ pub const Slots = struct {
                 .key_str = spell_idx_to_key_str[i],
                 .kind = .{ .spell = null },
                 .cooldown_timer = utl.TickCounter.initStopped(90),
+                .hover_timer = utl.TickCounter.init(15),
             };
             if (room.drawSpell()) |spell| {
                 slot.kind.spell = spell;
@@ -122,6 +124,7 @@ pub const Slots = struct {
                 .key_str = item_idx_to_key_str[i],
                 .kind = .{ .item = maybe_item },
                 .cooldown_timer = null,
+                .hover_timer = utl.TickCounter.init(15),
             };
             ret.items.append(slot) catch unreachable;
         }
@@ -230,20 +233,28 @@ pub const Slots = struct {
         for (0..slots.len) |i| {
             const rect = rects.get(i);
             const slot = &slots[i];
+            const mouse_pos = plat.input_buffer.getCurrMousePos();
+            const hovered = geom.pointIsInRectf(mouse_pos, rect);
+
+            if (hovered) {
+                _ = slot.hover_timer.tick(false);
+            } else {
+                slot.hover_timer.restart();
+            }
+
             switch (slot.kind) {
                 .item => |_item| if (_item) |item| {
                     if (!item.canUse(room, caster)) continue;
                 } else continue,
                 .spell => |_spell| if (_spell == null) continue,
             }
-            if (mouse_pressed) {
-                const mouse_pos = plat.input_buffer.getCurrMousePos();
-                if (geom.pointIsInRectf(mouse_pos, rect)) {
-                    ui_clicked = true;
-                    selection_idx = i;
-                    break;
-                }
+
+            if (hovered and mouse_pressed) {
+                ui_clicked = true;
+                selection_idx = i;
+                break;
             }
+
             if (plat.input_buffer.keyIsJustPressed(slot.key)) {
                 selection_idx = i;
                 cast_method = App.get().options.cast_method;
@@ -401,6 +412,23 @@ pub const Slots = struct {
                 .{&slot.key_str},
                 .{ .color = key_color },
             );
+        }
+        for (slots, 0..) |slot, i| {
+            const rect = rects.get(i);
+            if (!slot.hover_timer.running) {
+                switch (slot.kind) {
+                    .spell => |_spell| {
+                        if (_spell) |spell| {
+                            _ = spell;
+                        }
+                    },
+                    .item => |_item| {
+                        if (_item) |item| {
+                            try item.renderToolTip(rect.pos.add(v2f(rect.dims.x, 0)));
+                        }
+                    },
+                }
+            }
         }
     }
 
