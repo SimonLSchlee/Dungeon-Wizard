@@ -461,6 +461,10 @@ pub fn update(self: *Run) Error!void {
             self.loadNextPlace();
         }
     }
+    // TODO hack to stop stack getting too massive on run + room init
+    if (self.curr_tick == 0) {
+        try self.startRun();
+    }
 
     switch (self.load_state) {
         .none => switch (self.screen) {
@@ -480,6 +484,7 @@ pub fn update(self: *Run) Error!void {
             self.load_state = .fade_in;
         },
     }
+    self.curr_tick += 1;
 }
 
 fn makeGamePauseUI() GamePauseUI {
@@ -596,7 +601,7 @@ fn makeRewardUI(reward: *const Reward) Reward.UI {
 pub fn render(self: *Run) Error!void {
     const plat = getPlat();
     plat.clear(Colorf.magenta);
-    // room is always present
+
     if (self.room) |room| {
         try room.render();
         //const game_scale: i32 = 2;

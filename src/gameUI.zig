@@ -331,21 +331,44 @@ pub const Slots = struct {
         }
 
         for (slots, 0..) |slot, i| {
-            const rect = rects.get(i);
+            const slot_is_enabled = blk: {
+                if (!slots_are_enabled) {
+                    break :blk false;
+                } else {
+                    switch (slot.kind) {
+                        .spell => |_spell| {
+                            if (_spell) |_| break :blk true;
+                        },
+                        .item => |_item| {
+                            if (_item) |item| break :blk item.canUse(room, caster);
+                        },
+                    }
+                }
+                break :blk false;
+            };
+            var rect = rects.get(i);
+            const mouse_pos = plat.input_buffer.getCurrMousePos();
+            const hovered = geom.pointIsInRectf(mouse_pos, rect);
+            if (slot_is_enabled and hovered) {
+                const new_dims = rect.dims.scale(1.1);
+                rect.pos = rect.pos.sub(new_dims.sub(rect.dims).scale(0.5));
+                rect.dims = new_dims;
+            }
             const slot_center_pos = rect.pos.add(rect.dims.scale(0.5));
             const slot_icon_square_dims = V2f.splat(@min(rect.dims.x, rect.dims.y));
-            var key_color = Colorf.gray;
-            var border_color = Colorf.darkgray;
 
             plat.rectf(rect.pos, rect.dims, .{ .fill_color = Colorf.rgb(0.07, 0.05, 0.05) });
+
+            var key_color = Colorf.gray;
+            var border_color = Colorf.darkgray;
+            if (slot_is_enabled) {
+                border_color = .blue;
+                key_color = .white;
+            }
 
             const _render_info: ?sprites.RenderIconInfo = blk: switch (slot.kind) {
                 .spell => |_spell| {
                     if (_spell) |spell| {
-                        if (slots_are_enabled) {
-                            border_color = .blue;
-                            key_color = .white;
-                        }
                         break :blk spell.getRenderIconInfo();
                     } else if (slot.cooldown_timer.?.running) {
                         const rads = slot.cooldown_timer.?.remapTo0_1() * utl.tau;
@@ -357,10 +380,6 @@ pub const Slots = struct {
                 },
                 .item => |_item| {
                     if (_item) |item| {
-                        if (slots_are_enabled and item.canUse(room, caster)) {
-                            border_color = .blue;
-                            key_color = .white;
-                        }
                         break :blk item.getRenderIconInfo();
                     }
                     break :blk null;
@@ -419,7 +438,7 @@ pub const Slots = struct {
                 switch (slot.kind) {
                     .spell => |_spell| {
                         if (_spell) |spell| {
-                            _ = spell;
+                            try spell.renderToolTip(rect.pos.add(v2f(rect.dims.x, 0)));
                         }
                     },
                     .item => |_item| {
@@ -444,15 +463,15 @@ pub const Slots = struct {
         };
         const slots_are_enabled = caster.hp.?.curr > 0;
 
-        try self.renderSlots(room, caster, self.spells.constSlice(), .spell, slots_are_enabled);
-        try self.renderSlots(room, caster, self.items.constSlice(), .item, slots_are_enabled);
-
         {
             const rects = self.getSlotRects(.spell);
             const last_rect = rects.get(rects.len - 1);
             const p = last_rect.pos.add(v2f(last_rect.dims.x + 10, 0));
             try plat.textf(p, "draw: {}\ndiscard: {}\n", .{ room.draw_pile.len, room.discard_pile.len }, .{ .color = .white });
         }
+
+        try self.renderSlots(room, caster, self.spells.constSlice(), .spell, slots_are_enabled);
+        try self.renderSlots(room, caster, self.items.constSlice(), .item, slots_are_enabled);
     }
 };
 

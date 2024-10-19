@@ -92,10 +92,6 @@ pub fn deinit(self: *App) void {
 }
 
 fn update(self: *App) Error!void {
-    // TODO hack to stop stack getting too massive on run + room init
-    if (self.curr_tick == 0) {
-        try self.run.startRun();
-    }
     switch (self.screen) {
         .run => {
             try self.run.update();
