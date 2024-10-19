@@ -383,7 +383,6 @@ pub fn shopUpdate(self: *Run) Error!void {
             },
             .item => |item| {
                 assert(self.slots_init_params.items.len < self.slots_init_params.items.buffer.len);
-                self.gold -= price;
                 for (self.slots_init_params.items.slice()) |*item_slot| {
                     if (item_slot.* == null) {
                         item_slot.* = item;
