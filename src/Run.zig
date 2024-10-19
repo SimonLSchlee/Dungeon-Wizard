@@ -272,11 +272,21 @@ pub fn canPickupProduct(self: *const Run, product: *const Shop.Product) bool {
             if (self.deck.len >= self.deck.buffer.len) return false;
         },
         .item => |_| {
-            if (self.slots_init_params.items.len >= self.slots_init_params.items.buffer.len) return false;
-            for (self.slots_init_params.items.constSlice()) |maybe_item| {
-                if (maybe_item == null) break;
+            if (self.room) |*room| {
+                for (room.ui_slots.items.slice()) |*slot| {
+                    if (slot.kind != .item) continue;
+                    if (slot.kind.item == null) {
+                        break;
+                    }
+                } else {
+                    return false;
+                }
             } else {
-                return false;
+                for (self.slots_init_params.items.constSlice()) |maybe_item| {
+                    if (maybe_item == null) break;
+                } else {
+                    return false;
+                }
             }
         },
     }
@@ -296,14 +306,27 @@ pub fn pickupProduct(self: *Run, product: *const Shop.Product) void {
             }
         },
         .item => |item| {
-            assert(self.slots_init_params.items.len < self.slots_init_params.items.buffer.len);
-            for (self.slots_init_params.items.slice()) |*item_slot| {
-                if (item_slot.* == null) {
-                    item_slot.* = item;
-                    break;
+            // TODO ugh?
+            if (self.room) |*room| {
+                for (room.ui_slots.items.slice()) |*slot| {
+                    if (slot.kind != .item) continue;
+                    if (slot.kind.item == null) {
+                        slot.kind.item = item;
+                        break;
+                    }
+                } else {
+                    unreachable;
                 }
             } else {
-                unreachable;
+                for (self.slots_init_params.items.slice()) |*item_slot| {
+                    if (item_slot.* == null) {
+                        item_slot.* = item;
+
+                        break;
+                    }
+                } else {
+                    unreachable;
+                }
             }
         },
     }
@@ -406,8 +429,8 @@ pub fn rewardUpdate(self: *Run) Error!void {
                 const product = Shop.Product{ .kind = .{ .item = item } };
                 if (self.canPickupProduct(&product)) {
                     self.pickupProduct(&product);
+                    _ = reward.items.orderedRemove(i);
                 }
-                _ = reward.items.orderedRemove(i);
                 self.reward_ui = makeRewardUI(reward);
                 break;
             }
