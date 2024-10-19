@@ -41,6 +41,7 @@ pub const SpellTypes = [_]type{
     @import("spells/Promptitude.zig"),
     @import("spells/FlameyExplodey.zig"),
     @import("spells/Expose.zig"),
+    @import("spells/ZapDash.zig"),
 };
 
 pub const Kind = utl.EnumFromTypes(&SpellTypes, "enum_name");
@@ -113,15 +114,16 @@ pub const Params = struct {
 };
 
 pub const TargetingData = struct {
+    pub const Ray = struct {
+        ends_at_coll_mask: Collision.Mask = Collision.Mask.initEmpty(),
+        thickness: f32 = 1,
+    };
     kind: TargetKind = .self,
     color: Colorf = .cyan,
     fixed_range: bool = false,
     max_range: f32 = std.math.inf(f32),
     show_max_range_ring: bool = false,
-    ray_to_mouse: ?struct {
-        ends_at_coll_mask: Collision.Mask = Collision.Mask.initEmpty(),
-        thickness: f32 = 1,
-    } = null,
+    ray_to_mouse: ?Ray = null,
     target_faction_mask: Thing.Faction.Mask = .{},
     target_mouse_pos: bool = false,
     radius_under_mouse: ?f32 = null,
@@ -130,13 +132,42 @@ pub const TargetingData = struct {
         radians: f32,
     } = null,
 
+    pub fn getRayEnd(self: *const TargetingData, room: *const Room, caster: *const Thing, ray: Ray, target_pos: V2f) V2f {
+        const caster_to_target = target_pos.sub(caster.pos);
+        const target_dir = if (caster_to_target.normalizedChecked()) |d| d else return target_pos;
+        const max_radius = self.max_range + caster.coll_radius;
+        const capped_dist = if (self.fixed_range) max_radius else @min(max_radius, caster_to_target.length());
+        const capped_vec = target_dir.scale(capped_dist);
+        const ray_radius = ray.thickness * 0.5;
+
+        var target_hit_pos = caster.pos.add(capped_vec);
+        var end_ray_pos = target_hit_pos;
+
+        if (Collision.getNextSweptCircleCollision(
+            caster.pos,
+            capped_vec,
+            ray_radius,
+            ray.ends_at_coll_mask,
+            &.{caster.id},
+            room,
+        )) |coll| {
+            target_hit_pos = coll.pos;
+            end_ray_pos = coll.pos.add(coll.normal.scale(ray_radius));
+        }
+
+        return end_ray_pos;
+    }
+
     pub fn getParams(targeting_data: *const TargetingData, room: *Room, caster: *const Thing, mouse_pos: V2f) ?Params {
         switch (targeting_data.kind) {
             .pos => {
                 const caster_to_mouse = mouse_pos.sub(caster.pos);
                 const target_dir = if (caster_to_mouse.normalizedChecked()) |d| d else V2f.right;
                 const mouse_pos_dist = if (targeting_data.fixed_range) targeting_data.max_range else @min(targeting_data.max_range, caster_to_mouse.length());
-                const target_pos = caster.pos.add(target_dir.scale(mouse_pos_dist));
+                var target_pos = caster.pos.add(target_dir.scale(mouse_pos_dist));
+                if (targeting_data.ray_to_mouse) |ray| {
+                    target_pos = targeting_data.getRayEnd(room, caster, ray, target_pos);
+                }
                 return .{
                     .target = .{ .pos = target_pos },
                     .face_dir = target_pos.sub(caster.pos).normalizedChecked() orelse caster.dir,
@@ -184,18 +215,11 @@ pub const TargetingData = struct {
                 const max_radius = targeting_data.max_range + caster.coll_radius;
                 const capped_dist = if (targeting_data.fixed_range) max_radius else @min(max_radius, caster_to_mouse.length());
                 const capped_vec = target_dir.scale(capped_dist);
-                var target_hit_pos = caster.pos.add(capped_vec);
-                var target_circle_pos = target_hit_pos;
+                var target_circle_pos = caster.pos.add(capped_vec);
+
                 if (targeting_data.ray_to_mouse) |ray| {
+                    target_circle_pos = targeting_data.getRayEnd(room, caster, ray, target_circle_pos);
                     const ray_radius = ray.thickness * 0.5;
-                    var coll: ?Collision = null;
-                    if (caster_to_mouse.lengthSquared() > 0.001) {
-                        coll = Collision.getNextSweptCircleCollision(caster.pos, capped_vec, ray_radius, ray.ends_at_coll_mask, &.{caster.id}, room);
-                        if (coll) |c| {
-                            target_hit_pos = c.pos;
-                            target_circle_pos = c.pos.add(c.normal.scale(ray_radius));
-                        }
-                    }
                     plat.linef(caster.pos, target_circle_pos, ray.thickness, targeting_data.color);
                     plat.circlef(target_circle_pos, ray_radius, .{ .fill_color = targeting_data.color });
                     //if (coll) |c| {

@@ -529,7 +529,7 @@ fn updateController(self: *Thing, room: *Room) Error!void {
 }
 
 pub fn update(self: *Thing, room: *Room) Error!void {
-    if (self.statuses.get(.frozen).stacks == 0) {
+    if (self.statuses.get(.frozen).stacks == 0 and self.statuses.get(.stunned).stacks == 0) {
         try updateController(self, room);
         if (self.statuses.get(.promptitude).stacks > 0) {
             try updateController(self, room);
@@ -634,6 +634,11 @@ pub fn renderOver(self: *const Thing, room: *const Room) Error!void {
                 const color = Colorf.red.fade(utl.remapClampf(0, 120, 0.5, 0, utl.as(f32, ticks_since)));
                 const pos: V2f = self.pos.add(hitbox.rel_pos);
                 plat.circlef(pos, hitbox.radius, .{ .fill_color = color });
+                if (hitbox.sweep_to_rel_pos) |rel_end| {
+                    const end_pos = pos.add(rel_end);
+                    plat.linef(pos, end_pos, hitbox.radius * 2, color);
+                    plat.circlef(end_pos, hitbox.radius, .{ .fill_color = color });
+                }
             }
         }
         if (self.hurtbox) |hurtbox| {
