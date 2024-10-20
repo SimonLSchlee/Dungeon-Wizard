@@ -174,3 +174,7 @@ pub const fixed_ns_per_update_lower: i64 = ns_per_sec / fixed_updates_per_sec - 
 pub const fixed_update_fuzziness_ns: i64 = 500 * ns_per_sec / us_per_sec;
 pub const fixed_max_updates_per_frame: i64 = 8;
 pub const fixed_max_accumulated_update_ns: i64 = fixed_max_updates_per_frame * fixed_ns_per_update;
+
+pub inline fn ms_to_ticks(ms: i64) i64 {
+    return @divFloor((fups_per_sec * ms), ms_per_sec);
+}

@@ -125,6 +125,24 @@ pub const CreatureAnimator = struct {
     tick_in_frame: i32 = 0,
     anim_tick: i32 = 0,
 
+    pub fn getTicksUntilEvent(self: *const CreatureAnimator, event: CreatureAnim.Event.Kind) ?i64 {
+        const anim: CreatureAnim = App.get().data.getCreatureAnim(self.creature_kind, self.curr_anim).?;
+        for (anim.events.constSlice()) |e| {
+            if (e.kind == event) {
+                const e_frame_idx = utl.as(usize, e.frame);
+                if (e.frame <= self.curr_anim_frame) return null;
+                const sprite_sheet: Data.SpriteSheet = App.get().data.getCreatureAnimSpriteSheet(self.creature_kind, self.curr_anim).?;
+                const curr_frame_idx = utl.as(usize, self.curr_anim_frame);
+                var num_ticks: i64 = core.ms_to_ticks(sprite_sheet.frames[curr_frame_idx].duration_ms) - self.tick_in_frame;
+                for (sprite_sheet.frames[curr_frame_idx + 1 .. e_frame_idx]) |frame| {
+                    num_ticks += core.ms_to_ticks(frame.duration_ms);
+                }
+                return num_ticks;
+            }
+        }
+        return null;
+    }
+
     pub fn getCurrRenderFrame(self: *const CreatureAnimator, dir: V2f) RenderFrame {
         const anim: CreatureAnim = App.get().data.getCreatureAnim(self.creature_kind, self.curr_anim).?;
         return anim.getRenderFrame(dir, self.curr_anim_frame);
@@ -147,8 +165,7 @@ pub const CreatureAnimator = struct {
         const sprite_sheet = App.get().data.creature_sprite_sheets.get(self.creature_kind).get(self.curr_anim).?;
         // NOTE: We assume all the dirs of the anim are the same durations in each frame; not a big deal probably(!)
         const ssframe: Data.SpriteSheet.Frame = sprite_sheet.frames[utl.as(usize, self.curr_anim_frame)];
-        const frame_ticks_f = utl.as(f32, ssframe.duration_ms) * 0.06; // TODO! 60 fps means 1 / 16.66ms == 0.06
-        const frame_ticks = utl.as(i32, frame_ticks_f);
+        const frame_ticks = utl.as(i32, core.ms_to_ticks(ssframe.duration_ms));
 
         if (self.tick_in_frame >= frame_ticks) {
             // end of anim: last tick of frame, and on last frame

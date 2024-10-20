@@ -189,6 +189,7 @@ pub const AIController = struct {
                     continue :state .idle;
                 };
                 const dist = target.pos.dist(self.pos);
+                const range = @max(dist - self.coll_radius - target.coll_radius, 0);
                 // dont want it to be cancelable
                 //const range = @max(dist - self.coll_radius - target.coll_radius, 0);
                 // unless out of range, then pursue
@@ -197,14 +198,31 @@ pub const AIController = struct {
                 //    continue :state .pursue;
                 //}
                 // face le target, unless past point of no return
-                if (ai.can_turn_during_attack and dist > 0.001) {
-                    self.dir = target.pos.sub(self.pos).normalized();
+                if (ai.can_turn_during_attack) {
+                    //if (self.animator.creature.getTicksUntilEvent(.hit)) |ticks_til_hit| {
+
+                    //} else {
+                    self.dir = target.pos.sub(self.pos).normalizedChecked() orelse self.dir;
+                    //}
                 }
 
                 switch (ai.attack_type) {
                     .melee => |m| {
                         self.updateVel(.{}, .{});
                         const events = self.animator.creature.play(.attack, .{ .loop = true });
+                        // predict hit
+                        if (ai.can_turn_during_attack) {
+                            if (self.animator.creature.getTicksUntilEvent(.hit)) |ticks_til_hit_event| {
+                                var ticks_til_hit = utl.as(f32, ticks_til_hit_event);
+                                if (m.lunge_accel) |accel| {
+                                    ticks_til_hit += range / accel.max_speed;
+                                }
+                                const target_pos = target.pos.add(target.vel.scale(ticks_til_hit));
+                                self.dir = target_pos.sub(self.pos).normalizedChecked() orelse self.dir;
+                            } else {
+                                self.dir = target.pos.sub(self.pos).normalizedChecked() orelse self.dir;
+                            }
+                        }
                         if (events.contains(.end)) {
                             self.updateVel(.{}, .{});
                             //std.debug.print("attack end\n", .{});
