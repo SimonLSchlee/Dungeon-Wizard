@@ -250,7 +250,6 @@ pub const HurtBox = struct {
         // TODO elsewhere, better?
         if (self.hp) |hp| {
             if (hp.curr == 0) {
-
                 // TODO maybe dont access Run here, more testable/reproduceableeeu?
                 // e.g. have something like Room.rewards and add it there, and Run will grab it later
                 const run = &App.get().run;
@@ -258,9 +257,8 @@ pub const HurtBox = struct {
                 if (mint_status.stacks > 0) {
                     run.gold += mint_status.stacks;
                 }
-
-                // TODO do this elsewhere, better
-                self.deferFree(room);
+                // stop getting hit by stuff
+                self.hurtbox = null;
             }
         }
     }
@@ -437,13 +435,15 @@ pub const CreatureRenderer = struct {
         const plat = getPlat();
         const renderer = &self.renderer.creature;
 
-        plat.circlef(self.pos, renderer.draw_radius, .{
-            .fill_color = null,
-            .outline_color = renderer.draw_color,
-        });
-        const arrow_start = self.pos.add(self.dir.scale(renderer.draw_radius));
-        const arrow_end = self.pos.add(self.dir.scale(renderer.draw_radius + 5));
-        plat.arrowf(arrow_start, arrow_end, 5, renderer.draw_color);
+        if (self.isAliveCreature()) {
+            plat.circlef(self.pos, renderer.draw_radius, .{
+                .fill_color = null,
+                .outline_color = renderer.draw_color,
+            });
+            const arrow_start = self.pos.add(self.dir.scale(renderer.draw_radius));
+            const arrow_end = self.pos.add(self.dir.scale(renderer.draw_radius + 5));
+            plat.arrowf(arrow_start, arrow_end, 5, renderer.draw_color);
+        }
     }
 
     pub fn render(self: *const Thing, room: *const Room) Error!void {
@@ -504,10 +504,12 @@ pub const CreatureRenderer = struct {
         const hp_y_offset = if (self.selectable) |s| s.height + 15 else renderer.draw_radius * 3.5;
         const hp_offset = v2f(-hp_width * 0.5, -hp_y_offset);
 
-        if (self.hp) |hp| {
-            const curr_width = utl.remapClampf(0, hp.max, 0, hp_width, hp.curr);
-            plat.rectf(self.pos.add(hp_offset), v2f(hp_width, hp_height), .{ .fill_color = Colorf.black });
-            plat.rectf(self.pos.add(hp_offset), v2f(curr_width, hp_height), .{ .fill_color = HP.faction_colors.get(self.faction) });
+        if (self.isAliveCreature()) {
+            if (self.hp) |hp| {
+                const curr_width = utl.remapClampf(0, hp.max, 0, hp_width, hp.curr);
+                plat.rectf(self.pos.add(hp_offset), v2f(hp_width, hp_height), .{ .fill_color = Colorf.black });
+                plat.rectf(self.pos.add(hp_offset), v2f(curr_width, hp_height), .{ .fill_color = HP.faction_colors.get(self.faction) });
+            }
         }
         // debug draw statuses
         const status_height = 14;
@@ -541,11 +543,23 @@ fn updateController(self: *Thing, room: *Room) Error!void {
     }
 }
 
+inline fn canAct(self: *const Thing) bool {
+    if (self.creature_kind != null) {
+        return self.isAliveCreature() and self.statuses.get(.frozen).stacks == 0 and self.statuses.get(.stunned).stacks == 0;
+    }
+    return self.isActive();
+}
+
 pub fn update(self: *Thing, room: *Room) Error!void {
-    if (self.statuses.get(.frozen).stacks == 0 and self.statuses.get(.stunned).stacks == 0) {
+    if (self.canAct()) {
         try updateController(self, room);
         if (self.statuses.get(.promptitude).stacks > 0) {
             try updateController(self, room);
+        }
+    } else if (self.isDeadCreature()) {
+        if (self.animator.creature.play(.die, .{}).contains(.end)) {
+            self.deferFree(room);
+            return;
         }
     }
     if (self.hitbox) |*hitbox| {
@@ -845,4 +859,20 @@ pub fn isEnemy(self: *const Thing) bool {
 
 pub fn isInvisible(self: *const Thing) bool {
     return self.statuses.get(.unseeable).stacks > 0;
+}
+
+pub fn isCreature(self: *const Thing) bool {
+    return self.creature_kind != null;
+}
+
+pub inline fn isDeadCreature(self: *const Thing) bool {
+    return self.isActive() and self.isCreature() and (if (self.hp) |hp| hp.curr == 0 else true);
+}
+
+pub inline fn isAliveCreature(self: *const Thing) bool {
+    return self.isActive() and self.isCreature() and (if (self.hp) |hp| hp.curr > 0 else true);
+}
+
+pub inline fn isAttackableCreature(self: *const Thing) bool {
+    return self.isActive() and self.isCreature() and self.hurtbox != null;
 }

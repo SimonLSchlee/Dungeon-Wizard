@@ -440,12 +440,11 @@ pub fn update(self: *Room) Error!void {
             switch (self.progress_state) {
                 .none => {
                     if (hp.curr <= 0) {
-                        self.progress_state = .lost;
+                        // .lost is set below, after player is freed
                     } else if (self.curr_wave >= self.waves.len and self.num_enemies_alive == 0) {
                         self.progress_state = .won;
                     }
                 },
-                .lost => {},
                 .won => {
                     for (self.init_params.exits.slice()) |*exit| {
                         if (try exit.updateSelected(self)) {
@@ -454,7 +453,12 @@ pub fn update(self: *Room) Error!void {
                     }
                 },
                 .exited => {},
+                else => {
+                    // TODO .lost ? rn is set below when player is freed
+                },
             }
+        } else {
+            self.progress_state = .lost;
         }
         // things
         for (&self.things.items) |*thing| {

@@ -37,6 +37,7 @@ pub const RenderIconInfo = union(enum) {
 
 pub const CreatureAnim = struct {
     pub const Kind = enum {
+        creature, // misc anim
         wizard,
         bat,
         troll,
@@ -85,7 +86,7 @@ pub const CreatureAnim = struct {
     origin: draw.TextureOrigin = .center,
 
     pub fn getRenderFrame(self: CreatureAnim, dir: V2f, anim_frame: i32) RenderFrame {
-        const sprite_sheet: Data.SpriteSheet = App.get().data.getCreatureAnimSpriteSheet(self.creature_kind, self.anim_kind).?;
+        const sprite_sheet: Data.SpriteSheet = App.get().data.getCreatureAnimSpriteSheetOrDefault(self.creature_kind, self.anim_kind).?;
         const num_dirs_f = utl.as(f32, self.num_dirs);
         const angle_inc = utl.tau / num_dirs_f;
         const shifted_dir = dir.rotRadians(angle_inc * 0.5 - self.start_angle_rads);
@@ -144,14 +145,16 @@ pub const CreatureAnimator = struct {
     }
 
     pub fn getCurrRenderFrame(self: *const CreatureAnimator, dir: V2f) RenderFrame {
-        const anim: CreatureAnim = App.get().data.getCreatureAnim(self.creature_kind, self.curr_anim).?;
+        const anim: CreatureAnim = App.get().data.getCreatureAnimOrDefault(self.creature_kind, self.curr_anim).?;
         return anim.getRenderFrame(dir, self.curr_anim_frame);
     }
 
     pub fn play(self: *CreatureAnimator, anim_kind: CreatureAnim.AnimKind, params: PlayParams) std.EnumSet(CreatureAnim.Event.Kind) {
+        const data = App.get().data;
         var ret = std.EnumSet(CreatureAnim.Event.Kind).initEmpty();
-        const anim = if (App.get().data.creature_anims.get(self.creature_kind).get(anim_kind)) |a| a else {
-            std.debug.print("{s}: WARNING: tried to play non-existent anim: {any}\n", .{ @src().file, anim_kind });
+        const anim = if (data.getCreatureAnimOrDefault(self.creature_kind, self.curr_anim)) |a| a else {
+            std.debug.print("{s}: WARNING: tried to play non-existent creature anim: {any}, {any}\n", .{ @src().file, self.creature_kind, anim_kind });
+            ret.insert(.end);
             return ret;
         };
 
@@ -162,7 +165,12 @@ pub const CreatureAnimator = struct {
         }
         self.curr_anim = anim_kind;
 
-        const sprite_sheet = App.get().data.creature_sprite_sheets.get(self.creature_kind).get(self.curr_anim).?;
+        const sprite_sheet = if (data.getCreatureAnimSpriteSheetOrDefault(self.creature_kind, self.curr_anim)) |s| s else {
+            std.debug.print("{s}: WARNING: tried to get non-existent creature spritesheet: {any}, {any}\n", .{ @src().file, self.creature_kind, anim_kind });
+            ret.insert(.end);
+            return ret;
+        };
+
         // NOTE: We assume all the dirs of the anim are the same durations in each frame; not a big deal probably(!)
         const ssframe: Data.SpriteSheet.Frame = sprite_sheet.frames[utl.as(usize, self.curr_anim_frame)];
         const frame_ticks = utl.as(i32, core.ms_to_ticks(ssframe.duration_ms));

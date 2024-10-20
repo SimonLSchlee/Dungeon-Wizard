@@ -268,8 +268,22 @@ pub fn getCreatureAnim(self: *Data, creature_kind: sprites.CreatureAnim.Kind, an
     return self.creature_anims.get(creature_kind).get(anim_kind);
 }
 
+pub fn getCreatureAnimOrDefault(self: *Data, creature_kind: sprites.CreatureAnim.Kind, anim_kind: sprites.CreatureAnim.AnimKind) ?sprites.CreatureAnim {
+    if (self.creature_anims.get(creature_kind).get(anim_kind)) |a| {
+        return a;
+    }
+    return self.creature_anims.get(.creature).get(anim_kind);
+}
+
 pub fn getCreatureAnimSpriteSheet(self: *Data, creature_kind: sprites.CreatureAnim.Kind, anim_kind: sprites.CreatureAnim.AnimKind) ?SpriteSheet {
     return self.creature_sprite_sheets.get(creature_kind).get(anim_kind);
+}
+
+pub fn getCreatureAnimSpriteSheetOrDefault(self: *Data, creature_kind: sprites.CreatureAnim.Kind, anim_kind: sprites.CreatureAnim.AnimKind) ?SpriteSheet {
+    if (self.creature_sprite_sheets.get(creature_kind).get(anim_kind)) |s| {
+        return s;
+    }
+    return self.creature_sprite_sheets.get(.creature).get(anim_kind);
 }
 
 pub fn loadSounds(self: *Data) Error!void {
