@@ -257,7 +257,21 @@ pub const TargetingData = struct {
                     const range = @max(caster.pos.dist(thing.pos) - caster.coll_radius - thing.coll_radius, 0);
                     if (range > targeting_data.max_range) continue;
                     const selectable = thing.selectable.?;
-                    const draw_radius = if (mouse_pos.dist(thing.pos) < selectable.radius) selectable.radius else selectable.radius - 10;
+                    var draw_radius = selectable.radius - 10;
+                    if (room.moused_over_thing) |id| {
+                        if (thing.id.eql(id)) {
+                            draw_radius = selectable.radius;
+                        }
+                        if (targeting_data.ray_to_mouse) |ray| {
+                            const target_circle_pos = targeting_data.getRayEnd(room, caster, ray, thing.pos);
+                            const ray_radius = ray.thickness * 0.5;
+                            plat.linef(caster.pos, target_circle_pos, ray.thickness, targeting_data.color);
+                            plat.circlef(target_circle_pos, ray_radius, .{ .fill_color = targeting_data.color });
+                            //if (coll) |c| {
+                            //    plat.circlef(c.pos, 3, .{ .fill_color = .red });
+                            //}
+                        }
+                    }
                     plat.circlef(thing.pos, draw_radius, .{ .fill_color = targeting_data.color.fade(0.5) });
                 }
             },
