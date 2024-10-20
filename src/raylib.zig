@@ -39,6 +39,7 @@ pub const RenderTexture2D = struct {
     r_render_tex: r.RenderTexture2D,
 };
 
+should_exit: bool = false,
 app_dll: ?std.DynLib = null,
 appInit: *const fn (*Platform) *anyopaque = undefined,
 appReload: *const fn (*anyopaque, *Platform) void = undefined,
@@ -135,7 +136,7 @@ pub fn run(self: *Platform) Error!void {
     std.debug.print("refresh rate: {}\n", .{refresh_rate});
     std.debug.print("ns per refresh: {}\n", .{ns_per_refresh});
 
-    while (!r.WindowShouldClose()) {
+    while (!r.WindowShouldClose() and !self.should_exit) {
         if (r.IsKeyPressed(r.KEY_F5)) {
             self.unloadAppDll();
             try self.recompileAppDll();
@@ -602,4 +603,8 @@ pub fn loadSound(self: *Platform, path: []const u8) Error!Sound {
         .r_sound = r_sound,
     };
     return ret;
+}
+
+pub fn exit(self: *Platform) void {
+    self.should_exit = true;
 }

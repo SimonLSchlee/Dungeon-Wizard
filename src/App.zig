@@ -55,7 +55,7 @@ export fn appInit(plat: *Platform) *anyopaque {
 
     // populate _app here, Room.init() uses it
     _app = app;
-    app.run = Run.init(0) catch @panic("Failed to init run state");
+    app.run = Run.initRandom() catch @panic("Failed to init run state");
 
     return app;
 }

@@ -30,16 +30,39 @@ pub fn textInRect(topleft: V2f, dims: V2f, rect_opt: draw.PolyOpt, text_padding:
     try plat.textf(topleft.add(text_rel_pos), fmt, args, fitted_text_opt);
 }
 
+pub const Modal = struct {
+    rect: geom.Rectf = .{},
+    poly_opt: draw.PolyOpt = .{},
+    title_rel_pos: V2f = .{},
+    title: utl.BoundedString(128) = .{},
+    text_opt: draw.TextOpt = .{},
+    padding: V2f = .{},
+
+    pub fn toRectf(self: Modal) geom.Rectf {
+        return self.rect;
+    }
+    pub fn getInnerRect(self: Modal) geom.Rect {
+        return geom.Rectf{
+            .pos = self.rect.pos.add(self.padding),
+            .dims = self.rect.dims.sub(self.padding.scale(2)),
+        };
+    }
+    pub fn render(self: Modal) Error!void {
+        const plat = App.getPlat();
+        plat.rectf(self.rect.pos, self.rect.dims, self.poly_opt);
+        try plat.textf(self.rect.pos.add(self.title_rel_pos), "{s}", .{self.title.constSlice()}, self.text_opt);
+    }
+};
+
 pub const ClickableRect = struct {
-    pos: V2f = .{},
-    dims: V2f = v2f(200, 100),
+    rect: geom.Rectf = .{},
 
     pub fn toRectf(self: ClickableRect) geom.Rectf {
-        return .{ .pos = self.pos, .dims = self.dims };
+        return self.rect;
     }
     pub fn isHovered(self: ClickableRect) bool {
         const plat = App.getPlat();
-        return geom.pointIsInRectf(plat.mousePosf(), self.toRectf());
+        return geom.pointIsInRectf(plat.mousePosf(), self.rect);
     }
     pub fn isClicked(self: ClickableRect) bool {
         const plat = App.getPlat();
@@ -48,7 +71,7 @@ pub const ClickableRect = struct {
 };
 
 pub const Button = struct {
-    rect: ClickableRect = .{},
+    clickable_rect: ClickableRect = .{},
     poly_opt: draw.PolyOpt = .{
         .fill_color = Colorf.red.fade(0.5),
     },
@@ -60,17 +83,17 @@ pub const Button = struct {
         .center = true,
     },
     pub fn toRectf(self: Button) geom.Rectf {
-        return self.rect.toRectf();
+        return self.clickable_rect.toRectf();
     }
     pub fn isHovered(self: Button) bool {
-        return self.rect.isHovered();
+        return self.clickable_rect.isHovered();
     }
     pub fn isClicked(self: Button) bool {
-        return self.rect.isClicked();
+        return self.clickable_rect.isClicked();
     }
     pub fn render(self: Button) Error!void {
         const plat = App.getPlat();
-        const rect = self.rect;
+        const rect = self.clickable_rect.rect;
         plat.rectf(rect.pos, rect.dims, self.poly_opt);
         if (self.isHovered()) {
             var selected_poly_opt = self.poly_opt;

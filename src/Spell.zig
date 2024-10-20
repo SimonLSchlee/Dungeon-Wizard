@@ -505,7 +505,7 @@ pub fn renderToolTip(self: *const Spell, pos: V2f) Error!void {
     try plat.textf(text_pos, "{s}", .{desc}, desc_opt);
 }
 
-pub fn renderInfo(self: *const Spell, rect: menuUI.ClickableRect) Error!void {
+pub fn renderInfo(self: *const Spell, rect: geom.Rectf) Error!void {
     const plat = App.getPlat();
     const title_rect_dims = v2f(rect.dims.x, rect.dims.y * 0.2);
     const icon_rect_dims = v2f(rect.dims.x, rect.dims.y * 0.4);

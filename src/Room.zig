@@ -166,10 +166,8 @@ ui_slots: gameUI.Slots = .{},
 draw_pile: Spell.SpellArray = .{},
 discard_pile: Spell.SpellArray = .{},
 fog: Fog = undefined,
-ui_clicked: bool = false,
 curr_tick: i64 = 0,
 paused: bool = false,
-edit_mode: bool = false,
 waves: WavesArray = .{},
 first_wave_timer: u.TickCounter = undefined,
 curr_wave: i32 = 0,
@@ -181,6 +179,8 @@ progress_state: union(enum) {
     exited: gameUI.ExitDoor,
 } = .none,
 // reinit stuff, never needs saving or copying, probably?:
+edit_mode: bool = false,
+ui_clicked: bool = false,
 render_texture: ?Platform.RenderTexture2D = null,
 next_pool_id: u32 = 0, // i hate this, can we change it?
 rng: std.Random.DefaultPrng = undefined,
@@ -244,6 +244,8 @@ pub fn reset(self: *Room) Error!void {
     self.first_wave_timer = u.TickCounter.init(5 * core.fups_per_sec);
     self.curr_wave = 0;
     self.num_enemies_alive = 0;
+    self.progress_state = .none;
+    self.paused = false;
     self.draw_pile = self.init_params.deck;
     self.tilemap.deinit();
     self.tilemap = try TileMap.init(self.init_params.packed_room.tiles.constSlice(), self.init_params.packed_room.dims);

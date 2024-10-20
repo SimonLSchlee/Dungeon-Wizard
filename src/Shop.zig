@@ -40,7 +40,7 @@ pub const Product = struct {
 
 const ProductSlot = struct {
     product: ?Product,
-    rect: menuUI.ClickableRect,
+    crect: menuUI.ClickableRect,
 };
 
 render_texture: Platform.RenderTexture2D,
@@ -58,10 +58,10 @@ pub fn init(seed: u64) Error!Shop {
     const proceed_btn_dims = v2f(120, 70);
     const proceed_btn_center = v2f(plat.screen_dims_f.x - proceed_btn_dims.x - 80, plat.screen_dims_f.y - proceed_btn_dims.y - 140);
     var proceed_btn = menuUI.Button{
-        .rect = .{
+        .clickable_rect = .{ .rect = .{
             .pos = proceed_btn_center.sub(proceed_btn_dims.scale(0.5)),
             .dims = proceed_btn_dims,
-        },
+        } },
         .text_padding = v2f(10, 10),
         .poly_opt = .{ .fill_color = .orange },
         .text_opt = .{ .center = true, .color = .black, .size = 30 },
@@ -106,7 +106,7 @@ pub fn init(seed: u64) Error!Shop {
                     .kind = .{ .spell = spell },
                     .price = .{ .gold = 10 },
                 },
-                .rect = .{ .dims = rect.dims, .pos = rect.pos },
+                .crect = .{ .rect = .{ .dims = rect.dims, .pos = rect.pos } },
             }) catch unreachable;
         }
 
@@ -139,7 +139,7 @@ pub fn init(seed: u64) Error!Shop {
                     .kind = .{ .item = item },
                     .price = .{ .gold = 30 },
                 },
-                .rect = .{ .dims = rect.dims, .pos = rect.pos },
+                .crect = .{ .rect = .{ .dims = rect.dims, .pos = rect.pos } },
             }) catch unreachable;
         }
     }
@@ -173,14 +173,14 @@ pub fn update(self: *Shop, run: *const Run) Error!?Product {
     for (self.products.slice()) |*slot| {
         if (slot.product == null) continue;
         const product = &slot.product.?;
-        var hovered_crect = slot.rect;
-        if (hovered_crect.isHovered()) {
-            const new_dims = slot.rect.dims.scale(1.1);
-            const new_pos = slot.rect.pos.sub(new_dims.sub(slot.rect.dims).scale(0.5));
-            hovered_crect.pos = new_pos;
-            hovered_crect.dims = new_dims;
+        var hovered_rect = slot.crect.rect;
+        if (slot.crect.isHovered()) {
+            const new_dims = hovered_rect.dims.scale(1.1);
+            const new_pos = hovered_rect.pos.sub(new_dims.sub(hovered_rect.dims).scale(0.5));
+            hovered_rect.pos = new_pos;
+            hovered_rect.dims = new_dims;
         }
-        if (hovered_crect.isClicked()) {
+        if (slot.crect.isClicked()) {
             if (canBuy(run, product)) {
                 ret = product.*;
                 slot.product = null;
@@ -206,25 +206,25 @@ pub fn render(self: *Shop, run: *Run) Error!void {
     try plat.textf(v2f(plat.screen_dims_f.x * 0.5, 50), "Shoppy woppy", .{}, .{ .center = true, .color = .white, .size = 45 });
 
     for (self.products.constSlice()) |slot| {
-        plat.rectf(slot.rect.pos, slot.rect.dims, .{ .fill_color = .darkgray });
-        var hovered_crect = slot.rect;
-        if (hovered_crect.isHovered()) {
-            const new_dims = slot.rect.dims.scale(1.1);
-            const new_pos = slot.rect.pos.sub(new_dims.sub(slot.rect.dims).scale(0.5));
-            hovered_crect.pos = new_pos;
-            hovered_crect.dims = new_dims;
+        var hovered_rect = slot.crect.rect;
+        plat.rectf(hovered_rect.pos, hovered_rect.dims, .{ .fill_color = .darkgray });
+        if (slot.crect.isHovered()) {
+            const new_dims = hovered_rect.dims.scale(1.1);
+            const new_pos = hovered_rect.pos.sub(new_dims.sub(hovered_rect.dims).scale(0.5));
+            hovered_rect.pos = new_pos;
+            hovered_rect.dims = new_dims;
         }
         if (slot.product == null) continue;
         const product = slot.product.?;
         switch (product.kind) {
             .spell => |spell| {
-                try spell.renderInfo(hovered_crect);
+                try spell.renderInfo(hovered_rect);
             },
             .item => |item| {
-                try item.renderInfo(hovered_crect);
+                try item.renderInfo(hovered_rect);
             },
         }
-        const price_pos = hovered_crect.pos.add(hovered_crect.dims).sub(v2f(50, 40));
+        const price_pos = hovered_rect.pos.add(hovered_rect.dims).sub(v2f(50, 40));
         try plat.textf(price_pos, "${}", .{product.price.gold}, .{ .center = true, .color = .yellow, .size = 40 });
     }
 

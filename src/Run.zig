@@ -54,6 +54,13 @@ pub const GamePauseUI = struct {
     pause_menu_button: menuUI.Button,
 };
 
+pub const DeadMenu = struct {
+    modal: menuUI.Modal,
+    retry_room_button: menuUI.Button,
+    new_run_button: menuUI.Button,
+    quit_button: menuUI.Button,
+};
+
 pub fn makeStarterDeck(dbg: bool) Spell.SpellArray {
     var ret = Spell.SpellArray{};
     // TODO placeholder
@@ -122,6 +129,7 @@ reward: ?Reward = null,
 shop: ?Shop = null,
 reward_ui: Reward.UI = undefined,
 game_pause_ui: GamePauseUI = undefined,
+dead_menu: DeadMenu = undefined,
 screen: enum {
     game,
     pause_menu,
@@ -144,7 +152,7 @@ load_state: enum {
 } = .fade_in,
 curr_tick: i64 = 0,
 
-pub fn init(seed: u64) Error!Run {
+pub fn initSeeded(seed: u64) Error!Run {
     const app = App.get();
 
     var ret: Run = .{
@@ -152,6 +160,7 @@ pub fn init(seed: u64) Error!Run {
         .seed = seed,
         .deck = makeStarterDeck(false),
         .game_pause_ui = makeGamePauseUI(),
+        .dead_menu = makeDeadMenu(),
         .player_thing = app.data.creatures.get(.player),
     };
 
@@ -182,18 +191,21 @@ pub fn init(seed: u64) Error!Run {
     return ret;
 }
 
+pub fn initRandom() Error!Run {
+    var rng = std.Random.DefaultPrng.init(u.as(u64, std.time.microTimestamp()));
+    const seed = rng.random().int(u64);
+    return try initSeeded(seed);
+}
+
 pub fn deinit(self: *Run) void {
     if (self.room) |*room| {
         room.deinit();
     }
 }
 
-pub fn reset(self: *Run) Error!*Run {
+pub fn reset(self: *Run) Error!void {
     self.deinit();
-    var rng = std.Random.DefaultPrng.init(u.as(u64, std.time.microTimestamp()));
-    const seed = rng.random().int(u64);
-    self.* = try init(seed);
-    return self;
+    self.* = try initRandom();
 }
 
 pub fn startRun(self: *Run) Error!void {
@@ -367,7 +379,9 @@ pub fn gameUpdate(self: *Run) Error!void {
     try room.update();
     switch (room.progress_state) {
         .none => {},
-        .lost => {},
+        .lost => {
+            self.screen = .dead;
+        },
         .won => {
             const curr_room_place = self.places.get(self.curr_place_idx).room;
             if (self.reward == null and curr_room_place.kind == .normal) {
@@ -467,9 +481,15 @@ pub fn shopUpdate(self: *Run) Error!void {
 
 pub fn deadUpdate(self: *Run) Error!void {
     const plat = getPlat();
-    _ = plat;
-    _ = self;
-    // TODO
+    if (self.dead_menu.new_run_button.isClicked()) {
+        try self.reset();
+        try self.startRun();
+    } else if (self.dead_menu.quit_button.isClicked()) {
+        plat.exit();
+    } else if (self.dead_menu.retry_room_button.isClicked()) {
+        try self.room.?.reset();
+        self.screen = .game;
+    }
 }
 
 pub fn update(self: *Run) Error!void {
@@ -477,7 +497,7 @@ pub fn update(self: *Run) Error!void {
 
     if (debug.enable_debug_controls) {
         if (plat.input_buffer.keyIsJustPressed(.f3)) {
-            _ = try self.reset();
+            try self.reset();
         }
         if (plat.input_buffer.keyIsJustPressed(.o)) {
             self.makeReward();
@@ -512,16 +532,70 @@ pub fn update(self: *Run) Error!void {
     self.curr_tick += 1;
 }
 
+fn makeDeadMenu() DeadMenu {
+    const plat = App.getPlat();
+    const modal_dims = v2f(plat.screen_dims_f.x * 0.6, plat.screen_dims_f.y * 0.7);
+    const modal_topleft = plat.screen_dims_f.sub(modal_dims).scale(0.5);
+    const modal_center = modal_topleft.add(modal_dims.scale(0.5));
+    var modal = menuUI.Modal{
+        .rect = .{
+            .dims = modal_dims,
+            .pos = modal_topleft,
+        },
+        .padding = v2f(30, 30),
+        .poly_opt = .{
+            .fill_color = Colorf.rgba(0.1, 0.1, 0.1, 0.8),
+            .outline_color = Colorf.rgba(0.1, 0.1, 0.2, 0.8),
+            .outline_thickness = 4,
+        },
+        .text_opt = .{
+            .center = true,
+            .color = .white,
+            .size = 30,
+        },
+    };
+    modal.title = @TypeOf(modal.title).init("Your HP reached 0") catch unreachable;
+    modal.title_rel_pos = v2f(modal_dims.x * 0.5, modal.padding.y + 15);
+
+    const button_dims = v2f(230, 100);
+    var btn_rects = std.BoundedArray(geom.Rectf, 3){};
+    btn_rects.resize(3) catch unreachable;
+    gameUI.layoutRectsFixedSize(3, button_dims, modal_center, .{ .direction = .vertical, .space_between = 20 }, btn_rects.slice());
+    const btn_proto = menuUI.Button{
+        .poly_opt = .{ .fill_color = .orange },
+        .text_opt = .{ .center = true, .color = .black, .size = 30 },
+        .text_rel_pos = button_dims.scale(0.5),
+    };
+    var new_run_btn = btn_proto;
+    new_run_btn.clickable_rect.rect = btn_rects.buffer[0];
+    new_run_btn.text = @TypeOf(btn_proto.text).init("New Run") catch unreachable;
+    var quit_btn = btn_proto;
+    quit_btn.clickable_rect.rect = btn_rects.buffer[1];
+    quit_btn.text = @TypeOf(btn_proto.text).init("Quit") catch unreachable;
+
+    var retry_btn = btn_proto;
+    retry_btn.poly_opt.fill_color = Colorf.blue;
+    retry_btn.clickable_rect.rect = btn_rects.buffer[2];
+    retry_btn.text = @TypeOf(btn_proto.text).init("Retry Room\n(debug only)") catch unreachable;
+
+    return DeadMenu{
+        .modal = modal,
+        .new_run_button = new_run_btn,
+        .quit_button = quit_btn,
+        .retry_room_button = retry_btn,
+    };
+}
+
 fn makeGamePauseUI() GamePauseUI {
     const plat = App.getPlat();
     const screen_margin = v2f(30, 60);
     const button_dims = v2f(100, 50);
     const button_y = plat.screen_dims_f.y - screen_margin.y - button_dims.y;
     var deck_button = menuUI.Button{
-        .rect = .{
+        .clickable_rect = .{ .rect = .{
             .pos = v2f(screen_margin.x, button_y),
             .dims = button_dims,
-        },
+        } },
         .poly_opt = .{ .fill_color = .orange },
         .text_opt = .{ .center = true, .color = .black, .size = 30 },
         .text_rel_pos = button_dims.scale(0.5),
@@ -529,10 +603,10 @@ fn makeGamePauseUI() GamePauseUI {
     deck_button.text = @TypeOf(deck_button.text).init("Deck") catch unreachable;
 
     var pause_menu_button = menuUI.Button{
-        .rect = .{
+        .clickable_rect = .{ .rect = .{
             .pos = v2f(plat.screen_dims_f.x - screen_margin.x - button_dims.x, button_y),
             .dims = button_dims,
-        },
+        } },
         .poly_opt = .{ .fill_color = .orange },
         .text_opt = .{ .center = true, .color = .black, .size = 30 },
         .text_rel_pos = button_dims.scale(0.5),
@@ -576,7 +650,7 @@ fn makeRewardUI(reward: *const Reward) Reward.UI {
     // TODO ARARGHH
     var spell_rects = std.BoundedArray(menuUI.ClickableRect, Reward.max_spells){};
     for (spell_grects.constSlice()) |r| {
-        spell_rects.append(.{ .dims = r.dims, .pos = r.pos }) catch unreachable;
+        spell_rects.append(.{ .rect = .{ .dims = r.dims, .pos = r.pos } }) catch unreachable;
     }
     curr_row_y += spell_dims.y + 40;
 
@@ -589,17 +663,17 @@ fn makeRewardUI(reward: *const Reward) Reward.UI {
     // TODO ARARGHH
     var item_rects = std.BoundedArray(menuUI.ClickableRect, Reward.max_spells){};
     for (item_grects.constSlice()) |r| {
-        item_rects.append(.{ .dims = r.dims, .pos = r.pos }) catch unreachable;
+        item_rects.append(.{ .rect = .{ .dims = r.dims, .pos = r.pos } }) catch unreachable;
     }
     curr_row_y += item_dims.y + 40;
 
     const skip_btn_dims = v2f(150, 70);
     const skip_btn_center = v2f(center_x, curr_row_y + skip_btn_dims.y * 0.5);
     var skip_button = menuUI.Button{
-        .rect = .{
+        .clickable_rect = .{ .rect = .{
             .pos = skip_btn_center.sub(skip_btn_dims.scale(0.5)),
             .dims = skip_btn_dims,
-        },
+        } },
         .poly_opt = .{ .fill_color = .orange },
         .text_opt = .{ .center = true, .color = .black, .size = 30 },
         .text_rel_pos = skip_btn_dims.scale(0.5),
@@ -656,10 +730,10 @@ pub fn render(self: *Run) Error!void {
             try plat.textf(reward_ui.title_center, "Choose 1", .{}, reward_ui.title_opt);
             for (reward_ui.spell_rects.constSlice(), 0..) |crect, i| {
                 const spell = reward.spells.get(i);
-                var hovered_crect = crect;
+                var hovered_crect = crect.rect;
                 if (crect.isHovered()) {
-                    const new_dims = crect.dims.scale(1.1);
-                    const new_pos = crect.pos.sub(new_dims.sub(crect.dims).scale(0.5));
+                    const new_dims = hovered_crect.dims.scale(1.1);
+                    const new_pos = hovered_crect.pos.sub(new_dims.sub(hovered_crect.dims).scale(0.5));
                     hovered_crect.pos = new_pos;
                     hovered_crect.dims = new_dims;
                 }
@@ -668,11 +742,11 @@ pub fn render(self: *Run) Error!void {
             for (reward_ui.item_rects.constSlice(), 0..) |crect, i| {
                 const item = reward.items.get(i);
                 var show_tooltip = false;
-                var hovered_crect = crect;
+                var hovered_crect = crect.rect;
                 if (crect.isHovered()) {
                     show_tooltip = true;
-                    const new_dims = crect.dims.scale(1.1);
-                    const new_pos = crect.pos.sub(new_dims.sub(crect.dims).scale(0.5));
+                    const new_dims = hovered_crect.dims.scale(1.1);
+                    const new_pos = hovered_crect.pos.sub(new_dims.sub(hovered_crect.dims).scale(0.5));
                     hovered_crect.pos = new_pos;
                     hovered_crect.dims = new_dims;
                 }
@@ -693,7 +767,12 @@ pub fn render(self: *Run) Error!void {
             };
             plat.texturef(.{}, shop.render_texture.texture, shop_texture_opt);
         },
-        .dead => {},
+        .dead => {
+            try self.dead_menu.modal.render();
+            try self.dead_menu.new_run_button.render();
+            try self.dead_menu.quit_button.render();
+            try self.dead_menu.retry_room_button.render();
+        },
     }
     { // gold
         const fill_color = Colorf.rgb(1, 0.9, 0);
