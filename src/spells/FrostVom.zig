@@ -106,7 +106,7 @@ pub const Projectile = struct {
                                 shape.kind.sector.start_ang_rads,
                                 shape.kind.sector.end_ang_rads,
                             )) {
-                                hurtbox.hit(thing, room, frost_vom.hit_effect);
+                                hurtbox.hit(thing, room, frost_vom.hit_effect, self);
                             }
                         }
                     }

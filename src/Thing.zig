@@ -200,7 +200,7 @@ pub const HitBox = struct {
                 break :blk false;
             };
             if (did_hit) {
-                hurtbox.hit(thing, room, hitbox.effect);
+                hurtbox.hit(thing, room, hitbox.effect, self);
                 if (hitbox.deactivate_on_hit) {
                     hitbox.active = false;
                     break;
@@ -218,10 +218,18 @@ pub const HurtBox = struct {
     rel_pos: V2f = .{},
     radius: f32 = 0,
 
-    pub fn hit(_: *HurtBox, self: *Thing, room: *Room, effect: HitEffect) void {
-        const status_protect = self.statuses.getPtr(.protected);
-        if (status_protect.stacks > 0) {
-            status_protect.stacks -= 1;
+    pub fn hit(_: *HurtBox, self: *Thing, room: *Room, effect: HitEffect, hitter: *Thing) void {
+        const prickly_stacks = self.statuses.get(.prickly).stacks;
+        if (prickly_stacks > 0) {
+            if (hitter.hurtbox) |*hurtbox| {
+                assert(hitter != self);
+                assert(hitter.statuses.get(.prickly).stacks == 0);
+                hurtbox.hit(hitter, room, .{ .damage = utl.as(f32, prickly_stacks) }, self);
+            }
+        }
+        const protect_stacks = &self.statuses.getPtr(.protected).stacks;
+        if (protect_stacks.* > 0) {
+            protect_stacks.* -= 1;
             return;
         }
         { // compute and apply the damage

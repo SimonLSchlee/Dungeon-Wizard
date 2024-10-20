@@ -84,7 +84,7 @@ pub const Projectile = struct {
             done = true;
             if (_target) |target| {
                 if (target.hurtbox) |*hurtbox| {
-                    hurtbox.hit(target, room, unherring.hit_effect);
+                    hurtbox.hit(target, room, unherring.hit_effect, self);
                 }
             }
         }

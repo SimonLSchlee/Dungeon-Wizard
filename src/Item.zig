@@ -105,9 +105,42 @@ pub const PotionInvis = struct {
     }
 };
 
+pub const PotionThorns = struct {
+    pub const title = "Prickly Potion";
+    pub const description =
+        \\Drink it (carefully!) to gain 5
+        \\prickly stacks. While prickly,
+        \\enemies who hit you with melee
+        \\attacks take damage according to
+        \\your stacks. Stacks don't expire
+        \\until you exit the room.
+    ;
+
+    pub const enum_name = "pot_thorns";
+    pub const Controllers = [_]type{};
+
+    pub const proto = Item.makeProto(
+        std.meta.stringToEnum(Item.Kind, enum_name).?,
+        .{
+            .color = .green,
+            .targeting_data = .{
+                .kind = .self,
+            },
+        },
+    );
+
+    thorny_stacks: i32 = 5,
+
+    pub fn use(self: *const Item, user: *Thing, _: *Room, params: Params) Error!void {
+        assert(std.meta.activeTag(params.target) == Item.TargetKind.self);
+        user.statuses.getPtr(.prickly).stacks = self.kind.pot_thorns.thorny_stacks;
+    }
+};
+
 pub const ItemTypes = [_]type{
     PotionHP,
     PotionInvis,
+    PotionThorns,
 };
 
 pub const Kind = utl.EnumFromTypes(&ItemTypes, "enum_name");

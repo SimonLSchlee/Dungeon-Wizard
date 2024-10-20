@@ -84,6 +84,12 @@ const protos = [_]ComptimeProto{
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(0.26, 0.55, 0.7),
     },
+    .{
+        .enum_name = "prickly",
+        .cd = 0,
+        .cd_type = .no_cd,
+        .color = Colorf.rgb(0.25, 0.55, 0.2),
+    },
 };
 
 const Kind = blk: {
