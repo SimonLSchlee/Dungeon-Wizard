@@ -78,6 +78,12 @@ const protos = [_]ComptimeProto{
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(0.9, 0.8, 0.7),
     },
+    .{
+        .enum_name = "unseeable",
+        .cd = 1 * core.fups_per_sec,
+        .cd_type = .remove_one_stack,
+        .color = Colorf.rgb(0.26, 0.55, 0.7),
+    },
 };
 
 const Kind = blk: {

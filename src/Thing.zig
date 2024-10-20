@@ -452,11 +452,12 @@ pub const CreatureRenderer = struct {
 
         const animator = self.animator.creature;
         const frame = animator.getCurrRenderFrame(self.dir);
-        const tint: Colorf = blk: {
+        var tint: Colorf = blk: {
             if (self.statuses.get(.frozen).stacks > 0) break :blk StatusEffect.proto_array.get(.frozen).color;
             if (self.statuses.get(.exposed).stacks > 0) break :blk StatusEffect.proto_array.get(.exposed).color.lerp(.white, 0.25);
             break :blk .white;
         };
+        if (self.statuses.get(.unseeable).stacks > 0) tint.a = 0.5;
         const opt = draw.TextureOpt{
             .origin = frame.origin,
             .src_pos = frame.pos.toV2f(),
@@ -828,4 +829,8 @@ pub fn isEnemy(self: *const Thing) bool {
     if (self.statuses.get(.blackmailed).stacks > 0) return true;
 
     return false;
+}
+
+pub fn isInvisible(self: *const Thing) bool {
+    return self.statuses.get(.unseeable).stacks > 0;
 }

@@ -84,6 +84,7 @@ pub fn getNearestOpposingThing(self: *Thing, room: *Room) ?*Thing {
         if (!other.isActive()) continue;
         if (other.id.eql(self.id)) continue;
         if (!Thing.Faction.opposing_masks.get(self.faction).contains(other.faction)) continue;
+        if (other.isInvisible()) continue;
         const dist = other.pos.dist(self.pos);
         if (dist < closest_dist) {
             closest_dist = dist;

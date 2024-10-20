@@ -74,8 +74,40 @@ pub const PotionHP = struct {
     }
 };
 
+pub const PotionInvis = struct {
+    pub const title = "Unseeability Powder";
+    pub const description =
+        \\Makes you unseeable by enemies,
+        \\temporarily.
+        \\Some enemies won't be fooled.
+        \\You can cast spells and move as
+        \\normal while unseeable.
+    ;
+
+    pub const enum_name = "pot_invis";
+    pub const Controllers = [_]type{};
+
+    pub const proto = Item.makeProto(
+        std.meta.stringToEnum(Item.Kind, enum_name).?,
+        .{
+            .color = .blue,
+            .targeting_data = .{
+                .kind = .self,
+            },
+        },
+    );
+
+    invis_stacks: i32 = 7,
+
+    pub fn use(self: *const Item, user: *Thing, _: *Room, params: Params) Error!void {
+        assert(std.meta.activeTag(params.target) == Item.TargetKind.self);
+        user.statuses.getPtr(.unseeable).stacks = self.kind.pot_invis.invis_stacks;
+    }
+};
+
 pub const ItemTypes = [_]type{
     PotionHP,
+    PotionInvis,
 };
 
 pub const Kind = utl.EnumFromTypes(&ItemTypes, "enum_name");
