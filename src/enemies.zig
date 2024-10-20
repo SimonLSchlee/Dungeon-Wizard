@@ -32,12 +32,15 @@ const EnemyProjectile = enum {
     arrow,
 };
 
-fn gobbowArrow(self: *const Thing, room: *Room) Error!void {
+fn gobbowArrow(shooter: *Thing) Thing {
     const arrow = Thing{
         .kind = .projectile,
         .coll_radius = 5,
-        .vel = self.dir.scale(4),
-        .dir = self.dir,
+        .accel_params = .{
+            .accel = 4,
+            .friction = 0,
+            .max_speed = 4,
+        },
         .coll_mask = Thing.Collision.Mask.initMany(&.{.tile}),
         .controller = .{ .projectile = .{} },
         .renderer = .{ .shape = .{
@@ -51,13 +54,12 @@ fn gobbowArrow(self: *const Thing, room: *Room) Error!void {
             .active = true,
             .deactivate_on_hit = true,
             .deactivate_on_update = false,
-            .mask = Thing.Faction.opposing_masks.get(self.faction),
+            .mask = Thing.Faction.opposing_masks.get(shooter.faction),
             .effect = .{ .damage = 7 },
             .radius = 4,
-            .rel_pos = self.dir.scale(28),
         },
     };
-    assert(try room.queueSpawnThing(&arrow, self.pos) != null);
+    return arrow;
 }
 
 pub fn getThingsInRadius(self: *Thing, room: *Room, radius: f32, buf: []*Thing) usize {
@@ -198,13 +200,6 @@ pub const AIController = struct {
                 //    continue :state .pursue;
                 //}
                 // face le target, unless past point of no return
-                if (ai.can_turn_during_attack) {
-                    //if (self.animator.creature.getTicksUntilEvent(.hit)) |ticks_til_hit| {
-
-                    //} else {
-                    self.dir = target.pos.sub(self.pos).normalizedChecked() orelse self.dir;
-                    //}
-                }
 
                 switch (ai.attack_type) {
                     .melee => |m| {
@@ -263,6 +258,19 @@ pub const AIController = struct {
                     .projectile => |proj_name| {
                         self.updateVel(.{}, .{});
                         const events = self.animator.creature.play(.attack, .{ .loop = true });
+                        var proj = switch (proj_name) {
+                            .arrow => gobbowArrow(self),
+                        };
+                        if (ai.can_turn_during_attack) {
+                            if (self.animator.creature.getTicksUntilEvent(.hit)) |ticks_til_hit_event| {
+                                var ticks_til_hit = utl.as(f32, ticks_til_hit_event);
+                                ticks_til_hit += range / proj.accel_params.max_speed;
+                                const target_pos = target.pos.add(target.vel.scale(ticks_til_hit));
+                                self.dir = target_pos.sub(self.pos).normalizedChecked() orelse self.dir;
+                            } else {
+                                self.dir = target.pos.sub(self.pos).normalizedChecked() orelse self.dir;
+                            }
+                        }
                         if (events.contains(.end)) {
                             //std.debug.print("attack end\n", .{});
                             ai.attack_cooldown.restart();
@@ -277,7 +285,10 @@ pub const AIController = struct {
                             self.renderer.creature.draw_color = Colorf.red;
                             switch (proj_name) {
                                 .arrow => {
-                                    try gobbowArrow(self, room);
+                                    // TODO clean up?
+                                    proj.dir = self.dir;
+                                    proj.hitbox.?.rel_pos = self.dir.scale(28);
+                                    _ = try room.queueSpawnThing(&proj, self.pos);
                                 },
                             }
                         }

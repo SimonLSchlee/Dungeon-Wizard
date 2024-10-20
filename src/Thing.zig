@@ -361,6 +361,7 @@ pub const ProjectileController = struct {
                 self.deferFree(room);
             }
         }
+        self.updateVel(self.dir, self.accel_params);
         self.moveAndCollide(room);
         if (self.last_coll) |_| {
             self.deferFree(room);
