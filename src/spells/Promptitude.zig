@@ -28,10 +28,6 @@ const TargetingData = Spell.TargetingData;
 const Params = Spell.Params;
 
 pub const title = "Promptitude";
-pub const description =
-    \\Move and cast spells 2x faster,
-    \\for a short while.
-;
 
 pub const enum_name = "promptitude";
 pub const Controllers = [_]type{};
@@ -47,10 +43,28 @@ pub const proto = Spell.makeProto(
     },
 );
 
+num_stacks: i32 = 7,
+
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
     assert(params.target == .self);
-    caster.statuses.getPtr(.promptitude).stacks += 7;
+    const promptitude: @This() = self.kind.promptitude;
+    caster.statuses.getPtr(.promptitude).stacks += promptitude.num_stacks;
 
-    _ = self;
     _ = room;
+}
+
+pub const description =
+    \\Move and cast spells 2x faster.
+;
+
+pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
+    const promptitude: @This() = self.kind.promptitude;
+    const fmt =
+        \\Duration: {} secs
+        \\
+        \\{s}
+        \\
+    ;
+    const dur_secs: i32 = promptitude.num_stacks * utl.as(i32, @divFloor(StatusEffect.proto_array.get(.promptitude).cooldown.num_ticks, core.fups_per_sec));
+    return std.fmt.bufPrint(buf, fmt, .{ dur_secs, description });
 }

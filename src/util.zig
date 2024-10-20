@@ -43,7 +43,7 @@ pub fn strEq(a: []const u8, b: []const u8) bool {
     return std.mem.eql(u8, a, b);
 }
 
-var __str_fmt_local_buf: [1024]u8 = undefined;
+var __str_fmt_local_buf: [2048]u8 = undefined;
 pub fn bufPrintLocal(comptime fmt: []const u8, args: anytype) ![]u8 {
     return try std.fmt.bufPrint(__str_fmt_local_buf[0..], fmt, args);
 }

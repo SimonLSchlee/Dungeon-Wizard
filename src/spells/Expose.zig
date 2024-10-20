@@ -28,12 +28,6 @@ const TargetingData = Spell.TargetingData;
 const Params = Spell.Params;
 
 pub const title = "Expose";
-pub const description =
-    \\Add "exposed" stacks to enemies in
-    \\a small area. Exposed enemies take
-    \\30% additional damage from all
-    \\sources.
-;
 
 pub const enum_name = "expose";
 pub const Controllers = [_]type{Projectile};
@@ -131,4 +125,26 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
         } },
     };
     _ = try room.queueSpawnThing(&hit_circle, target_pos);
+}
+
+pub const description =
+    \\Add "exposed" stacks to enemies in
+    \\a small area. Exposed enemies take
+    \\30% additional damage from all
+    \\sources.
+;
+// TODO percentage could change? ^
+
+pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
+    const expose: @This() = self.kind.expose;
+    const fmt =
+        \\Damage: {}
+        \\Duration: {} secs
+        \\
+        \\{s}
+        \\
+    ;
+    const dur_secs: i32 = expose.hit_effect.status_stacks.get(.exposed) * utl.as(i32, @divFloor(StatusEffect.proto_array.get(.exposed).cooldown.num_ticks, core.fups_per_sec));
+    const damage: i32 = utl.as(i32, expose.hit_effect.damage);
+    return std.fmt.bufPrint(buf, fmt, .{ damage, dur_secs, description });
 }

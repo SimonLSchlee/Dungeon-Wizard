@@ -29,12 +29,6 @@ const TargetingData = Spell.TargetingData;
 const Params = Spell.Params;
 
 pub const title = "Zap Dash";
-pub const description =
-    \\Dash in the target direction. All
-    \\enemies you pass through take
-    \\lightning damage. Enemies near the
-    \\target location are stunned briefly.
-;
 
 pub const enum_name = "zap_dash";
 pub const Controllers = [_]type{Projectile};
@@ -66,7 +60,7 @@ line_hit_effect: Thing.HitEffect = .{
 },
 end_hit_effect: Thing.HitEffect = .{
     .damage = 5,
-    .status_stacks = StatusEffect.StacksArray.initDefault(0, .{ .stunned = 2 }),
+    .status_stacks = StatusEffect.StacksArray.initDefault(0, .{ .stunned = 1 }),
 },
 line_thickness: f32 = base_line_thickness,
 end_radius: f32 = base_end_radius,
@@ -146,4 +140,27 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     _ = try room.queueSpawnThing(&line, caster.pos);
     _ = try room.queueSpawnThing(&circle, target_pos);
     caster.pos = target_pos;
+}
+
+pub const description =
+    \\Zip around like a bolt of lightning!
+    \\Enemies you pass through are damaged.
+    \\Enemies near the target location take
+    \\additional damage and are stunned.
+;
+
+pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
+    const zap_dash: @This() = self.kind.zap_dash;
+    const fmt =
+        \\Line damage: {}
+        \\Target area damage: {}
+        \\Stun duration: {} secs
+        \\
+        \\{s}
+        \\
+    ;
+    const line_damage: i32 = utl.as(i32, zap_dash.line_hit_effect.damage);
+    const end_damage: i32 = utl.as(i32, zap_dash.end_hit_effect.damage);
+    const dur_secs: i32 = zap_dash.end_hit_effect.status_stacks.get(.stunned) * utl.as(i32, @divFloor(StatusEffect.proto_array.get(.stunned).cooldown.num_ticks, core.fups_per_sec));
+    return std.fmt.bufPrint(buf, fmt ++ "\n", .{ line_damage, end_damage, dur_secs, description });
 }

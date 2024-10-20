@@ -29,12 +29,6 @@ const TargetingData = Spell.TargetingData;
 const Params = Spell.Params;
 
 pub const title = "Mint 'Em";
-pub const description =
-    \\Cast a projectile which applies
-    \\temporary "mint" stacks on enemies.
-    \\Killing an enemy with "mint" stacks
-    \\yields that much gold.
-;
 
 pub const enum_name = "mint";
 pub const Controllers = [_]type{Projectile};
@@ -66,6 +60,7 @@ hit_effect: Thing.HitEffect = .{
 radius: f32 = base_radius,
 range: f32 = base_range,
 max_speed: f32 = 6,
+gold_cost: i32 = 1,
 
 pub const Projectile = struct {
     pub const controller_enum_name = enum_name ++ "_projectile";
@@ -96,6 +91,12 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     const mint = self.kind.mint;
     const target_pos = params.target.pos;
     const target_dir = if (target_pos.sub(caster.pos).normalizedChecked()) |d| d else V2f.right;
+    var run = App.get().run;
+    if (run.gold <= 0) {
+        // fizzle
+        return;
+    }
+    run.gold -= 1;
 
     const coin = Thing{
         .kind = .projectile,
@@ -129,4 +130,28 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
         },
     };
     _ = try room.queueSpawnThing(&coin, caster.pos);
+}
+
+pub const description =
+    \\Enchant a coin and throw it. It
+    \\applies "mint" stacks on enemies,
+    \\which decay at a rate of 1 per sec.
+    \\Killing an enemy with "mint" stacks
+    \\yields that much gold.
+    \\If you can't pay, the spell fizzles.
+;
+
+pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
+    const mint: @This() = self.kind.mint;
+    const fmt =
+        \\Gold cost: {}
+        \\Damage: {}
+        \\Mint stacks: {}
+        \\
+        \\{s}
+        \\
+    ;
+    const stacks: i32 = mint.hit_effect.status_stacks.get(.mint);
+    const damage: i32 = utl.as(i32, mint.hit_effect.damage);
+    return std.fmt.bufPrint(buf, fmt, .{ mint.gold_cost, damage, stacks, description });
 }

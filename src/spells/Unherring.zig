@@ -27,11 +27,6 @@ const TargetingData = Spell.TargetingData;
 const Params = Spell.Params;
 
 pub const title = "Unherring Missile";
-pub const description =
-    \\This little fish never misses!
-    \\Just point and click. Does
-    \\fish-type damage, of course.
-;
 
 pub const enum_name = "unherring";
 pub const Controllers = [_]type{Projectile};
@@ -133,4 +128,22 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
         } },
     };
     _ = try room.queueSpawnThing(&herring, caster.pos);
+}
+
+pub const description =
+    \\This little fish never misses!
+    \\Just point and click. Does
+    \\fish-type damage, of course.
+;
+
+pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
+    const unherring: @This() = self.kind.unherring;
+    const fmt =
+        \\Damage: {}
+        \\
+        \\{s}
+        \\
+    ;
+    const damage: i32 = utl.as(i32, unherring.hit_effect.damage);
+    return std.fmt.bufPrint(buf, fmt, .{ damage, description });
 }

@@ -31,6 +31,8 @@ const Spell = @This();
 pub const Pool = pool.BoundedPool(Spell, 32);
 pub const Id = pool.Id;
 
+var desc_buf: [2048]u8 = undefined;
+
 pub const SpellTypes = [_]type{
     @import("spells/Unherring.zig"),
     @import("spells/Protec.zig"),
@@ -131,6 +133,24 @@ pub const TargetingData = struct {
         radius: f32,
         radians: f32,
     } = null,
+
+    fn fmtRange(self: *const TargetingData, buf: []u8) Error![]u8 {
+        if (self.max_range == std.math.inf(f32)) return buf[0..0];
+        return try std.fmt.bufPrint(buf, "Range: {}\n", .{utl.as(u32, @floor(self.max_range))});
+    }
+
+    pub fn fmtDesc(self: *const TargetingData, buf: []u8) Error![]u8 {
+        var len: usize = 0;
+        len += (try std.fmt.bufPrint(buf[len..], "Target: {s}\n", .{
+            switch (self.kind) {
+                .self => "self",
+                .thing => "thing",
+                .pos => "ground",
+            },
+        })).len;
+        len += (try self.fmtRange(buf[len..])).len;
+        return buf[0..len];
+    }
 
     pub fn getRayEnd(self: *const TargetingData, room: *const Room, caster: *const Thing, ray: Ray, target_pos: V2f) V2f {
         const caster_to_target = target_pos.sub(caster.pos);
@@ -399,6 +419,25 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     }
 }
 
+pub fn getDescription(self: *const Spell) Error![]u8 {
+    var len: usize = 0;
+    var buf = desc_buf[0..];
+    len += (try std.fmt.bufPrint(buf, "Cast time: {}\n", .{self.cast_time})).len;
+    len += (try self.targeting_data.fmtDesc(buf[len..])).len;
+    const b = blk: switch (self.kind) {
+        inline else => |k| {
+            const K = @TypeOf(k);
+            if (std.meta.hasMethod(K, "getDescription")) {
+                break :blk try K.getDescription(self, buf[len..]);
+            } else {
+                break :blk try std.fmt.bufPrint(buf, "{s}", .{spell_descriptions.get(std.meta.activeTag(self.kind))});
+            }
+        },
+    };
+    len += b.len;
+    return buf[0..len];
+}
+
 pub inline fn getTargetParams(self: *const Spell, room: *Room, caster: *const Thing, mouse_pos: V2f) ?Params {
     return self.targeting_data.getParams(room, caster, mouse_pos);
 }
@@ -442,7 +481,7 @@ pub fn renderToolTip(self: *const Spell, pos: V2f) Error!void {
         .size = 25,
     };
     const name_dims = try plat.measureText(name, name_opt);
-    const desc = spell_descriptions.get(kind);
+    const desc = try self.getDescription();
     const desc_opt = draw.TextOpt{
         .color = .white,
         .size = 20,
@@ -450,8 +489,17 @@ pub fn renderToolTip(self: *const Spell, pos: V2f) Error!void {
     const desc_dims = try plat.measureText(desc, desc_opt);
     const text_dims = v2f(@max(name_dims.x, desc_dims.x), name_dims.y + desc_dims.y);
     const modal_dims = text_dims.add(v2f(10, 15));
-    plat.rectf(pos, modal_dims, .{ .fill_color = Colorf.black.fade(0.8) });
-    var text_pos = pos.add(v2f(5, 5));
+    var adjusted_pos = pos;
+    const bot_right = adjusted_pos.add(modal_dims);
+    if (bot_right.x > plat.screen_dims_f.x) {
+        adjusted_pos.x -= (bot_right.x - plat.screen_dims_f.x);
+    }
+    if (bot_right.y > plat.screen_dims_f.y) {
+        adjusted_pos.y -= (bot_right.y - plat.screen_dims_f.y);
+    }
+
+    plat.rectf(adjusted_pos, modal_dims, .{ .fill_color = Colorf.black.fade(0.8) });
+    var text_pos = adjusted_pos.add(v2f(5, 5));
     try plat.textf(text_pos, "{s}", .{name}, name_opt);
     text_pos.y += 5 + name_dims.y;
     try plat.textf(text_pos, "{s}", .{desc}, desc_opt);
@@ -497,7 +545,7 @@ pub fn renderInfo(self: *const Spell, rect: menuUI.ClickableRect) Error!void {
             );
         },
     }
-    const description_text = spell_descriptions.get(kind);
+    const description_text = try self.getDescription();
     const description_rect_topleft = rect.pos.add(v2f(0, title_rect_dims.y + icon_rect_dims.y));
     try menuUI.textInRect(description_rect_topleft, description_dims, .{ .fill_color = null }, v2f(10, 10), "{s}", .{description_text}, .{ .color = .white });
 }

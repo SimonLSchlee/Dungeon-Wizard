@@ -22,8 +22,6 @@ var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 
 const assets_path = "assets";
 
-var str_fmt_local_buf: [1024]u8 = undefined;
-
 pub const Font = struct {
     name: []const u8,
     r_font: r.Font,
@@ -53,15 +51,18 @@ screen_dims_f: V2f = .{},
 accumulated_update_ns: i64 = 0,
 prev_frame_time_ns: i64 = 0,
 input_buffer: core.InputBuffer = .{},
+str_fmt_buf: []u8 = undefined,
 
 pub fn init(width: u32, height: u32, title: []const u8) Error!Platform {
     @setRuntimeSafety(core.rt_safe_blocks);
+
     var ret: Platform = .{};
     const title_z = try std.fmt.allocPrintZ(ret.heap, "{s}", .{title});
     r.InitWindow(@intCast(width), @intCast(height), title_z);
-    ret.default_font = try ret.loadFont("Roboto-Regular.ttf");
+    ret.str_fmt_buf = try ret.heap.alloc(u8, 4096);
     ret.screen_dims = V2i.iToV2i(u32, width, height);
     ret.screen_dims_f = ret.screen_dims.toV2f();
+    ret.default_font = try ret.loadFont("Roboto-Regular.ttf"); // NOTE uses str_fmt_buf initialized above
 
     r.InitAudioDevice();
     r.SetExitKey(0);
@@ -302,7 +303,7 @@ pub fn clear(_: *Platform, color: Colorf) void {
 
 pub fn textf(self: *Platform, pos: V2f, comptime fmt: []const u8, args: anytype, opt: draw.TextOpt) Error!void {
     @setRuntimeSafety(core.rt_safe_blocks);
-    const text_z = try std.fmt.bufPrintZ(&str_fmt_local_buf, fmt, args);
+    const text_z = try std.fmt.bufPrintZ(self.str_fmt_buf, fmt, args);
     const font = if (opt.font) |f| f else self.default_font;
     const font_size_f: f32 = u.as(f32, opt.size);
     const text_width = r.MeasureTextEx(font.r_font, text_z, font_size_f, 0);
@@ -319,7 +320,7 @@ pub fn textf(self: *Platform, pos: V2f, comptime fmt: []const u8, args: anytype,
 }
 
 pub fn measureText(self: *Platform, text: []const u8, opt: draw.TextOpt) Error!V2f {
-    const text_z = try std.fmt.bufPrintZ(&str_fmt_local_buf, "{s}", .{text});
+    const text_z = try std.fmt.bufPrintZ(self.str_fmt_buf, "{s}", .{text});
     const font = if (opt.font) |f| f else self.default_font;
     const font_size_f: f32 = u.as(f32, opt.size);
     const sz = r.MeasureTextEx(font.r_font, text_z, font_size_f, 0);
@@ -407,9 +408,9 @@ pub fn arrowf(self: *Platform, base: V2f, point: V2f, thickness: f32, color: Col
     self.trianglef(.{ line_end.add(left_v), line_end.add(right_v), tri_end }, .{ .fill_color = color });
 }
 
-pub fn loadFont(_: *Platform, path: []const u8) Error!Font {
+pub fn loadFont(self: *Platform, path: []const u8) Error!Font {
     @setRuntimeSafety(core.rt_safe_blocks);
-    const path_z = try std.fmt.bufPrintZ(&str_fmt_local_buf, "{s}/fonts/{s}", .{ assets_path, path });
+    const path_z = try std.fmt.bufPrintZ(self.str_fmt_buf, "{s}/fonts/{s}", .{ assets_path, path });
     var r_font = r.LoadFontEx(path_z, 200, 0, 0);
     r.GenTextureMipmaps(&r_font.texture);
     const ret: Font = .{
@@ -419,9 +420,9 @@ pub fn loadFont(_: *Platform, path: []const u8) Error!Font {
     return ret;
 }
 
-pub fn loadTexture(_: *Platform, path: []const u8) Error!Texture2D {
+pub fn loadTexture(self: *Platform, path: []const u8) Error!Texture2D {
     @setRuntimeSafety(core.rt_safe_blocks);
-    const path_z = try std.fmt.bufPrintZ(&str_fmt_local_buf, "{s}/images/{s}", .{ assets_path, path });
+    const path_z = try std.fmt.bufPrintZ(self.str_fmt_buf, "{s}/images/{s}", .{ assets_path, path });
     const r_tex = r.LoadTexture(path_z);
     return .{
         .name = path,
@@ -592,9 +593,9 @@ pub fn playSound(_: *Platform, sound: Sound) void {
     r.PlaySound(sound.r_sound);
 }
 
-pub fn loadSound(_: *Platform, path: []const u8) Error!Sound {
+pub fn loadSound(self: *Platform, path: []const u8) Error!Sound {
     @setRuntimeSafety(core.rt_safe_blocks);
-    const path_z = try std.fmt.bufPrintZ(&str_fmt_local_buf, "{s}/sounds/{s}", .{ assets_path, path });
+    const path_z = try std.fmt.bufPrintZ(self.str_fmt_buf, "{s}/sounds/{s}", .{ assets_path, path });
     const r_sound = r.LoadSound(path_z);
     const ret: Sound = .{
         .name = path,

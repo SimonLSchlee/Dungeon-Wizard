@@ -29,12 +29,6 @@ const TargetingData = Spell.TargetingData;
 const Params = Spell.Params;
 
 pub const title = "Flamey Explodey";
-pub const description =
-    \\Conjure a ball of fire which flies
-    \\to the target point, and explodes.
-    \\It will also trigger on impact.
-    \\Careful!
-;
 
 pub const enum_name = "flamey_explodey";
 pub const Controllers = [_]type{Projectile};
@@ -147,4 +141,25 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
         },
     };
     _ = try room.queueSpawnThing(&ball, caster.pos);
+}
+
+pub const description =
+    \\Conjure a ball of fire which flies
+    \\to the target point, and explodes.
+    \\It will also trigger on impact.
+    \\Careful!
+;
+
+pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
+    const flamey_explodey: @This() = self.kind.flamey_explodey;
+    const fmt =
+        \\Direct hit damage: {}
+        \\Explosion damage: {}
+        \\
+        \\{s}
+        \\
+    ;
+    const ball_damage: i32 = utl.as(i32, flamey_explodey.ball_hit_effect.damage);
+    const explode_damage: i32 = utl.as(i32, flamey_explodey.explode_hit_effect.damage);
+    return std.fmt.bufPrint(buf, fmt, .{ ball_damage, explode_damage, description });
 }

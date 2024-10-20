@@ -432,6 +432,10 @@ pub const Slots = struct {
                 .{ .color = key_color },
             );
         }
+    }
+
+    pub fn renderToolTips(self: *const Slots, slots: []const Slot, kind: Slot.Kind) Error!void {
+        const rects = self.getSlotRects(kind);
         for (slots, 0..) |slot, i| {
             const rect = rects.get(i);
             if (!slot.hover_timer.running) {
@@ -472,6 +476,9 @@ pub const Slots = struct {
 
         try self.renderSlots(room, caster, self.spells.constSlice(), .spell, slots_are_enabled);
         try self.renderSlots(room, caster, self.items.constSlice(), .item, slots_are_enabled);
+        // tooltips on top of everything
+        try self.renderToolTips(self.spells.constSlice(), .spell);
+        try self.renderToolTips(self.items.constSlice(), .item);
     }
 };
 

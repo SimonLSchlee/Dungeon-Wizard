@@ -28,11 +28,6 @@ const TargetingData = Spell.TargetingData;
 const Params = Spell.Params;
 
 pub const title = "Invite Impling";
-pub const description =
-    \\Cordially request the presence of
-    \\a minor demon to aid your
-    \\endeavors.
-;
 
 pub const enum_name = "impling";
 pub const Controllers = [_]type{};
@@ -104,4 +99,26 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     const target_pos = params.target.pos;
     const spawner = Thing.SpawnerController.prototype(.impling);
     _ = try room.queueSpawnThing(&spawner, target_pos);
+}
+
+pub const description =
+    \\Cordially request the presence of
+    \\a minor demon to aid your
+    \\endeavors.
+;
+
+pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
+    const impling: @This() = self.kind.impling;
+    _ = impling;
+    const fmt =
+        \\Impling hp: {}
+        \\Impling damage: {}
+        \\
+        \\{s}
+        \\
+    ;
+    const summonProto = App.get().data.creatures.getPtr(.impling);
+    const hp: i32 = utl.as(i32, summonProto.hp.?.max);
+    const damage: i32 = utl.as(i32, summonProto.hitbox.?.effect.damage);
+    return std.fmt.bufPrint(buf, fmt, .{ hp, damage, description });
 }

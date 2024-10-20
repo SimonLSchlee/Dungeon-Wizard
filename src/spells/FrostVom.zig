@@ -28,10 +28,6 @@ const TargetingData = Spell.TargetingData;
 const Params = Spell.Params;
 
 pub const title = "Frost Vomit";
-pub const description =
-    \\"Hurl" a freezing cone of ice
-    \\which stuns enemies temporarily.
-;
 
 pub const enum_name = "frost_vom";
 pub const Controllers = [_]type{Projectile};
@@ -172,4 +168,23 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
         },
     };
     _ = try room.queueSpawnThing(&vom, caster.pos);
+}
+
+pub const description =
+    \\"Hurl" a cone of ice which
+    \\freezes enemies.
+;
+
+pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
+    const frost_vom: @This() = self.kind.frost_vom;
+    const fmt =
+        \\Damage: {}
+        \\Freeze duration: {} secs
+        \\
+        \\{s}
+        \\
+    ;
+    const dur_secs: i32 = frost_vom.hit_effect.status_stacks.get(.frozen) * utl.as(i32, @divFloor(StatusEffect.proto_array.get(.frozen).cooldown.num_ticks, core.fups_per_sec));
+    const damage: i32 = utl.as(i32, frost_vom.hit_effect.damage);
+    return std.fmt.bufPrint(buf, fmt, .{ damage, dur_secs, description });
 }

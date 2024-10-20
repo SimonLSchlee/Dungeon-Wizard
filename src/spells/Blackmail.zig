@@ -28,10 +28,6 @@ const TargetingData = Spell.TargetingData;
 const Params = Spell.Params;
 
 pub const title = "Blackmail";
-pub const description =
-    \\Intimidate an enemy into becoming
-    \\your ally. For a while, at least.
-;
 
 pub const enum_name = "blackmail";
 pub const Controllers = [_]type{};
@@ -44,6 +40,8 @@ pub const proto = Spell.makeProto(
         .targeting_data = .{
             .kind = .thing,
             .target_faction_mask = Thing.Faction.Mask.initOne(.enemy),
+            .max_range = 400,
+            .show_max_range_ring = true,
         },
     },
 );
@@ -63,4 +61,20 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     const blackmail = self.kind.blackmail;
     target.faction = .ally;
     target.statuses.getPtr(.blackmailed).stacks = blackmail.num_stacks;
+}
+
+pub const description =
+    \\Intimidate an enemy into becoming
+    \\your ally. For a while, at least.
+;
+pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
+    const blackmail: @This() = self.kind.blackmail;
+    const fmt =
+        \\Duration: {} secs
+        \\
+        \\{s}
+        \\
+    ;
+    const dur_secs: i32 = blackmail.num_stacks * utl.as(i32, @divFloor(StatusEffect.proto_array.get(.blackmailed).cooldown.num_ticks, core.fups_per_sec));
+    return std.fmt.bufPrint(buf, fmt, .{ dur_secs, description });
 }
