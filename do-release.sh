@@ -10,7 +10,7 @@ FONTS="assets/fonts"
 
 rm -rf zig-out/release
 
-zig build -Ddo-release
+zig build -Dstatic-link -Ddo-release
 
 pushd zig-out/release
 

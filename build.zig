@@ -5,7 +5,21 @@ const title = "action-deckbuilder";
 
 const raylib_config = "-DSUPPORT_CUSTOM_FRAME_CONTROL=1";
 
-pub fn buildDynamic(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, app_only: bool) ![]*std.Build.Step.Compile {
+fn linkOSStuff(b: *std.Build, target: std.Build.ResolvedTarget, artifact: *std.Build.Step.Compile) void {
+    switch (target.result.os.tag) {
+        .macos => {
+            if (std.zig.system.darwin.getSdk(b.allocator, target.result)) |sdk| {
+                //std.debug.print("\n\n{s}\n\n", .{sdk});
+                artifact.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ sdk, "/System/Library/Frameworks" }) });
+                artifact.linkFramework("CoreFoundation");
+                artifact.addIncludePath(.{ .cwd_relative = b.pathJoin(&.{ sdk, "/System/Library/Frameworks/CoreFoundation.framework/Versions/Current/Headers" }) });
+            }
+        },
+        else => {},
+    }
+}
+
+pub fn buildDynamic(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, app_only: bool, do_release: bool) ![]*std.Build.Step.Compile {
     var artifacts = std.ArrayList(*std.Build.Step.Compile).init(b.allocator);
 
     const raylib = try raylib_build.addRaylib(
@@ -17,7 +31,6 @@ pub fn buildDynamic(b: *std.Build, target: std.Build.ResolvedTarget, optimize: s
             .config = raylib_config,
         },
     );
-    try artifacts.append(raylib);
 
     const app_lib = b.addSharedLibrary(.{
         .name = "game",
@@ -29,7 +42,6 @@ pub fn buildDynamic(b: *std.Build, target: std.Build.ResolvedTarget, optimize: s
     });
     app_lib.linkLibrary(raylib);
     app_lib.addIncludePath(b.path("raylib/src"));
-    try artifacts.append(app_lib);
 
     if (!app_only) {
         const exe = b.addExecutable(.{
@@ -40,9 +52,11 @@ pub fn buildDynamic(b: *std.Build, target: std.Build.ResolvedTarget, optimize: s
         });
         exe.linkLibrary(raylib);
         exe.addIncludePath(b.path("raylib/src"));
-        exe.addLibraryPath(.{ .cwd_relative = "." });
+        linkOSStuff(b, target, exe);
 
         const options = b.addOptions();
+        options.addOption(bool, "static_lib", false);
+        options.addOption(bool, "is_release", do_release);
         exe.root_module.addOptions("config", options);
 
         if (target.query.isNative()) {
@@ -71,11 +85,13 @@ pub fn buildDynamic(b: *std.Build, target: std.Build.ResolvedTarget, optimize: s
         }
         try artifacts.append(exe);
     }
+    try artifacts.append(app_lib);
+    try artifacts.append(raylib);
 
     return try artifacts.toOwnedSlice();
 }
 
-pub fn buildStatic(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) ![]*std.Build.Step.Compile {
+pub fn buildStatic(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, do_release: bool) ![]*std.Build.Step.Compile {
     const raylib = try raylib_build.addRaylib(
         b,
         target,
@@ -93,9 +109,11 @@ pub fn buildStatic(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
     });
     exe.linkLibrary(raylib);
     exe.addIncludePath(b.path("raylib/src"));
+    linkOSStuff(b, target, exe);
 
     const options = b.addOptions();
     options.addOption(bool, "static_lib", true);
+    options.addOption(bool, "is_release", do_release);
     exe.root_module.addOptions("config", options);
 
     if (target.query.isNative()) {
@@ -118,9 +136,9 @@ pub fn buildStatic(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
 // declaratively construct a build graph that will be executed by an external
 // runner.
 pub fn build(b: *std.Build) !void {
-    const do_release = b.option(bool, "do-release", "package for release") orelse false;
-    const app_only = b.option(bool, "app-only", "only build the game shared lib") orelse false;
-    const static_link = do_release or b.option(bool, "static", "build statically") orelse false;
+    const do_release = b.option(bool, "do-release", "build all targets for release") orelse false;
+    const static_link = b.option(bool, "static-link", "build statically") orelse false;
+    const app_only = b.option(bool, "app-only", "only build the game shared lib - incompatible with static-link and do-release") orelse false;
     if (app_only) {
         std.debug.assert(!do_release);
         std.debug.assert(!static_link);
@@ -156,19 +174,17 @@ pub fn build(b: *std.Build) !void {
     const optimize = if (do_release) std.builtin.OptimizeMode.ReleaseSafe else b.standardOptimizeOption(.{});
 
     for (targets) |target| {
-        const target_triple = target.result.zigTriple(b.allocator) catch "<Failed to get triple>";
+        const target_triple = try target.result.zigTriple(b.allocator);
         defer b.allocator.free(target_triple);
         std.debug.print("Target triple{s}: {s}\n", .{ if (target.query.isNative()) " (native)" else "", target_triple });
 
         // buildu
-        const artifacts = (blk: {
+        const artifacts = blk: {
             if (static_link) {
-                break :blk buildStatic(b, target, optimize);
+                break :blk try buildStatic(b, target, optimize, do_release);
             } else {
-                break :blk buildDynamic(b, target, optimize, app_only);
+                break :blk try buildDynamic(b, target, optimize, app_only, do_release);
             }
-        }) catch {
-            @panic("Failed\n");
         };
 
         // installu

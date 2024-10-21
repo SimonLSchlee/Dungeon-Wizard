@@ -19,11 +19,12 @@ const v2f = V2f.v2f;
 const V2i = @import("V2i.zig");
 const v2i = V2i.v2i;
 
+const builtin = @import("builtin");
 const config = @import("config");
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 
-const assets_path = "assets";
+const str_fmt_buf_size = 4096;
 
 pub const Font = struct {
     name: []const u8,
@@ -56,6 +57,7 @@ accumulated_update_ns: i64 = 0,
 prev_frame_time_ns: i64 = 0,
 input_buffer: core.InputBuffer = .{},
 str_fmt_buf: []u8 = undefined,
+assets_path: []const u8 = undefined,
 
 pub fn init(width: u32, height: u32, title: []const u8) Error!Platform {
     @setRuntimeSafety(core.rt_safe_blocks);
@@ -65,9 +67,11 @@ pub fn init(width: u32, height: u32, title: []const u8) Error!Platform {
 
     r.InitWindow(@intCast(width), @intCast(height), title_z);
     // show raylib init INFO, then just warnings
-    r.SetTraceLogLevel(r.LOG_WARNING);
+    r.SetTraceLogLevel(r.LOG_INFO);
 
-    ret.str_fmt_buf = try ret.heap.alloc(u8, 4096);
+    ret.str_fmt_buf = try ret.heap.alloc(u8, str_fmt_buf_size);
+    ret.assets_path = try ret.getAssetsPath();
+
     ret.screen_dims = V2i.iToV2i(u32, width, height);
     ret.screen_dims_f = ret.screen_dims.toV2f();
     ret.default_font = try ret.loadFont("Roboto-Regular.ttf"); // NOTE uses str_fmt_buf initialized above
@@ -82,6 +86,34 @@ pub fn closeWindow(_: *Platform) void {
     r.CloseWindow();
 }
 
+pub fn getAssetsPath(self: *Platform) Error![]const u8 {
+    if (config.is_release) {
+        switch (builtin.os.tag) {
+            .macos => {
+                const CF = @cImport({
+                    @cInclude("CFBundle.h");
+                    @cInclude("CFURL.h");
+                    @cInclude("CFString.h");
+                });
+                // Zig thinks these are ? but they're just C pointers I guess
+                const bundle = CF.CFBundleGetMainBundle();
+                const cf_url = CF.CFBundleCopyResourcesDirectoryURL(bundle);
+                const cf_str_ref = CF.CFURLCopyFileSystemPath(cf_url, CF.kCFURLPOSIXPathStyle);
+                const c_buf: [*c]u8 = @ptrCast(self.str_fmt_buf);
+                if (CF.CFStringGetCString(cf_str_ref, c_buf, str_fmt_buf_size, CF.kCFStringEncodingASCII) != 0) {
+                    const slice = std.mem.span(c_buf);
+                    return try std.fmt.allocPrint(self.heap, "{s}/assets", .{slice});
+                } else {
+                    return Error.NoSpaceLeft;
+                }
+                return Error.FileSystemFail;
+            },
+            else => {},
+        }
+    }
+    return "assets";
+}
+
 pub fn setTargetFPS(_: *Platform, fps: u32) void {
     @setRuntimeSafety(core.rt_safe_blocks);
     r.SetTargetFPS(@intCast(fps));
@@ -91,7 +123,7 @@ pub fn getGameTimeNanosecs(_: *Platform) i64 {
     return u.as(i64, r.GetTime() * u.as(f64, core.ns_per_sec));
 }
 
-const app_dll_name = switch (@import("builtin").os.tag) {
+const app_dll_name = switch (builtin.os.tag) {
     .macos => "libgame.dylib",
     .windows => "game.dll",
     else => @compileError("missing app dll name"),
@@ -148,8 +180,7 @@ fn loadStaticApp(self: *Platform) void {
 pub fn run(self: *Platform) Error!void {
     @setRuntimeSafety(core.rt_safe_blocks);
 
-    const static_app = @hasDecl(config, "static_lib");
-    if (static_app) {
+    if (config.static_lib) {
         self.loadStaticApp();
     } else {
         try self.loadAppDll();
@@ -165,7 +196,7 @@ pub fn run(self: *Platform) Error!void {
     std.debug.print("ns per refresh: {}\n", .{ns_per_refresh});
 
     while (!r.WindowShouldClose() and !self.should_exit) {
-        if (static_app and debug.enable_debug_controls and r.IsKeyPressed(r.KEY_F5)) {
+        if (config.static_lib and debug.enable_debug_controls and r.IsKeyPressed(r.KEY_F5)) {
             self.unloadAppDll();
             try self.recompileAppDll();
             try self.loadAppDll();
@@ -439,7 +470,7 @@ pub fn arrowf(self: *Platform, base: V2f, point: V2f, thickness: f32, color: Col
 
 pub fn loadFont(self: *Platform, path: []const u8) Error!Font {
     @setRuntimeSafety(core.rt_safe_blocks);
-    const path_z = try std.fmt.bufPrintZ(self.str_fmt_buf, "{s}/fonts/{s}", .{ assets_path, path });
+    const path_z = try std.fmt.bufPrintZ(self.str_fmt_buf, "{s}/fonts/{s}", .{ self.assets_path, path });
     var r_font = r.LoadFontEx(path_z, 200, 0, 0);
     r.GenTextureMipmaps(&r_font.texture);
     const ret: Font = .{
@@ -451,7 +482,7 @@ pub fn loadFont(self: *Platform, path: []const u8) Error!Font {
 
 pub fn loadTexture(self: *Platform, path: []const u8) Error!Texture2D {
     @setRuntimeSafety(core.rt_safe_blocks);
-    const path_z = try std.fmt.bufPrintZ(self.str_fmt_buf, "{s}/images/{s}", .{ assets_path, path });
+    const path_z = try std.fmt.bufPrintZ(self.str_fmt_buf, "{s}/images/{s}", .{ self.assets_path, path });
     const r_tex = r.LoadTexture(path_z);
     return .{
         .name = path,
@@ -624,7 +655,7 @@ pub fn playSound(_: *Platform, sound: Sound) void {
 
 pub fn loadSound(self: *Platform, path: []const u8) Error!Sound {
     @setRuntimeSafety(core.rt_safe_blocks);
-    const path_z = try std.fmt.bufPrintZ(self.str_fmt_buf, "{s}/sounds/{s}", .{ assets_path, path });
+    const path_z = try std.fmt.bufPrintZ(self.str_fmt_buf, "{s}/sounds/{s}", .{ self.assets_path, path });
     const r_sound = r.LoadSound(path_z);
     const ret: Sound = .{
         .name = path,

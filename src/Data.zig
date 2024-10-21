@@ -376,13 +376,17 @@ pub fn loadSpriteSheetFromJson(json_file: std.fs.File, assets_images_rel_dir_pat
 }
 
 pub fn loadItemIcons(self: *Data) Error!void {
-    const icons_json = std.fs.cwd().openFile("assets/images/ui/item_icons.json", .{}) catch return Error.FileSystemFail;
+    const plat = App.getPlat();
+    const path = try u.bufPrintLocal("{s}/images/ui/item_icons.json", .{plat.assets_path});
+    const icons_json = std.fs.cwd().openFile(path, .{}) catch return Error.FileSystemFail;
     const sheet = try loadSpriteSheetFromJson(icons_json, "ui");
     self.item_icons = try @TypeOf(self.item_icons).init(sheet);
 }
 
 pub fn loadSpellIcons(self: *Data) Error!void {
-    const icons_json = std.fs.cwd().openFile("assets/images/ui/spell_icons.json", .{}) catch return Error.FileSystemFail;
+    const plat = App.getPlat();
+    const path = try u.bufPrintLocal("{s}/images/ui/spell_icons.json", .{plat.assets_path});
+    const icons_json = std.fs.cwd().openFile(path, .{}) catch return Error.FileSystemFail;
     const sheet = try loadSpriteSheetFromJson(icons_json, "ui");
     self.spell_icons = try @TypeOf(self.spell_icons).init(sheet);
 }
@@ -399,7 +403,8 @@ pub fn loadCreatureSpriteSheets(self: *Data) Error!void {
     self.creature_anims = @TypeOf(self.creature_anims).initFill(CreatureAnimArray.initFill(null));
     self.creature_sprite_sheets = @TypeOf(self.creature_sprite_sheets).initFill(CreatureSpriteSheetArray.initFill(null));
 
-    var creature = std.fs.cwd().openDir("assets/images/creature", .{ .iterate = true }) catch return Error.FileSystemFail;
+    const path = try u.bufPrintLocal("{s}/images/creature", .{plat.assets_path});
+    var creature = std.fs.cwd().openDir(path, .{ .iterate = true }) catch return Error.FileSystemFail;
     defer creature.close();
     var walker = try creature.walk(plat.heap);
     defer walker.deinit();
