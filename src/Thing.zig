@@ -472,11 +472,13 @@ pub const CreatureRenderer = struct {
         const animator = self.animator.creature;
         const frame = animator.getCurrRenderFrame(self.dir);
         var tint: Colorf = blk: {
-            if (self.statuses.get(.frozen).stacks > 0) break :blk StatusEffect.proto_array.get(.frozen).color;
-            if (self.statuses.get(.exposed).stacks > 0) break :blk StatusEffect.proto_array.get(.exposed).color.lerp(.white, 0.25);
+            if (self.isAliveCreature()) {
+                if (self.statuses.get(.frozen).stacks > 0) break :blk StatusEffect.proto_array.get(.frozen).color;
+                if (self.statuses.get(.exposed).stacks > 0) break :blk StatusEffect.proto_array.get(.exposed).color.lerp(.white, 0.25);
+            }
             break :blk .white;
         };
-        if (self.statuses.get(.unseeable).stacks > 0) tint.a = 0.5;
+        if (self.isAliveCreature() and self.statuses.get(.unseeable).stacks > 0) tint.a = 0.5;
         const opt = draw.TextureOpt{
             .origin = frame.origin,
             .src_pos = frame.pos.toV2f(),
@@ -487,7 +489,7 @@ pub const CreatureRenderer = struct {
         plat.texturef(self.pos, frame.texture, opt);
 
         const protected = self.statuses.get(.protected);
-        if (protected.stacks > 0) {
+        if (self.isAliveCreature() and protected.stacks > 0) {
             // TODO dont use select radius
             const r = if (self.selectable) |s| s.height * 0.5 else self.coll_radius;
             const shield_center = self.pos.sub(v2f(0, r));
@@ -517,20 +519,20 @@ pub const CreatureRenderer = struct {
                 plat.rectf(self.pos.add(hp_offset), v2f(hp_width, hp_height), .{ .fill_color = Colorf.black });
                 plat.rectf(self.pos.add(hp_offset), v2f(curr_width, hp_height), .{ .fill_color = HP.faction_colors.get(self.faction) });
             }
-        }
-        // debug draw statuses
-        const status_height = 14;
-        const status_y_offset = hp_y_offset - (hp_height + 3);
-        var status_pos = self.pos.add(v2f(-hp_width * 0.5, -status_y_offset));
-        for (self.statuses.values) |status| {
-            if (status.stacks == 0) continue;
-            const text = try utl.bufPrintLocal("{}", .{status.stacks});
-            const text_dims = try plat.measureText(text, .{ .size = status_height - 1 });
-            const status_box_width = text_dims.x;
-            const text_color = Colorf.getContrasting(status.color);
-            plat.rectf(status_pos, v2f(status_box_width, status_height), .{ .fill_color = status.color });
-            try plat.textf(status_pos, "{s}", .{text}, .{ .size = status_height - 1, .color = text_color });
-            status_pos.x += status_box_width;
+            // debug draw statuses
+            const status_height = 14;
+            const status_y_offset = hp_y_offset - (hp_height + 3);
+            var status_pos = self.pos.add(v2f(-hp_width * 0.5, -status_y_offset));
+            for (self.statuses.values) |status| {
+                if (status.stacks == 0) continue;
+                const text = try utl.bufPrintLocal("{}", .{status.stacks});
+                const text_dims = try plat.measureText(text, .{ .size = status_height - 1 });
+                const status_box_width = text_dims.x;
+                const text_color = Colorf.getContrasting(status.color);
+                plat.rectf(status_pos, v2f(status_box_width, status_height), .{ .fill_color = status.color });
+                try plat.textf(status_pos, "{s}", .{text}, .{ .size = status_height - 1, .color = text_color });
+                status_pos.x += status_box_width;
+            }
         }
     }
 };
@@ -566,8 +568,8 @@ pub fn update(self: *Thing, room: *Room) Error!void {
     } else if (self.isDeadCreature()) {
         if (self.animator.creature.play(.die, .{}).contains(.end)) {
             self.deferFree(room);
-            return;
         }
+        return;
     }
     if (self.hitbox) |*hitbox| {
         hitbox.update(self, room);
