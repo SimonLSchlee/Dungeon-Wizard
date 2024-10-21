@@ -181,7 +181,6 @@ camera: draw.Camera2D = .{},
 things: Thing.Pool = undefined,
 spawn_queue: ThingBoundedArray = .{},
 free_queue: ThingBoundedArray = .{},
-moused_over_thing: ?Thing.Id = null,
 player_id: ?pool.Id = null,
 move_press_ui_timer: u.TickCounter = u.TickCounter.initStopped(60),
 move_release_ui_timer: u.TickCounter = u.TickCounter.initStopped(60),
@@ -202,6 +201,10 @@ progress_state: union(enum) {
     exited: gameUI.ExitDoor,
 } = .none,
 // reinit stuff, never needs saving or copying, probably?:
+moused_over_thing: ?struct {
+    thing: Thing.Id,
+    faction_mask: Thing.Faction.Mask,
+} = null,
 edit_mode: bool = false,
 ui_clicked: bool = false,
 render_texture: ?Platform.RenderTexture2D = null,
@@ -370,9 +373,50 @@ pub fn spawnCurrWave(self: *Room) Error!void {
     self.curr_wave += 1;
 }
 
+pub fn getMousedOverThing(self: *Room, faction_mask: Thing.Faction.Mask) ?*Thing {
+    //cached
+    if (self.moused_over_thing) |s| {
+        if (s.faction_mask.eql(faction_mask)) return self.getThingById(s.thing);
+    }
+    const plat = getPlat();
+    const mouse_pos = plat.screenPosToCamPos(self.camera, plat.input_buffer.getCurrMousePos());
+    var best_thing: ?*Thing = null;
+    var best_y = -std.math.inf(f32);
+    for (&self.things.items) |*thing| {
+        if (!thing.isActive()) continue;
+        if (thing.selectable == null) continue;
+        if (!faction_mask.contains(thing.faction)) continue;
+        if (best_thing != null and thing.pos.y < best_y) continue;
+
+        const selectable = thing.selectable.?;
+        const rect = geom.Rectf{
+            .pos = thing.pos.sub(v2f(selectable.radius, selectable.height)),
+            .dims = v2f(selectable.radius * 2, selectable.height),
+        };
+        //const top_circle_pos = thing.pos.sub(v2f(0, selectable.height));
+
+        if (mouse_pos.dist(thing.pos) < selectable.radius or
+            geom.pointIsInRectf(mouse_pos, rect)) //or
+            //mouse_pos.dist(top_circle_pos) < selectable.radius)
+        {
+            best_y = thing.pos.y;
+            best_thing = thing;
+        }
+    }
+    if (best_thing) |thing| {
+        self.moused_over_thing = .{
+            .thing = thing.id,
+            .faction_mask = faction_mask,
+        };
+        return thing;
+    }
+    return null;
+}
+
 pub fn update(self: *Room) Error!void {
     const plat = getPlat();
     self.ui_clicked = false;
+    self.moused_over_thing = null;
 
     if (debug.enable_debug_controls) {
         if (plat.input_buffer.keyIsJustPressed(.backtick)) {
@@ -408,32 +452,6 @@ pub fn update(self: *Room) Error!void {
     }
     self.spawn_queue.len = 0;
 
-    // input and player controls
-    const mouse_pos = plat.screenPosToCamPos(self.camera, plat.input_buffer.getCurrMousePos());
-    { // get any "thing" that is moused over
-        self.moused_over_thing = null;
-        var best_y = -std.math.inf(f32);
-        for (&self.things.items) |*thing| {
-            if (!thing.isActive()) continue;
-            if (thing.selectable == null) continue;
-            if (thing.pos.y < best_y) continue;
-
-            const selectable = thing.selectable.?;
-            const rect = geom.Rectf{
-                .pos = thing.pos.sub(v2f(selectable.radius, selectable.height)),
-                .dims = v2f(selectable.radius * 2, selectable.height),
-            };
-            //const top_circle_pos = thing.pos.sub(v2f(0, selectable.height));
-
-            if (mouse_pos.dist(thing.pos) < selectable.radius or
-                geom.pointIsInRectf(mouse_pos, rect)) //or
-                //mouse_pos.dist(top_circle_pos) < selectable.radius)
-            {
-                best_y = thing.pos.y;
-                self.moused_over_thing = thing.id;
-            }
-        }
-    }
     // update spell slots, and player input
     {
         const slots = &self.ui_slots;

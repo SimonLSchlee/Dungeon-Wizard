@@ -196,20 +196,17 @@ pub const TargetingData = struct {
                 };
             },
             .thing => {
-                // TODO is it bad if moused_over_thing blocks selecting a valid target?
-                if (room.moused_over_thing) |id| {
-                    if (room.getThingById(id)) |thing| {
-                        // TODO different range calculation? sort that out and make consistent
-                        const range = @max(caster.pos.dist(thing.pos) - caster.coll_radius - thing.coll_radius, 0);
-                        if (range > targeting_data.max_range) {
-                            return null;
-                        }
-                        if (targeting_data.target_faction_mask.contains(thing.faction)) {
-                            return .{
-                                .target = .{ .thing = thing.id },
-                                .face_dir = thing.pos.sub(caster.pos).normalizedChecked() orelse caster.dir,
-                            };
-                        }
+                if (room.getMousedOverThing(targeting_data.target_faction_mask)) |thing| {
+                    // TODO different range calculation? sort that out and make consistent
+                    const range = @max(caster.pos.dist(thing.pos) - caster.coll_radius - thing.coll_radius, 0);
+                    if (range > targeting_data.max_range) {
+                        return null;
+                    }
+                    if (targeting_data.target_faction_mask.contains(thing.faction)) {
+                        return .{
+                            .target = .{ .thing = thing.id },
+                            .face_dir = thing.pos.sub(caster.pos).normalizedChecked() orelse caster.dir,
+                        };
                     }
                 }
             },
@@ -275,8 +272,8 @@ pub const TargetingData = struct {
                     if (range > targeting_data.max_range) continue;
                     const selectable = thing.selectable.?;
                     var draw_radius = selectable.radius - 10;
-                    if (room.moused_over_thing) |id| {
-                        if (thing.id.eql(id)) {
+                    if (@constCast(room).getMousedOverThing(targeting_data.target_faction_mask)) |moused_over_thing| {
+                        if (thing.id.eql(moused_over_thing.id)) {
                             draw_radius = selectable.radius;
                         }
                         if (targeting_data.ray_to_mouse) |ray| {
