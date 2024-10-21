@@ -19,7 +19,7 @@ pub fn build(b: *std.Build) void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
-    const raylib = try raylib_build.addRaylib(b, target, optimize, .{ .shared = true });
+    const raylib = try raylib_build.addRaylib(b, target, optimize, .{ .shared = true, .config = "-DSUPPORT_CUSTOM_FRAME_CONTROL=1" });
 
     const app_lib = b.addSharedLibrary(.{
         .name = "game",
