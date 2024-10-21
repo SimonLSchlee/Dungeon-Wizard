@@ -60,7 +60,11 @@ export fn appInit(plat: *Platform) *anyopaque {
     return app;
 }
 
-export fn appReload(app_ptr: *anyopaque, plat: *Platform) void {
+pub fn staticAppInit(plat: *Platform) *anyopaque {
+    return appInit(plat);
+}
+
+pub export fn appReload(app_ptr: *anyopaque, plat: *Platform) void {
     _plat = plat;
     const app: *App = @ptrCast(@alignCast(app_ptr));
     // allocator has a pointer to ArenaAllocater that needs re-setting
@@ -69,14 +73,26 @@ export fn appReload(app_ptr: *anyopaque, plat: *Platform) void {
     _app = app;
 }
 
-export fn appTick() void {
+pub fn staticAppReload(app_ptr: *anyopaque, plat: *Platform) void {
+    return appReload(app_ptr, plat);
+}
+
+pub export fn appTick() void {
     var app = App.get();
     app.update() catch @panic("fail appTick");
 }
 
-export fn appRender() void {
+pub fn staticAppTick() void {
+    appTick();
+}
+
+pub export fn appRender() void {
     var app = App.get();
     app.render() catch @panic("fail appRender");
+}
+
+pub fn staticAppRender() void {
+    appRender();
 }
 
 pub fn reset(self: *App) Error!*App {

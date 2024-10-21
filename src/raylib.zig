@@ -19,6 +19,8 @@ const v2f = V2f.v2f;
 const V2i = @import("V2i.zig");
 const v2i = V2i.v2i;
 
+const config = @import("config");
+
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 
 const assets_path = "assets";
@@ -60,7 +62,11 @@ pub fn init(width: u32, height: u32, title: []const u8) Error!Platform {
 
     var ret: Platform = .{};
     const title_z = try std.fmt.allocPrintZ(ret.heap, "{s}", .{title});
+
     r.InitWindow(@intCast(width), @intCast(height), title_z);
+    // show raylib init INFO, then just warnings
+    r.SetTraceLogLevel(r.LOG_WARNING);
+
     ret.str_fmt_buf = try ret.heap.alloc(u8, 4096);
     ret.screen_dims = V2i.iToV2i(u32, width, height);
     ret.screen_dims_f = ret.screen_dims.toV2f();
@@ -92,9 +98,12 @@ const app_dll_name = switch (@import("builtin").os.tag) {
 };
 
 fn loadAppDll(self: *Platform) Error!void {
-    self.app_dll = blk: for ([_][]const u8{ ".", "zig-out/lib", "zig-out/bin" }) |path| {
-        const app_dll_path = try std.fmt.bufPrint(self.str_fmt_buf, "{s}/{s}", .{ path, app_dll_name });
-        break :blk std.DynLib.open(app_dll_path) catch continue;
+    self.app_dll = blk: for ([_][]const u8{ "", ".", "zig-out/lib", "zig-out/bin" }) |path| {
+        const app_dll_path = if (path.len > 0) try std.fmt.bufPrint(self.str_fmt_buf, "{s}/{s}", .{ path, app_dll_name }) else app_dll_name;
+        break :blk std.DynLib.open(app_dll_path) catch |e| {
+            std.debug.print("{s}: {any}\n", .{ app_dll_path, e });
+            continue;
+        };
     } else {
         @panic("Fail to load app dll");
     };
@@ -116,7 +125,7 @@ fn recompileAppDll(self: *Platform) Error!void {
     const proc_args = [_][]const u8{
         "zig",
         "build",
-        "-Dapp_only=true",
+        "-Dapp-only=true",
     };
     var proc = std.process.Child.init(&proc_args, self.heap);
     const term = proc.spawnAndWait() catch return Error.RecompileFail;
@@ -128,10 +137,23 @@ fn recompileAppDll(self: *Platform) Error!void {
     }
 }
 
+fn loadStaticApp(self: *Platform) void {
+    const App = @import("App.zig");
+    self.appInit = App.staticAppInit;
+    self.appRender = App.staticAppRender;
+    self.appTick = App.staticAppTick;
+    self.appReload = App.staticAppReload;
+}
+
 pub fn run(self: *Platform) Error!void {
     @setRuntimeSafety(core.rt_safe_blocks);
 
-    try self.loadAppDll();
+    const static_app = @hasDecl(config, "static_lib");
+    if (static_app) {
+        self.loadStaticApp();
+    } else {
+        try self.loadAppDll();
+    }
     const app = self.appInit(self);
 
     self.prev_frame_time_ns = @max(self.getGameTimeNanosecs() - core.fixed_ns_per_update, 0);
@@ -143,7 +165,7 @@ pub fn run(self: *Platform) Error!void {
     std.debug.print("ns per refresh: {}\n", .{ns_per_refresh});
 
     while (!r.WindowShouldClose() and !self.should_exit) {
-        if (debug.enable_debug_controls and r.IsKeyPressed(r.KEY_F5)) {
+        if (static_app and debug.enable_debug_controls and r.IsKeyPressed(r.KEY_F5)) {
             self.unloadAppDll();
             try self.recompileAppDll();
             try self.loadAppDll();
