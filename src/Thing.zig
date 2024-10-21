@@ -260,6 +260,12 @@ pub const HurtBox = struct {
                 }
                 // stop getting hit by stuff
                 self.hurtbox = null;
+                // and hitting stuff
+                // and etc
+                self.hitbox = null;
+                self.coll_mask = @TypeOf(self.coll_mask).initEmpty();
+                self.coll_layer = @TypeOf(self.coll_mask).initEmpty();
+                self.selectable = null;
             }
         }
     }
