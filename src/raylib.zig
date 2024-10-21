@@ -7,6 +7,7 @@ const r = @cImport({
     @cInclude("rlgl.h");
 });
 const core = @import("core.zig");
+const debug = @import("debug.zig");
 const draw = @import("draw.zig");
 const Error = core.Error;
 const Key = core.Key;
@@ -137,7 +138,7 @@ pub fn run(self: *Platform) Error!void {
     std.debug.print("ns per refresh: {}\n", .{ns_per_refresh});
 
     while (!r.WindowShouldClose() and !self.should_exit) {
-        if (r.IsKeyPressed(r.KEY_F5)) {
+        if (debug.enable_debug_controls and r.IsKeyPressed(r.KEY_F5)) {
             self.unloadAppDll();
             try self.recompileAppDll();
             try self.loadAppDll();
