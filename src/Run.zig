@@ -230,9 +230,18 @@ pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
                 .boss => data.boss_room,
             };
             const exit_doors = self.makeExitDoors(packed_room);
-            const waves_params = Room.WavesParams{
+            var waves_params = Room.WavesParams{
                 .difficulty = r.difficulty,
+                .room_kind = switch (r.kind) {
+                    // TODO lel?
+                    .first => .first,
+                    .boss => .boss,
+                    .normal => .normal,
+                },
             };
+            if (r.kind == .first) {
+                waves_params.first_wave_delay_ticks = 0;
+            }
             self.room = try Room.init(.{
                 .deck = self.deck,
                 .waves_params = waves_params,
@@ -371,10 +380,10 @@ pub fn gameUpdate(self: *Run) Error!void {
         }
     }
     if (!room.edit_mode) {
-        if (plat.input_buffer.keyIsJustPressed(.escape)) {
-            room.paused = true;
-            self.screen = .pause_menu;
-        }
+        //if (plat.input_buffer.keyIsJustPressed(.escape)) {
+        //    room.paused = true;
+        //    self.screen = .pause_menu;
+        //}
     }
     try room.update();
     switch (room.progress_state) {
@@ -411,7 +420,10 @@ pub fn pauseMenuUpdate(self: *Run) Error!void {
     // TODO could pause in shop or w/e
     assert(self.room != null);
     const room = &self.room.?;
-    if (plat.input_buffer.keyIsJustPressed(.space) or plat.input_buffer.keyIsJustPressed(.escape)) {
+    //if (plat.input_buffer.keyIsJustPressed(.escape)) {
+    //    self.screen = .game;
+    //}
+    if (plat.input_buffer.keyIsJustPressed(.space)) {
         room.paused = false;
         self.screen = .game;
     }
@@ -717,8 +729,9 @@ pub fn render(self: *Run) Error!void {
             assert(self.room != null);
             const room = &self.room.?;
             if (room.paused) {
-                try self.game_pause_ui.deck_button.render();
-                try self.game_pause_ui.pause_menu_button.render();
+                // TODO these dont work so don't show em
+                //try self.game_pause_ui.deck_button.render();
+                //try self.game_pause_ui.pause_menu_button.render();
             }
         },
         .pause_menu => {},

@@ -39,6 +39,7 @@ pub const CreatureAnim = struct {
     pub const Kind = enum {
         creature, // misc anim
         wizard,
+        dummy,
         bat,
         troll,
         gobbow,

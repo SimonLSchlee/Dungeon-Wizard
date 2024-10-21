@@ -54,11 +54,17 @@ pub const WavesParams = struct {
     const max_max_kinds_per_wave = 4;
 
     difficulty: f32,
+    first_wave_delay_ticks: i64 = 5 * core.fups_per_sec,
     difficulty_error: f32 = 2,
     max_kinds_per_wave: usize = 2,
     min_waves: usize = 2,
     max_waves: usize = 4,
     enemy_kinds: []const Thing.CreatureKind = &all_enemy_kinds,
+    room_kind: enum {
+        first,
+        normal,
+        boss,
+    } = .normal,
 };
 
 pub const Wave = struct {
@@ -74,6 +80,23 @@ pub const WavesArray = std.BoundedArray(Wave, 8);
 fn makeWaves(packed_room: PackedRoom, rng: std.Random, params: WavesParams) WavesArray {
     const data = App.get().data;
     var ret = WavesArray{};
+    switch (params.room_kind) {
+        .first => {
+            const wave0 = packed_room.waves[0];
+            if (wave0.len > 0) {
+                var wave = Wave{};
+                wave.spawns.append(.{ .pos = wave0.get(0), .proto = data.creatures.get(.dummy) }) catch unreachable;
+                ret.append(wave) catch unreachable;
+                return ret;
+            }
+        },
+        .boss => {
+            // TODO?
+        },
+        .normal => {
+            // below is normal I guess
+        },
+    }
 
     var difficulty_left = params.difficulty;
     std.debug.print("\n\n#############\n", .{});
@@ -241,7 +264,7 @@ pub fn reset(self: *Room) Error!void {
     };
     self.curr_tick = 0;
     self.rng = std.Random.DefaultPrng.init(self.init_params.seed);
-    self.first_wave_timer = u.TickCounter.init(5 * core.fups_per_sec);
+    self.first_wave_timer = u.TickCounter.init(self.init_params.waves_params.first_wave_delay_ticks);
     self.curr_wave = 0;
     self.num_enemies_alive = 0;
     self.progress_state = .none;

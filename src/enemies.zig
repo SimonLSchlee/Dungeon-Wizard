@@ -648,3 +648,31 @@ pub fn acolyte() Error!Thing {
         .enemy_difficulty = 3,
     };
 }
+
+pub fn dummy() Thing {
+    return Thing{
+        .kind = .creature,
+        .creature_kind = .dummy,
+        .spawn_state = .instance,
+        .coll_radius = 15,
+        .coll_mask = Thing.Collision.Mask.initMany(&.{ .creature, .tile }),
+        .coll_layer = Thing.Collision.Mask.initMany(&.{.creature}),
+        .renderer = .{ .creature = .{
+            .draw_color = .yellow,
+            .draw_radius = 15,
+        } },
+        .animator = .{ .creature = .{
+            .creature_kind = .dummy,
+        } },
+        .hurtbox = .{
+            .radius = 15,
+        },
+        .selectable = .{
+            .height = 20 * 4, // TODO pixellszslz
+            .radius = 7 * 4,
+        },
+        .hp = Thing.HP.init(30),
+        .faction = .enemy,
+        .enemy_difficulty = 0,
+    };
+}

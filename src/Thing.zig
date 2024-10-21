@@ -40,6 +40,7 @@ pub const Kind = enum {
 
 pub const CreatureKind = enum {
     player,
+    dummy,
     troll,
     gobbow,
     sharpboi,
