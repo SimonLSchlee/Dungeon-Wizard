@@ -85,14 +85,19 @@ pub fn getGameTimeNanosecs(_: *Platform) i64 {
     return u.as(i64, r.GetTime() * u.as(f64, core.ns_per_sec));
 }
 
-const app_dll_path = "zig-out/lib/" ++ switch (@import("builtin").os.tag) {
+const app_dll_name = switch (@import("builtin").os.tag) {
     .macos => "libgame.dylib",
     .windows => "game.dll",
     else => @compileError("missing app dll name"),
 };
 
 fn loadAppDll(self: *Platform) Error!void {
-    self.app_dll = std.DynLib.open(app_dll_path) catch @panic("Fail to load app dll");
+    self.app_dll = blk: for ([_][]const u8{ ".", "zig-out/lib", "zig-out/bin" }) |path| {
+        const app_dll_path = try std.fmt.bufPrint(self.str_fmt_buf, "{s}/{s}", .{ path, app_dll_name });
+        break :blk std.DynLib.open(app_dll_path) catch continue;
+    } else {
+        @panic("Fail to load app dll");
+    };
     var dll = self.app_dll.?;
     self.appInit = dll.lookup(@TypeOf(self.appInit), "appInit") orelse return error.LookupFail;
     self.appReload = dll.lookup(@TypeOf(self.appReload), "appReload") orelse return error.LookupFail;

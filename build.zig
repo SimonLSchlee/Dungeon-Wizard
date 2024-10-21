@@ -20,6 +20,7 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     const raylib = try raylib_build.addRaylib(b, target, optimize, .{ .shared = true, .config = "-DSUPPORT_CUSTOM_FRAME_CONTROL=1" });
+    b.installArtifact(raylib);
 
     const app_lib = b.addSharedLibrary(.{
         .name = "game",
