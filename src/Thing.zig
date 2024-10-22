@@ -36,6 +36,7 @@ pub const Kind = enum {
     projectile,
     shield,
     spawner,
+    vfx,
 };
 
 pub const CreatureKind = enum {
@@ -89,12 +90,14 @@ controller: union(enum) {
     item: Item.Controller,
     projectile: ProjectileController,
     spawner: SpawnerController,
+    vfx: VFXController,
 } = .none,
 renderer: union(enum) {
     none: void,
     creature: CreatureRenderer,
     shape: ShapeRenderer,
     spawner: SpawnerRenderer,
+    vfx: VFXRenderer,
 } = .none,
 animator: ?sprites.Animator = null,
 path: std.BoundedArray(V2f, 32) = .{},
@@ -265,6 +268,75 @@ pub const HurtBox = struct {
                 self.selectable = null;
             }
         }
+    }
+};
+
+// TODO more generic, rn just for casting anim
+pub const VFXController = struct {
+    parent: Thing.Id,
+    anim_to_play: sprites.AnimName = .basic_loop,
+
+    pub fn update(self: *Thing, room: *Room) Error!void {
+        assert(self.spawn_state == .spawned);
+        const controller = &self.controller.vfx;
+
+        if (room.getThingById(controller.parent)) |parent| {
+            if (parent.isDeadCreature()) {
+                controller.anim_to_play = .basic_fizzle;
+            }
+        } else {
+            controller.anim_to_play = .basic_fizzle;
+        }
+
+        switch (controller.anim_to_play) {
+            .basic_loop => {
+                _ = self.animator.?.play(controller.anim_to_play, .{ .loop = true });
+            },
+            else => |anim_name| {
+                if (self.animator.?.play(anim_name, .{}).contains(.end)) {
+                    self.deferFree(room);
+                }
+            },
+        }
+    }
+
+    pub fn prototype(parent: *Thing) Thing {
+        return .{
+            .kind = .vfx,
+            .controller = .{
+                .vfx = .{
+                    .parent = parent.id,
+                },
+            },
+            .renderer = .{ .vfx = .{} },
+            .animator = .{
+                .kind = .{
+                    .vfx = .{
+                        .sheet_name = .spellcasting,
+                    },
+                },
+                .curr_anim = .basic_loop,
+            },
+        };
+    }
+};
+
+pub const VFXRenderer = struct {
+    sprite_tint: Colorf = .white,
+
+    pub fn renderOver(self: *const Thing, _: *const Room) Error!void {
+        const renderer = &self.renderer.vfx;
+        const plat = App.getPlat();
+        const frame = self.animator.?.getCurrRenderFrame();
+        const tint: Colorf = renderer.sprite_tint;
+        const opt = draw.TextureOpt{
+            .origin = frame.origin,
+            .src_pos = frame.pos.toV2f(),
+            .src_dims = frame.size.toV2f(),
+            .uniform_scaling = 4,
+            .tint = tint,
+        };
+        plat.texturef(self.pos, frame.texture, opt);
     }
 };
 

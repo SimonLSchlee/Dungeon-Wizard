@@ -155,6 +155,7 @@ pub const Controller = struct {
     action_casting: ?Action.Buffered = null,
     action_buffered: ?Action.Buffered = null,
     cast_counter: utl.TickCounter = .{},
+    cast_vfx: ?Thing.Id = null,
     ticks_in_state: i64 = 0,
 
     pub fn update(self: *Thing, room: *Room) Error!void {
@@ -221,11 +222,32 @@ pub const Controller = struct {
                         if (s.params.face_dir) |dir| {
                             self.dir = dir;
                         }
+                        switch (controller.action_casting.?.action) {
+                            .spell => {
+                                const cast_proto = Thing.VFXController.prototype(self);
+                                const cast_pos = self.pos;
+                                if (try room.queueSpawnThing(&cast_proto, cast_pos)) |id| {
+                                    controller.cast_vfx = id;
+                                }
+                            },
+                            else => {},
+                        }
+                    }
+                    // TODO bit of a hacky wacky
+                    if (controller.cast_counter.num_ticks - controller.cast_counter.curr_tick <= 30) {
+                        if (controller.cast_vfx) |id| {
+                            if (room.getThingById(id)) |cast| {
+                                cast.controller.vfx.anim_to_play = .basic_cast;
+                            }
+                        }
+                        controller.cast_vfx = null;
                     }
                     if (controller.cast_counter.tick(false)) {
                         switch (controller.action_casting.?.action) {
                             .item => |item| try item.use(self, room, s.params),
-                            .spell => |spell| try spell.cast(self, room, s.params),
+                            .spell => |spell| {
+                                try spell.cast(self, room, s.params);
+                            },
                         }
                         controller.action_casting = null;
                         controller.ticks_in_state = 0;

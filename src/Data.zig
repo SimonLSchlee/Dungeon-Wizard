@@ -526,6 +526,7 @@ pub fn loadVFXSpriteSheets(self: *Data) Error!void {
                     var anim: sprites.VFXAnim = .{
                         .sheet_name = vfx_sheet_name,
                         .anim_name = vfx_anim_name,
+                        .start_frame = tag.from_frame,
                         .num_frames = tag.to_frame - tag.from_frame + 1,
                     };
 

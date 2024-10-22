@@ -116,13 +116,14 @@ pub const VFXAnim = struct {
 
     sheet_name: SheetName,
     anim_name: AnimName,
+    start_frame: i32 = 0,
     num_frames: i32 = 1,
     events: std.BoundedArray(AnimEvent, 8) = .{},
     origin: draw.TextureOrigin = .center,
 
     pub fn getRenderFrame(self: VFXAnim, anim_frame: i32) RenderFrame {
         const sprite_sheet: Data.SpriteSheet = App.get().data.getVFXSpriteSheet(self.sheet_name, self.anim_name).?;
-        const frame_idx = utl.as(usize, anim_frame);
+        const frame_idx = utl.as(usize, self.start_frame + anim_frame);
         const ssframe: Data.SpriteSheet.Frame = sprite_sheet.frames[frame_idx];
         const rframe = RenderFrame{
             .pos = ssframe.pos,
