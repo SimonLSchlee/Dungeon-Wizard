@@ -156,7 +156,7 @@
    { "name": "cast-W", "from": 8, "to": 15, "direction": "forward", "color": "#000000ff" }
   ],
   "layers": [
-   { "name": "data", "opacity": 255, "blendMode": "normal", "cels": [{ "frame": 16, "data": "pivot-y=19" }] },
+   { "name": "data", "opacity": 255, "blendMode": "normal", "cels": [{ "frame": 16, "data": "pivot-y=19,cast-y=-3,cast-x=3" }] },
    { "name": "legs", "opacity": 255, "blendMode": "normal" },
    { "name": "body Copy", "opacity": 255, "blendMode": "normal" },
    { "name": "hands", "opacity": 255, "blendMode": "normal" },
