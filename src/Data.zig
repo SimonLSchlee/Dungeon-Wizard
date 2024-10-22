@@ -233,6 +233,10 @@ fn IconSprites(EnumType: type) type {
 creatures: std.EnumArray(Thing.CreatureKind, Thing) = undefined,
 creature_sprite_sheets: AllCreatureSpriteSheetArrays = undefined,
 creature_anims: AllCreatureAnimArrays = undefined,
+vfx_sprite_sheets: std.ArrayList(SpriteSheet) = undefined,
+vfx_sprite_sheet_mappings: sprites.VFXAnim.IdxMapping = undefined,
+vfx_anims: std.ArrayList(sprites.VFXAnim) = undefined,
+vfx_anim_mappings: sprites.VFXAnim.IdxMapping = undefined,
 spell_icons: IconSprites(Spell.Kind) = undefined,
 item_icons: IconSprites(Item.Kind) = undefined,
 sounds: std.EnumArray(SFX, ?Platform.Sound) = undefined,
@@ -250,6 +254,8 @@ pub fn init() Error!*Data {
     const plat = App.getPlat();
     const data = plat.heap.create(Data) catch @panic("Out of memory");
     data.* = .{};
+    data.vfx_anims = @TypeOf(data.vfx_anims).init(plat.heap);
+    data.vfx_sprite_sheets = @TypeOf(data.vfx_sprite_sheets).init(plat.heap);
     try data.reload();
     return data;
 }
@@ -391,12 +397,6 @@ pub fn loadSpellIcons(self: *Data) Error!void {
     self.spell_icons = try @TypeOf(self.spell_icons).init(sheet);
 }
 
-pub fn loadSpriteSheets(self: *Data) Error!void {
-    try self.loadCreatureSpriteSheets();
-    try self.loadSpellIcons();
-    try self.loadItemIcons();
-}
-
 pub fn loadCreatureSpriteSheets(self: *Data) Error!void {
     const plat = App.getPlat();
 
@@ -469,6 +469,87 @@ pub fn loadCreatureSpriteSheets(self: *Data) Error!void {
         }
         self.creature_anims.getPtr(creature_kind).getPtr(anim_kind).* = anim;
     }
+}
+
+pub fn loadVFXSpriteSheets(self: *Data) Error!void {
+    const plat = App.getPlat();
+
+    self.vfx_anims.clearRetainingCapacity();
+    self.vfx_anim_mappings = @TypeOf(self.vfx_anim_mappings).initFill(sprites.VFXAnim.AnimNameIdxMapping.initFill(null));
+    self.vfx_sprite_sheets.clearRetainingCapacity();
+    self.vfx_sprite_sheet_mappings = @TypeOf(self.vfx_sprite_sheet_mappings).initFill(sprites.VFXAnim.AnimNameIdxMapping.initFill(null));
+
+    const path = try u.bufPrintLocal("{s}/images/vfx", .{plat.assets_path});
+    var vfx = std.fs.cwd().openDir(path, .{ .iterate = true }) catch return Error.FileSystemFail;
+    defer vfx.close();
+    var walker = try vfx.walk(plat.heap);
+    defer walker.deinit();
+
+    while (walker.next() catch return Error.FileSystemFail) |w_entry| {
+        if (!std.mem.endsWith(u8, w_entry.basename, ".json")) continue;
+        const json_file = vfx.openFile(w_entry.basename, .{}) catch return Error.FileSystemFail;
+
+        const sheet = try loadSpriteSheetFromJson(json_file, "vfx");
+        const sheet_idx = self.vfx_sprite_sheets.items.len;
+        try self.vfx_sprite_sheets.append(sheet);
+
+        if (std.meta.stringToEnum(sprites.VFXAnim.SheetName, sheet.name.constSlice())) |vfx_sheet_name| {
+            // sprite sheet to vfx anims
+            for (sheet.tags) |tag| {
+                if (std.meta.stringToEnum(sprites.VFXAnim.AnimName, tag.name.constSlice())) |vfx_anim_name| {
+                    var anim: sprites.VFXAnim = .{
+                        .sheet_name = vfx_sheet_name,
+                        .anim_name = vfx_anim_name,
+                        .num_frames = tag.to_frame - tag.from_frame + 1,
+                    };
+
+                    meta_blk: for (sheet.meta) |m| {
+                        const m_name = m.name.constSlice();
+                        //std.debug.print("Meta '{s}'\n", .{m_name});
+
+                        if (std.mem.eql(u8, m_name, "pivot-y")) {
+                            const y = switch (m.data) {
+                                .int => |i| u.as(f32, i),
+                                .float => |f| f,
+                                .string => return Error.ParseFail,
+                            };
+                            const x = u.as(f32, sheet.frames[0].size.x) * 0.5;
+                            anim.origin = .{ .offset = v2f(x, y) };
+                            continue;
+                        }
+                        const event_info = @typeInfo(sprites.VFXAnim.Event.Kind);
+                        inline for (event_info.@"enum".fields) |f| {
+                            if (std.mem.eql(u8, m_name, f.name)) {
+                                //std.debug.print("Adding event '{s}' on frame {}\n", .{ f.name, m.data.int });
+                                anim.events.append(.{
+                                    .frame = u.as(i32, m.data.int),
+                                    .kind = @enumFromInt(f.value),
+                                }) catch {
+                                    std.debug.print("Skipped adding vfx anim event \"{s}\"; buffer full\n", .{f.name});
+                                };
+                                continue :meta_blk;
+                            }
+                        }
+                    }
+                    const anim_idx = self.vfx_anims.items.len;
+                    try self.vfx_anims.append(anim);
+                    self.vfx_sprite_sheet_mappings.getPtr(vfx_sheet_name).getPtr(vfx_anim_name).* = sheet_idx;
+                    self.vfx_anim_mappings.getPtr(vfx_sheet_name).getPtr(vfx_anim_name).* = anim_idx;
+                } else {
+                    std.log.warn("Unknown vfx anim skipped: {s}\n", .{tag.name.constSlice()});
+                }
+            }
+        } else {
+            std.log.warn("Unknown vfx spritesheet skipped: {s}\n", .{sheet.name.constSlice()});
+        }
+    }
+}
+
+pub fn loadSpriteSheets(self: *Data) Error!void {
+    try self.loadCreatureSpriteSheets();
+    try self.loadVFXSpriteSheets();
+    try self.loadSpellIcons();
+    try self.loadItemIcons();
 }
 
 pub fn reload(self: *Data) Error!void {

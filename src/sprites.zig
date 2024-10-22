@@ -115,6 +115,48 @@ pub const CreatureAnim = struct {
 
 pub const CreatureAnimKindSet = std.EnumSet(CreatureAnim.AnimKind);
 
+pub const VFXAnim = struct {
+    pub const SheetName = enum {
+        spellcasting,
+    };
+    pub const AnimName = enum {
+        basic_loop,
+        basic_cast,
+        basic_fizzle,
+    };
+    pub const AnimNameIdxMapping = std.EnumArray(AnimName, ?usize);
+    pub const IdxMapping = std.EnumArray(SheetName, AnimNameIdxMapping);
+    pub const Event = struct {
+        pub const Kind = enum {
+            end,
+        };
+        kind: Event.Kind,
+        frame: i32 = 0,
+    };
+
+    sheet_name: SheetName,
+    anim_name: AnimName,
+    num_frames: i32 = 1,
+    events: std.BoundedArray(Event, 8) = .{},
+    origin: draw.TextureOrigin = .center,
+
+    pub fn getRenderFrame(self: CreatureAnim, anim_frame: i32) RenderFrame {
+        const sprite_sheet: Data.SpriteSheet = App.get().data.getCreatureAnimSpriteSheetOrDefault(self.creature_kind, self.anim_kind).?;
+        // TODO
+        const dir_index = 0;
+        const frame_idx = utl.as(usize, dir_index * self.num_frames + anim_frame);
+        const ssframe: Data.SpriteSheet.Frame = sprite_sheet.frames[frame_idx];
+        const rframe = RenderFrame{
+            .pos = ssframe.pos,
+            .size = ssframe.size,
+            .texture = sprite_sheet.texture,
+            .origin = self.origin,
+        };
+
+        return rframe;
+    }
+};
+
 pub const CreatureAnimator = struct {
     pub const PlayParams = struct {
         reset: bool = false, // always true if new anim played
