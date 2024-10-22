@@ -333,7 +333,7 @@ pub const VFXRenderer = struct {
             .origin = frame.origin,
             .src_pos = frame.pos.toV2f(),
             .src_dims = frame.size.toV2f(),
-            .uniform_scaling = 4,
+            .uniform_scaling = sprites.uniform_scaling,
             .tint = tint,
         };
         plat.texturef(self.pos, frame.texture, opt);
@@ -362,7 +362,7 @@ pub const SpawnerRenderer = struct {
             .origin = frame.origin,
             .src_pos = frame.pos.toV2f(),
             .src_dims = frame.size.toV2f(),
-            .uniform_scaling = 4,
+            .uniform_scaling = sprites.uniform_scaling,
             .tint = tint,
         };
         plat.texturef(self.pos, frame.texture, opt);
@@ -552,7 +552,7 @@ pub const CreatureRenderer = struct {
             .origin = frame.origin,
             .src_pos = frame.pos.toV2f(),
             .src_dims = frame.size.toV2f(),
-            .uniform_scaling = 4,
+            .uniform_scaling = sprites.uniform_scaling,
             .tint = tint,
         };
         plat.texturef(self.pos, frame.texture, opt);

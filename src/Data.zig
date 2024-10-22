@@ -62,6 +62,17 @@ pub const SpriteSheet = struct {
             float: f32,
             string: u.BoundedString(16),
         } = undefined,
+
+        pub fn asf32(self: @This()) Error!f32 {
+            return switch (self.data) {
+                .int => |i| u.as(f32, i),
+                .float => |f| f,
+                .string => {
+                    std.log.warn("Failed to parse Meta.data \"{s}\" as f32\n", .{self.name.constSlice()});
+                    return Error.ParseFail;
+                },
+            };
+        }
     };
 
     name: u.BoundedString(64) = .{}, // filename without extension (.png)
@@ -454,13 +465,17 @@ pub fn loadCreatureSpriteSheets(self: *Data) Error!void {
             //std.debug.print("Meta '{s}'\n", .{m_name});
 
             if (std.mem.eql(u8, m_name, "pivot-y")) {
-                const y = switch (m.data) {
-                    .int => |i| u.as(f32, i),
-                    .float => |f| f,
-                    .string => return Error.ParseFail,
-                };
+                const y = m.asf32() catch continue;
                 const x = u.as(f32, sheet.frames[0].size.x) * 0.5;
                 anim.origin = .{ .offset = v2f(x, y) };
+                continue;
+            }
+            if (std.mem.eql(u8, m_name, "cast-y")) {
+                anim.cast_offset.y = m.asf32() catch continue;
+                continue;
+            }
+            if (std.mem.eql(u8, m_name, "cast-x")) {
+                anim.cast_offset.x = m.asf32() catch continue;
                 continue;
             }
             if (std.mem.eql(u8, m_name, "start-angle-deg")) {
@@ -535,11 +550,7 @@ pub fn loadVFXSpriteSheets(self: *Data) Error!void {
                         //std.debug.print("Meta '{s}'\n", .{m_name});
 
                         if (std.mem.eql(u8, m_name, "pivot-y")) {
-                            const y = switch (m.data) {
-                                .int => |i| u.as(f32, i),
-                                .float => |f| f,
-                                .string => return Error.ParseFail,
-                            };
+                            const y = m.asf32() catch continue;
                             const x = u.as(f32, sheet.frames[0].size.x) * 0.5;
                             anim.origin = .{ .offset = v2f(x, y) };
                             continue;

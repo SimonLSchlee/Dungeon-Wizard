@@ -7,6 +7,7 @@ const assert = std.debug.assert;
 
 const util = @import("util.zig");
 const V2f = @import("V2f.zig");
+const v2f = V2f.v2f;
 const V2i = @import("V2i.zig");
 const iToV2f = V2f.iToV2f;
 const iToV2i = V2i.iToV2i;
@@ -175,6 +176,7 @@ pub const TextureOrigin = union(enum) {
     center,
     offset: V2f,
 };
+
 pub const TextureOpt = struct {
     tint: Colorf = Colorf.white,
     smoothing: Smoothing = .none,

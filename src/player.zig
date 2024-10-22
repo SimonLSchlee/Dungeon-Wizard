@@ -21,6 +21,7 @@ const Room = @import("Room.zig");
 const Spell = @import("Spell.zig");
 const Item = @import("Item.zig");
 const gameUI = @import("gameUI.zig");
+const sprites = @import("sprites.zig");
 const Player = @This();
 
 pub const enum_name = "player";
@@ -225,7 +226,14 @@ pub const Controller = struct {
                         switch (controller.action_casting.?.action) {
                             .spell => {
                                 const cast_proto = Thing.VFXController.prototype(self);
-                                const cast_pos = self.pos;
+                                var cast_offset = V2f{};
+                                if (App.get().data.getCreatureAnimOrDefault(.wizard, .cast)) |anim| {
+                                    cast_offset = anim.cast_offset.scale(sprites.uniform_scaling);
+                                    if (self.dir.x < 0) {
+                                        cast_offset.x *= -1;
+                                    }
+                                }
+                                const cast_pos = self.pos.add(cast_offset);
                                 if (try room.queueSpawnThing(&cast_proto, cast_pos)) |id| {
                                     controller.cast_vfx = id;
                                 }

@@ -20,6 +20,10 @@ const getPlat = App.getPlat;
 const Data = @import("Data.zig");
 const Thing = @import("Thing.zig");
 
+// we scale up by this much
+// TODO arrgghh
+pub const uniform_scaling: f32 = 4;
+
 pub const RenderFrame = struct {
     pos: V2i,
     size: V2i,
@@ -77,6 +81,7 @@ pub const CreatureAnim = struct {
     // offset the 0th dir
     start_angle_rads: f32 = 0,
     origin: draw.TextureOrigin = .center,
+    cast_offset: V2f = .{},
 
     pub fn getRenderFrame(self: CreatureAnim, dir: V2f, anim_frame: i32) RenderFrame {
         const sprite_sheet: Data.SpriteSheet = App.get().data.getCreatureAnimSpriteSheetOrDefault(self.creature_kind, self.anim_kind).?;
