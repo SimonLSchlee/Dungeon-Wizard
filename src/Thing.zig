@@ -96,10 +96,7 @@ renderer: union(enum) {
     shape: ShapeRenderer,
     spawner: SpawnerRenderer,
 } = .none,
-animator: union(enum) {
-    none: void,
-    creature: sprites.CreatureAnimator,
-} = .none,
+animator: ?sprites.Animator = null,
 path: std.BoundedArray(V2f, 32) = .{},
 hitbox: ?HitBox = null,
 hurtbox: ?HurtBox = null,
@@ -349,7 +346,7 @@ pub const SpawnerController = struct {
             },
             .renderer = .{
                 .spawner = .{
-                    .creature_kind = proto.animator.creature.creature_kind,
+                    .creature_kind = proto.animator.?.kind.creature.kind,
                     .base_circle_radius = proto.renderer.creature.draw_radius,
                 },
             },
@@ -469,8 +466,8 @@ pub const CreatureRenderer = struct {
             }
         }
 
-        const animator = self.animator.creature;
-        const frame = animator.getCurrRenderFrame(self.dir);
+        const animator = self.animator.?;
+        const frame = animator.getCurrRenderFrameDir(self.dir);
         var tint: Colorf = blk: {
             if (self.isAliveCreature()) {
                 if (self.statuses.get(.frozen).stacks > 0) break :blk StatusEffect.proto_array.get(.frozen).color;
@@ -566,7 +563,7 @@ pub fn update(self: *Thing, room: *Room) Error!void {
             try updateController(self, room);
         }
     } else if (self.isDeadCreature()) {
-        if (self.animator.creature.play(.die, .{}).contains(.end)) {
+        if (self.animator.?.play(.die, .{}).contains(.end)) {
             self.deferFree(room);
         }
         return;

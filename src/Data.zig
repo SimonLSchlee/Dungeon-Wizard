@@ -186,9 +186,9 @@ const normal_room_strs = [_][]const u8{
     ,
 };
 
-pub const CreatureAnimArray = std.EnumArray(sprites.CreatureAnim.AnimKind, ?sprites.CreatureAnim);
+pub const CreatureAnimArray = std.EnumArray(sprites.AnimName, ?sprites.CreatureAnim);
 pub const AllCreatureAnimArrays = std.EnumArray(sprites.CreatureAnim.Kind, CreatureAnimArray);
-pub const CreatureSpriteSheetArray = std.EnumArray(sprites.CreatureAnim.AnimKind, ?SpriteSheet);
+pub const CreatureSpriteSheetArray = std.EnumArray(sprites.AnimName, ?SpriteSheet);
 pub const AllCreatureSpriteSheetArrays = std.EnumArray(sprites.CreatureAnim.Kind, CreatureSpriteSheetArray);
 
 fn IconSprites(EnumType: type) type {
@@ -260,22 +260,36 @@ pub fn init() Error!*Data {
     return data;
 }
 
-pub fn getCreatureAnim(self: *Data, creature_kind: sprites.CreatureAnim.Kind, anim_kind: sprites.CreatureAnim.AnimKind) ?sprites.CreatureAnim {
+pub fn getVFXAnim(self: *Data, sheet_name: sprites.VFXAnim.SheetName, anim_name: sprites.AnimName) ?sprites.VFXAnim {
+    if (self.vfx_anim_mappings.getPtr(sheet_name).get(anim_name)) |idx| {
+        return self.vfx_anims.items[idx];
+    }
+    return null;
+}
+
+pub fn getVFXSpriteSheet(self: *Data, sheet_name: sprites.VFXAnim.SheetName, anim_name: sprites.AnimName) ?SpriteSheet {
+    if (self.vfx_sprite_sheet_mappings.getPtr(sheet_name).get(anim_name)) |idx| {
+        return self.vfx_sprite_sheets.items[idx];
+    }
+    return null;
+}
+
+pub fn getCreatureAnim(self: *Data, creature_kind: sprites.CreatureAnim.Kind, anim_kind: sprites.AnimName) ?sprites.CreatureAnim {
     return self.creature_anims.get(creature_kind).get(anim_kind);
 }
 
-pub fn getCreatureAnimOrDefault(self: *Data, creature_kind: sprites.CreatureAnim.Kind, anim_kind: sprites.CreatureAnim.AnimKind) ?sprites.CreatureAnim {
+pub fn getCreatureAnimOrDefault(self: *Data, creature_kind: sprites.CreatureAnim.Kind, anim_kind: sprites.AnimName) ?sprites.CreatureAnim {
     if (self.creature_anims.get(creature_kind).get(anim_kind)) |a| {
         return a;
     }
     return self.creature_anims.get(.creature).get(anim_kind);
 }
 
-pub fn getCreatureAnimSpriteSheet(self: *Data, creature_kind: sprites.CreatureAnim.Kind, anim_kind: sprites.CreatureAnim.AnimKind) ?SpriteSheet {
+pub fn getCreatureAnimSpriteSheet(self: *Data, creature_kind: sprites.CreatureAnim.Kind, anim_kind: sprites.AnimName) ?SpriteSheet {
     return self.creature_sprite_sheets.get(creature_kind).get(anim_kind);
 }
 
-pub fn getCreatureAnimSpriteSheetOrDefault(self: *Data, creature_kind: sprites.CreatureAnim.Kind, anim_kind: sprites.CreatureAnim.AnimKind) ?SpriteSheet {
+pub fn getCreatureAnimSpriteSheetOrDefault(self: *Data, creature_kind: sprites.CreatureAnim.Kind, anim_kind: sprites.AnimName) ?SpriteSheet {
     if (self.creature_sprite_sheets.get(creature_kind).get(anim_kind)) |s| {
         return s;
     }
@@ -418,8 +432,14 @@ pub fn loadCreatureSpriteSheets(self: *Data) Error!void {
         const creature_name = it_dash.next().?;
         const creature_kind = std.meta.stringToEnum(sprites.CreatureAnim.Kind, creature_name).?;
         const anim_name = it_dash.next().?;
-        const anim_kind = std.meta.stringToEnum(sprites.CreatureAnim.AnimKind, anim_name).?;
+        const anim_kind = std.meta.stringToEnum(sprites.AnimName, anim_name).?;
         self.creature_sprite_sheets.getPtr(creature_kind).getPtr(anim_kind).* = sheet;
+        if (anim_kind == .idle) {
+            const none_sheet = self.creature_sprite_sheets.getPtr(creature_kind).getPtr(.none);
+            if (none_sheet.* == null) {
+                none_sheet.* = sheet;
+            }
+        }
 
         // sprite sheet to creature anim
         var anim = sprites.CreatureAnim{
@@ -453,7 +473,7 @@ pub fn loadCreatureSpriteSheets(self: *Data) Error!void {
                 anim.start_angle_rads = rads;
             }
 
-            const event_info = @typeInfo(sprites.CreatureAnim.Event.Kind);
+            const event_info = @typeInfo(sprites.AnimEvent.Kind);
             inline for (event_info.@"enum".fields) |f| {
                 if (std.mem.eql(u8, m_name, f.name)) {
                     //std.debug.print("Adding event '{s}' on frame {}\n", .{ f.name, m.data.int });
@@ -468,6 +488,12 @@ pub fn loadCreatureSpriteSheets(self: *Data) Error!void {
             }
         }
         self.creature_anims.getPtr(creature_kind).getPtr(anim_kind).* = anim;
+        if (anim_kind == .idle) {
+            const none_anim = self.creature_anims.getPtr(creature_kind).getPtr(.none);
+            if (none_anim.* == null) {
+                none_anim.* = anim;
+            }
+        }
     }
 }
 
@@ -496,7 +522,7 @@ pub fn loadVFXSpriteSheets(self: *Data) Error!void {
         if (std.meta.stringToEnum(sprites.VFXAnim.SheetName, sheet.name.constSlice())) |vfx_sheet_name| {
             // sprite sheet to vfx anims
             for (sheet.tags) |tag| {
-                if (std.meta.stringToEnum(sprites.VFXAnim.AnimName, tag.name.constSlice())) |vfx_anim_name| {
+                if (std.meta.stringToEnum(sprites.AnimName, tag.name.constSlice())) |vfx_anim_name| {
                     var anim: sprites.VFXAnim = .{
                         .sheet_name = vfx_sheet_name,
                         .anim_name = vfx_anim_name,
@@ -517,7 +543,7 @@ pub fn loadVFXSpriteSheets(self: *Data) Error!void {
                             anim.origin = .{ .offset = v2f(x, y) };
                             continue;
                         }
-                        const event_info = @typeInfo(sprites.VFXAnim.Event.Kind);
+                        const event_info = @typeInfo(sprites.AnimEvent.Kind);
                         inline for (event_info.@"enum".fields) |f| {
                             if (std.mem.eql(u8, m_name, f.name)) {
                                 //std.debug.print("Adding event '{s}' on frame {}\n", .{ f.name, m.data.int });

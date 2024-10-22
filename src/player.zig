@@ -45,9 +45,7 @@ pub fn protoype() Error!Thing {
             .draw_color = .cyan,
             .draw_radius = 20,
         } },
-        .animator = .{ .creature = .{
-            .creature_kind = .wizard,
-        } },
+        .animator = .{ .kind = .{ .creature = .{ .kind = .wizard } } },
         .hurtbox = .{
             .radius = 15,
         },
@@ -197,7 +195,7 @@ pub const Controller = struct {
                         continue :state .walk;
                     }
                     self.updateVel(.{}, self.accel_params);
-                    _ = self.animator.creature.play(.idle, .{ .loop = true });
+                    _ = self.animator.?.play(.idle, .{ .loop = true });
                     break :state .none;
                 },
                 .walk => {
@@ -213,7 +211,7 @@ pub const Controller = struct {
                     if (!self.vel.isZero()) {
                         self.dir = self.vel.normalized();
                     }
-                    _ = self.animator.creature.play(.move, .{ .loop = true });
+                    _ = self.animator.?.play(.move, .{ .loop = true });
                     break :state .walk;
                 },
                 .cast => {
@@ -234,7 +232,7 @@ pub const Controller = struct {
                         continue :state .none;
                     }
                     self.updateVel(.{}, self.accel_params);
-                    _ = self.animator.creature.play(.cast, .{ .loop = true });
+                    _ = self.animator.?.play(.cast, .{ .loop = true });
                     break :state .cast;
                 },
             };

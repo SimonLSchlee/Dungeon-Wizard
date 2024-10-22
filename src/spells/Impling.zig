@@ -70,9 +70,7 @@ pub fn implingProto() Error!Thing {
             .draw_color = .yellow,
             .draw_radius = 15,
         } },
-        .animator = .{ .creature = .{
-            .creature_kind = .impling,
-        } },
+        .animator = .{ .kind = .{ .creature = .{ .kind = .impling } } },
         .hitbox = .{
             .mask = Thing.Faction.opposing_masks.get(.ally),
             .radius = 20,

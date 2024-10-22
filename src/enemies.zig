@@ -132,7 +132,7 @@ pub const AIController = struct {
                     continue :state .pursue;
                 }
                 self.updateVel(.{}, .{});
-                _ = self.animator.creature.play(.idle, .{ .loop = true });
+                _ = self.animator.?.play(.idle, .{ .loop = true });
                 break :state .idle;
             },
             .pursue => {
@@ -155,13 +155,13 @@ pub const AIController = struct {
                         if (dist > 0.001) {
                             self.dir = target.pos.sub(self.pos).normalized();
                         }
-                        _ = self.animator.creature.play(.idle, .{ .loop = true });
+                        _ = self.animator.?.play(.idle, .{ .loop = true });
                     } else {
                         ai.ticks_in_state = 0;
                         continue :state .attack;
                     }
                 } else if (self.accel_params.max_speed > 0.0001) {
-                    _ = self.animator.creature.play(.move, .{ .loop = true });
+                    _ = self.animator.?.play(.move, .{ .loop = true });
                     const dist_til_in_range = range - ai.attack_range;
                     const time_til_reach = dist_til_in_range / self.accel_params.max_speed;
                     const target_pos = target.pos.add(target.vel.scale(time_til_reach));
@@ -205,10 +205,10 @@ pub const AIController = struct {
                 switch (ai.attack_type) {
                     .melee => |m| {
                         self.updateVel(.{}, .{});
-                        const events = self.animator.creature.play(.attack, .{ .loop = true });
+                        const events = self.animator.?.play(.attack, .{ .loop = true });
                         // predict hit
                         if (ai.can_turn_during_attack) {
-                            if (self.animator.creature.getTicksUntilEvent(.hit)) |ticks_til_hit_event| {
+                            if (self.animator.?.getTicksUntilEvent(.hit)) |ticks_til_hit_event| {
                                 var ticks_til_hit = utl.as(f32, ticks_til_hit_event);
                                 if (m.lunge_accel) |accel| {
                                     ticks_til_hit += range / accel.max_speed;
@@ -258,12 +258,12 @@ pub const AIController = struct {
                     },
                     .projectile => |proj_name| {
                         self.updateVel(.{}, .{});
-                        const events = self.animator.creature.play(.attack, .{ .loop = true });
+                        const events = self.animator.?.play(.attack, .{ .loop = true });
                         var proj = switch (proj_name) {
                             .arrow => gobbowArrow(self),
                         };
                         if (ai.can_turn_during_attack) {
-                            if (self.animator.creature.getTicksUntilEvent(.hit)) |ticks_til_hit_event| {
+                            if (self.animator.?.getTicksUntilEvent(.hit)) |ticks_til_hit_event| {
                                 var ticks_til_hit = utl.as(f32, ticks_til_hit_event);
                                 ticks_til_hit += range / proj.accel_params.max_speed;
                                 const target_pos = target.pos.add(target.vel.scale(ticks_til_hit));
@@ -382,7 +382,7 @@ pub const AcolyteAIController = struct {
                     }
                 }
                 self.updateVel(.{}, .{});
-                _ = self.animator.creature.play(.idle, .{ .loop = true });
+                _ = self.animator.?.play(.idle, .{ .loop = true });
                 break :state .idle;
             },
             .flee => {
@@ -410,7 +410,7 @@ pub const AcolyteAIController = struct {
                         }
                     }
                 }
-                _ = self.animator.creature.play(.move, .{ .loop = true });
+                _ = self.animator.?.play(.move, .{ .loop = true });
                 const p = self.followPathGetNextPoint(10);
                 self.updateVel(p.sub(self.pos).normalizedOrZero(), self.accel_params);
                 if (!self.vel.isAlmostZero()) {
@@ -435,7 +435,7 @@ pub const AcolyteAIController = struct {
                     continue :state .idle;
                 }
                 self.updateVel(.{}, .{});
-                _ = self.animator.creature.play(.cast, .{ .loop = true });
+                _ = self.animator.?.play(.cast, .{ .loop = true });
                 break :state .cast;
             },
         };
@@ -445,45 +445,62 @@ pub const AcolyteAIController = struct {
     }
 };
 
-pub fn bat() Error!Thing {
+pub fn creature() Thing {
     return Thing{
         .kind = .creature,
-        .creature_kind = .bat,
         .spawn_state = .instance,
-        .coll_radius = 9,
-        .accel_params = .{
-            .max_speed = 1,
-        },
         .vision_range = 160,
         .coll_mask = Thing.Collision.Mask.initMany(&.{ .creature, .tile }),
         .coll_layer = Thing.Collision.Mask.initMany(&.{.creature}),
-        .controller = .{ .enemy = .{
-            .attack_cooldown = utl.TickCounter.initStopped(60),
-        } },
         .renderer = .{ .creature = .{
             .draw_color = .yellow,
-            .draw_radius = 10,
+            .draw_radius = 15,
         } },
-        .animator = .{ .creature = .{
-            .creature_kind = .bat,
-        } },
-        .hitbox = .{
-            .mask = Thing.Faction.opposing_masks.get(.enemy),
-            .radius = 10,
-            .rel_pos = V2f.right.scale(60),
-            .effect = .{ .damage = 4 },
-        },
+        .animator = .{ .kind = .{ .creature = .{ .kind = .creature } } },
         .hurtbox = .{
-            .radius = 10,
+            .radius = 15,
         },
         .selectable = .{
-            .height = 17 * 4, // TODO pixellszslz
-            .radius = 6 * 4,
+            .height = 20 * 4, // TODO pixellszslz
+            .radius = 7 * 4,
         },
-        .hp = Thing.HP.init(5),
+        .hp = Thing.HP.init(30),
         .faction = .enemy,
-        .enemy_difficulty = 0.25,
     };
+}
+
+const sprites = @import("sprites.zig");
+
+pub fn bat() Error!Thing {
+    var c = creature();
+    c.creature_kind = .bat;
+    c.coll_radius = 9;
+    c.accel_params = .{
+        .max_speed = 1,
+    };
+    c.controller = .{ .enemy = .{
+        .attack_cooldown = utl.TickCounter.initStopped(60),
+    } };
+    c.renderer.creature.draw_radius = 10;
+    c.animator.?.kind.creature.kind = .bat;
+
+    c.hitbox = .{
+        .mask = Thing.Faction.opposing_masks.get(.enemy),
+        .radius = 10,
+        .rel_pos = V2f.right.scale(60),
+        .effect = .{ .damage = 4 },
+    };
+    c.hurtbox = .{
+        .radius = 10,
+    };
+    c.selectable = .{
+        .height = 17 * 4, // TODO pixellszslz
+        .radius = 6 * 4,
+    };
+    c.hp = Thing.HP.init(5);
+    c.faction = .enemy;
+    c.enemy_difficulty = 0.25;
+    return c;
 }
 
 pub fn troll() Error!Thing {
@@ -505,9 +522,7 @@ pub fn troll() Error!Thing {
             .draw_color = .yellow,
             .draw_radius = 20,
         } },
-        .animator = .{ .creature = .{
-            .creature_kind = .troll,
-        } },
+        .animator = .{ .kind = .{ .creature = .{ .kind = .troll } } },
         .hitbox = .{
             .mask = Thing.Faction.opposing_masks.get(.enemy),
             .radius = 15,
@@ -545,9 +560,7 @@ pub fn gobbow() Error!Thing {
             .draw_color = .yellow,
             .draw_radius = 15,
         } },
-        .animator = .{ .creature = .{
-            .creature_kind = .gobbow,
-        } },
+        .animator = .{ .kind = .{ .creature = .{ .kind = .gobbow } } },
         .hurtbox = .{
             .radius = 15,
         },
@@ -589,9 +602,7 @@ pub fn sharpboi() Error!Thing {
             .draw_color = .yellow,
             .draw_radius = 15,
         } },
-        .animator = .{ .creature = .{
-            .creature_kind = .sharpboi,
-        } },
+        .animator = .{ .kind = .{ .creature = .{ .kind = .sharpboi } } },
         .hitbox = .{
             .mask = Thing.Faction.opposing_masks.get(.enemy),
             .radius = 15,
@@ -632,9 +643,7 @@ pub fn acolyte() Error!Thing {
             .draw_color = .yellow,
             .draw_radius = 15,
         } },
-        .animator = .{ .creature = .{
-            .creature_kind = .acolyte,
-        } },
+        .animator = .{ .kind = .{ .creature = .{ .kind = .acolyte } } },
         .hitbox = null,
         .hurtbox = .{
             .radius = 15,
@@ -661,9 +670,7 @@ pub fn dummy() Thing {
             .draw_color = .yellow,
             .draw_radius = 15,
         } },
-        .animator = .{ .creature = .{
-            .creature_kind = .dummy,
-        } },
+        .animator = .{ .kind = .{ .creature = .{ .kind = .dummy } } },
         .hurtbox = .{
             .radius = 15,
         },
