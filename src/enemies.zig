@@ -352,6 +352,7 @@ pub const AcolyteAIController = struct {
     flee_range: f32 = 250,
     cast_cooldown: utl.TickCounter = utl.TickCounter.initStopped(5 * core.fups_per_sec),
     flee_cooldown: utl.TickCounter = utl.TickCounter.initStopped(1 * core.fups_per_sec),
+    cast_vfx: ?Thing.Id = null,
     // debug
     hiding_places: HidingPlacesArray = .{},
     to_enemy: V2f = .{},
@@ -424,6 +425,20 @@ pub const AcolyteAIController = struct {
                 break :state .flee;
             },
             .cast => {
+                if (ai.ticks_in_state == 0) {
+                    const cast_proto = Thing.VFXController.prototype(self);
+                    if (try room.queueSpawnThing(&cast_proto, cast_proto.pos)) |id| {
+                        ai.cast_vfx = id;
+                    }
+                }
+                if (ai.ticks_in_state == 30) {
+                    if (ai.cast_vfx) |id| {
+                        if (room.getThingById(id)) |cast| {
+                            cast.controller.vfx.anim_to_play = .basic_cast;
+                        }
+                    }
+                    ai.cast_vfx = null;
+                }
                 if (ai.ticks_in_state == 60) {
                     const dir = (if (nearest_enemy) |e| e.pos.sub(self.pos) else self.pos.neg()).normalizedOrZero();
                     const spawn_pos = self.pos.add(dir.scale(self.coll_radius * 2));

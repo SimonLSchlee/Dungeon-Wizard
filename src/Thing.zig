@@ -300,12 +300,21 @@ pub const VFXController = struct {
         }
     }
 
-    pub fn prototype(parent: *Thing) Thing {
+    pub fn prototype(caster: *Thing) Thing {
+        var cast_offset = V2f{};
+        if (App.get().data.getCreatureAnimOrDefault(caster.animator.?.kind.creature.kind, .cast)) |anim| {
+            cast_offset = anim.cast_offset.scale(sprites.uniform_scaling);
+            if (caster.dir.x < 0) {
+                cast_offset.x *= -1;
+            }
+        }
+        const cast_pos = caster.pos.add(cast_offset);
         return .{
             .kind = .vfx,
+            .pos = cast_pos,
             .controller = .{
                 .vfx = .{
-                    .parent = parent.id,
+                    .parent = caster.id,
                 },
             },
             .renderer = .{ .vfx = .{} },
