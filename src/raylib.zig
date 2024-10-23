@@ -7,7 +7,6 @@ const r = @cImport({
     @cInclude("rlgl.h");
 });
 const core = @import("core.zig");
-const debug = @import("debug.zig");
 const draw = @import("draw.zig");
 const Error = core.Error;
 const Key = core.Key;
@@ -159,9 +158,17 @@ fn recompileAppDll(self: *Platform) Error!void {
         "build",
         "-Dapp-only=true",
     };
-    var proc = std.process.Child.init(&proc_args, self.heap);
-    const term = proc.spawnAndWait() catch return Error.RecompileFail;
-    switch (term) {
+    std.debug.print("\n#### START RECOMPILE OUTPUT ####\n", .{});
+    const result = std.process.Child.run(.{
+        .allocator = self.heap,
+        .argv = &proc_args,
+    }) catch return Error.RecompileFail;
+    std.debug.print("stderr:\n{s}\n", .{result.stderr});
+    std.debug.print("stdout:\n{s}\n", .{result.stdout});
+    std.debug.print("\n#### END RECOMPILE OUTPUT ####\n", .{});
+    self.heap.free(result.stderr);
+    self.heap.free(result.stdout);
+    switch (result.term) {
         .Exited => |exited| {
             if (exited != 0) return Error.RecompileFail;
         },
@@ -196,7 +203,7 @@ pub fn run(self: *Platform) Error!void {
     std.debug.print("ns per refresh: {}\n", .{ns_per_refresh});
 
     while (!r.WindowShouldClose() and !self.should_exit) {
-        if (!config.static_lib and debug.enable_debug_controls and r.IsKeyPressed(r.KEY_F5)) {
+        if (!config.static_lib and !config.is_release and r.IsKeyPressed(r.KEY_F5)) {
             self.unloadAppDll();
             try self.recompileAppDll();
             try self.loadAppDll();
