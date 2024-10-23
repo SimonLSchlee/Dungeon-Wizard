@@ -259,6 +259,9 @@ first_room: PackedRoom = undefined,
 
 pub const SFX = enum {
     thwack,
+    spell_casting,
+    spell_cast,
+    spell_fizzle,
 };
 
 pub fn init() Error!*Data {
@@ -310,7 +313,14 @@ pub fn getCreatureAnimSpriteSheetOrDefault(self: *Data, creature_kind: sprites.C
 pub fn loadSounds(self: *Data) Error!void {
     const plat = App.getPlat();
     self.sounds = @TypeOf(self.sounds).initFill(null);
-    self.sounds.getPtr(.thwack).* = try plat.loadSound("thwack.wav");
+    const list = [_]struct { SFX, []const u8 }{
+        .{ .thwack, "thwack.wav" },
+        .{ .spell_casting, "casting.wav" },
+        .{ .spell_cast, "cast-end.wav" },
+    };
+    for (list) |s| {
+        self.sounds.getPtr(s[0]).* = try plat.loadSound(s[1]);
+    }
 }
 
 pub fn loadSpriteSheetFromJson(json_file: std.fs.File, assets_images_rel_dir_path: []const u8) Error!SpriteSheet {
@@ -591,8 +601,8 @@ pub fn loadSpriteSheets(self: *Data) Error!void {
 }
 
 pub fn reload(self: *Data) Error!void {
-    loadSpriteSheets(self) catch std.debug.print("WARNING: failed to load all sprites\n", .{});
-    loadSounds(self) catch std.debug.print("WARNING: failed to load all sounds\n", .{});
+    self.loadSpriteSheets() catch std.debug.print("WARNING: failed to load all sprites\n", .{});
+    self.loadSounds() catch std.debug.print("WARNING: failed to load all sounds\n", .{});
     self.creatures = @TypeOf(self.creatures).init(
         .{
             .player = try @import("player.zig").protoype(),

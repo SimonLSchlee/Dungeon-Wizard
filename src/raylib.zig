@@ -649,8 +649,21 @@ pub const Sound = struct {
     r_sound: r.Sound,
 };
 
+pub fn stopSound(_: *Platform, sound: Sound) void {
+    r.StopSound(sound.r_sound);
+}
+
 pub fn playSound(_: *Platform, sound: Sound) void {
     r.PlaySound(sound.r_sound);
+}
+
+pub fn loopSound(_: *Platform, sound: Sound) void {
+    if (!r.IsSoundPlaying(sound.r_sound)) {
+        r.PlaySound(sound.r_sound);
+    }
+}
+pub fn setSoundVolume(_: *Platform, sound: Sound, volume: f32) void {
+    r.SetSoundVolume(sound.r_sound, volume);
 }
 
 pub fn loadSound(self: *Platform, path: []const u8) Error!Sound {

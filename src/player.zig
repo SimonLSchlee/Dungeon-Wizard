@@ -218,6 +218,11 @@ pub const Controller = struct {
                 },
                 .cast => {
                     assert(controller.action_casting != null);
+
+                    const cast_loop_sound = App.get().data.sounds.get(.spell_casting).?;
+                    const cast_end_sound = App.get().data.sounds.get(.spell_cast).?;
+                    const cast_loop_volume = 0.2;
+                    const cast_end_volume = 0.4;
                     const s = controller.action_casting.?;
                     if (controller.ticks_in_state == 0) {
                         if (s.params.face_dir) |dir| {
@@ -226,29 +231,12 @@ pub const Controller = struct {
                         switch (controller.action_casting.?.action) {
                             .spell => {
                                 const cast_proto = Thing.VFXController.prototype(self);
-                                var cast_offset = V2f{};
-                                if (App.get().data.getCreatureAnimOrDefault(.wizard, .cast)) |anim| {
-                                    cast_offset = anim.cast_offset.scale(sprites.uniform_scaling);
-                                    if (self.dir.x < 0) {
-                                        cast_offset.x *= -1;
-                                    }
-                                }
-                                const cast_pos = self.pos.add(cast_offset);
-                                if (try room.queueSpawnThing(&cast_proto, cast_pos)) |id| {
+                                if (try room.queueSpawnThing(&cast_proto, cast_proto.pos)) |id| {
                                     controller.cast_vfx = id;
                                 }
                             },
                             else => {},
                         }
-                    }
-                    // TODO bit of a hacky wacky
-                    if (controller.cast_counter.num_ticks - controller.cast_counter.curr_tick <= 30) {
-                        if (controller.cast_vfx) |id| {
-                            if (room.getThingById(id)) |cast| {
-                                cast.controller.vfx.anim_to_play = .basic_cast;
-                            }
-                        }
-                        controller.cast_vfx = null;
                     }
                     if (controller.cast_counter.tick(false)) {
                         switch (controller.action_casting.?.action) {
@@ -257,9 +245,29 @@ pub const Controller = struct {
                                 try spell.cast(self, room, s.params);
                             },
                         }
+                        getPlat().stopSound(cast_loop_sound);
                         controller.action_casting = null;
                         controller.ticks_in_state = 0;
                         continue :state .none;
+                    }
+                    getPlat().loopSound(cast_loop_sound);
+                    // TODO bit of a hacky wacky
+                    const ticks_left = controller.cast_counter.num_ticks - controller.cast_counter.curr_tick;
+                    if (ticks_left <= 30) {
+                        const vol: f32 = utl.as(f32, ticks_left) / 30.0;
+                        getPlat().setSoundVolume(cast_loop_sound, vol * cast_loop_volume);
+                        if (controller.cast_vfx) |id| {
+                            if (room.getThingById(id)) |cast| {
+                                cast.controller.vfx.anim_to_play = .basic_cast;
+                            }
+                        }
+                        if (controller.cast_vfx != null) {
+                            getPlat().setSoundVolume(cast_end_sound, cast_end_volume);
+                            getPlat().playSound(cast_end_sound);
+                        }
+                        controller.cast_vfx = null;
+                    } else {
+                        getPlat().setSoundVolume(cast_loop_sound, cast_loop_volume);
                     }
                     self.updateVel(.{}, self.accel_params);
                     _ = self.animator.?.play(.cast, .{ .loop = true });
