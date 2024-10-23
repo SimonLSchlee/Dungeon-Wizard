@@ -37,7 +37,7 @@ const base_radius = 50;
 pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
     .{
-        .cast_time = 3,
+        .cast_secs = 1.5,
         .obtainableness = std.EnumSet(Spell.Obtainableness).initOne(.starter),
         .color = StatusEffect.proto_array.get(.exposed).color,
         .targeting_data = .{

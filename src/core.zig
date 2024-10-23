@@ -168,6 +168,7 @@ pub fn nsToSecs(ns: i64) f64 {
 
 pub const fixed_updates_per_sec: i64 = 60;
 pub const fups_per_sec = fixed_updates_per_sec;
+pub const fups_per_sec_f = u.as(f32, fups_per_sec);
 pub const fixed_ns_per_update: i64 = ns_per_sec / fixed_updates_per_sec;
 pub const fixed_ns_per_update_upper: i64 = ns_per_sec / fixed_updates_per_sec + 1;
 pub const fixed_ns_per_update_lower: i64 = ns_per_sec / fixed_updates_per_sec - 1;

@@ -394,15 +394,22 @@ spawn_state: enum {
 kind: KindData = undefined,
 rarity: Rarity = .pedestrian,
 obtainableness: Obtainableness.Mask = Obtainableness.Mask.initMany(&.{ .room_reward, .shop }),
-cast_time: i32 = 2,
-cast_time_ticks: i32 = 30,
+cast_secs: f32 = 1, // time from spell starting to when it's cast() is called - caster can't move or do anything except buffer inputs
+cast_ticks: i32 = 60,
+after_cast_slot_cooldown_secs: f32 = 4,
+after_cast_slot_cooldown_ticks: i32 = 4 * 60,
 color: Colorf = .black,
 targeting_data: TargetingData = .{},
+
+pub fn getSlotCooldownTicks(self: *const Spell) i32 {
+    return self.cast_ticks + self.after_cast_slot_cooldown_ticks;
+}
 
 pub fn makeProto(kind: Kind, the_rest: Spell) Spell {
     var ret = the_rest;
     ret.kind = @unionInit(KindData, @tagName(kind), .{});
-    ret.cast_time_ticks = 30 * ret.cast_time;
+    ret.cast_ticks = utl.as(i32, core.fups_per_sec_f * ret.cast_secs);
+    ret.after_cast_slot_cooldown_ticks = utl.as(i32, core.fups_per_sec_f * ret.after_cast_slot_cooldown_secs);
     return ret;
 }
 
@@ -420,7 +427,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
 pub fn getDescription(self: *const Spell) Error![]u8 {
     var len: usize = 0;
     var buf = desc_buf[0..];
-    len += (try std.fmt.bufPrint(buf, "Cast time: {}\n", .{self.cast_time})).len;
+    len += (try std.fmt.bufPrint(buf, "Cast time: {} secs\n", .{self.cast_secs})).len;
     len += (try self.targeting_data.fmtDesc(buf[len..])).len;
     const b = blk: switch (self.kind) {
         inline else => |k| {

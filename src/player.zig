@@ -172,7 +172,7 @@ pub const Controller = struct {
                     .spell => |spell| {
                         room.ui_slots.clearSpellSlot(utl.as(usize, buffered.slot_idx));
                         room.discardSpell(spell);
-                        controller.cast_counter = utl.TickCounter.init(spell.cast_time_ticks);
+                        controller.cast_counter = utl.TickCounter.init(spell.cast_ticks);
                     },
                 }
                 controller.action_casting = buffered;

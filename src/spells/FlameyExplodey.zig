@@ -40,7 +40,7 @@ const base_range = 300;
 pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
     .{
-        .cast_time = 3,
+        .cast_secs = 1.5,
         .color = .red,
         .targeting_data = .{
             .kind = .pos,

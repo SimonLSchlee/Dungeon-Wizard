@@ -194,9 +194,11 @@ pub const Slots = struct {
         const slot = &self.spells.slice()[slot_idx];
         assert(std.meta.activeTag(slot.kind) == .spell);
         assert(slot.kind.spell != null);
-        slot.kind.spell = null;
         assert(slot.cooldown_timer != null);
-        slot.cooldown_timer.?.restart();
+        const spell: Spell = slot.kind.spell.?;
+        slot.cooldown_timer.? = utl.TickCounter.init(spell.getSlotCooldownTicks());
+        slot.kind.spell = null;
+
         switch (self.state) {
             .spell => |s| {
                 if (s.idx == slot_idx) {
