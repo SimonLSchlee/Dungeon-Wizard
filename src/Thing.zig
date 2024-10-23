@@ -161,6 +161,7 @@ pub const HitEffect = struct {
     damage: f32 = 1,
     status_stacks: StatusEffect.StacksArray = StatusEffect.StacksArray.initDefault(0, .{}),
     force: V2f = .{},
+    can_be_blocked: bool = true,
 };
 
 pub const HitBox = struct {
@@ -219,19 +220,27 @@ pub const HurtBox = struct {
     rel_pos: V2f = .{},
     radius: f32 = 0,
 
-    pub fn hit(_: *HurtBox, self: *Thing, room: *Room, effect: HitEffect, hitter: *Thing) void {
+    pub fn hit(_: *HurtBox, self: *Thing, room: *Room, effect: HitEffect, maybe_hitter: ?*Thing) void {
         const prickly_stacks = self.statuses.get(.prickly).stacks;
         if (prickly_stacks > 0) {
-            if (hitter.hurtbox) |*hurtbox| {
-                assert(hitter != self);
-                assert(hitter.statuses.get(.prickly).stacks == 0);
-                hurtbox.hit(hitter, room, .{ .damage = utl.as(f32, prickly_stacks) }, self);
+            if (maybe_hitter) |hitter| {
+                if (!hitter.id.eql(self.id)) { // don't prickle yourself!
+                    if (hitter.hurtbox) |*hitter_hurtbox| {
+                        const prickle_effect = HitEffect{
+                            .damage = utl.as(f32, prickly_stacks),
+                            .can_be_blocked = false,
+                        };
+                        hitter_hurtbox.hit(hitter, room, prickle_effect, null);
+                    }
+                }
             }
         }
-        const protect_stacks = &self.statuses.getPtr(.protected).stacks;
-        if (protect_stacks.* > 0) {
-            protect_stacks.* -= 1;
-            return;
+        if (effect.can_be_blocked) {
+            const protect_stacks = &self.statuses.getPtr(.protected).stacks;
+            if (protect_stacks.* > 0) {
+                protect_stacks.* -= 1;
+                return;
+            }
         }
         { // compute and apply the damage
             var damage = effect.damage;
@@ -248,7 +257,6 @@ pub const HurtBox = struct {
             status.stacks += stacks;
         }
         // then kill
-        // TODO elsewhere, better?
         if (self.hp) |hp| {
             if (hp.curr == 0) {
                 // TODO maybe dont access Run here, more testable/reproduceableeeu?
@@ -674,9 +682,14 @@ pub fn update(self: *Thing, room: *Room) Error!void {
                 }
             }
             switch (status.kind) {
-                .lit => if (@mod(status.cooldown.curr_tick, core.fups_per_sec) == 0) {
-                    if (self.hp) |*hp| {
-                        hp.curr -= utl.as(f32, status.stacks);
+                // activate at start of each second
+                .lit => if (@mod(status.cooldown.curr_tick, core.fups_per_sec) == core.fups_per_sec - 1) {
+                    if (self.hurtbox) |*hurtbox| {
+                        const lit_effect = HitEffect{
+                            .damage = utl.as(f32, status.stacks),
+                            .can_be_blocked = false,
+                        };
+                        hurtbox.hit(self, room, lit_effect, null);
                     }
                 },
                 else => {},
