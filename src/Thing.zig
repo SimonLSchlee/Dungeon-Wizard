@@ -673,6 +673,14 @@ pub fn update(self: *Thing, room: *Room) Error!void {
                     else => {},
                 }
             }
+            switch (status.kind) {
+                .lit => if (@mod(status.cooldown.curr_tick, core.fups_per_sec) == 0) {
+                    if (self.hp) |*hp| {
+                        hp.curr -= utl.as(f32, status.stacks);
+                    }
+                },
+                else => {},
+            }
         }
     }
 }

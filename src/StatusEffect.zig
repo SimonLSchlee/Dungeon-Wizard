@@ -90,6 +90,12 @@ const protos = [_]ComptimeProto{
         .cd_type = .no_cd,
         .color = Colorf.rgb(0.25, 0.55, 0.2),
     },
+    .{
+        .enum_name = "lit",
+        .cd = 4 * core.fups_per_sec,
+        .cd_type = .remove_one_stack,
+        .color = Colorf.rgb(1, 0.5, 0),
+    },
 };
 
 const Kind = blk: {
