@@ -50,11 +50,12 @@ pub const proto = Spell.makeProto(
                 .thickness = base_radius, // TODO use radius below?
             },
         },
+        .mislay = true,
     },
 );
 
 hit_effect: Thing.HitEffect = .{
-    .damage = 9,
+    .damage = 10,
     .status_stacks = StatusEffect.StacksArray.initDefault(0, .{ .mint = 10 }),
 },
 radius: f32 = base_radius,

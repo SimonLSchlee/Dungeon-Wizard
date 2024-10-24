@@ -187,6 +187,7 @@ move_release_ui_timer: u.TickCounter = u.TickCounter.initStopped(60),
 ui_slots: gameUI.Slots = .{},
 draw_pile: Spell.SpellArray = .{},
 discard_pile: Spell.SpellArray = .{},
+mislay_pile: Spell.SpellArray = .{},
 fog: Fog = undefined,
 curr_tick: i64 = 0,
 paused: bool = false,
@@ -255,6 +256,7 @@ fn clearThings(self: *Room) void {
     self.ui_slots = .{};
     self.draw_pile = .{};
     self.discard_pile = .{};
+    self.mislay_pile = .{};
 }
 
 pub fn reset(self: *Room) Error!void {
@@ -361,6 +363,10 @@ pub fn drawSpell(self: *Room) ?Spell {
 
 pub fn discardSpell(self: *Room, spell: Spell) void {
     self.discard_pile.append(spell) catch @panic("discard pile ran out of space");
+}
+
+pub fn mislaySpell(self: *Room, spell: Spell) void {
+    self.mislay_pile.append(spell) catch @panic("mislay pile ran out of space");
 }
 
 pub fn spawnCurrWave(self: *Room) Error!void {

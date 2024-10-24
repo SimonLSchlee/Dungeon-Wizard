@@ -171,7 +171,11 @@ pub const Controller = struct {
                     },
                     .spell => |spell| {
                         room.ui_slots.clearSpellSlot(utl.as(usize, buffered.slot_idx));
-                        room.discardSpell(spell);
+                        if (spell.mislay) {
+                            room.mislaySpell(spell);
+                        } else {
+                            room.discardSpell(spell);
+                        }
                         controller.cast_counter = utl.TickCounter.init(spell.cast_ticks);
                     },
                 }

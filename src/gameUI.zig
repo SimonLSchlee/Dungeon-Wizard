@@ -473,7 +473,16 @@ pub const Slots = struct {
             const rects = self.getSlotRects(.spell);
             const last_rect = rects.get(rects.len - 1);
             const p = last_rect.pos.add(v2f(last_rect.dims.x + 10, 0));
-            try plat.textf(p, "draw: {}\ndiscard: {}\n", .{ room.draw_pile.len, room.discard_pile.len }, .{ .color = .white });
+            try plat.textf(
+                p,
+                "draw: {}\ndiscard: {}\nmislayed: {}\n",
+                .{
+                    room.draw_pile.len,
+                    room.discard_pile.len,
+                    room.mislay_pile.len,
+                },
+                .{ .color = .white },
+            );
         }
 
         try self.renderSlots(room, caster, self.spells.constSlice(), .spell, slots_are_enabled);

@@ -46,6 +46,7 @@ pub const proto = Spell.makeProto(
             .max_range = 200,
             .show_max_range_ring = true,
         },
+        .mislay = true,
     },
 );
 

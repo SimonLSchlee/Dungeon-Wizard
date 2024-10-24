@@ -400,6 +400,7 @@ after_cast_slot_cooldown_secs: f32 = 4,
 after_cast_slot_cooldown_ticks: i32 = 4 * 60,
 color: Colorf = .black,
 targeting_data: TargetingData = .{},
+mislay: bool = false,
 
 pub fn getSlotCooldownTicks(self: *const Spell) i32 {
     return self.cast_ticks + self.after_cast_slot_cooldown_ticks;
@@ -427,7 +428,15 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
 pub fn getDescription(self: *const Spell) Error![]u8 {
     var len: usize = 0;
     var buf = desc_buf[0..];
-    len += (try std.fmt.bufPrint(buf, "Cast time: {} secs\n", .{self.cast_secs})).len;
+    len += (try std.fmt.bufPrint(
+        buf,
+        "Cast time: {d:.1} secs\nSlot cooldown: {d:.1} secs\n{s}",
+        .{
+            self.cast_secs,
+            core.fups_to_secsf(self.getSlotCooldownTicks()),
+            if (self.mislay) "Mislay: Only use once per room\n" else "",
+        },
+    )).len;
     len += (try self.targeting_data.fmtDesc(buf[len..])).len;
     const b = blk: switch (self.kind) {
         inline else => |k| {
