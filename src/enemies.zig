@@ -583,7 +583,7 @@ pub fn gobbow() Error!Thing {
             .height = 12 * 4, // TODO pixellszslz
             .radius = 6 * 4,
         },
-        .hp = Thing.HP.init(20),
+        .hp = Thing.HP.init(18),
         .faction = .enemy,
         .enemy_difficulty = 1.5,
     };
