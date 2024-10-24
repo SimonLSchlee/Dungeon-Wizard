@@ -21,6 +21,14 @@ fn linkOSStuff(b: *std.Build, target: std.Build.ResolvedTarget, artifact: *std.B
 
 pub fn buildDynamic(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, app_only: bool, do_release: bool) ![]*std.Build.Step.Compile {
     var artifacts = std.ArrayList(*std.Build.Step.Compile).init(b.allocator);
+    std.debug.print(
+        "Dynamic linking\noptimize: {any}\n{s}{s}",
+        .{
+            optimize,
+            if (do_release) "doing release\n" else "",
+            if (app_only) "app only\n" else "",
+        },
+    );
 
     const raylib = try raylib_build.addRaylib(
         b,
@@ -92,6 +100,8 @@ pub fn buildDynamic(b: *std.Build, target: std.Build.ResolvedTarget, optimize: s
 }
 
 pub fn buildStatic(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, do_release: bool) ![]*std.Build.Step.Compile {
+    std.debug.print("Static linking\noptimize: {any}\n{s}", .{ optimize, if (do_release) "doing release\n" else "" });
+
     const raylib = try raylib_build.addRaylib(
         b,
         target,
