@@ -66,7 +66,7 @@ pub fn init(width: u32, height: u32, title: []const u8) Error!Platform {
 
     r.InitWindow(@intCast(width), @intCast(height), title_z);
     // show raylib init INFO, then just warnings
-    r.SetTraceLogLevel(r.LOG_INFO);
+    r.SetTraceLogLevel(r.LOG_WARNING);
 
     ret.str_fmt_buf = try ret.heap.alloc(u8, str_fmt_buf_size);
     ret.assets_path = try ret.getAssetsPath();
@@ -129,8 +129,20 @@ const app_dll_name = switch (builtin.os.tag) {
 };
 
 fn loadAppDll(self: *Platform) Error!void {
-    self.app_dll = blk: for ([_][]const u8{ "", ".", "zig-out/lib", "zig-out/bin" }) |path| {
-        const app_dll_path = if (path.len > 0) try std.fmt.bufPrint(self.str_fmt_buf, "{s}/{s}", .{ path, app_dll_name }) else app_dll_name;
+    const cwd_path = std.fs.cwd().realpath(".", self.str_fmt_buf) catch return error.RecompileFail;
+    // weirdness note:
+    // if there is no '/' character' in the dll path, then this doesn't work. Due to reasons.
+    // dlopen manpage:
+    // "
+    // When path does not contain a slash character (i.e. it is just a leaf name), dlopen() will do searching.  If $DYLD_LIBRARY_PATH was set at launch, dyld will first look in that directory.  Next, if the calling mach-o file or the main
+    // executable specify an LC_RPATH, then dyld will look in those directories. Next, if the process is unrestricted, dyld will search in the current working directory. Lastly, for old binaries, dyld will try some fallbacks.  If
+    // $DYLD_FALLBACK_LIBRARY_PATH was set at launch, dyld will search in those directories, otherwise, dyld will look in /usr/local/lib/ (if the process is unrestricted), and then in /usr/lib/.
+    // "
+    // So it's finding the old dll somewhere in one of these search paths instead of the recompiled one!
+    //
+    self.app_dll = blk: for ([_][]const u8{ cwd_path, "zig-out/lib", "zig-out/bin" }) |path| {
+        const app_dll_path = try std.fmt.bufPrint(self.str_fmt_buf[cwd_path.len..], "{s}/{s}", .{ path, app_dll_name });
+        std.debug.print("######### LOAD {s} ######\n", .{app_dll_path});
         break :blk std.DynLib.open(app_dll_path) catch |e| {
             std.debug.print("{s}: {any}\n", .{ app_dll_path, e });
             continue;
@@ -139,6 +151,7 @@ fn loadAppDll(self: *Platform) Error!void {
         @panic("Fail to load app dll");
     };
     var dll = self.app_dll.?;
+    std.debug.print("######### LOADED ######\n", .{});
     self.appInit = dll.lookup(@TypeOf(self.appInit), "appInit") orelse return error.LookupFail;
     self.appReload = dll.lookup(@TypeOf(self.appReload), "appReload") orelse return error.LookupFail;
     self.appTick = dll.lookup(@TypeOf(self.appTick), "appTick") orelse return error.LookupFail;
@@ -147,6 +160,7 @@ fn loadAppDll(self: *Platform) Error!void {
 
 fn unloadAppDll(self: *Platform) void {
     if (self.app_dll) |*dll| {
+        std.debug.print("######### UNLOAD ######\n", .{});
         dll.close();
         self.app_dll = null;
     }
@@ -163,6 +177,7 @@ fn recompileAppDll(self: *Platform) Error!void {
         .allocator = self.heap,
         .argv = &proc_args,
     }) catch return Error.RecompileFail;
+
     std.debug.print("stderr:\n{s}\n", .{result.stderr});
     std.debug.print("stdout:\n{s}\n", .{result.stdout});
     std.debug.print("\n#### END RECOMPILE OUTPUT ####\n", .{});
@@ -187,11 +202,12 @@ fn loadStaticApp(self: *Platform) void {
 pub fn run(self: *Platform) Error!void {
     @setRuntimeSafety(core.rt_safe_blocks);
 
-    if (config.static_lib) {
+    if (comptime config.static_lib) {
         self.loadStaticApp();
     } else {
         try self.loadAppDll();
     }
+
     const app = self.appInit(self);
 
     self.prev_frame_time_ns = @max(self.getGameTimeNanosecs() - core.fixed_ns_per_update, 0);
