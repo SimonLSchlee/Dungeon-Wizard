@@ -64,8 +64,44 @@ ball_hit_effect: Thing.HitEffect = .{
 },
 ball_radius: f32 = base_ball_radius,
 explode_radius: f32 = base_explode_radius,
+fire_spawn_radius: f32 = base_explode_radius + 20,
 range: f32 = base_range,
 max_speed: f32 = 6,
+
+pub fn spawnFiresInRadius(room: *Room, pos: V2f, radius: f32, comptime max_spawned: usize) Error!void {
+    if (max_spawned > 100) {
+        @compileError("too many firess");
+    }
+    const fire_proto: Thing = Spell.GetKindType(.trailblaze).fireProto();
+    const top_left = pos.sub(V2f.splat(radius));
+    const sq_size = radius * 2;
+    const rnd = room.rng.random();
+    const min_fire_dist = fire_proto.hitbox.?.radius * 2;
+
+    var fire_spawn_positions = std.BoundedArray(V2f, max_spawned){};
+    var failed_iters: usize = 0;
+    while (fire_spawn_positions.len < fire_spawn_positions.buffer.len and failed_iters < max_spawned * 10) {
+        const candidate_pos = v2f(
+            rnd.floatNorm(f32) * sq_size,
+            rnd.floatNorm(f32) * sq_size,
+        ).add(top_left);
+        const valid = blk: {
+            if (candidate_pos.dist(pos) > radius) break :blk false;
+            for (fire_spawn_positions.constSlice()) |existing_pos| {
+                if (candidate_pos.dist(existing_pos) < min_fire_dist) break :blk false;
+            }
+            break :blk true;
+        };
+        if (!valid) {
+            failed_iters += 1;
+            continue;
+        }
+        fire_spawn_positions.append(candidate_pos) catch unreachable;
+    }
+    for (fire_spawn_positions.constSlice()) |fire_pos| {
+        _ = try room.queueSpawnThing(&fire_proto, fire_pos);
+    }
+}
 
 pub const Projectile = struct {
     pub const controller_enum_name = enum_name ++ "_projectile";
@@ -93,6 +129,7 @@ pub const Projectile = struct {
                 hitbox.mask = Thing.Faction.Mask.initFull();
                 self.renderer.shape.kind.circle.radius = flamey_explodey.explode_radius;
                 self.vel = .{};
+                try spawnFiresInRadius(room, self.pos, flamey_explodey.explode_radius + 20, 20);
             }
         } else {
             if (projectile.explode_counter.tick(false)) {
