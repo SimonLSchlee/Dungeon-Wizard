@@ -35,7 +35,8 @@ pub const Controllers = [_]type{Projectile};
 pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
     .{
-        .cast_secs = 1.5,
+        .cast_secs = 1,
+        .rarity = .interesting,
         .color = StatusEffect.proto_array.get(.promptitude).color,
         .targeting_data = .{
             .kind = .self,

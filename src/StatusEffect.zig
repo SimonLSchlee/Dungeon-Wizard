@@ -206,14 +206,16 @@ pub fn update(status: *StatusEffect, thing: *Thing, room: *Room) Error!void {
         .trailblaze => if (status.timer.tick(true)) {
             const vec = thing.pos.sub(status.prev_pos);
             const len = vec.length();
-            const spawn_dist: f32 = 30;
+            const spawn_dist: f32 = 25;
             if (len > spawn_dist) {
                 const proto: Thing = Spell.GetKindType(.trailblaze).fireProto();
-                const vec_n = vec.scale(spawn_dist / len);
+                const vec_n = vec.scale(1 / len);
                 const num_to_spawn: usize = utl.as(usize, len / spawn_dist);
                 for (0..num_to_spawn) |i| {
-                    const pos = status.prev_pos.add(vec_n.scale(utl.as(f32, i)));
-                    _ = try room.queueSpawnThing(&proto, pos);
+                    var pos = status.prev_pos.add(vec_n.scale(utl.as(f32, i) * spawn_dist));
+                    const v_90 = vec_n.rot90CCW();
+                    const rand_offset = v_90.scale(2).add(v_90.neg()).scale(room.rng.random().floatNorm(f32) * 6);
+                    _ = try room.queueSpawnThing(&proto, pos.add(rand_offset));
                 }
             }
             status.prev_pos = thing.pos;
