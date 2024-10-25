@@ -50,7 +50,7 @@ pub const proto = Spell.makeProto(
                 .ends_at_coll_mask = Collision.Mask.initOne(.tile),
                 .thickness = base_line_thickness,
             },
-            .radius_under_mouse = base_end_radius,
+            .radius_at_target = base_end_radius,
         },
     },
 );

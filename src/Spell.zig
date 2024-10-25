@@ -46,6 +46,7 @@ pub const SpellTypes = [_]type{
     @import("spells/ZapDash.zig"),
     @import("spells/FlareDart.zig"),
     @import("spells/Trailblaze.zig"),
+    @import("spells/FlamePurge.zig"),
 };
 
 pub const Kind = utl.EnumFromTypes(&SpellTypes, "enum_name");
@@ -130,7 +131,7 @@ pub const TargetingData = struct {
     ray_to_mouse: ?Ray = null,
     target_faction_mask: Thing.Faction.Mask = .{},
     target_mouse_pos: bool = false,
-    radius_under_mouse: ?f32 = null,
+    radius_at_target: ?f32 = null,
     cone_from_self_to_mouse: ?struct {
         radius: f32,
         radians: f32,
@@ -254,7 +255,7 @@ pub const TargetingData = struct {
                         .{ .fill_color = targeting_data.color.fade(0.5) },
                     );
                 }
-                if (targeting_data.radius_under_mouse) |r| {
+                if (targeting_data.radius_at_target) |r| {
                     plat.circlef(target_circle_pos, r, .{ .fill_color = targeting_data.color.fade(0.4) });
                 }
                 if (targeting_data.target_mouse_pos) {
@@ -264,6 +265,9 @@ pub const TargetingData = struct {
             .self => {
                 const draw_radius = caster.selectable.?.radius;
                 plat.circlef(caster.pos, draw_radius, .{ .fill_color = targeting_data.color.fade(0.4) });
+                if (targeting_data.radius_at_target) |r| {
+                    plat.circlef(caster.pos, r, .{ .fill_color = targeting_data.color.fade(0.4) });
+                }
             },
             .thing => {
                 for (&room.things.items) |*thing| {
@@ -277,6 +281,9 @@ pub const TargetingData = struct {
                     if (@constCast(room).getMousedOverThing(targeting_data.target_faction_mask)) |moused_over_thing| {
                         if (thing.id.eql(moused_over_thing.id)) {
                             draw_radius = selectable.radius;
+                            if (targeting_data.radius_at_target) |r| {
+                                plat.circlef(caster.pos, r, .{ .fill_color = targeting_data.color.fade(0.4) });
+                            }
                         }
                         if (targeting_data.ray_to_mouse) |ray| {
                             const target_circle_pos = targeting_data.getRayEnd(room, caster, ray, thing.pos);

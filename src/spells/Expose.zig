@@ -45,7 +45,7 @@ pub const proto = Spell.makeProto(
             .target_faction_mask = Thing.Faction.Mask.initOne(.enemy),
             .max_range = 200,
             .show_max_range_ring = true,
-            .radius_under_mouse = base_radius,
+            .radius_at_target = base_radius,
         },
     },
 );

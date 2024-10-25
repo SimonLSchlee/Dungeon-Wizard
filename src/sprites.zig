@@ -207,6 +207,7 @@ pub const Animator = struct {
                 };
             },
         }
+        std.debug.print("No anim found: {any}\n", .{self.kind});
         return null;
     }
 
@@ -219,6 +220,7 @@ pub const Animator = struct {
                 return App.get().data.getCreatureAnimSpriteSheetOrDefault(creature.kind, self.curr_anim);
             },
         }
+        std.debug.print("No spritesheet found: {any}\n", .{self.kind});
         return null;
     }
 

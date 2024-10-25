@@ -163,8 +163,12 @@ pub const AIController = struct {
                 } else if (self.accel_params.max_speed > 0.0001) {
                     _ = self.animator.?.play(.move, .{ .loop = true });
                     const dist_til_in_range = range - ai.attack_range;
-                    const time_til_reach = dist_til_in_range / self.accel_params.max_speed;
-                    const target_pos = target.pos.add(target.vel.scale(time_til_reach));
+                    var target_pos = target.pos;
+                    // predictive movement if close enough
+                    if (dist_til_in_range < 50) {
+                        const time_til_reach = dist_til_in_range / self.accel_params.max_speed;
+                        target_pos = target.pos.add(target.vel.scale(time_til_reach));
+                    }
                     try self.findPath(room, target_pos);
                     const p = self.followPathGetNextPoint(10);
                     self.updateVel(p.sub(self.pos).normalizedOrZero(), self.accel_params);

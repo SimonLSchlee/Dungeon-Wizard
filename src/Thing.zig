@@ -66,23 +66,25 @@ spawn_state: enum {
 kind: Kind = undefined,
 creature_kind: ?CreatureKind = null,
 pos: V2f = .{},
-vel: V2f = .{},
 dir: V2f = V2f.right,
 dirv: f32 = 0,
+dir_accel_params: DirAccelParams = .{},
+// motion and collision
+accel_params: AccelParams = .{},
+vel: V2f = .{},
 coll_radius: f32 = 0,
 coll_mask: Collision.Mask = .{},
 coll_layer: Collision.Mask = .{},
 last_coll: ?Collision = null,
+//
 vision_range: f32 = 0,
-accel_params: AccelParams = .{},
-dir_accel_params: DirAccelParams = .{},
 dbg: struct {
     coords_searched: std.BoundedArray(V2i, 128) = .{},
     last_tick_hitbox_was_active: i64 = -10000,
 } = .{},
 player_input: ?player.Input = null,
 controller: union(enum) {
-    none: void,
+    default: DefaultController,
     player: player.Controller,
     enemy: enemies.AIController,
     acolyte_enemy: enemies.AcolyteAIController,
@@ -91,7 +93,7 @@ controller: union(enum) {
     projectile: ProjectileController,
     spawner: SpawnerController,
     vfx: VFXController,
-} = .none,
+} = .default,
 renderer: union(enum) {
     none: void,
     creature: CreatureRenderer,
@@ -160,7 +162,11 @@ pub const HP = struct {
 pub const HitEffect = struct {
     damage: f32 = 1,
     status_stacks: StatusEffect.StacksArray = StatusEffect.StacksArray.initDefault(0, .{}),
-    force: V2f = .{},
+    force: union(enum) {
+        none,
+        from_center: f32, // magnitude
+        fixed: V2f,
+    } = .none,
     can_be_blocked: bool = true,
 };
 
@@ -252,6 +258,29 @@ pub const HurtBox = struct {
             if (self.hp) |*hp| {
                 hp.curr = utl.clampf(hp.curr - damage, 0, hp.max);
             }
+        }
+        force_blk: {
+            const force = switch (effect.force) {
+                .none => break :force_blk,
+                .from_center => |mag| center_blk: {
+                    if (maybe_hitter) |hitter| {
+                        if (hitter.hitbox) |hitbox| {
+                            const dir = self.pos.sub(hitter.pos.add(hitbox.rel_pos)).normalizedChecked() orelse break :force_blk;
+                            break :center_blk dir.scale(mag);
+                        }
+                    }
+                    break :force_blk;
+                },
+                .fixed => |dir| dir,
+            };
+            const mag = force.length();
+            self.updateVel(
+                force.normalizedOrZero(),
+                .{
+                    .accel = mag,
+                    .max_speed = self.accel_params.max_speed + mag,
+                },
+            );
         }
         // then apply statuses
         for (&self.statuses.values) |*status| {
@@ -473,12 +502,14 @@ pub const ProjectileController = struct {
         if (self.hitbox) |hitbox| {
             if (!hitbox.active) {
                 self.deferFree(room);
+                return;
             }
         }
         self.updateVel(self.dir, self.accel_params);
         self.moveAndCollide(room);
         if (self.last_coll) |_| {
             self.deferFree(room);
+            return;
         }
     }
 };
@@ -647,7 +678,11 @@ pub const CreatureRenderer = struct {
 };
 
 pub const DefaultController = struct {
-    pub fn update(_: *Thing, _: *Room) Error!void {}
+    pub fn update(self: *Thing, room: *Room) Error!void {
+        assert(self.spawn_state == .spawned);
+        self.updateVel(.{}, self.accel_params);
+        self.moveAndCollide(room);
+    }
 };
 
 fn updateController(self: *Thing, room: *Room) Error!void {
@@ -788,11 +823,6 @@ pub fn copyTo(self: *const Thing, other: *Thing) Error!void {
     other.id = id;
     other.alloc_state = alloc_state;
     other.spawn_state = spawn_state;
-}
-
-fn defaultUpdate(self: *Thing, room: *Room) Error!void {
-    assert(self.spawn_state == .spawned);
-    self.moveAndCollide(room);
 }
 
 pub fn isActive(self: *const Thing) bool {
