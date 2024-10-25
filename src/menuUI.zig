@@ -18,6 +18,7 @@ const Run = @This();
 const App = @import("App.zig");
 const getPlat = App.getPlat;
 
+// render text at the right size to fit into a rect, with padding
 pub fn textInRect(topleft: V2f, dims: V2f, rect_opt: draw.PolyOpt, text_padding: V2f, comptime fmt: []const u8, args: anytype, text_opt: draw.TextOpt) Error!void {
     const plat = App.getPlat();
     const half_dims = dims.scale(0.5);

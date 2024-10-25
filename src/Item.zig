@@ -282,17 +282,9 @@ pub fn makeShopItems(rng: std.Random, buf: []Item) usize {
     return generateRandom(rng, Obtainableness.Mask.initOne(.shop), false, buf);
 }
 
-// only valid if spawn_state == .card
-id: Id = undefined,
-alloc_state: pool.AllocState = undefined,
-//
-obtainableness: Obtainableness.Mask = Obtainableness.Mask.initMany(&.{ .room_reward, .shop }),
-spawn_state: enum {
-    instance, // not in any pool
-    allocated, // a card allocated in a pool
-} = .instance,
 kind: KindData = undefined,
 rarity: Rarity = .pedestrian,
+obtainableness: Obtainableness.Mask = Obtainableness.Mask.initMany(&.{ .room_reward, .shop }),
 color: Colorf = .black,
 targeting_data: TargetingData = .{},
 
@@ -333,6 +325,10 @@ pub inline fn renderTargeting(self: *const Item, room: *const Room, caster: *con
     return self.targeting_data.render(room, caster);
 }
 
+pub inline fn renderIcon(self: *const Item, rect: geom.Rectf) Error!void {
+    return try self.getRenderIconInfo().render(rect);
+}
+
 pub fn getRenderIconInfo(self: *const Item) sprites.RenderIconInfo {
     const data = App.get().data;
     const kind = std.meta.activeTag(self.kind);
@@ -369,33 +365,6 @@ pub fn renderToolTip(self: *const Item, pos: V2f) Error!void {
     try plat.textf(text_pos, "{s}", .{name}, name_opt);
     text_pos.y += 5 + name_dims.y;
     try plat.textf(text_pos, "{s}", .{desc}, desc_opt);
-}
-
-pub fn renderIcon(self: *const Item, rect: geom.Rectf) Error!void {
-    const plat = App.getPlat();
-    const icon_center_pos = rect.pos.add(rect.dims.scale(0.5));
-    switch (self.getRenderIconInfo()) {
-        .frame => |frame| {
-            plat.texturef(icon_center_pos, frame.texture, .{
-                .origin = .center,
-                .src_pos = frame.pos.toV2f(),
-                .src_dims = frame.size.toV2f(),
-                .scaled_dims = rect.dims,
-            });
-        },
-        .letter => |letter| {
-            try plat.textf(
-                icon_center_pos,
-                "{s}",
-                .{&letter.str},
-                .{
-                    .color = letter.color,
-                    .size = utl.as(u32, rect.dims.y),
-                    .center = true,
-                },
-            );
-        },
-    }
 }
 
 pub fn renderInfo(self: *const Item, rect: geom.Rectf) Error!void {

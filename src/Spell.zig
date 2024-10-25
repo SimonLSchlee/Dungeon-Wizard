@@ -391,23 +391,15 @@ pub const Obtainableness = enum {
     shop,
 };
 
-// only valid if spawn_state == .card
-id: Id = undefined,
-alloc_state: pool.AllocState = undefined,
-//
-spawn_state: enum {
-    instance, // not in any pool
-    card, // a card allocated in a pool
-} = .instance,
 kind: KindData = undefined,
 rarity: Rarity = .pedestrian,
 obtainableness: Obtainableness.Mask = Obtainableness.Mask.initMany(&.{ .room_reward, .shop }),
+color: Colorf = .black,
+targeting_data: TargetingData = .{},
 cast_secs: f32 = 1, // time from spell starting to when it's cast() is called - caster can't move or do anything except buffer inputs
 cast_ticks: i32 = 60,
 after_cast_slot_cooldown_secs: f32 = 4,
 after_cast_slot_cooldown_ticks: i32 = 4 * 60,
-color: Colorf = .black,
-targeting_data: TargetingData = .{},
 mislay: bool = false,
 
 pub fn getSlotCooldownTicks(self: *const Spell) i32 {
@@ -468,16 +460,8 @@ pub inline fn renderTargeting(self: *const Spell, room: *const Room, caster: *co
     return self.targeting_data.render(room, caster);
 }
 
-pub fn textInRect(topleft: V2f, dims: V2f, rect_opt: draw.PolyOpt, text_padding: V2f, comptime fmt: []const u8, args: anytype, text_opt: draw.TextOpt) Error!void {
-    const plat = App.getPlat();
-    const half_dims = dims.scale(0.5);
-    const text_rel_pos = if (text_opt.center) half_dims else text_padding;
-    const text_dims = dims.sub(text_padding.scale(2));
-    assert(text_dims.x > 0 and text_dims.y > 0);
-    const text = try utl.bufPrintLocal(fmt, args);
-    const fitted_text_opt = try plat.fitTextToRect(text_dims, text, text_opt);
-    plat.rectf(topleft, dims, rect_opt);
-    try plat.textf(topleft.add(text_rel_pos), fmt, args, fitted_text_opt);
+pub inline fn renderIcon(self: *const Spell, rect: geom.Rectf) Error!void {
+    return try self.getRenderIconInfo().render(rect);
 }
 
 pub fn getRenderIconInfo(self: *const Spell) sprites.RenderIconInfo {

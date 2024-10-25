@@ -217,11 +217,8 @@ pub fn render(self: *Shop, run: *Run) Error!void {
         if (slot.product == null) continue;
         const product = slot.product.?;
         switch (product.kind) {
-            .spell => |spell| {
-                try spell.renderInfo(hovered_rect);
-            },
-            .item => |item| {
-                try item.renderInfo(hovered_rect);
+            inline else => |k| {
+                try k.renderIcon(hovered_rect);
             },
         }
         const price_pos = hovered_rect.pos.add(hovered_rect.dims).sub(v2f(50, 40));

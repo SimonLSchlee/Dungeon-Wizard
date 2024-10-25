@@ -37,6 +37,34 @@ pub const RenderIconInfo = union(enum) {
         color: Colorf,
     },
     frame: RenderFrame,
+
+    pub fn render(icon: *const RenderIconInfo, rect: geom.Rectf) Error!void {
+        const plat = App.getPlat();
+        const icon_center_pos = rect.pos.add(rect.dims.scale(0.5));
+        // TODO retain aspect ratio of texture always!
+        switch (icon.*) {
+            .frame => |frame| {
+                plat.texturef(icon_center_pos, frame.texture, .{
+                    .origin = .center,
+                    .src_pos = frame.pos.toV2f(),
+                    .src_dims = frame.size.toV2f(),
+                    .scaled_dims = rect.dims,
+                });
+            },
+            .letter => |letter| {
+                try plat.textf(
+                    icon_center_pos,
+                    "{s}",
+                    .{&letter.str},
+                    .{
+                        .color = letter.color,
+                        .size = utl.as(u32, rect.dims.y),
+                        .center = true,
+                    },
+                );
+            },
+        }
+    }
 };
 
 pub const AnimEvent = struct {

@@ -750,7 +750,7 @@ pub fn render(self: *Run) Error!void {
                     hovered_crect.pos = new_pos;
                     hovered_crect.dims = new_dims;
                 }
-                try spell.renderInfo(hovered_crect);
+                try spell.renderIcon(hovered_crect);
             }
             for (reward_ui.item_rects.constSlice(), 0..) |crect, i| {
                 const item = reward.items.get(i);
