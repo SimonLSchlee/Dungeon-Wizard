@@ -396,7 +396,7 @@ pub fn gameUpdate(self: *Run) Error!void {
             if (self.reward == null and curr_room_place.kind == .normal) {
                 self.makeReward();
                 // TODO bettterrr?
-                self.gold += u.as(i32, @floor(curr_room_place.difficulty));
+                self.gold += u.as(i32, @floor(curr_room_place.difficulty)) + self.rng.random().uintAtMost(u8, 5);
             }
         },
         .exited => |exit_door| {
