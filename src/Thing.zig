@@ -221,6 +221,7 @@ pub const HurtBox = struct {
     radius: f32 = 0,
 
     pub fn hit(_: *HurtBox, self: *Thing, room: *Room, effect: HitEffect, maybe_hitter: ?*Thing) void {
+        // TODO put in StatusEffect/PricklyPotion?
         const prickly_stacks = self.statuses.get(.prickly).stacks;
         if (prickly_stacks > 0) {
             if (maybe_hitter) |hitter| {
@@ -235,6 +236,7 @@ pub const HurtBox = struct {
                 }
             }
         }
+        // TODO put in StatusEffect/Protec?
         if (effect.can_be_blocked) {
             const protect_stacks = &self.statuses.getPtr(.protected).stacks;
             if (protect_stacks.* > 0) {
@@ -254,11 +256,14 @@ pub const HurtBox = struct {
         // then apply statuses
         for (&self.statuses.values) |*status| {
             const stacks = effect.status_stacks.get(status.kind);
-            status.stacks += stacks;
+            if (stacks > 0) {
+                status.addStacks(stacks);
+            }
         }
         // then kill
         if (self.hp) |hp| {
             if (hp.curr == 0) {
+                // TODO put in StatusEffect/Mint?
                 // TODO maybe dont access Run here, more testable/reproduceableeeu?
                 // e.g. have something like Room.rewards and add it there, and Run will grab it later
                 const run = &App.get().run;
@@ -308,7 +313,7 @@ pub const VFXController = struct {
         }
     }
 
-    pub fn prototype(caster: *Thing) Thing {
+    pub fn castingProto(caster: *Thing) Thing {
         var cast_offset = V2f{};
         if (App.get().data.getCreatureAnimOrDefault(caster.animator.?.kind.creature.kind, .cast)) |anim| {
             cast_offset = anim.cast_offset.scale(sprites.uniform_scaling);
@@ -325,7 +330,10 @@ pub const VFXController = struct {
                     .parent = caster.id,
                 },
             },
-            .renderer = .{ .vfx = .{} },
+            .renderer = .{ .vfx = .{
+                .draw_over = true,
+                .draw_normal = false,
+            } },
             .animator = .{
                 .kind = .{
                     .vfx = .{
@@ -340,9 +348,10 @@ pub const VFXController = struct {
 
 pub const VFXRenderer = struct {
     sprite_tint: Colorf = .white,
+    draw_normal: bool = true,
+    draw_over: bool = false,
 
-    pub fn renderOver(self: *const Thing, _: *const Room) Error!void {
-        const renderer = &self.renderer.vfx;
+    pub fn _render(self: *const Thing, renderer: *const VFXRenderer, _: *const Room) void {
         const plat = App.getPlat();
         const frame = self.animator.?.getCurrRenderFrame();
         const tint: Colorf = renderer.sprite_tint;
@@ -354,6 +363,20 @@ pub const VFXRenderer = struct {
             .tint = tint,
         };
         plat.texturef(self.pos, frame.texture, opt);
+    }
+
+    pub fn render(self: *const Thing, room: *const Room) Error!void {
+        const renderer = &self.renderer.vfx;
+        if (renderer.draw_normal) {
+            _render(self, renderer, room);
+        }
+    }
+
+    pub fn renderOver(self: *const Thing, room: *const Room) Error!void {
+        const renderer = &self.renderer.vfx;
+        if (renderer.draw_over) {
+            _render(self, renderer, room);
+        }
     }
 };
 
@@ -661,40 +684,7 @@ pub fn update(self: *Thing, room: *Room) Error!void {
         hitbox.update(self, room);
     }
     for (&self.statuses.values) |*status| {
-        if (status.cd_type != .no_cd and status.stacks > 0) {
-            if (status.cooldown.tick(true)) {
-                switch (status.cd_type) {
-                    .remove_one_stack => {
-                        status.stacks -= 1;
-                    },
-                    .remove_all_stacks => {
-                        status.stacks = 0;
-                    },
-                    else => unreachable,
-                }
-                switch (status.kind) {
-                    .blackmailed => if (status.stacks == 0) {
-                        assert(self.creature_kind != null);
-                        const proto = App.get().data.creatures.get(self.creature_kind.?);
-                        self.faction = proto.faction;
-                    },
-                    else => {},
-                }
-            }
-            switch (status.kind) {
-                // activate at start of each second
-                .lit => if (@mod(status.cooldown.curr_tick, core.fups_per_sec) == core.fups_per_sec - 1) {
-                    if (self.hurtbox) |*hurtbox| {
-                        const lit_effect = HitEffect{
-                            .damage = utl.as(f32, status.stacks),
-                            .can_be_blocked = false,
-                        };
-                        hurtbox.hit(self, room, lit_effect, null);
-                    }
-                },
-                else => {},
-            }
-        }
+        try status.update(self, room);
     }
 }
 
@@ -765,8 +755,8 @@ pub fn renderOver(self: *const Thing, room: *const Room) Error!void {
     if (debug.show_hitboxes) {
         if (self.hitbox) |hitbox| {
             const ticks_since = room.curr_tick - self.dbg.last_tick_hitbox_was_active;
-            if (ticks_since < 120) {
-                const color = Colorf.red.fade(utl.remapClampf(0, 120, 0.5, 0, utl.as(f32, ticks_since)));
+            if (ticks_since < 60) {
+                const color = Colorf.red.fade(utl.remapClampf(0, 60, 0.5, 0, utl.as(f32, ticks_since)));
                 const pos: V2f = self.pos.add(hitbox.rel_pos);
                 plat.circlef(pos, hitbox.radius, .{ .fill_color = color });
                 if (hitbox.sweep_to_rel_pos) |rel_end| {

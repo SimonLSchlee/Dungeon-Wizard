@@ -48,13 +48,14 @@ num_stacks: i32 = 7,
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
     assert(params.target == .self);
     const promptitude: @This() = self.kind.promptitude;
-    caster.statuses.getPtr(.promptitude).stacks += promptitude.num_stacks;
+    caster.statuses.getPtr(.promptitude).addStacks(promptitude.num_stacks);
 
     _ = room;
 }
 
 pub const description =
     \\Move and cast spells 2x faster.
+    \\Memory (slot cooldown) unaffected.
 ;
 
 pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {

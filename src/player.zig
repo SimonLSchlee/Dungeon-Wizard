@@ -234,7 +234,7 @@ pub const Controller = struct {
                         }
                         switch (controller.action_casting.?.action) {
                             .spell => {
-                                const cast_proto = Thing.VFXController.prototype(self);
+                                const cast_proto = Thing.VFXController.castingProto(self);
                                 if (try room.queueSpawnThing(&cast_proto, cast_proto.pos)) |id| {
                                     controller.cast_vfx = id;
                                 }

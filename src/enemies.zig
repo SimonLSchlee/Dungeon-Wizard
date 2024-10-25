@@ -426,7 +426,7 @@ pub const AcolyteAIController = struct {
             },
             .cast => {
                 if (ai.ticks_in_state == 0) {
-                    const cast_proto = Thing.VFXController.prototype(self);
+                    const cast_proto = Thing.VFXController.castingProto(self);
                     if (try room.queueSpawnThing(&cast_proto, cast_proto.pos)) |id| {
                         ai.cast_vfx = id;
                     }

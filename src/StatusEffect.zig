@@ -33,6 +33,7 @@ const ComptimeProto = struct {
     cd: i64,
     cd_type: CdType,
     color: Colorf,
+    max_stacks: i32 = 9999,
 };
 
 const protos = [_]ComptimeProto{
@@ -95,6 +96,13 @@ const protos = [_]ComptimeProto{
         .cd = 4 * core.fups_per_sec,
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(1, 0.5, 0),
+        .max_stacks = 4,
+    },
+    .{
+        .enum_name = "trailblaze",
+        .cd = 1 * core.fups_per_sec,
+        .cd_type = .remove_one_stack,
+        .color = Colorf.rgb(1, 0.2, 0),
     },
 };
 
@@ -128,6 +136,7 @@ pub const proto_array = blk: {
             .cooldown = utl.TickCounter.init(p.cd),
             .cd_type = p.cd_type,
             .color = p.color,
+            .max_stacks = p.max_stacks,
         });
     }
     break :blk ret;
@@ -140,7 +149,75 @@ pub const CdType = enum {
 };
 
 kind: Kind,
-stacks: i32,
-cooldown: utl.TickCounter,
-cd_type: CdType,
-color: Colorf,
+stacks: i32 = 0,
+cooldown: utl.TickCounter = utl.TickCounter.init(core.fups_per_sec * 1),
+cd_type: CdType = .no_cd,
+color: Colorf = .white,
+// should put in a union maybe
+timer: utl.TickCounter = .{},
+prev_pos: V2f = .{},
+max_stacks: i32 = 9999,
+
+pub fn addStacks(self: *StatusEffect, num: i32) void {
+    self.stacks = utl.clamp(i32, self.stacks + num, 0, self.max_stacks);
+}
+
+pub fn update(status: *StatusEffect, thing: *Thing, room: *Room) Error!void {
+    if (status.cd_type == .no_cd or status.stacks == 0) {
+        return;
+    }
+    if (status.cooldown.tick(true)) {
+        switch (status.cd_type) {
+            .remove_one_stack => {
+                status.stacks -= 1;
+            },
+            .remove_all_stacks => {
+                status.stacks = 0;
+            },
+            else => unreachable,
+        }
+        if (status.stacks == 0) {
+            switch (status.kind) {
+                .blackmailed => {
+                    assert(thing.isCreature());
+                    const proto = App.get().data.creatures.get(thing.creature_kind.?);
+                    thing.faction = proto.faction;
+                },
+                .trailblaze => {
+                    assert(thing.isCreature());
+                    const proto = App.get().data.creatures.get(thing.creature_kind.?);
+                    thing.accel_params = proto.accel_params;
+                },
+                else => {},
+            }
+        }
+    }
+    switch (status.kind) {
+        // activate at start of each second
+        .lit => if (@mod(status.cooldown.curr_tick, core.fups_per_sec) == core.fups_per_sec - 1) {
+            if (thing.hurtbox) |*hurtbox| {
+                const lit_effect = Thing.HitEffect{
+                    .damage = utl.as(f32, status.stacks),
+                    .can_be_blocked = false,
+                };
+                hurtbox.hit(thing, room, lit_effect, null);
+            }
+        },
+        .trailblaze => if (status.timer.tick(true)) {
+            const vec = thing.pos.sub(status.prev_pos);
+            const len = vec.length();
+            const spawn_dist: f32 = 30;
+            if (len > spawn_dist) {
+                const proto: Thing = Spell.GetKindType(.trailblaze).fireProto();
+                const vec_n = vec.scale(spawn_dist / len);
+                const num_to_spawn: usize = utl.as(usize, len / spawn_dist);
+                for (0..num_to_spawn) |i| {
+                    const pos = status.prev_pos.add(vec_n.scale(utl.as(f32, i)));
+                    _ = try room.queueSpawnThing(&proto, pos);
+                }
+            }
+            status.prev_pos = thing.pos;
+        },
+        else => {},
+    }
+}
