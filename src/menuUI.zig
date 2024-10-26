@@ -31,6 +31,36 @@ pub fn textInRect(topleft: V2f, dims: V2f, rect_opt: draw.PolyOpt, text_padding:
     try plat.textf(topleft.add(text_rel_pos), fmt, args, fitted_text_opt);
 }
 
+pub fn renderToolTip(title: []const u8, body: []const u8, pos: V2f) Error!void {
+    const plat = App.getPlat();
+    const title_opt = draw.TextOpt{
+        .color = .white,
+        .size = 25,
+    };
+    const title_dims = try plat.measureText(title, title_opt);
+    const body_opt = draw.TextOpt{
+        .color = .white,
+        .size = 20,
+    };
+    const body_dims = try plat.measureText(body, body_opt);
+    const text_dims = v2f(@max(title_dims.x, body_dims.x), title_dims.y + body_dims.y);
+    const modal_dims = text_dims.add(v2f(10, 15));
+    var adjusted_pos = pos;
+    const bot_right = adjusted_pos.add(modal_dims);
+    if (bot_right.x > plat.screen_dims_f.x) {
+        adjusted_pos.x -= (bot_right.x - plat.screen_dims_f.x);
+    }
+    if (bot_right.y > plat.screen_dims_f.y) {
+        adjusted_pos.y -= (bot_right.y - plat.screen_dims_f.y);
+    }
+
+    plat.rectf(adjusted_pos, modal_dims, .{ .fill_color = Colorf.black.fade(0.8) });
+    var text_pos = adjusted_pos.add(v2f(5, 5));
+    try plat.textf(text_pos, "{s}", .{title}, title_opt);
+    text_pos.y += 5 + title_dims.y;
+    try plat.textf(text_pos, "{s}", .{body}, body_opt);
+}
+
 pub const Modal = struct {
     rect: geom.Rectf = .{},
     poly_opt: draw.PolyOpt = .{},

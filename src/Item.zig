@@ -317,6 +317,10 @@ pub fn canUse(self: *const Item, room: *const Room, caster: *const Thing) bool {
     return true;
 }
 
+pub fn getDescription(self: *const Item) Error![]const u8 {
+    return item_descriptions.get(std.meta.activeTag(self.kind));
+}
+
 pub inline fn getTargetParams(self: *const Item, room: *Room, caster: *const Thing, mouse_pos: V2f) ?Params {
     return self.targeting_data.getParams(room, caster, mouse_pos);
 }
@@ -344,27 +348,10 @@ pub fn getRenderIconInfo(self: *const Item) sprites.RenderIconInfo {
 }
 
 pub fn renderToolTip(self: *const Item, pos: V2f) Error!void {
-    const plat = App.getPlat();
     const kind = std.meta.activeTag(self.kind);
     const name = item_names.get(kind);
-    const name_opt = draw.TextOpt{
-        .color = .white,
-        .size = 25,
-    };
-    const name_dims = try plat.measureText(name, name_opt);
-    const desc = item_descriptions.get(kind);
-    const desc_opt = draw.TextOpt{
-        .color = .white,
-        .size = 20,
-    };
-    const desc_dims = try plat.measureText(desc, desc_opt);
-    const text_dims = v2f(@max(name_dims.x, desc_dims.x), name_dims.y + desc_dims.y);
-    const modal_dims = text_dims.add(v2f(10, 15));
-    plat.rectf(pos, modal_dims, .{ .fill_color = Colorf.black.fade(0.8) });
-    var text_pos = pos.add(v2f(5, 5));
-    try plat.textf(text_pos, "{s}", .{name}, name_opt);
-    text_pos.y += 5 + name_dims.y;
-    try plat.textf(text_pos, "{s}", .{desc}, desc_opt);
+    const desc = try self.getDescription();
+    return menuUI.renderToolTip(name, desc, pos);
 }
 
 pub fn renderInfo(self: *const Item, rect: geom.Rectf) Error!void {

@@ -425,7 +425,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     }
 }
 
-pub fn getDescription(self: *const Spell) Error![]u8 {
+pub fn getDescription(self: *const Spell) Error![]const u8 {
     var len: usize = 0;
     var buf = desc_buf[0..];
     len += (try std.fmt.bufPrint(
@@ -479,36 +479,10 @@ pub fn getRenderIconInfo(self: *const Spell) sprites.RenderIconInfo {
 }
 
 pub fn renderToolTip(self: *const Spell, pos: V2f) Error!void {
-    const plat = App.getPlat();
     const kind = std.meta.activeTag(self.kind);
     const name = spell_names.get(kind);
-    const name_opt = draw.TextOpt{
-        .color = .white,
-        .size = 25,
-    };
-    const name_dims = try plat.measureText(name, name_opt);
     const desc = try self.getDescription();
-    const desc_opt = draw.TextOpt{
-        .color = .white,
-        .size = 20,
-    };
-    const desc_dims = try plat.measureText(desc, desc_opt);
-    const text_dims = v2f(@max(name_dims.x, desc_dims.x), name_dims.y + desc_dims.y);
-    const modal_dims = text_dims.add(v2f(10, 15));
-    var adjusted_pos = pos;
-    const bot_right = adjusted_pos.add(modal_dims);
-    if (bot_right.x > plat.screen_dims_f.x) {
-        adjusted_pos.x -= (bot_right.x - plat.screen_dims_f.x);
-    }
-    if (bot_right.y > plat.screen_dims_f.y) {
-        adjusted_pos.y -= (bot_right.y - plat.screen_dims_f.y);
-    }
-
-    plat.rectf(adjusted_pos, modal_dims, .{ .fill_color = Colorf.black.fade(0.8) });
-    var text_pos = adjusted_pos.add(v2f(5, 5));
-    try plat.textf(text_pos, "{s}", .{name}, name_opt);
-    text_pos.y += 5 + name_dims.y;
-    try plat.textf(text_pos, "{s}", .{desc}, desc_opt);
+    return menuUI.renderToolTip(name, desc, pos);
 }
 
 pub fn renderInfo(self: *const Spell, rect: geom.Rectf) Error!void {
