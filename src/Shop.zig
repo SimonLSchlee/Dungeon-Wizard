@@ -28,11 +28,13 @@ const gameUI = @import("gameUI.zig");
 const Item = @import("Item.zig");
 const Shop = @This();
 
+pub const SpellOrItem = union(enum) {
+    spell: Spell,
+    item: Item,
+};
+
 pub const Product = struct {
-    kind: union(enum) {
-        spell: Spell,
-        item: Item,
-    },
+    kind: SpellOrItem,
     price: union(enum) {
         gold: i32,
     } = .{ .gold = 10 },
@@ -78,7 +80,7 @@ pub fn init(seed: u64) Error!Shop {
     {
         const max_num_spells = 4;
         const num_spells = 4;
-        const spell_width: f32 = 250;
+        const spell_width: f32 = 150;
         const spell_spacing = 25;
         const spell_product_dims = v2f(spell_width, spell_width / 0.7);
         const spells_center = v2f(plat.screen_dims_f.x * 0.5, 100 + spell_product_dims.y * 0.5);
@@ -112,7 +114,7 @@ pub fn init(seed: u64) Error!Shop {
 
         const max_num_items = 4;
         const num_items = 3;
-        const item_width: f32 = 250;
+        const item_width: f32 = 150;
         const item_spacing = 25;
         const item_product_dims = v2f(item_width, item_width / 0.7);
         const items_center = v2f(plat.screen_dims_f.x * 0.5, spells_bottom_y + 50 + item_product_dims.y * 0.5);
@@ -205,27 +207,47 @@ pub fn render(self: *Shop, run: *Run) Error!void {
 
     try plat.textf(v2f(plat.screen_dims_f.x * 0.5, 50), "Shoppy woppy", .{}, .{ .center = true, .color = .white, .size = 45 });
 
+    var hovered: ?SpellOrItem = null;
+    var hovered_pos: V2f = .{};
+
     for (self.products.constSlice()) |slot| {
         var hovered_rect = slot.crect.rect;
-        plat.rectf(hovered_rect.pos, hovered_rect.dims, .{ .fill_color = .darkgray });
+        var text_sz: u32 = 40;
         if (slot.crect.isHovered()) {
             const new_dims = hovered_rect.dims.scale(1.1);
+            text_sz = 44;
             const new_pos = hovered_rect.pos.sub(new_dims.sub(hovered_rect.dims).scale(0.5));
             hovered_rect.pos = new_pos;
             hovered_rect.dims = new_dims;
+            if (slot.product) |product| {
+                hovered = product.kind;
+                hovered_pos = hovered_rect.pos.add(v2f(hovered_rect.dims.x, 0));
+            }
         }
+        plat.rectf(hovered_rect.pos, hovered_rect.dims, .{ .fill_color = .darkgray });
+        const hovered_square = V2f.splat(@min(hovered_rect.dims.x, hovered_rect.dims.y));
+        plat.rectf(hovered_rect.pos, hovered_square, .{ .fill_color = Colorf.rgb(0.07, 0.05, 0.05) });
+
         if (slot.product == null) continue;
         const product = slot.product.?;
         switch (product.kind) {
             inline else => |k| {
-                try k.renderIcon(hovered_rect);
+                try k.renderIcon(.{ .pos = hovered_rect.pos, .dims = hovered_square });
             },
         }
         const price_pos = hovered_rect.pos.add(hovered_rect.dims).sub(v2f(50, 40));
-        try plat.textf(price_pos, "${}", .{product.price.gold}, .{ .center = true, .color = .yellow, .size = 40 });
+        try plat.textf(price_pos, "${}", .{product.price.gold}, .{ .center = true, .color = .yellow, .size = text_sz });
     }
 
     try self.proceed_button.render();
+
+    if (hovered) |h| {
+        switch (h) {
+            inline else => |t| {
+                try t.renderToolTip(hovered_pos);
+            },
+        }
+    }
 
     plat.endRenderToTexture();
 }
