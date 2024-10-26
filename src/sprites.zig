@@ -235,7 +235,7 @@ pub const Animator = struct {
                 };
             },
         }
-        std.debug.print("No anim found: {any}\n", .{self.kind});
+        std.debug.print("No anim found: anim: {any} kind: {any}\n", .{ self.curr_anim, self.kind });
         return null;
     }
 
@@ -248,7 +248,7 @@ pub const Animator = struct {
                 return App.get().data.getCreatureAnimSpriteSheetOrDefault(creature.kind, self.curr_anim);
             },
         }
-        std.debug.print("No spritesheet found: {any}\n", .{self.kind});
+        std.debug.print("No spritesheet found: anim: {any} kind: {any}\n", .{ self.curr_anim, self.kind });
         return null;
     }
 
