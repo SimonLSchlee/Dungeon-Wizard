@@ -139,7 +139,7 @@ pub fn init(seed: u64) Error!Shop {
             ret.products.append(.{
                 .product = .{
                     .kind = .{ .item = item },
-                    .price = .{ .gold = 30 },
+                    .price = .{ .gold = 20 },
                 },
                 .crect = .{ .rect = .{ .dims = rect.dims, .pos = rect.pos } },
             }) catch unreachable;
