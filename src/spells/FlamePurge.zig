@@ -50,7 +50,7 @@ pub const proto = Spell.makeProto(
 );
 
 explode_hit_effect: Thing.HitEffect = .{
-    .damage = 0,
+    .damage = 8,
     .status_stacks = StatusEffect.StacksArray.initDefault(0, .{ .lit = 1 }),
     .force = .{ .from_center = 4 },
 },
@@ -85,6 +85,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     caster_lit_status.stacks = 0;
     var updated_hit_effect = flame_purge.explode_hit_effect;
     updated_hit_effect.status_stacks.getPtr(.lit).* += transferred_stacks;
+    updated_hit_effect.damage += utl.as(f32, transferred_stacks) * 2;
 
     const ball = Thing{
         .kind = .projectile,
@@ -123,12 +124,12 @@ pub const description =
 
 pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
     const flame_purge: @This() = self.kind.flame_purge;
-    _ = flame_purge;
     const fmt =
         \\Lit stacks transferred: 1 + any more you have
+        \\Damage: {} + 2 per lit stack transferred
         \\
         \\{s}
         \\
     ;
-    return std.fmt.bufPrint(buf, fmt, .{description});
+    return std.fmt.bufPrint(buf, fmt, .{ flame_purge.explode_hit_effect.damage, description });
 }
