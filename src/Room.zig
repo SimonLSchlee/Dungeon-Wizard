@@ -208,7 +208,6 @@ moused_over_thing: ?struct {
 } = null,
 edit_mode: bool = false,
 ui_clicked: bool = false,
-render_texture: ?Platform.RenderTexture2D = null,
 next_pool_id: u32 = 0, // i hate this, can we change it?
 rng: std.Random.DefaultPrng = undefined,
 // fields to save/load for level loading
@@ -223,11 +222,8 @@ tilemap: TileMap = .{},
 init_params: InitParams,
 
 pub fn init(params: InitParams) Error!Room {
-    const plat = getPlat();
-
     var ret: Room = .{
         .next_pool_id = 0,
-        .render_texture = plat.createRenderTexture("room", plat.screen_dims),
         .fog = try Fog.init(),
         .init_params = params,
     };
@@ -242,9 +238,6 @@ pub fn deinit(self: *Room) void {
     self.clearThings();
     self.fog.deinit();
     self.tilemap.deinit();
-    if (self.render_texture) |tex| {
-        getPlat().destroyRenderTexture(tex);
-    }
 }
 
 fn clearThings(self: *Room) void {
@@ -260,11 +253,10 @@ fn clearThings(self: *Room) void {
 }
 
 pub fn reset(self: *Room) Error!void {
-    const plat = getPlat();
     self.clearThings();
     self.fog.clearAll();
     self.camera = .{
-        .offset = plat.screen_dims_f.scale(0.5),
+        .offset = core.native_dims_f.scale(0.5),
         .zoom = 1,
     };
     self.curr_tick = 0;
@@ -380,12 +372,12 @@ pub fn spawnCurrWave(self: *Room) Error!void {
 }
 
 pub fn getMousedOverThing(self: *Room, faction_mask: Thing.Faction.Mask) ?*Thing {
+    const plat = getPlat();
     //cached
     if (self.moused_over_thing) |s| {
         if (s.faction_mask.eql(faction_mask)) return self.getThingById(s.thing);
     }
-    const plat = getPlat();
-    const mouse_pos = plat.screenPosToCamPos(self.camera, plat.input_buffer.getCurrMousePos());
+    const mouse_pos = plat.getMousePosWorld(self.camera);
     var best_thing: ?*Thing = null;
     var best_y = -std.math.inf(f32);
     for (&self.things.items) |*thing| {
@@ -439,7 +431,7 @@ pub fn update(self: *Room) Error!void {
 
     if (self.edit_mode) {
         if (plat.input_buffer.mouseBtnIsJustPressed(.left)) {
-            const pos = plat.screenPosToCamPos(self.camera, plat.input_buffer.getCurrMousePos());
+            const pos = plat.getMousePosWorld(self.camera);
             //std.debug.print("spawn sheep at {d:0.2}, {d:0.2}\n", .{ pos.x, pos.y });
             _ = try self.queueSpawnCreatureByKind(.troll, pos);
         }
@@ -540,8 +532,7 @@ pub fn update(self: *Room) Error!void {
     }
 }
 
-pub fn render(self: *const Room) Error!void {
-    if (self.render_texture == null) return;
+pub fn render(self: *const Room, native_render_texture: Platform.RenderTexture2D) Error!void {
     const plat = getPlat();
 
     const fog_enabled = !self.edit_mode;
@@ -549,7 +540,7 @@ pub fn render(self: *const Room) Error!void {
         try self.fog.renderToTexture(self.camera);
     }
 
-    plat.startRenderToTexture(self.render_texture.?);
+    plat.startRenderToTexture(native_render_texture);
     plat.clear(Colorf.rgb(0.4, 0.4, 0.4));
     plat.setBlend(.render_tex_alpha);
 
@@ -662,7 +653,7 @@ pub fn render(self: *const Room) Error!void {
         const opt: draw.TextOpt = .{ .center = true, .size = 50, .color = .white };
         const txt = "edit mode";
         const dims = (try plat.measureText(txt, opt)).add(v2f(10, 4));
-        const p: V2f = v2f(plat.screen_dims_f.x * 0.5, plat.screen_dims_f.y - 50);
+        const p: V2f = v2f(core.native_dims_f.x * 0.5, core.native_dims_f.y - 50);
         plat.rectf(p.sub(dims.scale(0.5)), dims, .{ .fill_color = Colorf.black.fade(0.5) });
         try plat.textf(p, txt, .{}, opt);
     } else {
@@ -671,7 +662,7 @@ pub fn render(self: *const Room) Error!void {
             const opt: draw.TextOpt = .{ .center = true, .size = 50, .color = .white };
             const txt = "[paused]";
             const dims = (try plat.measureText(txt, opt)).add(v2f(10, 4));
-            const p: V2f = v2f(plat.screen_dims_f.x * 0.5, plat.screen_dims_f.y - 50);
+            const p: V2f = v2f(core.native_dims_f.x * 0.5, core.native_dims_f.y - 50);
             plat.rectf(p.sub(dims.scale(0.5)), dims, .{ .fill_color = Colorf.black.fade(0.5) });
             try plat.textf(p, txt, .{}, opt);
         }
@@ -679,6 +670,4 @@ pub fn render(self: *const Room) Error!void {
     if (debug.show_num_enemies) {
         try plat.textf(v2f(10, 10), "num_enemies_alive: {}", .{self.num_enemies_alive}, .{ .color = .white });
     }
-
-    plat.endRenderToTexture();
 }

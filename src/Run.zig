@@ -545,9 +545,8 @@ pub fn update(self: *Run) Error!void {
 }
 
 fn makeDeadMenu() DeadMenu {
-    const plat = App.getPlat();
-    const modal_dims = v2f(plat.screen_dims_f.x * 0.6, plat.screen_dims_f.y * 0.7);
-    const modal_topleft = plat.screen_dims_f.sub(modal_dims).scale(0.5);
+    const modal_dims = v2f(core.native_dims_f.x * 0.6, core.native_dims_f.y * 0.7);
+    const modal_topleft = core.native_dims_f.sub(modal_dims).scale(0.5);
     const modal_center = modal_topleft.add(modal_dims.scale(0.5));
     var modal = menuUI.Modal{
         .rect = .{
@@ -599,10 +598,9 @@ fn makeDeadMenu() DeadMenu {
 }
 
 fn makeGamePauseUI() GamePauseUI {
-    const plat = App.getPlat();
     const screen_margin = v2f(30, 60);
     const button_dims = v2f(100, 50);
-    const button_y = plat.screen_dims_f.y - screen_margin.y - button_dims.y;
+    const button_y = core.native_dims_f.y - screen_margin.y - button_dims.y;
     var deck_button = menuUI.Button{
         .clickable_rect = .{ .rect = .{
             .pos = v2f(screen_margin.x, button_y),
@@ -616,7 +614,7 @@ fn makeGamePauseUI() GamePauseUI {
 
     var pause_menu_button = menuUI.Button{
         .clickable_rect = .{ .rect = .{
-            .pos = v2f(plat.screen_dims_f.x - screen_margin.x - button_dims.x, button_y),
+            .pos = v2f(core.native_dims_f.x - screen_margin.x - button_dims.x, button_y),
             .dims = button_dims,
         } },
         .poly_opt = .{ .fill_color = .orange },
@@ -632,9 +630,8 @@ fn makeGamePauseUI() GamePauseUI {
 }
 
 fn makeRewardUI(reward: *const Reward) Reward.UI {
-    const plat = App.getPlat();
-    const modal_dims = v2f(plat.screen_dims_f.x * 0.6, plat.screen_dims_f.y * 0.6);
-    const modal_topleft = plat.screen_dims_f.sub(modal_dims).scale(0.5);
+    const modal_dims = v2f(core.native_dims_f.x * 0.6, core.native_dims_f.y * 0.6);
+    const modal_topleft = core.native_dims_f.sub(modal_dims).scale(0.5);
     const modal_opt = draw.PolyOpt{
         .fill_color = Colorf.rgba(0.1, 0.1, 0.1, 0.8),
         .outline_color = Colorf.rgba(0.1, 0.1, 0.2, 0.8),
@@ -719,6 +716,7 @@ pub fn renderIconButton(spell_or_item: anytype, crect: menuUI.ClickableRect) Err
         hovered_crect.pos = new_pos;
         hovered_crect.dims = new_dims;
     }
+    getPlat().rectf(hovered_crect.pos, hovered_crect.dims, .{ .fill_color = Colorf.rgb(0.07, 0.05, 0.05) });
     try spell_or_item.renderIcon(hovered_crect);
     if (show_tooltip) {
         return hovered_crect.pos.add(v2f(hovered_crect.dims.x, 0));
@@ -763,19 +761,11 @@ pub fn renderReward(self: *Run) Error!void {
     }
 }
 
-pub fn render(self: *Run) Error!void {
+pub fn render(self: *Run, native_render_texture: Platform.RenderTexture2D) Error!void {
     const plat = getPlat();
-    plat.clear(Colorf.magenta);
 
     if (self.room) |room| {
-        try room.render();
-        //const game_scale: i32 = 2;
-        //const game_dims_scaled_f = game_dims.scale(game_scale).toV2f();
-        //const topleft = p.screen_dims_f.sub(game_dims_scaled_f).scale(0.5);
-        const game_texture_opt = .{
-            .flip_y = true,
-        };
-        plat.texturef(.{}, room.render_texture.?.texture, game_texture_opt);
+        try room.render(native_render_texture);
     }
 
     switch (self.screen) {
@@ -790,16 +780,14 @@ pub fn render(self: *Run) Error!void {
         },
         .pause_menu => {},
         .reward => {
+            plat.startRenderToTexture(native_render_texture);
+            plat.setBlend(.render_tex_alpha);
             try self.renderReward();
         },
         .shop => {
             assert(self.shop != null);
             const shop = &self.shop.?;
-            try shop.render(self);
-            const shop_texture_opt = .{
-                .flip_y = true,
-            };
-            plat.texturef(.{}, shop.render_texture.texture, shop_texture_opt);
+            try shop.render(self, native_render_texture);
         },
         .dead => {
             try self.dead_menu.modal.render();
@@ -808,11 +796,13 @@ pub fn render(self: *Run) Error!void {
             try self.dead_menu.retry_room_button.render();
         },
     }
+    plat.startRenderToTexture(native_render_texture);
+    plat.setBlend(.render_tex_alpha);
     { // gold
         const fill_color = Colorf.rgb(1, 0.9, 0);
         const text_color = Colorf.rgb(0.44, 0.3, 0.0);
         const poly_opt = .{ .fill_color = fill_color, .outline_color = text_color, .outline_thickness = 10 };
-        const center = v2f(250, plat.screen_dims_f.y - 100);
+        const center = v2f(250, core.native_dims_f.y - 100);
         const num = 3;
         const lower = center.add(v2f(0, 7 * num));
         for (0..num) |i| {
@@ -828,11 +818,11 @@ pub fn render(self: *Run) Error!void {
         .none => {},
         .fade_in => {
             const color = Colorf.black.fade(1 - self.load_timer.remapTo0_1());
-            plat.rectf(.{}, plat.screen_dims_f, .{ .fill_color = color });
+            plat.rectf(.{}, core.native_dims_f, .{ .fill_color = color });
         },
         .fade_out => {
             const color = Colorf.black.fade(self.load_timer.remapTo0_1());
-            plat.rectf(.{}, plat.screen_dims_f, .{ .fill_color = color });
+            plat.rectf(.{}, core.native_dims_f, .{ .fill_color = color });
         },
     }
 }

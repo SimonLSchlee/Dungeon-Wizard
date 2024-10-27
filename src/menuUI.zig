@@ -47,11 +47,11 @@ pub fn renderToolTip(title: []const u8, body: []const u8, pos: V2f) Error!void {
     const modal_dims = text_dims.add(v2f(10, 15));
     var adjusted_pos = pos;
     const bot_right = adjusted_pos.add(modal_dims);
-    if (bot_right.x > plat.screen_dims_f.x) {
-        adjusted_pos.x -= (bot_right.x - plat.screen_dims_f.x);
+    if (bot_right.x > core.native_dims_f.x) {
+        adjusted_pos.x -= (bot_right.x - core.native_dims_f.x);
     }
-    if (bot_right.y > plat.screen_dims_f.y) {
-        adjusted_pos.y -= (bot_right.y - plat.screen_dims_f.y);
+    if (bot_right.y > core.native_dims_f.y) {
+        adjusted_pos.y -= (bot_right.y - core.native_dims_f.y);
     }
 
     plat.rectf(adjusted_pos, modal_dims, .{ .fill_color = Colorf.black.fade(0.8) });
@@ -93,7 +93,7 @@ pub const ClickableRect = struct {
     }
     pub fn isHovered(self: ClickableRect) bool {
         const plat = App.getPlat();
-        return geom.pointIsInRectf(plat.mousePosf(), self.rect);
+        return geom.pointIsInRectf(plat.getMousePosScreen(), self.rect);
     }
     pub fn isClicked(self: ClickableRect) bool {
         const plat = App.getPlat();

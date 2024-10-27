@@ -81,7 +81,7 @@ pub const Input = struct {
         const plat = App.getPlat();
         const controller = &self.controller.player;
         const ui_slots = &room.ui_slots;
-        const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
+        const mouse_pos = plat.getMousePosWorld(room.camera);
 
         // tick this here even though its on the player controller
         if (plat.input_buffer.mouseBtnIsJustPressed(.right)) {

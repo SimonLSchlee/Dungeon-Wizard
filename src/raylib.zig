@@ -52,27 +52,41 @@ heap: std.mem.Allocator = gpa.allocator(),
 default_font: Font = undefined,
 screen_dims: V2i = .{},
 screen_dims_f: V2f = .{},
+native_to_screen_scaling: f32 = 1,
+native_to_screen_offset: V2f = .{},
 accumulated_update_ns: i64 = 0,
 prev_frame_time_ns: i64 = 0,
 input_buffer: core.InputBuffer = .{},
 str_fmt_buf: []u8 = undefined,
 assets_path: []const u8 = undefined,
 
-pub fn init(width: u32, height: u32, title: []const u8) Error!Platform {
+pub fn updateDims(self: *Platform, dims: V2i) void {
+    self.screen_dims = dims;
+    self.screen_dims_f = dims.toV2f();
+    const x_scaling = self.screen_dims_f.x / core.native_dims_f.x;
+    const y_scaling = self.screen_dims_f.y / core.native_dims_f.y;
+    self.native_to_screen_scaling = @max(x_scaling, y_scaling);
+    const scaled_native_dims = core.native_dims_f.scale(self.native_to_screen_scaling);
+    self.native_to_screen_offset = self.screen_dims_f.sub(scaled_native_dims).scale(0.5);
+}
+
+pub fn init(title: []const u8) Error!Platform {
     @setRuntimeSafety(core.rt_safe_blocks);
+
+    const dims = core.supported_resolutions[2];
 
     var ret: Platform = .{};
     const title_z = try std.fmt.allocPrintZ(ret.heap, "{s}", .{title});
 
-    r.InitWindow(@intCast(width), @intCast(height), title_z);
+    r.SetConfigFlags(r.FLAG_WINDOW_RESIZABLE);
+    r.InitWindow(@intCast(dims.x), @intCast(dims.y), title_z);
     // show raylib init INFO, then just warnings
     r.SetTraceLogLevel(r.LOG_WARNING);
 
     ret.str_fmt_buf = try ret.heap.alloc(u8, str_fmt_buf_size);
     ret.assets_path = try ret.getAssetsPath();
 
-    ret.screen_dims = V2i.iToV2i(u32, width, height);
-    ret.screen_dims_f = ret.screen_dims.toV2f();
+    ret.updateDims(dims);
     ret.default_font = try ret.loadFont("Roboto-Regular.ttf"); // NOTE uses str_fmt_buf initialized above
 
     r.InitAudioDevice();
@@ -571,7 +585,7 @@ pub fn texturef(_: *Platform, pos: V2f, tex: Texture2D, opt: draw.TextureOpt) vo
     };
     const r_filter = switch (opt.smoothing) {
         .none => r.TEXTURE_FILTER_POINT,
-        .bilinear => r.TEXTURE_FILTER_POINT,
+        .bilinear => r.TEXTURE_FILTER_BILINEAR,
     };
     r.SetTextureFilter(tex.r_tex, r_filter);
     r.DrawTexturePro(tex.r_tex, src, dest, cVec(origin), u.radiansToDegrees(opt.rot_rads), cColorf(opt.tint));
@@ -598,7 +612,8 @@ fn cCam(cam: draw.Camera2D) r.Camera2D {
     };
 }
 
-pub fn startCamera2D(_: *Platform, cam: draw.Camera2D) void {
+pub fn startCamera2D(self: *Platform, cam: draw.Camera2D) void {
+    _ = self;
     r.BeginMode2D(cCam(cam));
 }
 
@@ -606,12 +621,29 @@ pub fn endCamera2D(_: *Platform) void {
     r.EndMode2D();
 }
 
-pub fn screenPosToCamPos(_: *Platform, cam: draw.Camera2D, pos: V2f) V2f {
-    return zVec(r.GetScreenToWorld2D(cVec(pos), cCam(cam)));
+pub fn screenPosToCamPos(self: *Platform, cam: draw.Camera2D, pos: V2f) V2f {
+    var c = cam;
+    c.offset = c.offset.add(self.native_to_screen_offset);
+    return zVec(r.GetScreenToWorld2D(cVec(pos), cCam(c)));
 }
 
-pub fn camPosToScreenPos(_: *Platform, cam: draw.Camera2D, pos: V2f) V2f {
-    return zVec(r.GetWorldToScreen2D(cVec(pos), cCam(cam)));
+pub fn camPosToScreenPos(self: *Platform, cam: draw.Camera2D, pos: V2f) V2f {
+    var c = cam;
+    c.offset = c.offset.add(self.native_to_screen_offset);
+    return zVec(r.GetWorldToScreen2D(cVec(pos), cCam(c)));
+}
+
+pub fn getMousePosWorld(self: *Platform, cam: draw.Camera2D) V2f {
+    const mouse_cam = draw.Camera2D{
+        .pos = cam.pos,
+        .offset = self.screen_dims_f.scale(0.5).sub(self.native_to_screen_offset),
+        .zoom = cam.zoom * self.native_to_screen_scaling,
+    };
+    return self.screenPosToCamPos(mouse_cam, self.mousePosf());
+}
+
+pub fn getMousePosScreen(self: *Platform) V2f {
+    return self.mousePosf().sub(self.native_to_screen_offset).scale(1 / self.native_to_screen_scaling);
 }
 
 pub fn startRenderToTexture(_: *Platform, render_tex: RenderTexture2D) void {
@@ -650,7 +682,7 @@ fn tickInputBuffer(self: *Platform) void {
             state.mouse_buttons.insert(e);
         }
     }
-    state.mouse_screen_pos = self.mousePosf();
+    state.mouse_screen_pos = self.getMousePosScreen();
 }
 
 pub fn fitTextToRect(self: *Platform, dims: V2f, text: []const u8, opt: draw.TextOpt) Error!draw.TextOpt {

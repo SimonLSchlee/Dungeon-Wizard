@@ -39,6 +39,7 @@ screen: enum {
     run,
 } = .run,
 run: Run = undefined,
+render_texture: Platform.RenderTexture2D = undefined,
 
 export fn appInit(plat: *Platform) *anyopaque {
     // everything depends on plat global
@@ -55,6 +56,7 @@ export fn appInit(plat: *Platform) *anyopaque {
 
     // populate _app here, Room.init() uses it
     _app = app;
+    app.render_texture = plat.createRenderTexture("app", core.native_dims);
     app.run = Run.initRandom() catch @panic("Failed to init run state");
 
     return app;
@@ -95,16 +97,11 @@ pub fn staticAppRender() void {
     appRender();
 }
 
-pub fn reset(self: *App) Error!*App {
-    self.deinit();
-    self.* = .{};
-    try self.init();
-    return self;
-}
-
 pub fn deinit(self: *App) void {
+    const plat = getPlat();
     self.run.deinit();
-    getPlat().heap.destroy(self);
+    plat.destroyRenderTexture(self.render_texture);
+    plat.heap.destroy(self);
 }
 
 fn update(self: *App) Error!void {
@@ -117,11 +114,22 @@ fn update(self: *App) Error!void {
 }
 
 fn render(self: *App) Error!void {
+    const plat = getPlat();
+    plat.clear(Colorf.magenta);
+
     switch (self.screen) {
         .run => {
-            try self.run.render();
+            try self.run.render(self.render_texture);
         },
     }
+    plat.endRenderToTexture();
+    const texture_opt = draw.TextureOpt{
+        .flip_y = true,
+        .uniform_scaling = plat.native_to_screen_scaling,
+        .origin = .center,
+        .smoothing = .none,
+    };
+    plat.texturef(plat.screen_dims_f.scale(0.5), self.render_texture.texture, texture_opt);
 }
 
 pub fn copyString(allocator: *std.mem.Allocator, str: []const u8) []u8 {

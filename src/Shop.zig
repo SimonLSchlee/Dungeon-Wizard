@@ -58,7 +58,7 @@ pub fn init(seed: u64) Error!Shop {
     const plat = App.getPlat();
 
     const proceed_btn_dims = v2f(120, 70);
-    const proceed_btn_center = v2f(plat.screen_dims_f.x - proceed_btn_dims.x - 80, plat.screen_dims_f.y - proceed_btn_dims.y - 140);
+    const proceed_btn_center = v2f(core.native_dims_f.x - proceed_btn_dims.x - 80, core.native_dims_f.y - proceed_btn_dims.y - 140);
     var proceed_btn = menuUI.Button{
         .clickable_rect = .{ .rect = .{
             .pos = proceed_btn_center.sub(proceed_btn_dims.scale(0.5)),
@@ -72,7 +72,7 @@ pub fn init(seed: u64) Error!Shop {
     proceed_btn.text = @TypeOf(proceed_btn.text).init("Proceed") catch unreachable;
 
     var ret = Shop{
-        .render_texture = plat.createRenderTexture("shop", plat.screen_dims),
+        .render_texture = plat.createRenderTexture("shop", core.native_dims),
         .proceed_button = proceed_btn,
         .rng = std.Random.DefaultPrng.init(seed),
     };
@@ -83,7 +83,7 @@ pub fn init(seed: u64) Error!Shop {
         const spell_width: f32 = 150;
         const spell_spacing = 25;
         const spell_product_dims = v2f(spell_width, spell_width / 0.7);
-        const spells_center = v2f(plat.screen_dims_f.x * 0.5, 100 + spell_product_dims.y * 0.5);
+        const spells_center = v2f(core.native_dims_f.x * 0.5, 100 + spell_product_dims.y * 0.5);
         const spells_bottom_y = spells_center.y + spell_product_dims.y * 0.5;
         var spells = std.BoundedArray(Spell, max_num_spells){};
         spells.resize(num_spells) catch unreachable;
@@ -117,7 +117,7 @@ pub fn init(seed: u64) Error!Shop {
         const item_width: f32 = 150;
         const item_spacing = 25;
         const item_product_dims = v2f(item_width, item_width / 0.7);
-        const items_center = v2f(plat.screen_dims_f.x * 0.5, spells_bottom_y + 50 + item_product_dims.y * 0.5);
+        const items_center = v2f(core.native_dims_f.x * 0.5, spells_bottom_y + 50 + item_product_dims.y * 0.5);
         var items = std.BoundedArray(Item, max_num_items){};
         items.resize(num_items) catch unreachable;
         const num_items_generated = Item.makeShopItems(ret.rng.random(), items.slice());
@@ -197,15 +197,15 @@ pub fn update(self: *Shop, run: *const Run) Error!?Product {
     return ret;
 }
 
-pub fn render(self: *Shop, run: *Run) Error!void {
+pub fn render(self: *Shop, run: *Run, native_render_texture: Platform.RenderTexture2D) Error!void {
     const plat = getPlat();
     _ = run;
 
-    plat.startRenderToTexture(self.render_texture);
+    plat.startRenderToTexture(native_render_texture);
     plat.clear(Colorf.rgb(0.2, 0.2, 0.2));
     plat.setBlend(.render_tex_alpha);
 
-    try plat.textf(v2f(plat.screen_dims_f.x * 0.5, 50), "Shoppy woppy", .{}, .{ .center = true, .color = .white, .size = 45 });
+    try plat.textf(v2f(core.native_dims_f.x * 0.5, 50), "Shoppy woppy", .{}, .{ .center = true, .color = .white, .size = 45 });
 
     var hovered: ?SpellOrItem = null;
     var hovered_pos: V2f = .{};
@@ -248,6 +248,4 @@ pub fn render(self: *Shop, run: *Run) Error!void {
             },
         }
     }
-
-    plat.endRenderToTexture();
 }

@@ -133,9 +133,8 @@ pub const Slots = struct {
     }
 
     pub fn getSlotRects(self: *const Slots, kind: Slot.Kind) std.BoundedArray(geom.Rectf, @max(max_spell_slots, max_item_slots)) {
-        const plat = App.getPlat();
         var ret = std.BoundedArray(geom.Rectf, @max(max_spell_slots, max_item_slots)){};
-        const spells_center_pos: V2f = v2f(plat.screen_dims_f.x * 0.5, plat.screen_dims_f.y - 50 - spell_slot_dims.y * 0.5);
+        const spells_center_pos: V2f = v2f(core.native_dims_f.x * 0.5, core.native_dims_f.y - 50 - spell_slot_dims.y * 0.5);
         switch (kind) {
             .spell => {
                 ret.resize(self.spells.len) catch unreachable;
@@ -235,7 +234,7 @@ pub const Slots = struct {
         for (0..slots.len) |i| {
             const rect = rects.get(i);
             const slot = &slots[i];
-            const mouse_pos = plat.input_buffer.getCurrMousePos();
+            const mouse_pos = plat.getMousePosScreen();
             const hovered = geom.pointIsInRectf(mouse_pos, rect);
 
             if (hovered) {
@@ -349,7 +348,7 @@ pub const Slots = struct {
                 break :blk false;
             };
             var rect = rects.get(i);
-            const mouse_pos = plat.input_buffer.getCurrMousePos();
+            const mouse_pos = plat.getMousePosScreen();
             const hovered = geom.pointIsInRectf(mouse_pos, rect);
             if (slot_is_enabled and hovered) {
                 const new_dims = rect.dims.scale(1.1);
@@ -543,7 +542,7 @@ pub const ExitDoor = struct {
         plat.circlef(self.pos, ExitDoor.radius, .{ .fill_color = ExitDoor.rim_color });
         // fill
         if (room.progress_state == .won) {
-            const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
+            const mouse_pos = plat.getMousePosWorld(room.camera);
             const tick_60 = @mod(room.curr_tick, 360);
             const f = utl.pi * utl.as(f32, tick_60) / 360;
             const t = @sin(f);
@@ -566,7 +565,7 @@ pub const ExitDoor = struct {
     pub fn renderOver(self: *const ExitDoor, room: *const Room) Error!void {
         const plat = App.getPlat();
         if (room.progress_state == .won) {
-            const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
+            const mouse_pos = plat.getMousePosWorld(room.camera);
             if (self.selected or mouse_pos.dist(self.pos) <= select_radius) {
                 const tick_60 = @mod(room.curr_tick, 60);
                 const f = utl.pi * utl.as(f32, tick_60) / 60;

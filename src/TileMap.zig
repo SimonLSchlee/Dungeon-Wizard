@@ -450,7 +450,7 @@ pub fn debugDrawPath(_: *const TileMap, camera: draw.Camera2D, path: []const V2i
 pub fn debugDrawGrid(_: *const TileMap, camera: draw.Camera2D) Error!void {
     const plat = getPlat();
     const inv_zoom = 1 / camera.zoom;
-    const camera_dims = plat.screen_dims_f.scale(inv_zoom);
+    const camera_dims = core.native_dims_f.scale(inv_zoom);
     const line_thickness = inv_zoom;
     // add 2 to grid dims to make sure it covers the screen
     const grid_dims = camera_dims.scale(1 / tile_sz_f).toV2i().add(v2i(2, 2));

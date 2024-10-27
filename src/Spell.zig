@@ -219,7 +219,7 @@ pub const TargetingData = struct {
 
     pub fn render(targeting_data: *const TargetingData, room: *const Room, caster: *const Thing) Error!void {
         const plat = App.getPlat();
-        const mouse_pos = plat.screenPosToCamPos(room.camera, plat.input_buffer.getCurrMousePos());
+        const mouse_pos = plat.getMousePosWorld(room.camera);
 
         if (targeting_data.show_max_range_ring and targeting_data.max_range < 99999) {
             plat.circlef(caster.pos, targeting_data.max_range + caster.coll_radius, .{ .outline_color = targeting_data.color.fade(0.5), .fill_color = null });
