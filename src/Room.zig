@@ -488,9 +488,10 @@ pub fn update(self: *Room) Error!void {
             const hp = player.hp.?;
             switch (self.progress_state) {
                 .none => {
+                    const defeated_all_enemies = self.curr_wave >= self.waves.len and self.num_enemies_alive == 0;
                     if (hp.curr <= 0) {
                         // .lost is set below, after player is freed
-                    } else if (self.curr_wave >= self.waves.len and self.num_enemies_alive == 0) {
+                    } else if (defeated_all_enemies or self.init_params.waves_params.room_kind == .first) {
                         self.progress_state = .won;
                     }
                 },
