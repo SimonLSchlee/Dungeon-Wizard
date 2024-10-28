@@ -644,24 +644,19 @@ pub fn render(self: *const Room, native_render_texture: Platform.RenderTexture2D
         plat.setBlend(.render_tex_alpha);
     }
 
-    if (self.edit_mode) {
-        const opt: draw.TextOpt = .{ .center = true, .size = 50, .color = .white };
-        const txt = "edit mode";
-        const dims = (try plat.measureText(txt, opt)).add(v2f(10, 4));
-        const p: V2f = plat.native_rect_cropped_offset.add(v2f(plat.native_rect_cropped_dims.x * 0.5, plat.native_rect_cropped_dims.y - 50));
-        plat.rectf(p.sub(dims.scale(0.5)), dims, .{ .fill_color = Colorf.black.fade(0.5) });
-        try plat.textf(p, txt, .{}, opt);
-    } else {
+    if (!self.edit_mode) {
         try self.ui_slots.render(self);
-        if (self.paused) {
-            const opt: draw.TextOpt = .{ .center = true, .size = 30, .color = .white };
-            const txt = "[paused]";
-            const dims = (try plat.measureText(txt, opt)).add(v2f(10, 4));
-            const p: V2f = plat.native_rect_cropped_offset.add(v2f(plat.native_rect_cropped_dims.x * 0.5, plat.native_rect_cropped_dims.y - 35));
-            plat.rectf(p.sub(dims.scale(0.5)), dims, .{ .fill_color = Colorf.black.fade(0.5) });
-            try plat.textf(p, txt, .{}, opt);
-        }
     }
+
+    { // bottom screen msg and ui slots
+        const opt: draw.TextOpt = .{ .center = true, .size = 30, .color = .white };
+        const txt = if (self.edit_mode) "edit mode" else if (self.paused) "[paused]" else "<spacebar to pause>";
+        const dims = (try plat.measureText(txt, opt)).add(v2f(10, 4));
+        const p: V2f = plat.native_rect_cropped_offset.add(v2f(plat.native_rect_cropped_dims.x * 0.5, plat.native_rect_cropped_dims.y - 35));
+        plat.rectf(p.sub(dims.scale(0.5)), dims, .{ .fill_color = Colorf.black.fade(0.5) });
+        try plat.textf(p, "{s}", .{txt}, opt);
+    }
+
     if (debug.show_num_enemies) {
         try plat.textf(v2f(10, 10), "num_enemies_alive: {}", .{self.num_enemies_alive}, .{ .color = .white });
     }
