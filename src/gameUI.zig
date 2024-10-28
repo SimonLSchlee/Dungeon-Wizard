@@ -127,7 +127,7 @@ pub const Slots = struct {
         var ret = std.BoundedArray(geom.Rectf, @max(max_spell_slots, max_item_slots)){};
         const spells_center_pos: V2f = plat.native_rect_cropped_offset.add(v2f(
             plat.native_rect_cropped_dims.x * 0.5,
-            plat.native_rect_cropped_dims.y - 10 - spell_slot_dims.y * 0.5,
+            plat.native_rect_cropped_dims.y - 60 - spell_slot_dims.y * 0.5,
         ));
         switch (kind) {
             .spell => {

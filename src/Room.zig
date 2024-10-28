@@ -510,7 +510,7 @@ pub fn update(self: *Room) Error!void {
         // fog
         self.fog.clearVisible();
         if (self.getPlayer()) |player| {
-            self.camera.pos = player.pos;
+            self.camera.pos = player.pos.add(v2f(0, plat.native_rect_cropped_dims.y * 0.08));
             try self.fog.addVisibleCircle(self.tilemap.dims, player.pos, player.vision_range + player.coll_radius);
         }
     }
@@ -648,16 +648,16 @@ pub fn render(self: *const Room, native_render_texture: Platform.RenderTexture2D
         const opt: draw.TextOpt = .{ .center = true, .size = 50, .color = .white };
         const txt = "edit mode";
         const dims = (try plat.measureText(txt, opt)).add(v2f(10, 4));
-        const p: V2f = v2f(core.native_dims_f.x * 0.5, core.native_dims_f.y - 50);
+        const p: V2f = plat.native_rect_cropped_offset.add(v2f(plat.native_rect_cropped_dims.x * 0.5, plat.native_rect_cropped_dims.y - 50));
         plat.rectf(p.sub(dims.scale(0.5)), dims, .{ .fill_color = Colorf.black.fade(0.5) });
         try plat.textf(p, txt, .{}, opt);
     } else {
         try self.ui_slots.render(self);
         if (self.paused) {
-            const opt: draw.TextOpt = .{ .center = true, .size = 50, .color = .white };
+            const opt: draw.TextOpt = .{ .center = true, .size = 30, .color = .white };
             const txt = "[paused]";
             const dims = (try plat.measureText(txt, opt)).add(v2f(10, 4));
-            const p: V2f = v2f(core.native_dims_f.x * 0.5, core.native_dims_f.y - 50);
+            const p: V2f = plat.native_rect_cropped_offset.add(v2f(plat.native_rect_cropped_dims.x * 0.5, plat.native_rect_cropped_dims.y - 35));
             plat.rectf(p.sub(dims.scale(0.5)), dims, .{ .fill_color = Colorf.black.fade(0.5) });
             try plat.textf(p, txt, .{}, opt);
         }

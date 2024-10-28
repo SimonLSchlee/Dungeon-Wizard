@@ -47,11 +47,12 @@ pub fn renderToolTip(title: []const u8, body: []const u8, pos: V2f) Error!void {
     const modal_dims = text_dims.add(v2f(10, 15));
     var adjusted_pos = pos;
     const bot_right = adjusted_pos.add(modal_dims);
-    if (bot_right.x > core.native_dims_f.x) {
-        adjusted_pos.x -= (bot_right.x - core.native_dims_f.x);
+    const native_cropped_rect_bot_right = plat.native_rect_cropped_offset.add(plat.native_rect_cropped_dims);
+    if (bot_right.x > native_cropped_rect_bot_right.x) {
+        adjusted_pos.x -= (bot_right.x - native_cropped_rect_bot_right.x);
     }
-    if (bot_right.y > core.native_dims_f.y) {
-        adjusted_pos.y -= (bot_right.y - core.native_dims_f.y);
+    if (bot_right.y > native_cropped_rect_bot_right.y) {
+        adjusted_pos.y -= (bot_right.y - native_cropped_rect_bot_right.y);
     }
 
     plat.rectf(adjusted_pos, modal_dims, .{ .fill_color = Colorf.black.fade(0.8) });
