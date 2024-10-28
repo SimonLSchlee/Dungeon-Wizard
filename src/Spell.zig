@@ -391,11 +391,24 @@ pub const Obtainableness = enum {
     shop,
 };
 
+pub const CastTime = enum {
+    slow,
+    medium,
+    fast,
+};
+
+pub const cast_time_to_secs = std.EnumArray(CastTime, f32).init(.{
+    .slow = 1.25,
+    .medium = 1.0,
+    .fast = 0.75,
+});
+
 kind: KindData = undefined,
 rarity: Rarity = .pedestrian,
 obtainableness: Obtainableness.Mask = Obtainableness.Mask.initMany(&.{ .room_reward, .shop }),
 color: Colorf = .black,
 targeting_data: TargetingData = .{},
+cast_time: CastTime,
 cast_secs: f32 = 1, // time from spell starting to when it's cast() is called - caster can't move or do anything except buffer inputs
 cast_ticks: i32 = 60,
 after_cast_slot_cooldown_secs: f32 = 4,
@@ -409,6 +422,7 @@ pub fn getSlotCooldownTicks(self: *const Spell) i32 {
 pub fn makeProto(kind: Kind, the_rest: Spell) Spell {
     var ret = the_rest;
     ret.kind = @unionInit(KindData, @tagName(kind), .{});
+    ret.cast_secs = cast_time_to_secs.get(ret.cast_time);
     ret.cast_ticks = utl.as(i32, core.fups_per_sec_f * ret.cast_secs);
     ret.after_cast_slot_cooldown_ticks = utl.as(i32, core.fups_per_sec_f * ret.after_cast_slot_cooldown_secs);
     return ret;
