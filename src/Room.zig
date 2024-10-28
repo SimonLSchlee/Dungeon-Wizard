@@ -566,13 +566,8 @@ pub fn render(self: *const Room, native_render_texture: Platform.RenderTexture2D
     if (!self.edit_mode) {
         if (self.getConstPlayer()) |player| {
             if (self.ui_slots.getSelectedSlot()) |slot| {
-                switch (slot.kind) {
-                    .spell => |_spell| if (_spell) |spell| {
-                        try spell.renderTargeting(self, player);
-                    },
-                    else => {
-                        // TODO
-                    },
+                switch (slot.kind.?) {
+                    inline else => |k| try k.renderTargeting(self, player),
                 }
             }
             if (self.move_release_ui_timer.running and player.path.len > 0) {

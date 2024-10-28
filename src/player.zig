@@ -105,39 +105,25 @@ pub const Input = struct {
                 .quick_release => !plat.input_buffer.keyIsDown(slot.key),
             };
             if (do_cast) {
-                const _params: ?Spell.Params = blk: switch (slot.kind) {
-                    inline else => |_action| {
-                        assert(_action != null);
-                        const action = _action.?;
+                const _params: ?Spell.Params = blk: switch (slot.kind.?) {
+                    inline else => |action| {
                         break :blk action.getTargetParams(room, self, mouse_pos);
                     },
                 };
                 if (_params) |params| {
                     self.path.len = 0; // cancel the current path on cast, but you can buffer a new one
-                    var baction = Action.Buffered{
-                        .action = undefined,
+                    controller.action_buffered = Action.Buffered{
+                        .action = slot.kind.?,
                         .params = params,
                         .slot_idx = utl.as(i32, slot.idx),
                     };
-                    switch (slot.kind) {
-                        .item => |item| {
-                            baction.action = .{ .item = item.? };
-                            ui_slots.state = .{ .item = .{
-                                .idx = slot.idx,
-                                .select_kind = .buffered,
-                            } };
-                        },
-                        .spell => |spell| {
-                            baction.action = .{ .spell = spell.? };
-                            ui_slots.state = .{ .spell = .{
-                                .idx = slot.idx,
-                                .select_kind = .buffered,
-                            } };
-                        },
-                    }
-                    controller.action_buffered = baction;
+                    ui_slots.select_state = .{
+                        .slot_idx = slot.idx,
+                        .select_kind = .buffered,
+                        .slot_kind = slot.kind.?,
+                    };
                 } else if (cast_method == .quick_press or cast_method == .quick_release) {
-                    ui_slots.state = .none;
+                    ui_slots.select_state = null;
                     controller.action_buffered = null;
                 }
             }
@@ -166,11 +152,7 @@ pub const Controller = struct {
         if (controller.action_buffered) |buffered| {
             if (controller.action_casting == null) {
                 switch (buffered.action) {
-                    .item => |_| {
-                        room.ui_slots.clearItemSlot(utl.as(usize, buffered.slot_idx));
-                    },
                     .spell => |spell| {
-                        room.ui_slots.clearSpellSlot(utl.as(usize, buffered.slot_idx));
                         if (spell.mislay) {
                             room.mislaySpell(spell);
                         } else {
@@ -178,7 +160,9 @@ pub const Controller = struct {
                         }
                         controller.cast_counter = utl.TickCounter.init(spell.cast_ticks);
                     },
+                    else => {},
                 }
+                room.ui_slots.clearSlotByKind(utl.as(usize, buffered.slot_idx), std.meta.activeTag(buffered.action));
                 controller.action_casting = buffered;
                 controller.action_buffered = null;
             }

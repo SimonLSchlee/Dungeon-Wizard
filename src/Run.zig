@@ -296,14 +296,7 @@ pub fn canPickupProduct(self: *const Run, product: *const Shop.Product) bool {
         },
         .item => |_| {
             if (self.room) |*room| {
-                for (room.ui_slots.items.slice()) |*slot| {
-                    if (slot.kind != .item) continue;
-                    if (slot.kind.item == null) {
-                        break;
-                    }
-                } else {
-                    return false;
-                }
+                if (room.ui_slots.getNextEmptyItemSlot() == null) return false;
             } else {
                 for (self.slots_init_params.items.constSlice()) |maybe_item| {
                     if (maybe_item == null) break;
@@ -331,12 +324,8 @@ pub fn pickupProduct(self: *Run, product: *const Shop.Product) void {
         .item => |item| {
             // TODO ugh?
             if (self.room) |*room| {
-                for (room.ui_slots.items.slice()) |*slot| {
-                    if (slot.kind != .item) continue;
-                    if (slot.kind.item == null) {
-                        slot.kind.item = item;
-                        break;
-                    }
+                if (room.ui_slots.getNextEmptyItemSlot()) |slot| {
+                    room.ui_slots.items.buffer[slot.idx].kind = .{ .item = item };
                 } else {
                     unreachable;
                 }
@@ -405,7 +394,8 @@ pub fn gameUpdate(self: *Run) Error!void {
             // TODO make it betterrrs?
             self.slots_init_params.items = .{};
             for (room.ui_slots.items.constSlice()) |slot| {
-                self.slots_init_params.items.append(slot.kind.item) catch unreachable;
+                const item: ?Item = if (slot.kind) |k| k.item else null;
+                self.slots_init_params.items.append(item) catch unreachable;
             }
             self.loadNextPlace();
         },

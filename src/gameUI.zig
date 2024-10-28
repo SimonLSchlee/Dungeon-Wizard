@@ -38,16 +38,14 @@ pub const Slots = struct {
     };
     pub const Slot = struct {
         pub const Kind = player.Action.Kind;
+        pub const SpellOrItem = player.Action.KindData;
 
         idx: usize,
         key: core.Key,
         key_str: [3]u8,
-        kind: union(Kind) {
-            spell: ?Spell,
-            item: ?Item,
-        },
-        cooldown_timer: ?utl.TickCounter,
-        hover_timer: utl.TickCounter,
+        kind: ?SpellOrItem = null,
+        cooldown_timer: ?utl.TickCounter = null,
+        hover_timer: utl.TickCounter = utl.TickCounter.init(15),
     };
     pub const InitParams = struct {
         num_spell_slots: usize = 4, // populated from deck
@@ -77,25 +75,19 @@ pub const Slots = struct {
         break :blk arr;
     };
 
-    const spell_slot_dims = v2f(100, 120);
-    const spell_slot_spacing: f32 = 20;
+    const spell_slot_dims = v2f(72, 72);
+    const spell_slot_spacing: f32 = 12;
 
-    const item_slot_dims = v2f(50, 50);
-    const item_slot_spacing: f32 = 5;
+    const item_slot_dims = v2f(48, 48);
+    const item_slot_spacing: f32 = 8;
 
     spells: std.BoundedArray(Slot, max_spell_slots) = .{},
     items: std.BoundedArray(Slot, max_item_slots) = .{},
-    state: union(enum) {
-        none,
-        spell: struct {
-            select_kind: SelectionKind,
-            idx: usize,
-        },
-        item: struct {
-            select_kind: SelectionKind,
-            idx: usize,
-        },
-    } = .none,
+    select_state: ?struct {
+        select_kind: SelectionKind,
+        slot_kind: Slot.Kind,
+        slot_idx: usize,
+    } = null,
     selected_method: Options.CastMethod = .left_click,
 
     pub fn init(room: *Room, params: InitParams) Slots {
@@ -107,25 +99,23 @@ pub const Slots = struct {
                 .idx = i,
                 .key = spell_idx_to_key[i],
                 .key_str = spell_idx_to_key_str[i],
-                .kind = .{ .spell = null },
-                .cooldown_timer = utl.TickCounter.initStopped(90),
-                .hover_timer = utl.TickCounter.init(15),
+                .cooldown_timer = utl.TickCounter.init(90),
             };
             if (room.drawSpell()) |spell| {
-                slot.kind.spell = spell;
+                slot.kind = .{ .spell = spell };
             }
             ret.spells.append(slot) catch unreachable;
         }
 
         for (params.items.constSlice(), 0..) |maybe_item, i| {
-            const slot = Slot{
+            var slot = Slot{
                 .idx = i,
                 .key = item_idx_to_key[i],
                 .key_str = item_idx_to_key_str[i],
-                .kind = .{ .item = maybe_item },
-                .cooldown_timer = null,
-                .hover_timer = utl.TickCounter.init(15),
             };
+            if (maybe_item) |item| {
+                slot.kind = .{ .item = item };
+            }
             ret.items.append(slot) catch unreachable;
         }
 
@@ -133,8 +123,12 @@ pub const Slots = struct {
     }
 
     pub fn getSlotRects(self: *const Slots, kind: Slot.Kind) std.BoundedArray(geom.Rectf, @max(max_spell_slots, max_item_slots)) {
+        const plat = getPlat();
         var ret = std.BoundedArray(geom.Rectf, @max(max_spell_slots, max_item_slots)){};
-        const spells_center_pos: V2f = v2f(core.native_dims_f.x * 0.5, core.native_dims_f.y - 50 - spell_slot_dims.y * 0.5);
+        const spells_center_pos: V2f = plat.native_rect_cropped_offset.add(v2f(
+            plat.native_rect_cropped_dims.x * 0.5,
+            plat.native_rect_cropped_dims.y - 10 - spell_slot_dims.y * 0.5,
+        ));
         switch (kind) {
             .spell => {
                 ret.resize(self.spells.len) catch unreachable;
@@ -149,75 +143,67 @@ pub const Slots = struct {
         return ret;
     }
 
+    fn getSlotsByKind(self: *Slots, kind: Slot.Kind) []Slot {
+        return switch (kind) {
+            .spell => self.spells.slice(),
+            .item => self.items.slice(),
+        };
+    }
+
+    fn getSlotsByKindConst(self: *const Slots, kind: Slot.Kind) []const Slot {
+        return switch (kind) {
+            .spell => self.spells.constSlice(),
+            .item => self.items.constSlice(),
+        };
+    }
+
     pub fn getSelectedSlot(self: *const Slots) ?Slot {
-        switch (self.state) {
-            .none => {},
-            .spell => |s| {
-                const slot = self.spells.get(s.idx);
-                assert(std.meta.activeTag(slot.kind) == .spell);
-                assert(slot.kind.spell != null);
-                if (s.select_kind == .selected) {
-                    return slot;
-                }
-            },
-            .item => |s| {
-                const slot = self.items.get(s.idx);
-                assert(std.meta.activeTag(slot.kind) == .item);
-                assert(slot.kind.item != null);
-                if (s.select_kind == .selected) {
-                    return slot;
-                }
-            },
+        if (self.select_state) |state| {
+            if (state.select_kind == .selected) {
+                const slots = self.getSlotsByKindConst(state.slot_kind);
+                return slots[state.slot_idx];
+            }
         }
         return null;
     }
 
-    pub fn clearItemSlot(self: *Slots, slot_idx: usize) void {
-        assert(slot_idx < self.items.len);
-        const slot = &self.items.slice()[slot_idx];
-        assert(std.meta.activeTag(slot.kind) == .item);
-        assert(slot.kind.item != null);
-        slot.kind.item = null;
-        switch (self.state) {
-            .item => |s| {
-                if (s.idx == slot_idx) {
-                    self.state = .none;
-                }
-            },
-            else => {},
+    pub fn getNextEmptyItemSlot(self: *const Slots) ?Slot {
+        for (self.items.constSlice()) |slot| {
+            if (slot.kind == null) return slot;
         }
+        return null;
     }
 
-    pub fn clearSpellSlot(self: *Slots, slot_idx: usize) void {
-        assert(slot_idx < self.spells.len);
-        const slot = &self.spells.slice()[slot_idx];
-        assert(std.meta.activeTag(slot.kind) == .spell);
-        assert(slot.kind.spell != null);
-        assert(slot.cooldown_timer != null);
-        const spell: Spell = slot.kind.spell.?;
-        slot.cooldown_timer.? = utl.TickCounter.init(spell.getSlotCooldownTicks());
-        slot.kind.spell = null;
+    pub fn clearSlotByKind(self: *Slots, slot_idx: usize, slot_kind: Slot.Kind) void {
+        const slots = self.getSlotsByKind(slot_kind);
+        const slot = &slots[slot_idx];
 
-        switch (self.state) {
-            .spell => |s| {
-                if (s.idx == slot_idx) {
-                    self.state = .none;
-                }
-            },
-            else => {},
+        if (slot.kind) |k| {
+            switch (k) {
+                .spell => |spell| {
+                    slot.cooldown_timer = utl.TickCounter.init(spell.getSlotCooldownTicks());
+                },
+                else => {},
+            }
+        }
+        slot.kind = null;
+
+        if (self.select_state) |*state| {
+            if (state.slot_kind == slot_kind) {
+                self.select_state = null;
+            }
         }
     }
 
     pub fn updateTimerAndDrawSpell(self: *Slots, room: *Room) void {
         for (self.spells.slice()) |*slot| {
-            assert(std.meta.activeTag(slot.kind) == .spell);
             assert(slot.cooldown_timer != null);
-            // only tick and draw into empty slots!
-            if (slot.kind.spell == null) {
-                if (slot.cooldown_timer.?.tick(false)) {
-                    if (room.drawSpell()) |spell| {
-                        slot.kind.spell = spell;
-                    }
+            if (slot.kind) |k| {
+                assert(std.meta.activeTag(k) == .spell);
+                // only tick and draw into empty slots!
+            } else if (slot.cooldown_timer.?.tick(false)) {
+                if (room.drawSpell()) |spell| {
+                    slot.kind = .{ .spell = spell };
                 }
             }
         }
@@ -243,12 +229,14 @@ pub const Slots = struct {
                 slot.hover_timer.restart();
             }
 
-            switch (slot.kind) {
-                .item => |_item| if (_item) |item| {
-                    if (!item.canUse(room, caster)) continue;
-                } else continue,
-                .spell => |_spell| if (_spell == null) continue,
-            }
+            if (slot.kind) |k| {
+                switch (k) {
+                    .item => |item| {
+                        if (!item.canUse(room, caster)) continue;
+                    },
+                    else => {},
+                }
+            } else continue;
 
             if (hovered and mouse_pressed) {
                 ui_clicked = true;
@@ -264,20 +252,11 @@ pub const Slots = struct {
         }
 
         if (selection_idx) |new_idx| {
-            switch (kind) {
-                .spell => {
-                    self.state = .{ .spell = .{
-                        .idx = new_idx,
-                        .select_kind = .selected,
-                    } };
-                },
-                .item => {
-                    self.state = .{ .item = .{
-                        .idx = new_idx,
-                        .select_kind = .selected,
-                    } };
-                },
-            }
+            self.select_state = .{
+                .slot_idx = new_idx,
+                .select_kind = .selected,
+                .slot_kind = kind,
+            };
             self.selected_method = cast_method;
         }
 
@@ -292,11 +271,11 @@ pub const Slots = struct {
                     break :blk p;
                 }
             }
-            self.state = .none;
+            self.select_state = null;
             return;
         };
         if (plat.input_buffer.mouseBtnIsJustPressed(.right)) {
-            self.state = .none;
+            self.select_state = null;
             return;
         }
 
@@ -311,38 +290,23 @@ pub const Slots = struct {
         const plat = App.getPlat();
         const rects = self.getSlotRects(kind);
         var slot_selected_or_buffered: ?struct { idx: usize, color: Colorf } = null;
-        switch (self.state) {
-            .none => {},
-            .spell => |s| {
-                if (kind == .spell) {
-                    slot_selected_or_buffered = .{
-                        .idx = s.idx,
-                        .color = SelectionKind.colors.get(s.select_kind),
-                    };
-                }
-            },
-            .item => |s| {
-                if (kind == .item) {
-                    slot_selected_or_buffered = .{
-                        .idx = s.idx,
-                        .color = SelectionKind.colors.get(s.select_kind),
-                    };
-                }
-            },
+        if (self.select_state) |state| {
+            if (state.slot_kind == kind) {
+                slot_selected_or_buffered = .{
+                    .idx = state.slot_idx,
+                    .color = SelectionKind.colors.get(state.select_kind),
+                };
+            }
         }
 
         for (slots, 0..) |slot, i| {
             const slot_is_enabled = blk: {
                 if (!slots_are_enabled) {
                     break :blk false;
-                } else {
-                    switch (slot.kind) {
-                        .spell => |_spell| {
-                            if (_spell) |_| break :blk true;
-                        },
-                        .item => |_item| {
-                            if (_item) |item| break :blk item.canUse(room, caster);
-                        },
+                } else if (slot.kind) |k| {
+                    switch (k) {
+                        .item => |item| break :blk item.canUse(room, caster),
+                        else => break :blk true,
                     }
                 }
                 break :blk false;
@@ -356,65 +320,35 @@ pub const Slots = struct {
                 rect.dims = new_dims;
             }
             const slot_center_pos = rect.pos.add(rect.dims.scale(0.5));
-            const slot_icon_square_dims = V2f.splat(@min(rect.dims.x, rect.dims.y));
 
             plat.rectf(rect.pos, rect.dims, .{ .fill_color = Colorf.rgb(0.07, 0.05, 0.05) });
 
             var key_color = Colorf.gray;
             var border_color = Colorf.darkgray;
+
+            // slot could be disabled but still have something in it
+            if (slot.kind) |k| {
+                switch (k) {
+                    inline else => |inner| try inner.renderIcon(rect),
+                }
+            } else if (slot.cooldown_timer) |*timer| {
+                if (timer.running) {
+                    const rads = timer.remapTo0_1() * utl.tau;
+                    const radius = rect.dims.x * 0.5 * 0.7;
+                    plat.sectorf(slot_center_pos, radius, 0, rads, .{ .fill_color = .blue });
+                }
+            }
+
             if (slot_is_enabled) {
                 border_color = .blue;
                 key_color = .white;
+                if (slot_selected_or_buffered) |s| {
+                    if (s.idx == i) {
+                        border_color = s.color;
+                    }
+                }
             }
 
-            const _render_info: ?sprites.RenderIconInfo = blk: switch (slot.kind) {
-                .spell => |_spell| {
-                    if (_spell) |spell| {
-                        break :blk spell.getRenderIconInfo();
-                    } else if (slot.cooldown_timer.?.running) {
-                        const rads = slot.cooldown_timer.?.remapTo0_1() * utl.tau;
-                        const radius = rect.dims.x * 0.5 * 0.7;
-                        //std.debug.print("{d:.2}\n", .{rads});
-                        plat.sectorf(slot_center_pos, radius, 0, rads, .{ .fill_color = .blue });
-                    }
-                    break :blk null;
-                },
-                .item => |_item| {
-                    if (_item) |item| {
-                        break :blk item.getRenderIconInfo();
-                    }
-                    break :blk null;
-                },
-            };
-            if (slot_selected_or_buffered) |s| {
-                if (s.idx == i) {
-                    border_color = s.color;
-                }
-            }
-            if (_render_info) |render_info| {
-                switch (render_info) {
-                    .frame => |frame| {
-                        plat.texturef(slot_center_pos, frame.texture, .{
-                            .origin = .center,
-                            .src_pos = frame.pos.toV2f(),
-                            .src_dims = frame.size.toV2f(),
-                            .scaled_dims = slot_icon_square_dims.sub(V2f.splat(slot_icon_square_dims.x * 0.1)),
-                        });
-                    },
-                    .letter => |letter| {
-                        try plat.textf(
-                            slot_center_pos,
-                            "{s}",
-                            .{&letter.str},
-                            .{
-                                .color = letter.color,
-                                .size = utl.as(u32, @floor(slot_icon_square_dims.y)),
-                                .center = true,
-                            },
-                        );
-                    },
-                }
-            }
             // border
             plat.rectf(
                 rect.pos,
@@ -439,18 +373,12 @@ pub const Slots = struct {
         const rects = self.getSlotRects(kind);
         for (slots, 0..) |slot, i| {
             const rect = rects.get(i);
+            const pos = rect.pos.add(v2f(rect.dims.x, 0));
             if (!slot.hover_timer.running) {
-                switch (slot.kind) {
-                    .spell => |_spell| {
-                        if (_spell) |spell| {
-                            try spell.renderToolTip(rect.pos.add(v2f(rect.dims.x, 0)));
-                        }
-                    },
-                    .item => |_item| {
-                        if (_item) |item| {
-                            try item.renderToolTip(rect.pos.add(v2f(rect.dims.x, 0)));
-                        }
-                    },
+                if (slot.kind) |k| {
+                    switch (k) {
+                        inline else => |inner| try inner.renderToolTip(pos),
+                    }
                 }
             }
         }
