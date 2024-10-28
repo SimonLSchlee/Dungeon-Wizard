@@ -24,7 +24,7 @@ for DIR in */; do
 	cp -r "${ASSETS}/images/" $IMAGES
 	cp -r "${ASSETS}/sounds/" $SOUNDS
 	cp -r "${ASSETS}/fonts/" $FONTS
-	ZIPNAME="${DIR%/}.zip"
+	ZIPNAME="wizardboi-${DIR%/}.zip"
 	zip -r "$ZIPNAME" *
 	popd # arch dir
 	popd # release dir
