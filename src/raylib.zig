@@ -54,6 +54,8 @@ screen_dims: V2i = .{},
 screen_dims_f: V2f = .{},
 native_to_screen_scaling: f32 = 1,
 native_to_screen_offset: V2f = .{},
+native_rect_cropped_offset: V2f = .{},
+native_rect_cropped_dims: V2f = .{},
 accumulated_update_ns: i64 = 0,
 prev_frame_time_ns: i64 = 0,
 input_buffer: core.InputBuffer = .{},
@@ -68,6 +70,9 @@ pub fn updateDims(self: *Platform, dims: V2i) void {
     self.native_to_screen_scaling = @max(x_scaling, y_scaling);
     const scaled_native_dims = core.native_dims_f.scale(self.native_to_screen_scaling);
     self.native_to_screen_offset = self.screen_dims_f.sub(scaled_native_dims).scale(0.5);
+    // in native space, get rectangle that is actually shown on the screen, for UI anchoring and such
+    self.native_rect_cropped_offset = self.native_to_screen_offset.scale(1 / self.native_to_screen_scaling).neg();
+    self.native_rect_cropped_dims = self.screen_dims_f.scale(1 / self.native_to_screen_scaling);
 }
 
 pub fn init(title: []const u8) Error!Platform {
@@ -78,7 +83,7 @@ pub fn init(title: []const u8) Error!Platform {
     var ret: Platform = .{};
     const title_z = try std.fmt.allocPrintZ(ret.heap, "{s}", .{title});
 
-    r.SetConfigFlags(r.FLAG_WINDOW_RESIZABLE);
+    //r.SetConfigFlags(r.FLAG_WINDOW_RESIZABLE);
     r.InitWindow(@intCast(dims.x), @intCast(dims.y), title_z);
     // show raylib init INFO, then just warnings
     r.SetTraceLogLevel(r.LOG_WARNING);

@@ -182,6 +182,7 @@ pub const supported_resolutions = [_]V2i{
     v2i(3440, 1440),
     v2i(3840, 2160),
 };
+pub const pixel_art_scaling: f32 = 4;
 
 pub const fixed_updates_per_sec: i64 = 60;
 pub const fups_per_sec = fixed_updates_per_sec;

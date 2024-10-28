@@ -802,7 +802,10 @@ pub fn render(self: *Run, native_render_texture: Platform.RenderTexture2D) Error
         const fill_color = Colorf.rgb(1, 0.9, 0);
         const text_color = Colorf.rgb(0.44, 0.3, 0.0);
         const poly_opt = .{ .fill_color = fill_color, .outline_color = text_color, .outline_thickness = 10 };
-        const center = v2f(250, core.native_dims_f.y - 100);
+        const center = plat.native_rect_cropped_offset.add(v2f(
+            150,
+            plat.native_rect_cropped_dims.y - 100,
+        ));
         const num = 3;
         const lower = center.add(v2f(0, 7 * num));
         for (0..num) |i| {

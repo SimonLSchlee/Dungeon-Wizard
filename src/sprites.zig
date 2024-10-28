@@ -20,10 +20,6 @@ const getPlat = App.getPlat;
 const Data = @import("Data.zig");
 const Thing = @import("Thing.zig");
 
-// we scale up by this much
-// TODO arrgghh
-pub const uniform_scaling: f32 = 4;
-
 pub const RenderFrame = struct {
     pos: V2i,
     size: V2i,

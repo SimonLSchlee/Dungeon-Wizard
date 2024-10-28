@@ -345,7 +345,7 @@ pub const VFXController = struct {
     pub fn castingProto(caster: *Thing) Thing {
         var cast_offset = V2f{};
         if (App.get().data.getCreatureAnimOrDefault(caster.animator.?.kind.creature.kind, .cast)) |anim| {
-            cast_offset = anim.cast_offset.scale(sprites.uniform_scaling);
+            cast_offset = anim.cast_offset.scale(core.pixel_art_scaling);
             if (caster.dir.x < 0) {
                 cast_offset.x *= -1;
             }
@@ -388,7 +388,7 @@ pub const VFXRenderer = struct {
             .origin = frame.origin,
             .src_pos = frame.pos.toV2f(),
             .src_dims = frame.size.toV2f(),
-            .uniform_scaling = sprites.uniform_scaling,
+            .uniform_scaling = core.pixel_art_scaling,
             .tint = tint,
         };
         plat.texturef(self.pos, frame.texture, opt);
@@ -431,7 +431,7 @@ pub const SpawnerRenderer = struct {
             .origin = frame.origin,
             .src_pos = frame.pos.toV2f(),
             .src_dims = frame.size.toV2f(),
-            .uniform_scaling = sprites.uniform_scaling,
+            .uniform_scaling = core.pixel_art_scaling,
             .tint = tint,
         };
         plat.texturef(self.pos, frame.texture, opt);
@@ -623,7 +623,7 @@ pub const CreatureRenderer = struct {
             .origin = frame.origin,
             .src_pos = frame.pos.toV2f(),
             .src_dims = frame.size.toV2f(),
-            .uniform_scaling = sprites.uniform_scaling,
+            .uniform_scaling = core.pixel_art_scaling,
             .tint = tint,
         };
         plat.texturef(self.pos, frame.texture, opt);
