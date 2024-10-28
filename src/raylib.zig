@@ -78,7 +78,7 @@ pub fn updateDims(self: *Platform, dims: V2i) void {
 pub fn init(title: []const u8) Error!Platform {
     @setRuntimeSafety(core.rt_safe_blocks);
 
-    const dims = core.supported_resolutions[2];
+    const dims = core.native_dims;
 
     var ret: Platform = .{};
     const title_z = try std.fmt.allocPrintZ(ret.heap, "{s}", .{title});

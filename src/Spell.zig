@@ -398,9 +398,9 @@ pub const CastTime = enum {
 };
 
 pub const cast_time_to_secs = std.EnumArray(CastTime, f32).init(.{
-    .slow = 1.25,
+    .slow = 1.334,
     .medium = 1.0,
-    .fast = 0.75,
+    .fast = 0.667,
 });
 
 kind: KindData = undefined,
@@ -444,8 +444,9 @@ pub fn getDescription(self: *const Spell) Error![]const u8 {
     var buf = desc_buf[0..];
     len += (try std.fmt.bufPrint(
         buf,
-        "Cast time: {d:.1} secs\nSlot cooldown: {d:.1} secs\n{s}",
+        "Cast time: {s} ({d:.2} secs)\nSlot cooldown: {d:.1} secs\n{s}",
         .{
+            @tagName(self.cast_time),
             self.cast_secs,
             core.fups_to_secsf(self.getSlotCooldownTicks()),
             if (self.mislay) "Mislay: Only use once per room\n" else "",
