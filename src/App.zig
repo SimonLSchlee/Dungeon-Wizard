@@ -38,7 +38,7 @@ curr_tick: i64 = 0,
 screen: enum {
     run,
 } = .run,
-options_open: bool = true,
+options_open: bool = false,
 run: Run = undefined,
 render_texture: Platform.RenderTexture2D = undefined,
 
