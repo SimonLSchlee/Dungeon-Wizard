@@ -38,6 +38,7 @@ curr_tick: i64 = 0,
 screen: enum {
     run,
 } = .run,
+options_open: bool = true,
 run: Run = undefined,
 render_texture: Platform.RenderTexture2D = undefined,
 
@@ -58,6 +59,7 @@ export fn appInit(plat: *Platform) *anyopaque {
     _app = app;
     app.render_texture = plat.createRenderTexture("app", core.native_dims);
     app.run = Run.initRandom() catch @panic("Failed to init run state");
+    app.run.startRun() catch @panic("Failed to start run");
 
     return app;
 }
@@ -105,10 +107,17 @@ pub fn deinit(self: *App) void {
 }
 
 fn update(self: *App) Error!void {
-    switch (self.screen) {
-        .run => {
-            try self.run.update();
-        },
+    if (self.options_open) {
+        switch (try self.options.update()) {
+            .close => self.options_open = false,
+            else => {},
+        }
+    } else {
+        switch (self.screen) {
+            .run => {
+                try self.run.update();
+            },
+        }
     }
     self.curr_tick += 1;
 }
@@ -121,6 +130,9 @@ fn render(self: *App) Error!void {
         .run => {
             try self.run.render(self.render_texture);
         },
+    }
+    if (self.options_open) {
+        try self.options.render(self.render_texture);
     }
     plat.endRenderToTexture();
     const texture_opt = draw.TextureOpt{

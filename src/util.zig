@@ -295,6 +295,14 @@ pub fn BoundedString(max_len: usize) type {
             ret.len = str.len;
             return ret;
         }
+        pub fn initTrunc(str: []const u8) @This() {
+            var ret = @This(){};
+            const len = @min(str.len, ret.buf.len);
+            const str_trunc = str[0..len];
+            std.mem.copyForwards(u8, &ret.buf, str_trunc);
+            ret.len = str.len;
+            return ret;
+        }
         pub fn slice(self: *@This()) []u8 {
             return self.buf[0..self.len];
         }

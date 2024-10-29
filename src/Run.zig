@@ -510,7 +510,7 @@ pub fn update(self: *Run) Error!void {
     }
     // TODO hack to stop stack getting too massive on run + room init
     if (self.curr_tick == 0) {
-        try self.startRun();
+        //try self.startRun();
     }
 
     switch (self.load_state) {
