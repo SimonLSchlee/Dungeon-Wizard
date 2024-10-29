@@ -55,6 +55,7 @@ explode_hit_effect: Thing.HitEffect = .{
     .force = .{ .from_center = 4 },
 },
 explode_radius: f32 = base_explode_radius,
+immune_stacks: i32 = 3,
 
 pub const Projectile = struct {
     pub const controller_enum_name = enum_name ++ "_projectile";
@@ -106,11 +107,14 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             .active = true,
             .mask = Thing.Faction.opposing_masks.get(caster.faction),
             .deactivate_on_update = true,
+            .deactivate_on_hit = false,
             .effect = updated_hit_effect,
             .radius = flame_purge.explode_radius,
         },
     };
     _ = try room.queueSpawnThing(&ball, caster.pos);
+
+    caster.statuses.getPtr(.moist).addStacks(caster, flame_purge.immune_stacks);
 }
 
 pub const description =
@@ -129,7 +133,9 @@ pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
         \\Damage: {} + 2 per lit stack transferred
         \\
         \\{s}
+        \\Leaves  you 'moist' (immune to lit) for {d:.1}
+        \\seconds
         \\
     ;
-    return std.fmt.bufPrint(buf, fmt, .{ flame_purge.explode_hit_effect.damage, description });
+    return std.fmt.bufPrint(buf, fmt, .{ flame_purge.explode_hit_effect.damage, description, flame_purge.immune_stacks });
 }

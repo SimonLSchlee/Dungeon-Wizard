@@ -286,7 +286,7 @@ pub const HurtBox = struct {
         for (&self.statuses.values) |*status| {
             const stacks = effect.status_stacks.get(status.kind);
             if (stacks > 0) {
-                status.addStacks(stacks);
+                status.addStacks(self, stacks);
             }
         }
         // then kill

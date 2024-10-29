@@ -99,6 +99,12 @@ const protos = [_]ComptimeProto{
         .max_stacks = 4,
     },
     .{
+        .enum_name = "moist",
+        .cd = 1 * core.fups_per_sec,
+        .cd_type = .remove_one_stack,
+        .color = Colorf.rgb(0.5, 0.8, 1),
+    },
+    .{
         .enum_name = "trailblaze",
         .cd = 1 * core.fups_per_sec,
         .cd_type = .remove_one_stack,
@@ -158,8 +164,26 @@ timer: utl.TickCounter = .{},
 prev_pos: V2f = .{},
 max_stacks: i32 = 9999,
 
-pub fn addStacks(self: *StatusEffect, num: i32) void {
-    self.stacks = utl.clamp(i32, self.stacks + num, 0, self.max_stacks);
+pub fn setStacks(self: *StatusEffect, thing: *Thing, num: i32) void {
+    switch (self.kind) {
+        .lit => {
+            if (thing.statuses.get(.moist).stacks > 0) {
+                return;
+            }
+        },
+        .moist => {
+            thing.statuses.getPtr(.lit).stacks = 0;
+        },
+        else => {},
+    }
+    if (self.stacks == 0) {
+        self.cooldown.restart();
+    }
+    self.stacks = utl.clamp(i32, num, 0, self.max_stacks);
+}
+
+pub fn addStacks(self: *StatusEffect, thing: *Thing, num: i32) void {
+    self.setStacks(thing, self.stacks + num);
 }
 
 pub fn update(status: *StatusEffect, thing: *Thing, room: *Room) Error!void {
@@ -195,6 +219,7 @@ pub fn update(status: *StatusEffect, thing: *Thing, room: *Room) Error!void {
     switch (status.kind) {
         // activate at start of each second
         .lit => if (@mod(status.cooldown.curr_tick, core.fups_per_sec) == core.fups_per_sec - 1) {
+            assert(thing.statuses.get(.moist).stacks == 0);
             if (thing.hurtbox) |*hurtbox| {
                 const lit_effect = Thing.HitEffect{
                     .damage = utl.as(f32, status.stacks),

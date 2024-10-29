@@ -49,7 +49,7 @@ num_stacks: i32 = 7,
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
     assert(params.target == .self);
     const promptitude: @This() = self.kind.promptitude;
-    caster.statuses.getPtr(.promptitude).addStacks(promptitude.num_stacks);
+    caster.statuses.getPtr(.promptitude).addStacks(caster, promptitude.num_stacks);
 
     _ = room;
 }

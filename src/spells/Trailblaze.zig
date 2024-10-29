@@ -116,7 +116,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     _ = room;
     const trailblaze: @This() = self.kind.trailblaze;
     const status = caster.statuses.getPtr(.trailblaze);
-    status.addStacks(trailblaze.num_stacks);
+    status.addStacks(caster, trailblaze.num_stacks);
     status.timer.num_ticks = 20;
     status.prev_pos = caster.pos;
     caster.accel_params = .{
