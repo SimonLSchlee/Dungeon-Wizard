@@ -54,9 +54,14 @@ pub fn fireProto() Thing {
             .controller = .{ .trailblaze_projectile = .{} },
         } },
         .renderer = .{ .vfx = .{} },
-        .animator = .{ .kind = .{ .vfx = .{
-            .sheet_name = .trailblaze,
-        } } },
+        .animator = .{
+            .kind = .{
+                .vfx = .{
+                    .sheet_name = .trailblaze,
+                },
+            },
+            .curr_anim = .loop, // TODO not setting this sometimes defaults to "none" anim when rendering, which is weird cos update should have run already
+        },
         .hitbox = .{
             .mask = Thing.Faction.Mask.initFull(),
             .radius = 25,
