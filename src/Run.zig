@@ -501,6 +501,8 @@ pub fn update(self: *Run) Error!void {
     if (debug.enable_debug_controls) {
         if (plat.input_buffer.keyIsJustPressed(.f3)) {
             try self.reset();
+            try self.startRun();
+            return;
         }
         if (plat.input_buffer.keyIsJustPressed(.o)) {
             self.makeReward();
