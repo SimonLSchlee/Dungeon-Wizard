@@ -546,7 +546,7 @@ pub fn troll() Error!Thing {
             .mask = Thing.Faction.opposing_masks.get(.enemy),
             .radius = 15,
             .rel_pos = V2f.right.scale(60),
-            .effect = .{ .damage = 15 },
+            .effect = .{ .damage = 12 },
         },
         .hurtbox = .{
             .radius = 15,

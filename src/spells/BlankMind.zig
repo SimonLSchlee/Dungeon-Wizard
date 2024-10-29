@@ -27,15 +27,16 @@ const TargetKind = Spell.TargetKind;
 const TargetingData = Spell.TargetingData;
 const Params = Spell.Params;
 
-pub const title = "Protec";
+pub const title = "Blank Mind";
 
-pub const enum_name = "protec";
+pub const enum_name = "blank_mind";
 pub const Controllers = [_]type{};
 
 pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
     .{
         .cast_time = .fast,
+        .after_cast_slot_cooldown_secs = 0,
         .color = StatusEffect.proto_array.get(.protected).color,
         .targeting_data = .{
             .kind = .self,
@@ -43,33 +44,33 @@ pub const proto = Spell.makeProto(
     },
 );
 
-num_stacks: i32 = 1,
-max_stacks: i32 = 5,
+shield_amount: f32 = 15,
+duration_secs: f32 = 5,
 
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
     assert(params.target == .self);
-    const protec: @This() = self.kind.protec;
-    caster.statuses.getPtr(.protected).addStacks(caster, protec.num_stacks);
-
+    const blank_mind: @This() = self.kind.blank_mind;
+    if (caster.hp) |*hp| {
+        hp.addShield(blank_mind.shield_amount, core.secsToTicks(blank_mind.duration_secs));
+    }
     _ = room;
 }
 
 pub const description =
-    \\Conjure a personal shield
-    \\that renders you invulnerable
-    \\to the next hit.
+    \\Shield self from damage.
+    \\Draw next spell immediately.
 ;
 
 pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
-    const protec: @This() = self.kind.protec;
+    const blank_mind: @This() = self.kind.blank_mind;
     const fmt =
+        \\Shield amount: {}
         \\Duration: {} secs
         \\
         \\{s}
-        \\Stacks up to {} times.
         \\
     ;
-    const dur_secs: i32 = protec.num_stacks * utl.as(i32, @divFloor(StatusEffect.proto_array.get(.protected).cooldown.num_ticks, core.fups_per_sec));
-    const b = try std.fmt.bufPrint(buf, fmt, .{ dur_secs, description, protec.max_stacks });
+
+    const b = try std.fmt.bufPrint(buf, fmt, .{ blank_mind.shield_amount, blank_mind.duration_secs, description });
     return b;
 }

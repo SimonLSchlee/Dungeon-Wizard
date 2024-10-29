@@ -136,8 +136,15 @@ pub const Faction = enum {
 };
 
 pub const HP = struct {
+    pub const Shield = struct {
+        curr: f32,
+        max: f32,
+        timer: ?utl.TickCounter,
+    };
+
     curr: f32 = 10,
     max: f32 = 10,
+    shields: std.BoundedArray(Shield, 8) = .{},
 
     pub const faction_colors = std.EnumArray(Faction, Colorf).init(.{
         .object = Colorf.gray,
@@ -154,8 +161,51 @@ pub const HP = struct {
             .max = max,
         };
     }
+    pub fn update(self: *HP) void {
+        var i: usize = 0;
+        while (i < self.shields.len) {
+            const shield = &self.shields.buffer[i];
+            if (shield.timer) |*timer| {
+                if (timer.tick(false)) {
+                    _ = self.shields.orderedRemove(i);
+                    continue;
+                }
+            }
+            i += 1;
+        }
+    }
     pub fn heal(self: *HP, amount: f32) void {
         self.curr = @min(self.curr + amount, self.max);
+    }
+    pub fn addShield(self: *HP, amount: f32, ticks: ?i64) void {
+        if (self.shields.len >= self.shields.buffer.len) {
+            _ = self.shields.orderedRemove(0);
+            std.log.warn("Ran out of shields space!", .{});
+        }
+        self.shields.append(.{
+            .curr = amount,
+            .max = amount,
+            .timer = if (ticks) |t| utl.TickCounter.init(t) else null,
+        }) catch unreachable;
+    }
+    pub fn doDamage(self: *HP, amount: f32) void {
+        if (amount <= 0) return;
+        var damage_left = amount;
+        // damage hits the outermost shield, continuing inwards until it hits the actual current hp
+        while (self.shields.len > 0 and damage_left > 0) {
+            const last = &self.shields.buffer[self.shields.len - 1];
+            // this shield blocked all the remaining damage
+            if (damage_left < last.curr) {
+                last.curr -= damage_left;
+                return;
+            }
+            // too much damage - pop the shield and continue
+            damage_left -= last.curr;
+            _ = self.shields.pop();
+        }
+        if (damage_left <= 0) return;
+        // shield are all popped
+        self.curr = utl.clampf(self.curr - damage_left, 0, self.max);
     }
 };
 
@@ -256,7 +306,7 @@ pub const HurtBox = struct {
                 damage *= 1.3;
             }
             if (self.hp) |*hp| {
-                hp.curr = utl.clampf(hp.curr - damage, 0, hp.max);
+                hp.doDamage(damage);
             }
         }
         force_blk: {
@@ -650,18 +700,61 @@ pub const CreatureRenderer = struct {
 
         const hp_height = 6;
         const hp_width = renderer.draw_radius * 2;
-        const hp_y_offset = if (self.selectable) |s| s.height + 15 else renderer.draw_radius * 3.5;
+        const hp_y_offset = if (self.selectable) |s| s.height + 20 else renderer.draw_radius * 3.5;
         const hp_offset = v2f(-hp_width * 0.5, -hp_y_offset);
+        const shields_y_offset = hp_y_offset - hp_height;
+        const shields_height = 6;
+        const shields_offset = v2f(-hp_width * 0.5, -shields_y_offset);
 
         if (self.isAliveCreature()) {
             if (self.hp) |hp| {
                 const curr_width = utl.remapClampf(0, hp.max, 0, hp_width, hp.curr);
-                plat.rectf(self.pos.add(hp_offset), v2f(hp_width, hp_height), .{ .fill_color = Colorf.black });
-                plat.rectf(self.pos.add(hp_offset), v2f(curr_width, hp_height), .{ .fill_color = HP.faction_colors.get(self.faction) });
+                const hp_topleft = self.pos.add(hp_offset);
+                plat.rectf(hp_topleft, v2f(hp_width, hp_height), .{ .fill_color = Colorf.black });
+                plat.rectf(hp_topleft, v2f(curr_width, hp_height), .{ .fill_color = HP.faction_colors.get(self.faction) });
+                { // lines
+                    const line_hp_inc: f32 = if (hp.curr > 10) 10 else 2;
+                    var i: f32 = line_hp_inc;
+                    while (i < hp.curr) {
+                        const line_x = curr_width * (i / hp.curr);
+                        const top = hp_topleft.add(v2f(line_x, 0));
+                        const bot = hp_topleft.add(v2f(line_x, hp_height));
+                        plat.linef(top, bot, 1, Colorf.black.fade(0.5));
+                        i += line_hp_inc;
+                    }
+                }
+                var total_shield_amount: f32 = 0;
+                var curr_shield_amount: f32 = 0;
+                for (hp.shields.constSlice()) |shield| {
+                    total_shield_amount += shield.max;
+                    curr_shield_amount += shield.curr;
+                }
+                if (total_shield_amount > 0) {
+                    const shield_color = Colorf.rgb(0.7, 0.7, 0.4);
+                    const shields_topleft = self.pos.add(shields_offset);
+                    var curr_pos = shields_topleft;
+                    for (hp.shields.constSlice()) |shield| {
+                        const shield_width = hp_width * shield.curr / total_shield_amount;
+                        plat.rectf(curr_pos, v2f(shield_width, shields_height), .{ .fill_color = shield_color });
+                        curr_pos.x += shield_width;
+                    }
+                    { // lines
+                        const curr_shield_width = utl.remapClampf(0, total_shield_amount, 0, hp_width, curr_shield_amount);
+                        const line_shield_inc: f32 = if (curr_shield_amount > 10) 10 else 1;
+                        var i: f32 = 0;
+                        while (i <= curr_shield_amount) {
+                            const line_x = curr_shield_width * (i / curr_shield_amount);
+                            const top = shields_topleft.add(v2f(line_x, 0));
+                            const bot = shields_topleft.add(v2f(line_x, shields_height));
+                            plat.linef(top, bot, 1, Colorf.black.fade(0.5));
+                            i += line_shield_inc;
+                        }
+                    }
+                }
             }
             // debug draw statuses
             const status_height = 14;
-            const status_y_offset = hp_y_offset - (hp_height + 3);
+            const status_y_offset = shields_y_offset - (shields_height + 3);
             var status_pos = self.pos.add(v2f(-hp_width * 0.5, -status_y_offset));
             for (self.statuses.values) |status| {
                 if (status.stacks == 0) continue;
@@ -720,6 +813,9 @@ pub fn update(self: *Thing, room: *Room) Error!void {
     }
     for (&self.statuses.values) |*status| {
         try status.update(self, room);
+    }
+    if (self.hp) |*hp| {
+        hp.update();
     }
 }
 

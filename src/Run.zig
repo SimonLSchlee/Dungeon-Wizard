@@ -74,6 +74,7 @@ pub fn makeStarterDeck(dbg: bool) Spell.SpellArray {
     const flamey_explodey = Spell.getProto(.flamey_explodey);
     const expose = Spell.getProto(.expose);
     const zap_dash = Spell.getProto(.zap_dash);
+    const shield_fu = Spell.getProto(.shield_fu);
 
     const deck_cards = if (dbg)
         &[_]struct { Spell, usize }{
@@ -90,7 +91,7 @@ pub fn makeStarterDeck(dbg: bool) Spell.SpellArray {
     else
         &[_]struct { Spell, usize }{
             .{ unherring, 4 },
-            .{ protec, 2 },
+            .{ shield_fu, 2 },
             .{ expose, 1 },
         };
 

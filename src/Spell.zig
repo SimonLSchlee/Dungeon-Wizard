@@ -47,6 +47,8 @@ pub const SpellTypes = [_]type{
     @import("spells/FlareDart.zig"),
     @import("spells/Trailblaze.zig"),
     @import("spells/FlamePurge.zig"),
+    @import("spells/BlankMind.zig"),
+    @import("spells/ShieldFu.zig"),
 };
 
 pub const Kind = utl.EnumFromTypes(&SpellTypes, "enum_name");

@@ -39,7 +39,7 @@ const ComptimeProto = struct {
 const protos = [_]ComptimeProto{
     .{
         .enum_name = "protected",
-        .cd = 5 * core.fups_per_sec,
+        .cd = 10 * core.fups_per_sec,
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(0.7, 0.7, 0.4),
     },

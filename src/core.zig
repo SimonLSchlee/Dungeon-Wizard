@@ -198,6 +198,10 @@ pub inline fn fups_to_secsf(fups: i64) f32 {
     return utl.as(f32, fups) / fups_per_sec_f;
 }
 
+pub inline fn secsToTicks(secs: f32) i64 {
+    return utl.as(i64, @round(secs * fups_per_sec_f));
+}
+
 pub inline fn ms_to_ticks(ms: i64) i64 {
     return @divFloor((fups_per_sec * ms), ms_per_sec);
 }
