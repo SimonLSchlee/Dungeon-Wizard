@@ -28,6 +28,11 @@ const gameUI = @import("gameUI.zig");
 const Shop = @import("Shop.zig");
 const Item = @import("Item.zig");
 
+pub const Mode = enum {
+    _4_slot_frank,
+    _2_mana_mandy,
+};
+
 pub const Reward = struct {
     pub const UI = struct {
         modal_topleft: V2f,
@@ -143,6 +148,7 @@ rng: std.Random.DefaultPrng = undefined,
 places: Place.Array = .{},
 curr_place_idx: usize = 0,
 player_thing: Thing = undefined,
+mode: Mode = undefined,
 deck: Spell.SpellArray = .{},
 slots_init_params: gameUI.Slots.InitParams = .{},
 load_timer: u.TickCounter = u.TickCounter.init(20),
@@ -153,7 +159,7 @@ load_state: enum {
 } = .fade_in,
 curr_tick: i64 = 0,
 
-pub fn initSeeded(seed: u64) Error!Run {
+pub fn initSeeded(mode: Mode, seed: u64) Error!Run {
     const app = App.get();
 
     var ret: Run = .{
@@ -163,6 +169,7 @@ pub fn initSeeded(seed: u64) Error!Run {
         .game_pause_ui = makeGamePauseUI(),
         .dead_menu = makeDeadMenu(),
         .player_thing = app.data.creatures.get(.player),
+        .mode = mode,
     };
 
     // TODO elsewhererre?
@@ -192,10 +199,10 @@ pub fn initSeeded(seed: u64) Error!Run {
     return ret;
 }
 
-pub fn initRandom() Error!Run {
+pub fn initRandom(mode: Mode) Error!Run {
     var rng = std.Random.DefaultPrng.init(u.as(u64, std.time.microTimestamp()));
     const seed = rng.random().int(u64);
-    return try initSeeded(seed);
+    return try initSeeded(mode, seed);
 }
 
 pub fn deinit(self: *Run) void {
@@ -206,7 +213,7 @@ pub fn deinit(self: *Run) void {
 
 pub fn reset(self: *Run) Error!void {
     self.deinit();
-    self.* = try initRandom();
+    self.* = try initRandom(self.mode);
 }
 
 pub fn startRun(self: *Run) Error!void {

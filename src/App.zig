@@ -58,7 +58,7 @@ export fn appInit(plat: *Platform) *anyopaque {
     // populate _app here, Room.init() uses it
     _app = app;
     app.render_texture = plat.createRenderTexture("app", core.native_dims);
-    app.run = Run.initRandom() catch @panic("Failed to init run state");
+    app.run = Run.initRandom(._4_slot_frank) catch @panic("Failed to init run state");
     app.run.startRun() catch @panic("Failed to start run");
 
     return app;
