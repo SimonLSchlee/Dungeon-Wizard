@@ -30,7 +30,7 @@ const Item = @import("Item.zig");
 
 pub const Mode = enum {
     _4_slot_frank,
-    _2_mana_mandy,
+    _mana_mandy,
 };
 
 pub const Reward = struct {

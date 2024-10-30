@@ -64,7 +64,7 @@ export fn appInit(plat: *Platform) *anyopaque {
     _app = app;
     app.render_texture = plat.createRenderTexture("app", core.native_dims);
 
-    app.startNewRun(._4_slot_frank) catch @panic("Failed to go straight into run");
+    //app.startNewRun(._4_slot_frank) catch @panic("Failed to go straight into run");
 
     return app;
 }
@@ -192,12 +192,12 @@ fn menuUpdate(self: *App) Error!void {
         title_topleft.y + title_dims.y + title_padding.y,
     );
     var curr_btn_pos = btns_topleft;
-    if (menuButton(&self.menu_ui.commands, curr_btn_pos, "    New Run\n(4 slot Frank)", btn_dims)) {
+    if (menuButton(&self.menu_ui.commands, curr_btn_pos, "    New Run\n(4-Slot Frank)", btn_dims)) {
         try self.startNewRun(._4_slot_frank);
     }
     curr_btn_pos.y += btn_dims.y + btn_spacing;
-    if (menuButton(&self.menu_ui.commands, curr_btn_pos, "       New Run\n(2 mana Mandy)", btn_dims)) {
-        try self.startNewRun(._2_mana_mandy);
+    if (menuButton(&self.menu_ui.commands, curr_btn_pos, "      New Run\n(Mana Mandy)", btn_dims)) {
+        try self.startNewRun(._mana_mandy);
     }
     curr_btn_pos.y += btn_dims.y + btn_spacing;
     if (menuButton(&self.menu_ui.commands, curr_btn_pos, "Options", btn_dims)) {
