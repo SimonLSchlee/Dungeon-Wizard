@@ -88,9 +88,13 @@ pub const Action = struct {
 };
 
 pub const Input = struct {
+    move_press_ui_timer: utl.TickCounter = utl.TickCounter.initStopped(60),
+    move_release_ui_timer: utl.TickCounter = utl.TickCounter.initStopped(60),
+
     pub fn update(self: *Thing, room: *Room) Error!void {
         assert(self.spawn_state == .spawned);
         const plat = App.getPlat();
+        const input = &self.player_input.?;
         const controller = &self.controller.player;
         const ui_slots = &room.ui_slots;
         const mouse_pos = plat.getMousePosWorld(room.camera);
@@ -102,17 +106,17 @@ pub const Input = struct {
 
         // tick this here even though its on the player controller
         if (plat.input_buffer.mouseBtnIsJustPressed(.right)) {
-            room.move_press_ui_timer.restart();
+            input.move_press_ui_timer.restart();
         }
         if (plat.input_buffer.mouseBtnIsDown(.right)) {
             ui_slots.select_state = null;
             controller.action_buffered = null;
             try self.findPath(room, mouse_pos);
-            _ = room.move_press_ui_timer.tick(true);
-            room.move_release_ui_timer.restart();
+            _ = input.move_press_ui_timer.tick(true);
+            input.move_release_ui_timer.restart();
         } else {
-            _ = room.move_press_ui_timer.tick(false);
-            _ = room.move_release_ui_timer.tick(false);
+            _ = input.move_press_ui_timer.tick(false);
+            _ = input.move_release_ui_timer.tick(false);
         }
 
         if (ui_slots.getSelectedSlot()) |slot| {
@@ -145,6 +149,38 @@ pub const Input = struct {
                     controller.action_buffered = null;
                 }
             }
+        }
+    }
+
+    pub fn render(self: *const Thing, room: *const Room) Error!void {
+        const plat = getPlat();
+        const input = &self.player_input.?;
+        const ui_slots = &room.ui_slots;
+
+        if (ui_slots.getSelectedSlot()) |slot| {
+            switch (slot.kind.?) {
+                inline else => |k| try k.renderTargeting(room, self),
+            }
+        }
+
+        if (input.move_release_ui_timer.running and self.path.len > 0) {
+            const move_pos = self.path.get(self.path.len - 1);
+            const release_f = input.move_release_ui_timer.remapTo0_1();
+            const bounce_f = input.move_press_ui_timer.remapTo0_1();
+            const bounce_t = @sin(bounce_f * 3);
+            const bounce_range = 10;
+            const y_off = -bounce_range * bounce_t;
+            var points: [3]V2f = .{
+                v2f(0, 0),
+                v2f(8, -10),
+                v2f(-8, -10),
+            };
+            for (&points) |*p| {
+                p.* = p.add(move_pos);
+                p.y += y_off;
+            }
+            plat.circlef(move_pos, 10, .{ .outline_color = Colorf.green.fade(0.6 * (1 - release_f)), .fill_color = null });
+            plat.trianglef(points, .{ .fill_color = Colorf.green.fade(1 - release_f) });
         }
     }
 };

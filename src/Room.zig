@@ -182,8 +182,6 @@ things: Thing.Pool = undefined,
 spawn_queue: ThingBoundedArray = .{},
 free_queue: ThingBoundedArray = .{},
 player_id: ?pool.Id = null,
-move_press_ui_timer: u.TickCounter = u.TickCounter.initStopped(60),
-move_release_ui_timer: u.TickCounter = u.TickCounter.initStopped(60),
 ui_slots: gameUI.Slots = .{},
 draw_pile: Spell.SpellArray = .{},
 discard_pile: Spell.SpellArray = .{},
@@ -560,30 +558,7 @@ pub fn render(self: *const Room, native_render_texture: Platform.RenderTexture2D
     // spell targeting, movement
     if (!self.edit_mode) {
         if (self.getConstPlayer()) |player| {
-            if (self.ui_slots.getSelectedSlot()) |slot| {
-                switch (slot.kind.?) {
-                    inline else => |k| try k.renderTargeting(self, player),
-                }
-            }
-            if (self.move_release_ui_timer.running and player.path.len > 0) {
-                const move_pos = player.path.get(player.path.len - 1);
-                const release_f = self.move_release_ui_timer.remapTo0_1();
-                const bounce_f = self.move_press_ui_timer.remapTo0_1();
-                const bounce_t = @sin(bounce_f * 3);
-                const bounce_range = 10;
-                const y_off = -bounce_range * bounce_t;
-                var points: [3]V2f = .{
-                    v2f(0, 0),
-                    v2f(8, -10),
-                    v2f(-8, -10),
-                };
-                for (&points) |*p| {
-                    p.* = p.add(move_pos);
-                    p.y += y_off;
-                }
-                plat.circlef(move_pos, 10, .{ .outline_color = Colorf.green.fade(0.6 * (1 - release_f)), .fill_color = null });
-                plat.trianglef(points, .{ .fill_color = Colorf.green.fade(1 - release_f) });
-            }
+            try @TypeOf(player.player_input.?).render(player, self);
         }
     }
 
