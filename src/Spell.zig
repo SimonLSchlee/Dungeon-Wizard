@@ -416,6 +416,7 @@ cast_ticks: i32 = 60,
 after_cast_slot_cooldown_secs: f32 = 4,
 after_cast_slot_cooldown_ticks: i32 = 4 * 60,
 mislay: bool = false,
+mana_cost: i32 = 1, // only applies to Things that have mana!
 
 pub fn getSlotCooldownTicks(self: *const Spell) i32 {
     return self.cast_ticks + self.after_cast_slot_cooldown_ticks;
@@ -439,6 +440,21 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             }
         },
     }
+}
+
+pub fn canUse(self: *const Spell, room: *const Room, caster: *const Thing) bool {
+    if (caster.mana) |mana| {
+        if (mana.curr < self.mana_cost) return false;
+    }
+    switch (self.kind) {
+        inline else => |k| {
+            const K = @TypeOf(k);
+            if (std.meta.hasMethod(K, "canUse")) {
+                return K.canUse(self, room, caster);
+            }
+        },
+    }
+    return true;
 }
 
 pub fn getDescription(self: *const Spell) Error![]const u8 {

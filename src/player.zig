@@ -103,8 +103,6 @@ pub const Input = struct {
         if (!room.paused) {
             ui_slots.updateTimerAndDrawSpell(room);
         }
-
-        // tick this here even though its on the player controller
         if (plat.input_buffer.mouseBtnIsJustPressed(.right)) {
             input.move_press_ui_timer.restart();
         }

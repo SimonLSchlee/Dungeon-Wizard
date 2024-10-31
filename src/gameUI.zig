@@ -231,10 +231,12 @@ pub const Slots = struct {
 
             if (slot.kind) |k| {
                 switch (k) {
-                    .item => |item| {
-                        if (!item.canUse(room, caster)) continue;
+                    inline else => |a| {
+                        const A = @TypeOf(a);
+                        if (std.meta.hasMethod(A, "canUse")) {
+                            if (!a.canUse(room, caster)) continue;
+                        }
                     },
-                    else => {},
                 }
             } else continue;
 
@@ -290,8 +292,12 @@ pub const Slots = struct {
                     break :blk false;
                 } else if (slot.kind) |k| {
                     switch (k) {
-                        .item => |item| break :blk item.canUse(room, caster),
-                        else => break :blk true,
+                        inline else => |a| {
+                            const A = @TypeOf(a);
+                            if (std.meta.hasMethod(A, "canUse")) {
+                                break :blk a.canUse(room, caster);
+                            }
+                        },
                     }
                 }
                 break :blk false;
