@@ -27,6 +27,7 @@ const menuUI = @import("menuUI.zig");
 const gameUI = @import("gameUI.zig");
 const Shop = @import("Shop.zig");
 const Item = @import("Item.zig");
+const player = @import("player.zig");
 
 pub const Mode = enum {
     _4_slot_frank,
@@ -168,7 +169,7 @@ pub fn initSeeded(mode: Mode, seed: u64) Error!Run {
         .deck = makeStarterDeck(false),
         .game_pause_ui = makeGamePauseUI(),
         .dead_menu = makeDeadMenu(),
-        .player_thing = app.data.creatures.get(.player),
+        .player_thing = player.modePrototype(mode),
         .mode = mode,
     };
 

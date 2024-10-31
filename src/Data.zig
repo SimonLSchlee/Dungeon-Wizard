@@ -21,6 +21,7 @@ const sprites = @import("sprites.zig");
 const Spell = @import("Spell.zig");
 const Item = @import("Item.zig");
 const PackedRoom = @import("PackedRoom.zig");
+const player = @import("player.zig");
 const Data = @This();
 
 pub fn EnumToBoundedStringArrayType(E: type) type {
@@ -606,7 +607,7 @@ pub fn reload(self: *Data) Error!void {
     self.loadSounds() catch std.debug.print("WARNING: failed to load all sounds\n", .{});
     self.creatures = @TypeOf(self.creatures).init(
         .{
-            .player = try @import("player.zig").protoype(),
+            .player = player.basePrototype(),
             .dummy = @import("enemies.zig").dummy(),
             .bat = try @import("enemies.zig").bat(),
             .troll = try @import("enemies.zig").troll(),

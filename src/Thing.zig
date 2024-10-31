@@ -106,6 +106,10 @@ path: std.BoundedArray(V2f, 32) = .{},
 hitbox: ?HitBox = null,
 hurtbox: ?HurtBox = null,
 hp: ?HP = null,
+mana: ?struct {
+    curr: i32,
+    max: i32,
+} = null,
 faction: Faction = .object,
 selectable: ?struct {
     // its a half capsule shape

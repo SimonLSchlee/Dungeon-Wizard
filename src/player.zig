@@ -16,6 +16,7 @@ const v2i = V2i.v2i;
 
 const App = @import("App.zig");
 const getPlat = App.getPlat;
+const Run = @import("Run.zig");
 const Thing = @import("Thing.zig");
 const Room = @import("Room.zig");
 const Spell = @import("Spell.zig");
@@ -26,7 +27,7 @@ const Player = @This();
 
 pub const enum_name = "player";
 
-pub fn protoype() Error!Thing {
+pub fn basePrototype() Thing {
     return Thing{
         .kind = .creature,
         .creature_kind = .player,
@@ -57,6 +58,17 @@ pub fn protoype() Error!Thing {
         .hp = Thing.HP.init(40),
         .faction = .player,
     };
+}
+
+pub fn modePrototype(mode: Run.Mode) Thing {
+    var base = basePrototype();
+    switch (mode) {
+        ._4_slot_frank => {},
+        ._mana_mandy => {
+            base.mana = .{ .max = 3, .curr = 3 };
+        },
+    }
+    return base;
 }
 
 pub const Action = struct {
