@@ -137,3 +137,99 @@ pub const Button = struct {
         try plat.textf(rect.pos.add(self.text_rel_pos), "{s}", .{self.text.constSlice()}, self.text_opt);
     }
 };
+
+pub const HotKeyedButton = struct {
+    key: core.Key,
+    key_str: [3]u8,
+    crect: ClickableRect = .{},
+    poly_opt: draw.PolyOpt = .{
+        .fill_color = Colorf.red.fade(0.5),
+    },
+    hover_timer: ?utl.TickCounter = utl.TickCounter.init(15),
+    text: ?struct {
+        str: utl.BoundedString(64) = .{},
+        padding: V2f = v2f(20, 20),
+        rel_pos: V2f = .{},
+        opt: draw.TextOpt = .{
+            .color = Colorf.black,
+            .center = true,
+        },
+    } = null,
+
+    pub fn toRectf(self: HotKeyedButton) geom.Rectf {
+        return self.crect.toRectf();
+    }
+    pub fn isHovered(self: HotKeyedButton) bool {
+        const hovered = self.crect.isHovered();
+        if (self.hover_timer) |timer| {
+            if (hovered and timer.running) return false;
+        }
+        return hovered;
+    }
+    pub fn update(self: *HotKeyedButton) void {
+        const hovered = self.crect.isHovered();
+        if (self.hover_timer) |*timer| {
+            if (hovered) {
+                _ = timer.tick(false);
+            } else {
+                timer.restart();
+            }
+        }
+    }
+    pub fn isClicked(self: HotKeyedButton) bool {
+        return self.crect.isClicked();
+    }
+    pub fn isHotkeyed(self: HotKeyedButton) bool {
+        const plat = App.getPlat();
+        return plat.input_buffer.keyIsJustPressed(self.key);
+    }
+    pub fn render(self: HotKeyedButton, enabled: bool) Error!void {
+        const plat = App.getPlat();
+        var rect = self.crect.rect;
+        var border_color = Colorf.darkgray;
+        var key_color = Colorf.gray;
+
+        if (enabled) {
+            key_color = .white;
+            border_color = .blue;
+            if (self.isHovered()) {
+                rect.pos = rect.pos.sub(v2f(5, 5));
+                rect.dims = rect.dims.add(v2f(10, 10));
+            }
+        }
+        plat.rectf(rect.pos, rect.dims, self.poly_opt);
+        if (self.text) |text| {
+            try plat.textf(rect.pos.add(text.rel_pos), "{s}", .{text.str.constSlice()}, text.opt);
+        }
+
+        // border
+        plat.rectf(
+            rect.pos,
+            rect.dims,
+            .{
+                .fill_color = null,
+                .outline_color = border_color,
+                .outline_thickness = 4,
+            },
+        );
+        // hotkey
+        try plat.textf(
+            rect.pos.add(v2f(1, 1)),
+            "{s}",
+            .{&self.key_str},
+            .{ .color = key_color },
+        );
+    }
+};
+
+pub fn sectorTimer(pos: V2f, radius: f32, timer: utl.TickCounter, poly_opt: draw.PolyOpt) void {
+    const plat = App.getPlat();
+    const rads = timer.remapTo0_1() * utl.tau;
+    plat.sectorf(pos, radius, 0, rads, poly_opt);
+    const secs_left = utl.as(u32, @ceil(core.fups_to_secsf(timer.num_ticks - timer.curr_tick)));
+    plat.textf(pos, "{}", .{secs_left}, .{
+        .center = true,
+        .color = .white,
+        .size = utl.as(u32, radius * 1.5),
+    }) catch {};
+}

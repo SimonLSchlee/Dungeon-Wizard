@@ -174,6 +174,7 @@ pub fn initSeeded(mode: Mode, seed: u64) Error!Run {
     };
 
     // TODO elsewhererre?
+    ret.slots_init_params.discard_button = mode == ._mana_mandy;
     ret.slots_init_params.items = @TypeOf(ret.slots_init_params.items).fromSlice(&.{
         Item.getProto(.pot_hp),
         null,

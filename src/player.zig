@@ -103,6 +103,22 @@ pub const Input = struct {
         if (!room.paused) {
             ui_slots.updateTimerAndDrawSpell(room);
         }
+        if (self.mana) |*mana| {
+            if (mana.curr == 0 or ui_slots.pressedDiscard()) {
+                const max_extra_mana_cooldown_secs: f32 = 2;
+                const per_mana_secs = max_extra_mana_cooldown_secs / utl.as(f32, mana.max);
+                const num_secs: f32 = 1 + per_mana_secs * utl.as(f32, mana.curr);
+                for (ui_slots.getSlotsByKindConst(.spell)) |slot| {
+                    if (slot.kind) |k| {
+                        const spell = k.spell;
+                        room.discardSpell(spell);
+                    }
+                }
+                ui_slots.clearAndSetAllSlotsAndDiscardCooldown(.spell, core.secsToTicks(num_secs));
+                mana.curr = mana.max;
+            }
+        }
+
         // clicking rmb cancels buffered action
         if (plat.input_buffer.mouseBtnIsJustPressed(.right)) {
             input.move_press_ui_timer.restart();
@@ -121,6 +137,7 @@ pub const Input = struct {
         }
 
         if (ui_slots.getSelectedSlot()) |slot| {
+            assert(slot.kind != null);
             const cast_method = ui_slots.selected_method;
             const do_cast = switch (cast_method) {
                 .left_click => !room.ui_clicked and plat.input_buffer.mouseBtnIsJustPressed(.left),
@@ -206,6 +223,8 @@ pub const Controller = struct {
 
         if (controller.action_buffered) |buffered| {
             if (controller.action_casting == null) {
+                const slot_idx = utl.as(usize, buffered.slot_idx);
+                room.ui_slots.clearSlotByKind(slot_idx, std.meta.activeTag(buffered.action));
                 switch (buffered.action) {
                     .spell => |spell| {
                         if (spell.mislay) {
@@ -213,11 +232,17 @@ pub const Controller = struct {
                         } else {
                             room.discardSpell(spell);
                         }
+                        if (self.mana) |*mana| {
+                            assert(mana.curr >= spell.mana_cost);
+                            mana.curr -= spell.mana_cost;
+                            room.ui_slots.setSlotCooldown(slot_idx, .spell, null);
+                        } else {
+                            room.ui_slots.setSlotCooldown(slot_idx, .spell, spell.getSlotCooldownTicks());
+                        }
                         controller.cast_counter = utl.TickCounter.init(spell.cast_ticks);
                     },
                     else => {},
                 }
-                room.ui_slots.clearSlotByKind(utl.as(usize, buffered.slot_idx), std.meta.activeTag(buffered.action));
                 controller.action_casting = buffered;
                 controller.action_buffered = null;
             }

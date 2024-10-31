@@ -25,6 +25,7 @@ const Options = @import("Options.zig");
 const sprites = @import("sprites.zig");
 const Item = @import("Item.zig");
 const player = @import("player.zig");
+const menuUI = @import("menuUI.zig");
 
 pub const Slots = struct {
     pub const SelectionKind = enum {
@@ -50,6 +51,7 @@ pub const Slots = struct {
     pub const InitParams = struct {
         num_spell_slots: usize = 4, // populated from deck
         items: std.BoundedArray(?Item, max_item_slots) = .{},
+        discard_button: bool = false,
     };
 
     pub const max_spell_slots = 6;
@@ -74,6 +76,8 @@ pub const Slots = struct {
         }
         break :blk arr;
     };
+    pub const discard_key = core.Key.d;
+    pub const discard_key_str = "[D]".*;
 
     const spell_slot_dims = v2f(72, 72);
     const spell_slot_spacing: f32 = 12;
@@ -89,6 +93,11 @@ pub const Slots = struct {
         slot_idx: usize,
     } = null,
     selected_method: Options.CastMethod = .left_click,
+    discard_button: ?struct {
+        btn: menuUI.HotKeyedButton,
+        cooldown_timer: ?utl.TickCounter = null,
+        hover_timer: utl.TickCounter = utl.TickCounter.init(15),
+    } = null,
 
     pub fn init(room: *Room, params: InitParams) Slots {
         assert(params.num_spell_slots < max_spell_slots);
@@ -119,6 +128,24 @@ pub const Slots = struct {
             ret.items.append(slot) catch unreachable;
         }
 
+        if (params.discard_button) {
+            const spell_rects = ret.getSlotRects(.spell);
+            const last = spell_rects.get(spell_rects.len - 1);
+            const right_middle = last.pos.add(v2f(last.dims.x, last.dims.y * 0.5));
+            const discard_btn_dims = v2f(48, 48);
+            const rect_center = right_middle.add(v2f(spell_slot_spacing + discard_btn_dims.x * 0.5, 0));
+            ret.discard_button = .{
+                .btn = .{
+                    .key = discard_key,
+                    .key_str = discard_key_str,
+                    .crect = .{ .rect = .{
+                        .pos = rect_center.sub(discard_btn_dims.scale(0.5)),
+                        .dims = discard_btn_dims,
+                    } },
+                },
+            };
+        }
+
         return ret;
     }
 
@@ -143,14 +170,14 @@ pub const Slots = struct {
         return ret;
     }
 
-    fn getSlotsByKind(self: *Slots, kind: Slot.Kind) []Slot {
+    pub fn getSlotsByKind(self: *Slots, kind: Slot.Kind) []Slot {
         return switch (kind) {
             .spell => self.spells.slice(),
             .item => self.items.slice(),
         };
     }
 
-    fn getSlotsByKindConst(self: *const Slots, kind: Slot.Kind) []const Slot {
+    pub fn getSlotsByKindConst(self: *const Slots, kind: Slot.Kind) []const Slot {
         return switch (kind) {
             .spell => self.spells.constSlice(),
             .item => self.items.constSlice(),
@@ -174,18 +201,27 @@ pub const Slots = struct {
         return null;
     }
 
+    pub fn setSlotCooldown(self: *Slots, slot_idx: usize, slot_kind: Slot.Kind, ticks: ?i64) void {
+        const slots = self.getSlotsByKind(slot_kind);
+        const slot = &slots[slot_idx];
+        slot.cooldown_timer = if (ticks) |t| utl.TickCounter.init(t) else null;
+    }
+
+    pub fn clearAndSetAllSlotsAndDiscardCooldown(self: *Slots, slot_kind: Slot.Kind, ticks: ?i64) void {
+        const slots = self.getSlotsByKind(slot_kind);
+        for (0..slots.len) |i| {
+            self.clearSlotByKind(i, slot_kind);
+            self.setSlotCooldown(i, slot_kind, ticks);
+        }
+        if (self.discard_button) |*btn| {
+            btn.cooldown_timer = if (ticks) |t| utl.TickCounter.init(t) else null;
+        }
+    }
+
     pub fn clearSlotByKind(self: *Slots, slot_idx: usize, slot_kind: Slot.Kind) void {
         const slots = self.getSlotsByKind(slot_kind);
         const slot = &slots[slot_idx];
 
-        if (slot.kind) |k| {
-            switch (k) {
-                .spell => |spell| {
-                    slot.cooldown_timer = utl.TickCounter.init(spell.getSlotCooldownTicks());
-                },
-                else => {},
-            }
-        }
         slot.kind = null;
 
         if (self.select_state) |*state| {
@@ -197,13 +233,21 @@ pub const Slots = struct {
 
     pub fn updateTimerAndDrawSpell(self: *Slots, room: *Room) void {
         for (self.spells.slice()) |*slot| {
-            assert(slot.cooldown_timer != null);
-            if (slot.kind) |k| {
-                assert(std.meta.activeTag(k) == .spell);
-                // only tick and draw into empty slots!
-            } else if (slot.cooldown_timer.?.tick(false)) {
-                if (room.drawSpell()) |spell| {
-                    slot.kind = .{ .spell = spell };
+            if (slot.cooldown_timer) |*timer| {
+                if (slot.kind) |k| {
+                    assert(std.meta.activeTag(k) == .spell);
+                    // only tick and draw into empty slots!
+                } else if (timer.tick(false)) {
+                    if (room.drawSpell()) |spell| {
+                        slot.kind = .{ .spell = spell };
+                    }
+                }
+            }
+        }
+        if (self.discard_button) |*d| {
+            if (d.cooldown_timer) |*timer| {
+                if (timer.tick(false)) {
+                    d.cooldown_timer = null;
                 }
             }
         }
@@ -276,9 +320,36 @@ pub const Slots = struct {
     pub fn updateSelected(self: *Slots, room: *Room, caster: *const Thing) void {
         const clicked_a = self.updateSelectedSlots(room, caster, self.spells.slice(), .spell);
         const clicked_b = self.updateSelectedSlots(room, caster, self.items.slice(), .item);
-        if (clicked_a or clicked_b) {
+        var clicked_c = false;
+        if (self.discard_button) |*d| {
+            clicked_c = d.btn.isClicked();
+        }
+
+        if (clicked_a or clicked_b or clicked_c) {
             room.ui_clicked = true;
         }
+    }
+
+    pub fn discardEnabled(self: *const Slots) bool {
+        if (self.discard_button) |btn| {
+            if (btn.cooldown_timer) |timer| {
+                return !timer.running;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    pub fn pressedDiscard(self: *const Slots) bool {
+        if (self.discard_button) |btn| {
+            if (btn.cooldown_timer) |timer| {
+                if (timer.running) return false;
+            }
+            if (btn.btn.isClicked() or btn.btn.isHotkeyed()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     fn renderSlots(self: *const Slots, room: *const Room, caster: *const Thing, slots: []const Slot, kind: Slot.Kind, slots_are_enabled: bool) Error!void {
@@ -330,11 +401,9 @@ pub const Slots = struct {
                 switch (k) {
                     inline else => |inner| try inner.renderIcon(rect),
                 }
-            } else if (slot.cooldown_timer) |*timer| {
+            } else if (slot.cooldown_timer) |timer| {
                 if (timer.running) {
-                    const rads = timer.remapTo0_1() * utl.tau;
-                    const radius = rect.dims.x * 0.5 * 0.7;
-                    plat.sectorf(slot_center_pos, radius, 0, rads, .{ .fill_color = .blue });
+                    menuUI.sectorTimer(slot_center_pos, rect.dims.x * 0.5 * 0.7, timer, .{ .fill_color = .blue });
                 }
             }
 
@@ -395,13 +464,20 @@ pub const Slots = struct {
         };
         const slots_are_enabled = caster.hp.?.curr > 0;
 
-        {
-            const rects = self.getSlotRects(.spell);
-            const last_rect = rects.get(rects.len - 1);
-            const p = last_rect.pos.add(v2f(last_rect.dims.x + 10, 0));
+        { // debug deck stuff
+            var right_center: V2f = .{};
+            if (self.discard_button) |d| {
+                const rect = d.btn.toRectf();
+                right_center = rect.pos.add(v2f(rect.dims.x, rect.dims.y * 0.5));
+            } else {
+                const rects = self.getSlotRects(.spell);
+                const last_rect = rects.get(rects.len - 1);
+                right_center = last_rect.pos.add(v2f(last_rect.dims.x, last_rect.dims.y * 0.5));
+            }
+            const p = right_center.add(v2f(10, -30));
             try plat.textf(
                 p,
-                "draw: {}\ndiscard: {}\nmislayed: {}\n",
+                "deck: {}\ndiscard: {}\nmislayed: {}\n",
                 .{
                     room.draw_pile.len,
                     room.discard_pile.len,
@@ -413,6 +489,16 @@ pub const Slots = struct {
 
         try self.renderSlots(room, caster, self.spells.constSlice(), .spell, slots_are_enabled);
         try self.renderSlots(room, caster, self.items.constSlice(), .item, slots_are_enabled);
+        if (self.discard_button) |btn| {
+            const enabled = self.discardEnabled();
+            try btn.btn.render(enabled);
+            if (btn.cooldown_timer) |timer| {
+                if (timer.running) {
+                    const btn_rect = btn.btn.toRectf();
+                    menuUI.sectorTimer(btn_rect.pos.add(btn_rect.dims.scale(0.5)), btn_rect.dims.x * 0.5 * 0.7, timer, .{ .fill_color = .blue });
+                }
+            }
+        }
         // tooltips on top of everything
         try self.renderToolTips(self.spells.constSlice(), .spell);
         try self.renderToolTips(self.items.constSlice(), .item);
