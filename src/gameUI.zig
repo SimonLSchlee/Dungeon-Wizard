@@ -260,6 +260,14 @@ pub const Slots = struct {
                 .slot_kind = kind,
             };
             self.selected_method = cast_method;
+            const kind_data = self.getSlotsByKindConst(kind)[new_idx].kind.?;
+            switch (kind_data) {
+                inline else => |k| {
+                    if (k.targeting_data.kind == .self) {
+                        self.selected_method = .quick_release;
+                    }
+                },
+            }
         }
 
         return ui_clicked;

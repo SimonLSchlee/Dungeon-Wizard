@@ -103,12 +103,15 @@ pub const Input = struct {
         if (!room.paused) {
             ui_slots.updateTimerAndDrawSpell(room);
         }
+        // clicking rmb cancels buffered action
         if (plat.input_buffer.mouseBtnIsJustPressed(.right)) {
             input.move_press_ui_timer.restart();
-        }
-        if (plat.input_buffer.mouseBtnIsDown(.right)) {
             ui_slots.select_state = null;
             controller.action_buffered = null;
+        }
+        // holding rmb sets path, only if an action isn't buffered
+        // so movement can be 'canceled' with an action, even if still holding RMB
+        if (controller.action_buffered == null and plat.input_buffer.mouseBtnIsDown(.right)) {
             try self.findPath(room, mouse_pos);
             _ = input.move_press_ui_timer.tick(true);
             input.move_release_ui_timer.restart();
