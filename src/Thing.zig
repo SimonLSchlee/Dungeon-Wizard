@@ -755,6 +755,24 @@ pub const CreatureRenderer = struct {
                         }
                     }
                 }
+                if (self.mana) |mana| {
+                    const mana_bar_width = hp_width;
+                    const mana_bar_height = 15;
+                    const mana_topleft = hp_topleft.sub(v2f(0, mana_bar_height));
+                    const mana_inc_px = mana_bar_width / utl.as(f32, mana.max);
+                    // restrict radius to keep 4 pixels around it even when only 1-2 mana
+                    const mana_diam = @min(mana_inc_px * 0.8, mana_bar_height - 4);
+                    const mana_radius = mana_diam * 0.5;
+                    const mana_spacing = (mana_inc_px - mana_diam) * 0.666666; // this makes sense cos of reasons
+                    var curr_pos = mana_topleft.add(v2f(mana_spacing + mana_radius, mana_bar_height * 0.5));
+                    for (0..utl.as(usize, mana.curr)) |_| {
+                        plat.circlef(curr_pos, mana_radius, .{
+                            .fill_color = Colorf.rgb(0, 0.5, 1),
+                            .outline_color = .black,
+                        });
+                        curr_pos.x += mana_spacing + mana_diam;
+                    }
+                }
             }
             // debug draw statuses
             const status_height = 14;
