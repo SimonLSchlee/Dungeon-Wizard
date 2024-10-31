@@ -405,6 +405,8 @@ pub const cast_time_to_secs = std.EnumArray(CastTime, f32).init(.{
     .fast = 0.667,
 });
 
+const mana_cost_max: i32 = 5;
+
 kind: KindData = undefined,
 rarity: Rarity = .pedestrian,
 obtainableness: Obtainableness.Mask = Obtainableness.Mask.initMany(&.{ .room_reward, .shop }),
@@ -495,6 +497,27 @@ pub inline fn renderTargeting(self: *const Spell, room: *const Room, caster: *co
 
 pub inline fn renderIcon(self: *const Spell, rect: geom.Rectf) Error!void {
     return try self.getRenderIconInfo().render(rect);
+}
+
+pub fn renderManaCost(self: *const Spell, rect: geom.Rectf) void {
+    const plat = getPlat();
+    const mana_bar_padding = rect.dims.x * 0.1;
+    const mana_bar_width = rect.dims.x - mana_bar_padding * 2;
+    const mana_bar_height = rect.dims.y * 0.2;
+    const mana_topleft = rect.pos.add(v2f(mana_bar_padding, rect.dims.y - mana_bar_height - mana_bar_padding));
+    const mana_inc_px = mana_bar_width / utl.as(f32, mana_cost_max);
+    // restrict radius to keep 4 pixels around it even when only 1-2 mana
+    const mana_diam = @min(mana_inc_px * 0.8, mana_bar_height - 4);
+    const mana_radius = mana_diam * 0.5;
+    const mana_spacing = (mana_inc_px - mana_diam) * 0.666666; // this makes sense cos of reasons
+    var curr_pos = mana_topleft.add(v2f(mana_spacing + mana_radius, mana_bar_height * 0.5));
+    for (0..utl.as(usize, self.mana_cost)) |_| {
+        plat.circlef(curr_pos, mana_radius, .{
+            .fill_color = Colorf.rgb(0, 0.5, 1),
+            .outline_color = .black,
+        });
+        curr_pos.x += mana_spacing + mana_diam;
+    }
 }
 
 pub fn getRenderIconInfo(self: *const Spell) sprites.RenderIconInfo {

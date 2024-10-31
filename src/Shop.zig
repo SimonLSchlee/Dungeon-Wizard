@@ -199,7 +199,6 @@ pub fn update(self: *Shop, run: *const Run) Error!?Product {
 
 pub fn render(self: *Shop, run: *Run, native_render_texture: Platform.RenderTexture2D) Error!void {
     const plat = getPlat();
-    _ = run;
 
     plat.startRenderToTexture(native_render_texture);
     plat.clear(Colorf.rgb(0.2, 0.2, 0.2));
@@ -230,10 +229,19 @@ pub fn render(self: *Shop, run: *Run, native_render_texture: Platform.RenderText
 
         if (slot.product == null) continue;
         const product = slot.product.?;
+        const product_square = geom.Rectf{ .pos = hovered_rect.pos, .dims = hovered_square };
         switch (product.kind) {
             inline else => |k| {
-                try k.renderIcon(.{ .pos = hovered_rect.pos, .dims = hovered_square });
+                try k.renderIcon(product_square);
             },
+        }
+        if (run.mode == ._mana_mandy) {
+            switch (product.kind) {
+                .spell => |spell| {
+                    spell.renderManaCost(product_square);
+                },
+                else => {},
+            }
         }
         const price_pos = hovered_rect.pos.add(hovered_rect.dims).sub(v2f(50, 40));
         try plat.textf(price_pos, "${}", .{product.price.gold}, .{ .center = true, .color = .yellow, .size = text_sz });

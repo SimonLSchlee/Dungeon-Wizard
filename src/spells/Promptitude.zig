@@ -36,6 +36,7 @@ pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
     .{
         .cast_time = .slow,
+        .mana_cost = 2,
         .rarity = .exceptional,
         .color = StatusEffect.proto_array.get(.promptitude).color,
         .targeting_data = .{

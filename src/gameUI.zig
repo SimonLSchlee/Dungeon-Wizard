@@ -401,6 +401,15 @@ pub const Slots = struct {
                 switch (k) {
                     inline else => |inner| try inner.renderIcon(rect),
                 }
+                // TODO maybe dont tie these together (mana and discard button)
+                if (self.discard_button != null) {
+                    switch (k) {
+                        .spell => |spell| {
+                            spell.renderManaCost(rect);
+                        },
+                        else => {},
+                    }
+                }
             } else if (slot.cooldown_timer) |timer| {
                 if (timer.running) {
                     menuUI.sectorTimer(slot_center_pos, rect.dims.x * 0.5 * 0.7, timer, .{ .fill_color = .blue });

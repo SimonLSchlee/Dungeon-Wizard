@@ -708,7 +708,7 @@ fn makeRewardUI(reward: *const Reward) Reward.UI {
     };
 }
 
-pub fn renderIconButton(spell_or_item: anytype, crect: menuUI.ClickableRect) Error!?V2f {
+pub fn renderIconButton(self: *const Run, spell_or_item: anytype, crect: menuUI.ClickableRect) Error!?V2f {
     var show_tooltip = false;
     var hovered_crect = crect.rect;
     if (crect.isHovered()) {
@@ -720,6 +720,12 @@ pub fn renderIconButton(spell_or_item: anytype, crect: menuUI.ClickableRect) Err
     }
     getPlat().rectf(hovered_crect.pos, hovered_crect.dims, .{ .fill_color = Colorf.rgb(0.07, 0.05, 0.05) });
     try spell_or_item.renderIcon(hovered_crect);
+
+    if (self.mode == ._mana_mandy) {
+        if (std.meta.hasMethod(@TypeOf(spell_or_item), "renderManaCost")) {
+            spell_or_item.renderManaCost(hovered_crect);
+        }
+    }
     if (show_tooltip) {
         return hovered_crect.pos.add(v2f(hovered_crect.dims.x, 0));
     }
@@ -740,14 +746,14 @@ pub fn renderReward(self: *Run) Error!void {
     var hovered_pos: V2f = .{};
     for (reward_ui.spell_rects.constSlice(), 0..) |crect, i| {
         const spell = reward.spells.get(i);
-        if (try renderIconButton(spell, crect)) |p| {
+        if (try self.renderIconButton(spell, crect)) |p| {
             hovered = .{ .spell = spell };
             hovered_pos = p;
         }
     }
     for (reward_ui.item_rects.constSlice(), 0..) |crect, i| {
         const item = reward.items.get(i);
-        if (try renderIconButton(item, crect)) |p| {
+        if (try self.renderIconButton(item, crect)) |p| {
             hovered = .{ .item = item };
             hovered_pos = p;
         }
