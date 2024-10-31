@@ -418,6 +418,7 @@ cast_ticks: i32 = 60,
 after_cast_slot_cooldown_secs: f32 = 4,
 after_cast_slot_cooldown_ticks: i32 = 4 * 60,
 mislay: bool = false,
+draw_immediate: bool = false,
 mana_cost: i32 = 1, // only applies to Things that have mana!
 
 pub fn getSlotCooldownTicks(self: *const Spell) i32 {

@@ -108,13 +108,15 @@ pub const Input = struct {
                 const max_extra_mana_cooldown_secs: f32 = 2;
                 const per_mana_secs = max_extra_mana_cooldown_secs / utl.as(f32, mana.max);
                 const num_secs: f32 = 1 + per_mana_secs * utl.as(f32, mana.curr);
-                for (ui_slots.getSlotsByKindConst(.spell)) |slot| {
+                const num_ticks = core.secsToTicks(num_secs);
+                for (ui_slots.getSlotsByKindConst(.spell)) |*slot| {
                     if (slot.kind) |k| {
                         const spell = k.spell;
                         room.discardSpell(spell);
                     }
+                    ui_slots.clearSlotByKind(slot.idx, .spell);
+                    ui_slots.setSlotCooldown(slot.idx, .spell, num_ticks);
                 }
-                ui_slots.clearAndSetAllSlotsAndDiscardCooldown(.spell, core.secsToTicks(num_secs));
                 mana.curr = mana.max;
             }
         }
@@ -235,7 +237,11 @@ pub const Controller = struct {
                         if (self.mana) |*mana| {
                             assert(mana.curr >= spell.mana_cost);
                             mana.curr -= spell.mana_cost;
-                            room.ui_slots.setSlotCooldown(slot_idx, .spell, null);
+                            if (spell.draw_immediate) {
+                                room.ui_slots.setSlotCooldown(slot_idx, .spell, 0);
+                            } else {
+                                room.ui_slots.setSlotCooldown(slot_idx, .spell, null);
+                            }
                         } else {
                             room.ui_slots.setSlotCooldown(slot_idx, .spell, spell.getSlotCooldownTicks());
                         }
