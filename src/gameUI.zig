@@ -263,22 +263,7 @@ pub const Slots = struct {
         return ui_clicked;
     }
 
-    pub fn updateSelected(self: *Slots, room: *Room) void {
-        const plat = App.getPlat();
-        const caster = blk: {
-            if (room.getConstPlayer()) |p| {
-                if (p.hp.?.curr > 0) {
-                    break :blk p;
-                }
-            }
-            self.select_state = null;
-            return;
-        };
-        if (plat.input_buffer.mouseBtnIsJustPressed(.right)) {
-            self.select_state = null;
-            return;
-        }
-
+    pub fn updateSelected(self: *Slots, room: *Room, caster: *const Thing) void {
         const clicked_a = self.updateSelectedSlots(room, caster, self.spells.slice(), .spell);
         const clicked_b = self.updateSelectedSlots(room, caster, self.items.slice(), .item);
         if (clicked_a or clicked_b) {

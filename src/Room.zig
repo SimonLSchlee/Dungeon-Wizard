@@ -452,11 +452,6 @@ pub fn update(self: *Room) Error!void {
 
     // update spell slots, and player input
     {
-        const slots = &self.ui_slots;
-        slots.updateSelected(self);
-        if (!self.paused) {
-            slots.updateTimerAndDrawSpell(self);
-        }
         if (self.getPlayer()) |player| {
             try @TypeOf(player.player_input.?).update(player, self);
         }

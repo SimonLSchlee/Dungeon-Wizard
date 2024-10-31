@@ -95,11 +95,17 @@ pub const Input = struct {
         const ui_slots = &room.ui_slots;
         const mouse_pos = plat.getMousePosWorld(room.camera);
 
+        ui_slots.updateSelected(room, self);
+        if (!room.paused) {
+            ui_slots.updateTimerAndDrawSpell(room);
+        }
+
         // tick this here even though its on the player controller
         if (plat.input_buffer.mouseBtnIsJustPressed(.right)) {
             room.move_press_ui_timer.restart();
         }
         if (plat.input_buffer.mouseBtnIsDown(.right)) {
+            ui_slots.select_state = null;
             controller.action_buffered = null;
             try self.findPath(room, mouse_pos);
             _ = room.move_press_ui_timer.tick(true);
