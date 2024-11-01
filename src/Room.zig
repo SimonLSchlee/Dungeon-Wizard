@@ -504,7 +504,11 @@ pub fn update(self: *Room) Error!void {
         self.fog.clearVisible();
         if (self.getPlayer()) |player| {
             self.camera.pos = player.pos.add(v2f(0, plat.native_rect_cropped_dims.y * 0.08));
-            try self.fog.addVisibleCircle(self.tilemap.dims, player.pos, player.vision_range + player.coll_radius);
+            try self.fog.addVisibleCircle(
+                self.tilemap.getRoomRect(),
+                player.pos,
+                player.vision_range + player.coll_radius,
+            );
         }
     }
 
@@ -534,7 +538,7 @@ pub fn render(self: *const Room, native_render_texture: Platform.RenderTexture2D
     }
 
     plat.startRenderToTexture(native_render_texture);
-    plat.clear(Colorf.rgb(0.4, 0.4, 0.4));
+    plat.clear(.black);
     plat.setBlend(.render_tex_alpha);
 
     plat.startCamera2D(self.camera);
@@ -606,7 +610,7 @@ pub fn render(self: *const Room, native_render_texture: Platform.RenderTexture2D
     plat.endCamera2D();
 
     if (fog_enabled) {
-        const fog_texture_opt = .{
+        const fog_texture_opt = draw.TextureOpt{
             .flip_y = true,
         };
         plat.setBlend(.multiply);

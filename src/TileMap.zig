@@ -45,6 +45,7 @@ pub const tile_dims_2 = V2f.splat(tile_sz_f * 0.5);
 
 initted: bool = false,
 tiles: std.AutoArrayHashMap(V2i, Tile) = undefined,
+dims_tiles: V2i = .{},
 dims: V2f = .{},
 
 pub fn init(tiles: []const Tile, dims: V2f) Error!TileMap {
@@ -53,6 +54,7 @@ pub fn init(tiles: []const Tile, dims: V2f) Error!TileMap {
     for (tiles) |tile| {
         try ret.tiles.put(tile.coord, tile);
     }
+    ret.dims_tiles = dims.scale(1 / tile_sz_f).toV2i();
     ret.dims = dims;
     ret.initted = true;
     return ret;
@@ -479,8 +481,22 @@ pub fn debugDraw(self: *const TileMap) Error!void {
     }
 }
 
+pub fn getRoomRect(self: *const TileMap) geom.Rectf {
+    const topleft_coord = v2i(
+        -@divFloor(self.dims_tiles.x, 2),
+        -@divFloor(self.dims_tiles.y, 2),
+    );
+    const topleft_pos = tileCoordToPos(topleft_coord);
+    return .{
+        .pos = topleft_pos,
+        .dims = self.dims,
+    };
+}
+
 pub fn render(self: *const TileMap) Error!void {
     const plat = getPlat();
+    const room_rect = self.getRoomRect();
+    plat.rectf(room_rect.pos, room_rect.dims, .{ .fill_color = Colorf.rgb(0.4, 0.4, 0.4) });
     for (self.tiles.values()) |tile| {
         const color = if (tile.passable) Colorf.lightgray else Colorf.rgb(0.1, 0.1, 0.1);
         plat.rectf(tileCoordToPos(tile.coord), tile_dims, .{ .fill_color = color });

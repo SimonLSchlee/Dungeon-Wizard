@@ -51,7 +51,7 @@ pub fn init() Error!Fog {
     const plat = getPlat();
     return .{
         .visited = Map.init(plat.heap),
-        .render_tex = plat.createRenderTexture("fog", plat.screen_dims),
+        .render_tex = plat.createRenderTexture("fog", core.native_dims),
     };
 }
 
@@ -90,7 +90,7 @@ pub fn clearVisible(self: *Fog) void {
     }
 }
 
-pub fn addVisibleCircle(self: *Fog, room_dims: V2f, pos: V2f, radius: f32) Error!void {
+pub fn addVisibleCircle(self: *Fog, room_rect: geom.Rectf, pos: V2f, radius: f32) Error!void {
     assert(radius >= 0);
     const center_coord = posToTileCoord(pos, world_tiles.sz_f);
     const radius_i: i32 = utl.as(i32, @floor(radius / world_tiles.sz_f));
@@ -99,10 +99,6 @@ pub fn addVisibleCircle(self: *Fog, room_dims: V2f, pos: V2f, radius: f32) Error
     const bl_coord = center_coord.add(tl_offset);
     //std.debug.print("{any}\n", .{bl_coord.sub(tl_coord)});
     var coord = tl_coord;
-    const room_rect: geom.Rectf = .{
-        .pos = room_dims.scale(-0.5),
-        .dims = room_dims,
-    };
 
     while (coord.y < bl_coord.y) {
         while (coord.x < bl_coord.x) {
