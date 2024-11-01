@@ -404,6 +404,11 @@ pub const Slots = struct {
                     switch (k) {
                         .spell => |spell| {
                             spell.renderManaCost(rect);
+                            if (caster.mana) |mana| {
+                                if (mana.curr < spell.mana_cost) {
+                                    plat.rectf(rect.pos, rect.dims, .{ .fill_color = Colorf.red.fade(0.25) });
+                                }
+                            }
                         },
                         else => {},
                     }
