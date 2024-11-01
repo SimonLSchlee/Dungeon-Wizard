@@ -717,7 +717,7 @@ pub const CreatureRenderer = struct {
                 plat.rectf(hp_topleft, v2f(hp_width, hp_height), .{ .fill_color = Colorf.black });
                 plat.rectf(hp_topleft, v2f(curr_width, hp_height), .{ .fill_color = HP.faction_colors.get(self.faction) });
                 { // lines
-                    const line_hp_inc: f32 = if (hp.curr > 10) 10 else 2;
+                    const line_hp_inc: f32 = 10;
                     var i: f32 = line_hp_inc;
                     while (i < hp.curr) {
                         const line_x = curr_width * (i / hp.curr);
@@ -744,7 +744,7 @@ pub const CreatureRenderer = struct {
                     }
                     { // lines
                         const curr_shield_width = utl.remapClampf(0, total_shield_amount, 0, hp_width, curr_shield_amount);
-                        const line_shield_inc: f32 = if (curr_shield_amount > 10) 10 else 1;
+                        const line_shield_inc: f32 = 10;
                         var i: f32 = 0;
                         while (i <= curr_shield_amount) {
                             const line_x = curr_shield_width * (i / curr_shield_amount);
