@@ -172,7 +172,7 @@ pub const AIController = struct {
                     const dist_til_in_range = range - ai.attack_range;
                     var target_pos = target.pos;
                     // predictive movement if close enough
-                    if (dist_til_in_range < 50) {
+                    if (range < 80) {
                         const time_til_reach = dist_til_in_range / self.accel_params.max_speed;
                         target_pos = target.pos.add(target.vel.scale(time_til_reach));
                     }
