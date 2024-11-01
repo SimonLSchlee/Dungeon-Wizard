@@ -128,7 +128,8 @@ pub const Place = union(PlaceKind) {
 };
 
 gold: i32 = 0,
-room: ?Room = null,
+room: Room = undefined,
+room_exists: bool = false,
 reward: ?Reward = null,
 shop: ?Shop = null,
 reward_ui: Reward.UI = undefined,
@@ -229,8 +230,8 @@ pub fn initRandom(run: *Run, mode: Mode) Error!*Run {
 }
 
 pub fn deinit(self: *Run) void {
-    if (self.room) |*room| {
-        room.deinit();
+    if (self.room_exists) {
+        self.room.deinit();
     }
 }
 
@@ -245,9 +246,9 @@ pub fn startRun(self: *Run) Error!void {
 
 pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
     const data = App.get().data;
-    if (self.room) |*room| {
-        room.deinit();
-        self.room = null;
+    if (self.room_exists) {
+        self.room.deinit();
+        self.room_exists = false;
     }
     if (self.shop) |*shop| {
         shop.deinit();
@@ -264,7 +265,7 @@ pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
             if (r.kind == .first) {
                 waves_params.first_wave_delay_ticks = 0;
             }
-            self.room = try Room.init(.{
+            _ = try Room.init(&self.room, .{
                 .deck = self.deck,
                 .waves_params = waves_params,
                 .packed_room = packed_room,
@@ -273,9 +274,10 @@ pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
                 .player = self.player_thing,
                 .slots_params = self.slots_init_params,
             });
+            self.room_exists = true;
             // TODO hacky
             // update once to clear fog
-            try self.room.?.update();
+            try self.room.update();
             self.screen = .game;
         },
         .shop => |s| {
@@ -317,8 +319,8 @@ pub fn canPickupProduct(self: *const Run, product: *const Shop.Product) bool {
             if (self.deck.len >= self.deck.buffer.len) return false;
         },
         .item => |_| {
-            if (self.room) |*room| {
-                if (room.ui_slots.getNextEmptyItemSlot() == null) return false;
+            if (self.room_exists) {
+                if (self.room.ui_slots.getNextEmptyItemSlot() == null) return false;
             } else {
                 for (self.slots_init_params.items.constSlice()) |maybe_item| {
                     if (maybe_item == null) break;
@@ -338,16 +340,16 @@ pub fn pickupProduct(self: *Run, product: *const Shop.Product) void {
             assert(self.deck.len < self.deck.buffer.len);
             self.deck.append(spell) catch unreachable;
             // TODO ugh?
-            if (self.room) |*room| {
-                room.init_params.deck.append(spell) catch unreachable;
-                room.draw_pile.append(spell) catch unreachable;
+            if (self.room_exists) {
+                self.room.init_params.deck.append(spell) catch unreachable;
+                self.room.draw_pile.append(spell) catch unreachable;
             }
         },
         .item => |item| {
             // TODO ugh?
-            if (self.room) |*room| {
-                if (room.ui_slots.getNextEmptyItemSlot()) |slot| {
-                    room.ui_slots.items.buffer[slot.idx].kind = .{ .item = item };
+            if (self.room_exists) {
+                if (self.room.ui_slots.getNextEmptyItemSlot()) |slot| {
+                    self.room.ui_slots.items.buffer[slot.idx].kind = .{ .item = item };
                 } else {
                     unreachable;
                 }
@@ -372,8 +374,8 @@ fn loadNextPlace(self: *Run) void {
 
 pub fn gameUpdate(self: *Run) Error!void {
     const plat = getPlat();
-    assert(self.room != null);
-    const room = &self.room.?;
+    assert(self.room_exists);
+    const room = &self.room;
 
     if (debug.enable_debug_controls) {
         if (plat.input_buffer.keyIsJustPressed(.f4)) {
@@ -431,8 +433,8 @@ pub fn gameUpdate(self: *Run) Error!void {
 pub fn pauseMenuUpdate(self: *Run) Error!void {
     const plat = getPlat();
     // TODO could pause in shop or w/e
-    assert(self.room != null);
-    const room = &self.room.?;
+    assert(self.room_exists);
+    const room = &self.room;
     //if (plat.input_buffer.keyIsJustPressed(.escape)) {
     //    self.screen = .game;
     //}
@@ -512,7 +514,8 @@ pub fn deadUpdate(self: *Run) Error!void {
     } else if (self.dead_menu.quit_button.isClicked()) {
         plat.exit();
     } else if (self.dead_menu.retry_room_button.isClicked()) {
-        try self.room.?.reset();
+        assert(self.room_exists);
+        try self.room.reset();
         self.screen = .game;
     }
 }
@@ -785,14 +788,14 @@ pub fn renderReward(self: *Run) Error!void {
 pub fn render(self: *Run, native_render_texture: Platform.RenderTexture2D) Error!void {
     const plat = getPlat();
 
-    if (self.room) |room| {
-        try room.render(native_render_texture);
+    if (self.room_exists) {
+        try self.room.render(native_render_texture);
     }
 
     switch (self.screen) {
         .game => {
-            assert(self.room != null);
-            const room = &self.room.?;
+            assert(self.room_exists);
+            const room = &self.room;
             if (room.paused) {
                 // TODO these dont work so don't show em
                 //try self.game_pause_ui.deck_button.render();

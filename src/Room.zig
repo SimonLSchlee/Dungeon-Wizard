@@ -213,17 +213,17 @@ rng: std.Random.DefaultPrng = undefined,
 tilemap: TileMap = .{},
 init_params: InitParams,
 
-pub fn init(params: InitParams) Error!Room {
-    var ret: Room = .{
+pub fn init(room: *Room, params: InitParams) Error!*Room {
+    room.* = .{
         .next_pool_id = 0,
         .fog = try Fog.init(),
         .init_params = params,
     };
 
     // everything is done except spawning stuff
-    try ret.reset();
+    try room.reset();
 
-    return ret;
+    return room;
 }
 
 pub fn deinit(self: *Room) void {
