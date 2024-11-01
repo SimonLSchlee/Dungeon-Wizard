@@ -93,11 +93,7 @@ pub const Slots = struct {
         slot_idx: usize,
     } = null,
     selected_method: Options.CastMethod = .left_click,
-    discard_button: ?struct {
-        btn: menuUI.HotKeyedButton,
-        cooldown_timer: ?utl.TickCounter = null,
-        hover_timer: utl.TickCounter = utl.TickCounter.init(15),
-    } = null,
+    discard_button: ?menuUI.HotKeyedButton = null,
 
     pub fn init(room: *Room, params: InitParams) Slots {
         assert(params.num_spell_slots < max_spell_slots);
@@ -129,19 +125,25 @@ pub const Slots = struct {
         }
 
         if (params.discard_button) {
+            const data = App.get().data;
             const spell_rects = ret.getSlotRects(.spell);
             const last = spell_rects.get(spell_rects.len - 1);
             const right_middle = last.pos.add(v2f(last.dims.x, last.dims.y * 0.5));
             const discard_btn_dims = v2f(48, 48);
             const rect_center = right_middle.add(v2f(spell_slot_spacing + discard_btn_dims.x * 0.5, 0));
             ret.discard_button = .{
-                .btn = .{
-                    .key = discard_key,
-                    .key_str = discard_key_str,
-                    .crect = .{ .rect = .{
-                        .pos = rect_center.sub(discard_btn_dims.scale(0.5)),
-                        .dims = discard_btn_dims,
-                    } },
+                .key = discard_key,
+                .key_str = discard_key_str,
+                .crect = .{ .rect = .{
+                    .pos = rect_center.sub(discard_btn_dims.scale(0.5)),
+                    .dims = discard_btn_dims,
+                } },
+                .icon = .{
+                    .render_info = .{ .frame = data.misc_icons.getRenderFrame(.discard).? },
+                    .tint = Colorf.rgb(0.7, 0, 0),
+                },
+                .poly_opt = .{
+                    .fill_color = Colorf.rgb(0.1, 0.1, 0.1),
                 },
             };
         }
@@ -244,12 +246,8 @@ pub const Slots = struct {
                 }
             }
         }
-        if (self.discard_button) |*d| {
-            if (d.cooldown_timer) |*timer| {
-                if (timer.tick(false)) {
-                    d.cooldown_timer = null;
-                }
-            }
+        if (self.discard_button) |*btn| {
+            btn.update();
         }
     }
 
@@ -322,7 +320,7 @@ pub const Slots = struct {
         const clicked_b = self.updateSelectedSlots(room, caster, self.items.slice(), .item);
         var clicked_c = false;
         if (self.discard_button) |*d| {
-            clicked_c = d.btn.isClicked();
+            clicked_c = d.isClicked();
         }
 
         if (clicked_a or clicked_b or clicked_c) {
@@ -345,7 +343,7 @@ pub const Slots = struct {
             if (btn.cooldown_timer) |timer| {
                 if (timer.running) return false;
             }
-            if (btn.btn.isClicked() or btn.btn.isHotkeyed()) {
+            if (btn.isClicked() or btn.isHotkeyed()) {
                 return true;
             }
         }
@@ -476,7 +474,7 @@ pub const Slots = struct {
         { // debug deck stuff
             var right_center: V2f = .{};
             if (self.discard_button) |d| {
-                const rect = d.btn.toRectf();
+                const rect = d.toRectf();
                 right_center = rect.pos.add(v2f(rect.dims.x, rect.dims.y * 0.5));
             } else {
                 const rects = self.getSlotRects(.spell);
@@ -500,12 +498,10 @@ pub const Slots = struct {
         try self.renderSlots(room, caster, self.items.constSlice(), .item, slots_are_enabled);
         if (self.discard_button) |btn| {
             const enabled = self.discardEnabled();
-            try btn.btn.render(enabled);
-            if (btn.cooldown_timer) |timer| {
-                if (timer.running) {
-                    const btn_rect = btn.btn.toRectf();
-                    menuUI.sectorTimer(btn_rect.pos.add(btn_rect.dims.scale(0.5)), btn_rect.dims.x * 0.5 * 0.7, timer, .{ .fill_color = .blue });
-                }
+            try btn.render(enabled);
+            if (btn.isLongHovered()) {
+                const rect = btn.toRectf();
+                try menuUI.renderToolTip("Discard hand", "", rect.pos.add(v2f(rect.dims.x, 0)));
             }
         }
         // tooltips on top of everything

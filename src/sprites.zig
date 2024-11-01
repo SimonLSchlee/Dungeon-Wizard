@@ -35,6 +35,10 @@ pub const RenderIconInfo = union(enum) {
     frame: RenderFrame,
 
     pub fn render(icon: *const RenderIconInfo, rect: geom.Rectf) Error!void {
+        try icon.renderTint(rect, .white);
+    }
+
+    pub fn renderTint(icon: *const RenderIconInfo, rect: geom.Rectf, tint: Colorf) Error!void {
         const plat = App.getPlat();
         const icon_center_pos = rect.pos.add(rect.dims.scale(0.5));
         // TODO retain aspect ratio of texture always!
@@ -45,6 +49,7 @@ pub const RenderIconInfo = union(enum) {
                     .src_pos = frame.pos.toV2f(),
                     .src_dims = frame.size.toV2f(),
                     .scaled_dims = rect.dims,
+                    .tint = tint,
                 });
             },
             .letter => |letter| {

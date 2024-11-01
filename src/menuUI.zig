@@ -17,6 +17,7 @@ const v2i = V2i.v2i;
 const Run = @This();
 const App = @import("App.zig");
 const getPlat = App.getPlat;
+const sprites = @import("sprites.zig");
 
 // render text at the right size to fit into a rect, with padding
 pub fn textInRect(topleft: V2f, dims: V2f, rect_opt: draw.PolyOpt, text_padding: V2f, comptime fmt: []const u8, args: anytype, text_opt: draw.TextOpt) Error!void {
@@ -146,6 +147,7 @@ pub const HotKeyedButton = struct {
         .fill_color = Colorf.red.fade(0.5),
     },
     hover_timer: ?utl.TickCounter = utl.TickCounter.init(15),
+    cooldown_timer: ?utl.TickCounter = null,
     text: ?struct {
         str: utl.BoundedString(64) = .{},
         padding: V2f = v2f(20, 20),
@@ -155,16 +157,23 @@ pub const HotKeyedButton = struct {
             .center = true,
         },
     } = null,
+    icon: ?struct {
+        render_info: sprites.RenderIconInfo,
+        tint: Colorf = .white,
+    } = null,
 
     pub fn toRectf(self: HotKeyedButton) geom.Rectf {
         return self.crect.toRectf();
     }
-    pub fn isHovered(self: HotKeyedButton) bool {
+    pub fn isLongHovered(self: HotKeyedButton) bool {
         const hovered = self.crect.isHovered();
         if (self.hover_timer) |timer| {
             if (hovered and timer.running) return false;
         }
         return hovered;
+    }
+    pub fn isHovered(self: HotKeyedButton) bool {
+        return self.crect.isHovered();
     }
     pub fn update(self: *HotKeyedButton) void {
         const hovered = self.crect.isHovered();
@@ -173,6 +182,11 @@ pub const HotKeyedButton = struct {
                 _ = timer.tick(false);
             } else {
                 timer.restart();
+            }
+        }
+        if (self.cooldown_timer) |*timer| {
+            if (timer.tick(false)) {
+                self.cooldown_timer = null;
             }
         }
     }
@@ -198,8 +212,23 @@ pub const HotKeyedButton = struct {
             }
         }
         plat.rectf(rect.pos, rect.dims, self.poly_opt);
-        if (self.text) |text| {
-            try plat.textf(rect.pos.add(text.rel_pos), "{s}", .{text.str.constSlice()}, text.opt);
+
+        if (self.cooldown_timer) |timer| {
+            if (timer.running) {
+                sectorTimer(
+                    rect.pos.add(rect.dims.scale(0.5)),
+                    rect.dims.x * 0.5 * 0.7,
+                    timer,
+                    .{ .fill_color = .blue },
+                );
+            }
+        } else {
+            if (self.icon) |icon| {
+                try icon.render_info.renderTint(rect, icon.tint);
+            }
+            if (self.text) |text| {
+                try plat.textf(rect.pos.add(text.rel_pos), "{s}", .{text.str.constSlice()}, text.opt);
+            }
         }
 
         // border

@@ -117,6 +117,7 @@ pub const Input = struct {
                     ui_slots.clearSlotByKind(slot.idx, .spell);
                     ui_slots.setSlotCooldown(slot.idx, .spell, num_ticks);
                 }
+                ui_slots.discard_button.?.cooldown_timer = utl.TickCounter.init(num_ticks);
                 mana.curr = mana.max;
             }
         }
