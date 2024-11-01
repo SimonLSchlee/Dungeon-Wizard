@@ -243,6 +243,10 @@ fn IconSprites(EnumType: type) type {
     };
 }
 
+pub const MiscIcon = enum {
+    discard,
+};
+
 creatures: std.EnumArray(Thing.CreatureKind, Thing) = undefined,
 creature_sprite_sheets: AllCreatureSpriteSheetArrays = undefined,
 creature_anims: AllCreatureAnimArrays = undefined,
@@ -252,6 +256,7 @@ vfx_anims: std.ArrayList(sprites.VFXAnim) = undefined,
 vfx_anim_mappings: sprites.VFXAnim.IdxMapping = undefined,
 spell_icons: IconSprites(Spell.Kind) = undefined,
 item_icons: IconSprites(Item.Kind) = undefined,
+misc_icons: IconSprites(MiscIcon) = undefined,
 sounds: std.EnumArray(SFX, ?Platform.Sound) = undefined,
 // roooms
 test_rooms: std.BoundedArray(PackedRoom, 32) = .{},
@@ -418,20 +423,12 @@ pub fn loadSpriteSheetFromJson(json_file: std.fs.File, assets_images_rel_dir_pat
     return sheet;
 }
 
-pub fn loadItemIcons(self: *Data) Error!void {
+pub fn loadSpriteSheetFromJsonPath(_: *Data, assets_rel_json_path: []const u8) Error!SpriteSheet {
     const plat = App.getPlat();
-    const path = try u.bufPrintLocal("{s}/images/ui/item_icons.json", .{plat.assets_path});
+    const path = try u.bufPrintLocal("{s}/{s}", .{ plat.assets_path, assets_rel_json_path });
     const icons_json = std.fs.cwd().openFile(path, .{}) catch return Error.FileSystemFail;
     const sheet = try loadSpriteSheetFromJson(icons_json, "ui");
-    self.item_icons = try @TypeOf(self.item_icons).init(sheet);
-}
-
-pub fn loadSpellIcons(self: *Data) Error!void {
-    const plat = App.getPlat();
-    const path = try u.bufPrintLocal("{s}/images/ui/spell_icons.json", .{plat.assets_path});
-    const icons_json = std.fs.cwd().openFile(path, .{}) catch return Error.FileSystemFail;
-    const sheet = try loadSpriteSheetFromJson(icons_json, "ui");
-    self.spell_icons = try @TypeOf(self.spell_icons).init(sheet);
+    return sheet;
 }
 
 pub fn loadCreatureSpriteSheets(self: *Data) Error!void {
@@ -598,8 +595,9 @@ pub fn loadVFXSpriteSheets(self: *Data) Error!void {
 pub fn loadSpriteSheets(self: *Data) Error!void {
     try self.loadCreatureSpriteSheets();
     try self.loadVFXSpriteSheets();
-    try self.loadSpellIcons();
-    try self.loadItemIcons();
+    self.item_icons = try @TypeOf(self.item_icons).init(try self.loadSpriteSheetFromJsonPath("images/ui/item_icons.json"));
+    self.spell_icons = try @TypeOf(self.spell_icons).init(try self.loadSpriteSheetFromJsonPath("images/ui/spell_icons.json"));
+    self.misc_icons = try @TypeOf(self.misc_icons).init(try self.loadSpriteSheetFromJsonPath("images/ui/misc_icons.json"));
 }
 
 pub fn reload(self: *Data) Error!void {
