@@ -118,11 +118,8 @@ pub const Place = union(PlaceKind) {
     pub const Array = std.BoundedArray(Place, 32);
 
     room: struct {
-        kind: union(enum) {
-            first,
-            normal: usize,
-            boss,
-        },
+        kind: Data.RoomKind,
+        idx: usize,
         difficulty: f32,
     },
     shop: struct {
@@ -160,10 +157,10 @@ load_state: enum {
 } = .fade_in,
 curr_tick: i64 = 0,
 
-pub fn initSeeded(mode: Mode, seed: u64) Error!Run {
+pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
     const app = App.get();
 
-    var ret: Run = .{
+    run.* = .{
         .rng = std.Random.DefaultPrng.init(seed),
         .seed = seed,
         .deck = makeStarterDeck(false),
@@ -174,8 +171,8 @@ pub fn initSeeded(mode: Mode, seed: u64) Error!Run {
     };
 
     // TODO elsewhererre?
-    ret.slots_init_params.discard_button = mode == ._mana_mandy;
-    ret.slots_init_params.items = @TypeOf(ret.slots_init_params.items).fromSlice(&.{
+    run.slots_init_params.discard_button = mode == ._mana_mandy;
+    run.slots_init_params.items = @TypeOf(run.slots_init_params.items).fromSlice(&.{
         Item.getProto(.pot_hp),
         null,
         null,
@@ -184,27 +181,51 @@ pub fn initSeeded(mode: Mode, seed: u64) Error!Run {
 
     // init places
     var places = Place.Array{};
-    for (0..app.data.normal_rooms.len) |i| {
-        try places.append(.{ .room = .{ .difficulty = 0, .kind = .{ .normal = i } } });
+
+    var smol_room_idxs = std.BoundedArray(usize, 16){};
+    for (0..app.data.rooms.get(.smol).len) |i| {
+        smol_room_idxs.append(i) catch unreachable;
     }
-    assert(places.len >= 2);
-    ret.rng.random().shuffleWithIndex(Place, places.slice(), u32);
+    run.rng.random().shuffleWithIndex(usize, smol_room_idxs.slice(), u32);
+
+    for (0..3) |i| {
+        try places.append(.{ .room = .{
+            .difficulty = 0,
+            .kind = .smol,
+            .idx = smol_room_idxs.get(i),
+        } });
+    }
+
+    var big_room_idxs = std.BoundedArray(usize, 16){};
+    for (0..app.data.rooms.get(.smol).len) |i| {
+        big_room_idxs.append(i) catch unreachable;
+    }
+    run.rng.random().shuffleWithIndex(usize, big_room_idxs.slice(), u32);
+
+    for (0..3) |i| {
+        try places.append(.{ .room = .{
+            .difficulty = 0,
+            .kind = .big,
+            .idx = big_room_idxs.get(i),
+        } });
+    }
+
     for (places.slice(), 0..) |*place, i| {
         place.room.difficulty = 4 + u.as(f32, i) * 2;
     }
     try places.insert(places.len / 2, .{ .shop = .{ .num = 0 } });
-    try places.insert(0, .{ .room = .{ .difficulty = 0, .kind = .first } });
+    try places.insert(0, .{ .room = .{ .difficulty = 0, .kind = .first, .idx = 0 } });
     try places.append(.{ .shop = .{ .num = 1 } });
-    try places.append(.{ .room = .{ .difficulty = places.get(places.len - 2).room.difficulty, .kind = .boss } });
-    ret.places = places;
+    try places.append(.{ .room = .{ .difficulty = places.get(places.len - 2).room.difficulty, .kind = .boss, .idx = 0 } });
+    run.places = places;
 
-    return ret;
+    return run;
 }
 
-pub fn initRandom(mode: Mode) Error!Run {
+pub fn initRandom(run: *Run, mode: Mode) Error!*Run {
     var rng = std.Random.DefaultPrng.init(u.as(u64, std.time.microTimestamp()));
     const seed = rng.random().int(u64);
-    return try initSeeded(mode, seed);
+    return try initSeeded(run, mode, seed);
 }
 
 pub fn deinit(self: *Run) void {
@@ -215,7 +236,7 @@ pub fn deinit(self: *Run) void {
 
 pub fn reset(self: *Run) Error!void {
     self.deinit();
-    self.* = try initRandom(self.mode);
+    _ = try initRandom(self, self.mode);
 }
 
 pub fn startRun(self: *Run) Error!void {
@@ -234,20 +255,11 @@ pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
     }
     switch (self.places.get(self.curr_place_idx)) {
         .room => |r| {
-            const packed_room = switch (r.kind) {
-                .first => data.first_room,
-                .normal => |idx| data.normal_rooms.get(idx),
-                .boss => data.boss_room,
-            };
+            const packed_room = data.rooms.get(r.kind).get(r.idx);
             const exit_doors = self.makeExitDoors(packed_room);
             var waves_params = Room.WavesParams{
                 .difficulty = r.difficulty,
-                .room_kind = switch (r.kind) {
-                    // TODO lel?
-                    .first => .first,
-                    .boss => .boss,
-                    .normal => .normal,
-                },
+                .room_kind = r.kind,
             };
             if (r.kind == .first) {
                 waves_params.first_wave_delay_ticks = 0;
@@ -371,8 +383,9 @@ pub fn gameUpdate(self: *Run) Error!void {
             if (plat.input_buffer.getNumberKeyJustPressed()) |num| {
                 const app = App.get();
                 const n: usize = if (num == 0) 9 else num - 1;
-                if (n < app.data.test_rooms.len) {
-                    const packed_room = app.data.test_rooms.get(n);
+                const test_rooms = app.data.rooms.getPtr(.testu);
+                if (n < test_rooms.len) {
+                    const packed_room = test_rooms.get(n);
                     try room.reloadFromPackedRoom(packed_room);
                 }
             }
@@ -392,7 +405,7 @@ pub fn gameUpdate(self: *Run) Error!void {
         },
         .won => {
             const curr_room_place = self.places.get(self.curr_place_idx).room;
-            if (self.reward == null and curr_room_place.kind == .normal) {
+            if (self.reward == null and curr_room_place.kind == .smol or curr_room_place.kind == .big) {
                 self.makeReward();
                 // TODO bettterrr?
                 self.gold += u.as(i32, @floor(curr_room_place.difficulty)) + self.rng.random().uintAtMost(u8, 5);

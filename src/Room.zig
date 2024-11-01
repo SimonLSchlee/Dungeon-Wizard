@@ -60,11 +60,7 @@ pub const WavesParams = struct {
     min_waves: usize = 2,
     max_waves: usize = 4,
     enemy_kinds: []const Thing.CreatureKind = &all_enemy_kinds,
-    room_kind: enum {
-        first,
-        normal,
-        boss,
-    } = .normal,
+    room_kind: Data.RoomKind,
 };
 
 pub const Wave = struct {
@@ -93,9 +89,7 @@ fn makeWaves(packed_room: PackedRoom, rng: std.Random, params: WavesParams) Wave
         .boss => {
             // TODO?
         },
-        .normal => {
-            // below is normal I guess
-        },
+        else => {},
     }
 
     var difficulty_left = params.difficulty;

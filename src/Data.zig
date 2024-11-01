@@ -135,7 +135,7 @@ const boss_room_str =
     \\###############
 ;
 
-const normal_room_strs = [_][]const u8{
+const smol_room_strs = [_][]const u8{
     \\#########
     \\#   #   #
     \\# 0 1 0 #
@@ -164,6 +164,18 @@ const normal_room_strs = [_][]const u8{
     \\##  &  &  ##
     \\############
     ,
+    \\###########
+    \\## 1 # 1 ##
+    \\#    p    #
+    \\#   # #   #
+    \\# #2   2# #
+    \\#   # #   #
+    \\##  & &  ##
+    \\###########
+    ,
+};
+
+const big_room_strs = [_][]const u8{
     \\############
     \\#   &  &   #
     \\#      3   #
@@ -197,6 +209,18 @@ const normal_room_strs = [_][]const u8{
     \\#    ##    #
     \\# 0      0 #
     \\#    ## p  #
+    \\############
+    ,
+    \\############
+    \\####&  &####
+    \\##     3 ###
+    \\#  # ##   ##
+    \\# 1  ### 1##
+    \\##  0     ##
+    \\##   ##0  ##
+    \\# 2  ##  2 #
+    \\##  3 p   ##
+    \\#####    ###
     \\############
     ,
 };
@@ -249,6 +273,31 @@ pub const MiscIcon = enum {
     discard,
 };
 
+pub const PackedRoomBuf = std.BoundedArray(PackedRoom, 16);
+
+pub const SFX = enum {
+    thwack,
+    spell_casting,
+    spell_cast,
+    spell_fizzle,
+};
+
+pub const RoomKind = enum {
+    testu,
+    first,
+    smol,
+    big,
+    boss,
+};
+
+pub const room_strs = std.EnumArray(RoomKind, []const []const u8).init(.{
+    .testu = &test_rooms_strs,
+    .first = &.{first_room_str},
+    .smol = &smol_room_strs,
+    .big = &big_room_strs,
+    .boss = &.{boss_room_str},
+});
+
 creatures: std.EnumArray(Thing.CreatureKind, Thing) = undefined,
 creature_sprite_sheets: AllCreatureSpriteSheetArrays = undefined,
 creature_anims: AllCreatureAnimArrays = undefined,
@@ -261,17 +310,7 @@ item_icons: IconSprites(Item.Kind) = undefined,
 misc_icons: IconSprites(MiscIcon) = undefined,
 sounds: std.EnumArray(SFX, ?Platform.Sound) = undefined,
 // roooms
-test_rooms: std.BoundedArray(PackedRoom, 32) = .{},
-normal_rooms: std.BoundedArray(PackedRoom, 32) = .{},
-boss_room: PackedRoom = undefined,
-first_room: PackedRoom = undefined,
-
-pub const SFX = enum {
-    thwack,
-    spell_casting,
-    spell_cast,
-    spell_fizzle,
-};
+rooms: std.EnumArray(RoomKind, PackedRoomBuf) = undefined,
 
 pub fn init() Error!*Data {
     const plat = App.getPlat();
@@ -617,14 +656,13 @@ pub fn reload(self: *Data) Error!void {
             .impling = try @import("spells/Impling.zig").implingProto(),
         },
     );
-    self.test_rooms = .{};
-    for (test_rooms_strs) |s| {
-        try self.test_rooms.append(try PackedRoom.init(s));
+    self.rooms = @TypeOf(self.rooms).initDefault(.{}, .{});
+    inline for (std.meta.fields(RoomKind)) |f| {
+        const kind: RoomKind = @enumFromInt(f.value);
+        const strs = room_strs.get(kind);
+        const packed_rooms = self.rooms.getPtr(kind);
+        for (strs) |s| {
+            try packed_rooms.append(try PackedRoom.init(s));
+        }
     }
-    self.normal_rooms = .{};
-    for (normal_room_strs) |s| {
-        try self.normal_rooms.append(try PackedRoom.init(s));
-    }
-    self.first_room = try PackedRoom.init(first_room_str);
-    self.boss_room = try PackedRoom.init(boss_room_str);
 }
