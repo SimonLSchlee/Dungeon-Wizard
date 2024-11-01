@@ -24,15 +24,23 @@ const TileMap = @import("TileMap.zig");
 const AttackType = union(enum) {
     melee: struct {
         lunge_accel: ?Thing.AccelParams = null,
+        hit_to_side_force: f32 = 0,
     },
     projectile: EnemyProjectile,
 };
 
 const EnemyProjectile = enum {
     arrow,
+
+    pub fn prototype(self: EnemyProjectile) Thing {
+        switch (self) {
+            .arrow => return gobbowArrow(),
+        }
+        unreachable;
+    }
 };
 
-fn gobbowArrow(shooter: *Thing) Thing {
+fn gobbowArrow() Thing {
     const arrow = Thing{
         .kind = .projectile,
         .coll_radius = 5,
@@ -54,7 +62,6 @@ fn gobbowArrow(shooter: *Thing) Thing {
             .active = true,
             .deactivate_on_hit = true,
             .deactivate_on_update = false,
-            .mask = Thing.Faction.opposing_masks.get(shooter.faction),
             .effect = .{ .damage = 7 },
             .radius = 4,
         },
@@ -197,15 +204,6 @@ pub const AIController = struct {
                 };
                 const dist = target.pos.dist(self.pos);
                 const range = @max(dist - self.coll_radius - target.coll_radius, 0);
-                // dont want it to be cancelable
-                //const range = @max(dist - self.coll_radius - target.coll_radius, 0);
-                // unless out of range, then pursue
-                //if (range > ai.attack_range) {
-                //    ai.ticks_in_state = 0;
-                //    continue :state .pursue;
-                //}
-                // face le target, unless past point of no return
-
                 switch (ai.attack_type) {
                     .melee => |m| {
                         self.updateVel(.{}, .{});
@@ -224,8 +222,7 @@ pub const AIController = struct {
                             }
                         }
                         if (events.contains(.end)) {
-                            self.updateVel(.{}, .{});
-                            //std.debug.print("attack end\n", .{});
+                            // deactivate hitbox
                             if (self.hitbox) |*hitbox| {
                                 hitbox.active = false;
                             }
@@ -249,6 +246,11 @@ pub const AIController = struct {
                                 hitbox.mask = Thing.Faction.opposing_masks.get(self.faction);
                                 hitbox.rel_pos = self.dir.scale(hitbox.rel_pos.length());
                                 hitbox.active = true;
+                                if (m.hit_to_side_force > 0) {
+                                    const d = if (self.dir.cross(target.pos.sub(self.pos)) > 0) self.dir.rotRadians(-utl.pi / 3) else self.dir.rotRadians(utl.pi / 3);
+                                    hitbox.effect.force = .{ .fixed = d.scale(m.hit_to_side_force) };
+                                }
+                                // play sound
                                 if (App.get().data.sounds.get(.thwack)) |s| {
                                     App.getPlat().playSound(s);
                                 }
@@ -263,13 +265,12 @@ pub const AIController = struct {
                     .projectile => |proj_name| {
                         self.updateVel(.{}, .{});
                         const events = self.animator.?.play(.attack, .{ .loop = true });
-                        var proj = switch (proj_name) {
-                            .arrow => gobbowArrow(self),
-                        };
+                        // face/track target
+                        var projectile = proj_name.prototype();
                         if (ai.can_turn_during_attack) {
                             if (self.animator.?.getTicksUntilEvent(.hit)) |ticks_til_hit_event| {
                                 var ticks_til_hit = utl.as(f32, ticks_til_hit_event);
-                                ticks_til_hit += range / proj.accel_params.max_speed;
+                                ticks_til_hit += range / projectile.accel_params.max_speed;
                                 const target_pos = target.pos.add(target.vel.scale(ticks_til_hit));
                                 self.dir = target_pos.sub(self.pos).normalizedChecked() orelse self.dir;
                             } else {
@@ -290,10 +291,10 @@ pub const AIController = struct {
                             self.renderer.creature.draw_color = Colorf.red;
                             switch (proj_name) {
                                 .arrow => {
-                                    // TODO clean up?
-                                    proj.dir = self.dir;
-                                    proj.hitbox.?.rel_pos = self.dir.scale(28);
-                                    _ = try room.queueSpawnThing(&proj, self.pos);
+                                    projectile.dir = self.dir;
+                                    projectile.hitbox.?.mask = Thing.Faction.opposing_masks.get(self.faction);
+                                    projectile.hitbox.?.rel_pos = self.dir.scale(28);
+                                    _ = try room.queueSpawnThing(&projectile, self.pos);
                                 },
                             }
                         }
@@ -614,6 +615,7 @@ pub fn sharpboi() Error!Thing {
                     .max_speed = 5,
                     .friction = 0,
                 },
+                .hit_to_side_force = 2.5,
             } },
             .LOS_thiccness = 30,
         } },
