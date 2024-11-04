@@ -533,13 +533,17 @@ pub fn loadFont(self: *Platform, path: []const u8) Error!Font {
 
 pub fn loadTexture(self: *Platform, path: []const u8) Error!Texture2D {
     @setRuntimeSafety(core.rt_safe_blocks);
-    const path_z = try std.fmt.bufPrintZ(self.str_fmt_buf, "{s}/images/{s}", .{ self.assets_path, path });
+    const path_z = try std.fmt.bufPrintZ(self.str_fmt_buf, "{s}/{s}", .{ self.assets_path, path });
     const r_tex = r.LoadTexture(path_z);
     return .{
         .name = path,
         .dims = .{ .x = @intCast(r_tex.width), .y = @intCast(r_tex.height) },
         .r_tex = r_tex,
     };
+}
+pub fn unloadTexture(self: *Platform, texture: Texture2D) void {
+    _ = self;
+    r.UnloadTexture(texture.r_tex);
 }
 
 pub fn createRenderTexture(_: *Platform, name: []const u8, dims: V2i) RenderTexture2D {

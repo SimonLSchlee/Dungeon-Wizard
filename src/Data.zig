@@ -22,7 +22,29 @@ const Spell = @import("Spell.zig");
 const Item = @import("Item.zig");
 const PackedRoom = @import("PackedRoom.zig");
 const player = @import("player.zig");
+const TileMap = @import("TileMap.zig");
 const Data = @This();
+
+pub const TileSet = struct {
+    pub const NameBuf = u.BoundedString(64);
+    pub const GameTileCorner = enum(u4) {
+        NW,
+        NE,
+        SW,
+        SE,
+        const Map = std.EnumArray(GameTileCorner, bool);
+    };
+    pub const TileProperties = struct {
+        coll: GameTileCorner.Map = GameTileCorner.Map.initFill(false),
+    };
+
+    name: NameBuf = .{}, // filename without extension (.tsj)
+    id: i32 = 0,
+    texture: Platform.Texture2D = undefined,
+    tile_dims: V2i = .{},
+    sheet_dims: V2i = .{},
+    tiles: std.BoundedArray(TileProperties, TileMap.max_map_tiles) = .{},
+};
 
 pub fn EnumToBoundedStringArrayType(E: type) type {
     var max_len = 0;
@@ -298,6 +320,7 @@ pub const room_strs = std.EnumArray(RoomKind, []const []const u8).init(.{
     .boss = &.{boss_room_str},
 });
 
+tilesets: std.ArrayList(TileSet) = undefined,
 creatures: std.EnumArray(Thing.CreatureKind, Thing) = undefined,
 creature_sprite_sheets: AllCreatureSpriteSheetArrays = undefined,
 creature_anims: AllCreatureAnimArrays = undefined,
@@ -318,6 +341,7 @@ pub fn init() Error!*Data {
     data.* = .{};
     data.vfx_anims = @TypeOf(data.vfx_anims).init(plat.heap);
     data.vfx_sprite_sheets = @TypeOf(data.vfx_sprite_sheets).init(plat.heap);
+    data.tilesets = @TypeOf(data.tilesets).init(plat.heap);
     try data.reload();
     return data;
 }
@@ -371,7 +395,7 @@ pub fn loadSounds(self: *Data) Error!void {
     }
 }
 
-pub fn loadSpriteSheetFromJson(json_file: std.fs.File, assets_images_rel_dir_path: []const u8) Error!SpriteSheet {
+pub fn loadSpriteSheetFromJson(json_file: std.fs.File, assets_rel_dir_path: []const u8) Error!SpriteSheet {
     const plat = App.getPlat();
     const s = json_file.readToEndAlloc(plat.heap, 8 * 1024 * 1024) catch return Error.FileSystemFail;
     //std.debug.print("{s}\n", .{s});
@@ -381,7 +405,7 @@ pub fn loadSpriteSheetFromJson(json_file: std.fs.File, assets_images_rel_dir_pat
 
     const meta = tree.object.get("meta").?.object;
     const image_filename = meta.get("image").?.string;
-    const image_path = try u.bufPrintLocal("{s}/{s}", .{ assets_images_rel_dir_path, image_filename });
+    const image_path = try u.bufPrintLocal("{s}/{s}", .{ assets_rel_dir_path, image_filename });
 
     var sheet = SpriteSheet{};
     var it_dot = std.mem.tokenizeScalar(u8, image_filename, '.');
@@ -464,11 +488,11 @@ pub fn loadSpriteSheetFromJson(json_file: std.fs.File, assets_images_rel_dir_pat
     return sheet;
 }
 
-pub fn loadSpriteSheetFromJsonPath(_: *Data, assets_rel_json_path: []const u8) Error!SpriteSheet {
+pub fn loadSpriteSheetFromJsonPath(_: *Data, assets_rel_dir: []const u8, json_file_name: []const u8) Error!SpriteSheet {
     const plat = App.getPlat();
-    const path = try u.bufPrintLocal("{s}/{s}", .{ plat.assets_path, assets_rel_json_path });
+    const path = try u.bufPrintLocal("{s}/{s}/{s}", .{ plat.assets_path, assets_rel_dir, json_file_name });
     const icons_json = std.fs.cwd().openFile(path, .{}) catch return Error.FileSystemFail;
-    const sheet = try loadSpriteSheetFromJson(icons_json, "ui");
+    const sheet = try loadSpriteSheetFromJson(icons_json, assets_rel_dir);
     return sheet;
 }
 
@@ -487,7 +511,7 @@ pub fn loadCreatureSpriteSheets(self: *Data) Error!void {
     while (walker.next() catch return Error.FileSystemFail) |w_entry| {
         if (!std.mem.endsWith(u8, w_entry.basename, ".json")) continue;
         const json_file = creature.openFile(w_entry.basename, .{}) catch return Error.FileSystemFail;
-        const sheet = try loadSpriteSheetFromJson(json_file, "creature");
+        const sheet = try loadSpriteSheetFromJson(json_file, "images/creature");
 
         var it_dash = std.mem.tokenizeScalar(u8, sheet.name.constSlice(), '-');
         const creature_name = it_dash.next().?;
@@ -580,7 +604,7 @@ pub fn loadVFXSpriteSheets(self: *Data) Error!void {
         if (!std.mem.endsWith(u8, w_entry.basename, ".json")) continue;
         const json_file = vfx.openFile(w_entry.basename, .{}) catch return Error.FileSystemFail;
 
-        const sheet = try loadSpriteSheetFromJson(json_file, "vfx");
+        const sheet = try loadSpriteSheetFromJson(json_file, "images/vfx");
         const sheet_idx = self.vfx_sprite_sheets.items.len;
         try self.vfx_sprite_sheets.append(sheet);
 
@@ -636,9 +660,93 @@ pub fn loadVFXSpriteSheets(self: *Data) Error!void {
 pub fn loadSpriteSheets(self: *Data) Error!void {
     try self.loadCreatureSpriteSheets();
     try self.loadVFXSpriteSheets();
-    self.item_icons = try @TypeOf(self.item_icons).init(try self.loadSpriteSheetFromJsonPath("images/ui/item_icons.json"));
-    self.spell_icons = try @TypeOf(self.spell_icons).init(try self.loadSpriteSheetFromJsonPath("images/ui/spell_icons.json"));
-    self.misc_icons = try @TypeOf(self.misc_icons).init(try self.loadSpriteSheetFromJsonPath("images/ui/misc_icons.json"));
+    self.item_icons = try @TypeOf(self.item_icons).init(try self.loadSpriteSheetFromJsonPath("images/ui", "item_icons.json"));
+    self.spell_icons = try @TypeOf(self.spell_icons).init(try self.loadSpriteSheetFromJsonPath("images/ui", "spell_icons.json"));
+    self.misc_icons = try @TypeOf(self.misc_icons).init(try self.loadSpriteSheetFromJsonPath("images/ui", "misc_icons.json"));
+}
+
+pub fn loadTileSetFromJson(json_file: std.fs.File, assets_rel_path: []const u8) Error!TileSet {
+    const plat = App.getPlat();
+    const s = json_file.readToEndAlloc(plat.heap, 8 * 1024 * 1024) catch return Error.FileSystemFail;
+    //std.debug.print("{s}\n", .{s});
+    var scanner = std.json.Scanner.initCompleteInput(plat.heap, s);
+    const _tree = std.json.Value.jsonParse(plat.heap, &scanner, .{ .max_value_len = s.len }) catch return Error.ParseFail;
+    var tree = _tree.object;
+    // TODO I guess tree just leaks rn? use arena?
+
+    const image_filename = tree.get("image").?.string;
+    const image_path = try u.bufPrintLocal("{s}/{s}", .{ assets_rel_path, image_filename });
+
+    const name = tree.get("name").?.string;
+    const tile_dims = V2i.iToV2i(
+        i64,
+        tree.get("tilewidth").?.integer,
+        tree.get("tileheight").?.integer,
+    );
+    const image_dims = V2i.iToV2i(
+        i64,
+        tree.get("imagewidth").?.integer,
+        tree.get("imageheight").?.integer,
+    );
+    const columns = tree.get("columns").?.integer;
+    const sheet_dims = V2i.iToV2i(i64, columns, @divExact(image_dims.y, tile_dims.y));
+
+    var tileset = TileSet{
+        .name = try TileSet.NameBuf.init(name),
+        .sheet_dims = sheet_dims,
+        .tile_dims = tile_dims,
+        .texture = try plat.loadTexture(image_path),
+    };
+    assert(tileset.texture.dims.x == image_dims.x);
+    assert(tileset.texture.dims.y == image_dims.y);
+
+    if (tree.get("tiles")) |tiles| {
+        for (tiles.array.items) |t| {
+            const id = t.object.get("id").?.integer;
+            const idx = u.as(usize, id);
+            const props = t.object.get("properties").?.array;
+            var prop = TileSet.TileProperties{};
+            for (props.items) |p| {
+                const prop_name = p.object.get("name").?.string;
+                const val = p.object.get("value").?.string;
+                if (std.mem.eql(u8, prop_name, "colls")) {
+                    var prop_it = std.mem.tokenizeScalar(u8, val, ',');
+                    var c_i: usize = 0;
+                    while (prop_it.next()) |c| {
+                        const coll_bool: bool = if (c[0] == '0') false else true;
+                        prop.coll.getPtr(@enumFromInt(c_i)).* = coll_bool;
+                        c_i += 1;
+                    }
+                }
+            }
+            tileset.tiles.buffer[idx] = prop;
+        }
+    }
+    return tileset;
+}
+
+pub fn loadTileSets(self: *Data) Error!void {
+    const plat = App.getPlat();
+
+    for (self.tilesets.items) |t| {
+        plat.unloadTexture(t.texture);
+    }
+    self.tilesets.clearRetainingCapacity();
+
+    const path = try u.bufPrintLocal("{s}/maps/tilesets", .{plat.assets_path});
+    var dir = std.fs.cwd().openDir(path, .{ .iterate = true }) catch return Error.FileSystemFail;
+    defer dir.close();
+    var walker = try dir.walk(plat.heap);
+    defer walker.deinit();
+
+    while (walker.next() catch return Error.FileSystemFail) |w_entry| {
+        if (!std.mem.endsWith(u8, w_entry.basename, ".tsj")) continue;
+        const json_file = dir.openFile(w_entry.basename, .{}) catch return Error.FileSystemFail;
+        var tileset = try loadTileSetFromJson(json_file, "maps/tilesets/");
+        tileset.id = u.as(i32, self.tilesets.items.len);
+        try (self.tilesets.append(tileset));
+        std.debug.print("Loaded tileset: {s}\n", .{tileset.name.constSlice()});
+    }
 }
 
 pub fn reload(self: *Data) Error!void {
@@ -656,6 +764,7 @@ pub fn reload(self: *Data) Error!void {
             .impling = try @import("spells/Impling.zig").implingProto(),
         },
     );
+    try self.loadTileSets();
     self.rooms = @TypeOf(self.rooms).initDefault(.{}, .{});
     inline for (std.meta.fields(RoomKind)) |f| {
         const kind: RoomKind = @enumFromInt(f.value);
