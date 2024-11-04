@@ -74,6 +74,7 @@ pub const AnimEvent = struct {
         hit,
         end,
     };
+    pub const Set = std.EnumSet(AnimEvent.Kind);
     kind: AnimEvent.Kind,
     frame: i32 = 0,
 };
@@ -290,7 +291,7 @@ pub const Animator = struct {
         return self.getCurrRenderFrameDir(.{});
     }
 
-    pub fn play(self: *Animator, anim_name: AnimName, params: PlayParams) std.EnumSet(AnimEvent.Kind) {
+    pub fn play(self: *Animator, anim_name: AnimName, params: PlayParams) AnimEvent.Set {
         var ret = std.EnumSet(AnimEvent.Kind).initEmpty();
         if (params.reset or self.curr_anim != anim_name) {
             self.anim_tick = 0;
