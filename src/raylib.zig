@@ -42,6 +42,8 @@ pub const RenderTexture2D = struct {
     r_render_tex: r.RenderTexture2D,
 };
 
+stack_base: usize = 0,
+thing_stack_ptr: usize = 0,
 should_exit: bool = false,
 app_dll: ?std.DynLib = null,
 appInit: *const fn (*Platform) *anyopaque = undefined,
@@ -81,6 +83,7 @@ pub fn init(title: []const u8) Error!Platform {
     const dims = core.native_dims;
 
     var ret: Platform = .{};
+    ret.stack_base = ret.getStackPointer();
     const title_z = try std.fmt.allocPrintZ(ret.heap, "{s}", .{title});
 
     //r.SetConfigFlags(r.FLAG_WINDOW_RESIZABLE);
@@ -102,6 +105,12 @@ pub fn init(title: []const u8) Error!Platform {
 
 pub fn closeWindow(_: *Platform) void {
     r.CloseWindow();
+}
+
+pub fn getStackPointer(_: *Platform) usize {
+    return asm (""
+        : [ret] "={sp}" (-> usize),
+    );
 }
 
 pub fn getAssetsPath(self: *Platform) Error![]const u8 {
