@@ -888,6 +888,7 @@ pub fn loadTileMapFromJsonString(tilemap: *TileMap, json_string: []u8) Error!voi
                     if (obj.get("point").?.bool) {
                         const obj_name = obj.get("name").?.string;
                         // TODO clean up arrgh
+                        // transform map pixel pos to game tile pixel pos
                         const pos = v2f(
                             u.as(f32, switch (obj.get("x").?) {
                                 .float => |f| f,
@@ -899,7 +900,7 @@ pub fn loadTileMapFromJsonString(tilemap: *TileMap, json_string: []u8) Error!voi
                                 .integer => |i| u.as(f64, i),
                                 else => return Error.ParseFail,
                             }),
-                        ).scale(core.pixel_art_scaling);
+                        ).scale(core.pixel_art_scaling).sub(TileMap.tile_dims_2);
                         if (startsWith(u8, obj_name, "creature")) {
                             var it = std.mem.tokenizeScalar(u8, obj_name, ':');
                             _ = it.next() orelse return Error.ParseFail;

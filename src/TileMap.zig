@@ -555,7 +555,7 @@ pub fn getRoomRect(self: *const TileMap) geom.Rectf {
     //    -@divFloor(self.dims_tiles.y, 2),
     //);
     const topleft_coord: V2i = .{};
-    const topleft_pos = tileCoordToPos(topleft_coord);
+    const topleft_pos = tileCoordToPos(topleft_coord).sub(tile_dims_2);
     return .{
         .pos = topleft_pos,
         .dims = self.rect_dims,
