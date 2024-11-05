@@ -26,7 +26,9 @@ pub const max_map_sz_f: f32 = max_map_sz;
 pub const max_map_tiles: i64 = max_map_sz * max_map_sz;
 pub const max_map_layers = 8;
 pub const max_map_tilesets = 16;
-pub const max_map_objects = 32;
+pub const max_map_exits = 4;
+pub const max_map_spawns = 32;
+pub const max_map_creatures = 32;
 
 pub const tile_sz: i64 = 64;
 pub const tile_sz_f: f32 = tile_sz;
@@ -54,7 +56,6 @@ pub const Tile = struct {
 
 pub const GameTile = struct {
     coord: V2i,
-    updated: bool = false,
     passable: bool = true,
 };
 
@@ -65,36 +66,21 @@ pub const TileSetReference = struct {
     data_idx: usize = 0,
     first_gid: usize = 1,
 };
-pub const Point = struct {
-    pub const Kind = enum {
-        creature,
-        spawn,
-        exit,
-    };
-    pub const KindData = union(enum) {
-        creature: Thing.CreatureKind,
-        spawn,
-        exit,
-    };
-
-    kind: KindData,
-    pos: V2f,
-};
 
 pub const NameBuf = utl.BoundedString(64);
 
-initted: bool = false,
 name: NameBuf = .{},
 kind: Data.RoomKind = .testu,
 id: i32 = 0,
-tiles: std.AutoArrayHashMap(V2i, Tile) = undefined,
 game_tiles: std.BoundedArray(GameTile, max_map_tiles) = .{},
 tile_layers: std.BoundedArray(TileLayer, max_map_layers) = .{},
 tilesets: std.BoundedArray(TileSetReference, max_map_tilesets) = .{},
-points: std.BoundedArray(Point, max_map_objects) = .{},
+creatures: std.BoundedArray(struct { kind: Thing.CreatureKind, pos: V2f }, max_map_creatures) = .{},
+exits: std.BoundedArray(V2f, max_map_exits) = .{},
+wave_spawns: std.BoundedArray(V2f, max_map_spawns) = .{},
 dims_tiles: V2i = .{},
 dims_game: V2i = .{},
-dims: V2f = .{},
+rect_dims: V2f = .{},
 
 pub fn tileIdxToTileSetRef(self: *const TileMap, tile_idx: usize) ?TileSetReference {
     if (tile_idx == 0) return null;
@@ -117,25 +103,33 @@ pub fn tileCoordToGameTile(self: *TileMap, tile_coord: V2i) ?*GameTile {
     if (idxi < 0) return null;
     const idx = utl.as(usize, idxi);
     if (idx >= self.game_tiles.len) return null;
-    return &self.game_tiles.buffer[idx];
+    const gt = &self.game_tiles.buffer[idx];
+    // TODO ? change?
+    if (!gt.coord.eql(tile_coord)) return null;
+    return gt;
 }
 
-pub fn init(tiles: []const Tile, dims: V2f) Error!TileMap {
-    var ret = TileMap{};
-    ret.tiles = @TypeOf(ret.tiles).init(getPlat().heap);
-    for (tiles) |tile| {
-        try ret.tiles.put(tile.coord, tile);
+fn gameTileCoordToIdx(self: *const TileMap, gt_coord: V2i) ?usize {
+    if (gt_coord.x < 0 or gt_coord.y < 0) return null;
+    if (gt_coord.x >= self.dims_game.x or gt_coord.y >= self.dims_game.y) return null;
+    const idxi = gt_coord.x + gt_coord.y * self.dims_game.x;
+    if (idxi < 0) return null;
+    const idx = utl.as(usize, idxi);
+    if (idx >= self.game_tiles.len) return null;
+    return idx;
+}
+
+pub fn gameTileCoordToGameTile(self: *TileMap, gt_coord: V2i) ?*GameTile {
+    if (self.gameTileCoordToIdx(gt_coord)) |idx| {
+        const gt = &self.game_tiles.buffer[idx];
+        assert(gt.coord.eql(gt_coord));
+        return gt;
     }
-    ret.dims_tiles = dims.scale(1 / tile_sz_f).toV2i();
-    ret.dims = dims;
-    ret.initted = true;
-    return ret;
+    return null;
 }
 
-pub fn deinit(self: *TileMap) void {
-    if (!self.initted) return;
-    self.tiles.clearAndFree();
-    self.initted = false;
+pub fn gameTileCoordToConstGameTile(self: *const TileMap, gt_coord: V2i) ?*const GameTile {
+    return @constCast(self).gameTileCoordToGameTile(gt_coord);
 }
 
 pub fn posToTileCoord(pos: V2f) V2i {
@@ -177,7 +171,7 @@ pub fn getTileNeighborsPassable(self: *const TileMap, coord: V2i) std.EnumArray(
     var ret: std.EnumArray(NeighborDir, bool) = undefined;
     for (neighbor_dirs) |nd| {
         const neighbor_coord = coord.add(neighbor_dirs_coords.get(nd));
-        const tile = self.tiles.get(neighbor_coord);
+        const tile = self.gameTileCoordToConstGameTile(neighbor_coord);
         const passable = if (tile) |t| t.passable else true;
         ret.set(nd, passable);
     }
@@ -243,7 +237,7 @@ pub fn findPathAStar(self: *const TileMap, allocator: std.mem.Allocator, start: 
                 .f = next_g + next_p.sub(goal).length(),
             };
             //std.debug.print("neighbor {}, {}\n", .{ next.p.x, next.p.y });
-            if (self.tiles.get(posToTileCoord(next_p))) |tile| {
+            if (self.gameTileCoordToGameTile(posToTileCoord(next_p))) |tile| {
                 if (!tile.passable) continue;
             }
             const entry = try seen.getOrPut(next.p);
@@ -288,7 +282,7 @@ pub fn findPathAStar(self: *const TileMap, allocator: std.mem.Allocator, start: 
 }
 
 pub fn tileCoordIsPassable(self: *const TileMap, coord: V2i) bool {
-    if (self.tiles.get(coord)) |tile| {
+    if (self.gameTileCoordToConstGameTile(coord)) |tile| {
         return tile.passable;
     }
     return true;
@@ -384,7 +378,7 @@ pub fn findPathThetaStar(self: *const TileMap, allocator: std.mem.Allocator, sta
     const start_coord = posToTileCoord(start);
     const goal_coord = posToTileCoord(goal);
 
-    if (self.tiles.get(goal_coord)) |goal_tile| {
+    if (self.gameTileCoordToConstGameTile(goal_coord)) |goal_tile| {
         if (!goal_tile.passable) {
             return .{};
         }
@@ -547,21 +541,24 @@ pub fn debugDrawGrid(_: *const TileMap, camera: draw.Camera2D) Error!void {
 
 pub fn debugDraw(self: *const TileMap) Error!void {
     const plat = getPlat();
-    for (self.tiles.values()) |tile| {
-        const color = if (tile.passable) Colorf.darkgray else Colorf.gray;
-        plat.rectf(tileCoordToPos(tile.coord), tile_dims, .{ .fill_color = color });
+    const room_rect = self.getRoomRect();
+    plat.rectf(room_rect.pos, room_rect.dims, .{ .fill_color = Colorf.rgb(0.4, 0.4, 0.4) });
+    for (self.game_tiles.constSlice()) |game_tile| {
+        const color = if (game_tile.passable) Colorf.gray else Colorf.rgb(0.1, 0.1, 0.1);
+        plat.rectf(tileCoordToPos(game_tile.coord), tile_dims, .{ .fill_color = color });
     }
 }
 
 pub fn getRoomRect(self: *const TileMap) geom.Rectf {
-    const topleft_coord = v2i(
-        -@divFloor(self.dims_tiles.x, 2),
-        -@divFloor(self.dims_tiles.y, 2),
-    );
+    //const topleft_coord = v2i(
+    //    -@divFloor(self.dims_tiles.x, 2),
+    //    -@divFloor(self.dims_tiles.y, 2),
+    //);
+    const topleft_coord: V2i = .{};
     const topleft_pos = tileCoordToPos(topleft_coord);
     return .{
         .pos = topleft_pos,
-        .dims = self.dims,
+        .dims = self.rect_dims,
     };
 }
 
@@ -569,8 +566,9 @@ pub fn render(self: *const TileMap) Error!void {
     const plat = getPlat();
     const room_rect = self.getRoomRect();
     plat.rectf(room_rect.pos, room_rect.dims, .{ .fill_color = Colorf.rgb(0.4, 0.4, 0.4) });
-    for (self.tiles.values()) |tile| {
-        const color = if (tile.passable) Colorf.lightgray else Colorf.rgb(0.1, 0.1, 0.1);
-        plat.rectf(tileCoordToPos(tile.coord), tile_dims, .{ .fill_color = color });
-    }
+    // TODO
+    //for (self.tiles.values()) |tile| {
+    //    const color = if (tile.passable) Colorf.lightgray else Colorf.rgb(0.1, 0.1, 0.1);
+    //    plat.rectf(tileCoordToPos(tile.coord), tile_dims, .{ .fill_color = color });
+    //}
 }

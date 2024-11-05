@@ -160,7 +160,7 @@ pub fn getNextCircleCollisionWithThings(pos: V2f, radius: f32, mask: Mask, ignor
     return best_coll;
 }
 
-pub fn getPointCollisionInTile(point: V2f, tile: TileMap.Tile, passable_neighbors: std.EnumArray(TileMap.NeighborDir, bool)) ?Collision {
+pub fn getPointCollisionInTile(point: V2f, tile: TileMap.GameTile, passable_neighbors: std.EnumArray(TileMap.NeighborDir, bool)) ?Collision {
     const rect = TileMap.tileCoordToRect(tile.coord);
     if (!geom.pointIsInRectf(point, rect)) {
         return null;
@@ -216,7 +216,7 @@ pub fn getPointCollisionInTile(point: V2f, tile: TileMap.Tile, passable_neighbor
 pub fn getCircleCollisionWithTiles(pos: V2f, radius: f32, tilemap: *const TileMap) ?Collision {
     var coll: ?Collision = null;
 
-    for (tilemap.tiles.values()) |tile| outer_blk: {
+    for (tilemap.game_tiles.constSlice()) |tile| outer_blk: {
         if (tile.passable) continue;
 
         const passable_neighbors = tilemap.getTileNeighborsPassable(tile.coord);
@@ -316,7 +316,7 @@ pub fn getNextSweptCircleCollisionWithTiles(ray_pos: V2f, ray_v: V2f, radius: f3
     var best_coll: ?Collision = null;
     var best_dist = std.math.inf(f32);
 
-    for (tilemap.tiles.values()) |tile| {
+    for (tilemap.game_tiles.constSlice()) |tile| {
         if (tile.passable) continue;
 
         const passable_neighbors = tilemap.getTileNeighborsPassable(tile.coord);

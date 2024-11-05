@@ -22,7 +22,6 @@ const Room = @import("Room.zig");
 const Spell = @import("Spell.zig");
 const Thing = @import("Thing.zig");
 const Data = @import("Data.zig");
-const PackedRoom = @import("PackedRoom.zig");
 const menuUI = @import("menuUI.zig");
 const gameUI = @import("gameUI.zig");
 const Shop = @import("Shop.zig");
@@ -183,41 +182,44 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
     // init places
     var places = Place.Array{};
 
-    var smol_room_idxs = std.BoundedArray(usize, 16){};
-    for (0..app.data.rooms.get(.smol).len) |i| {
-        smol_room_idxs.append(i) catch unreachable;
-    }
-    run.rng.random().shuffleWithIndex(usize, smol_room_idxs.slice(), u32);
+    if (false) {
+        var smol_room_idxs = std.BoundedArray(usize, 16){};
+        for (0..app.data.rooms.get(.smol).len) |i| {
+            smol_room_idxs.append(i) catch unreachable;
+        }
+        run.rng.random().shuffleWithIndex(usize, smol_room_idxs.slice(), u32);
 
-    for (0..3) |i| {
-        try places.append(.{ .room = .{
-            .difficulty = 0,
-            .kind = .smol,
-            .idx = smol_room_idxs.get(i),
-        } });
-    }
+        for (0..3) |i| {
+            try places.append(.{ .room = .{
+                .difficulty = 0,
+                .kind = .smol,
+                .idx = smol_room_idxs.get(i),
+            } });
+        }
 
-    var big_room_idxs = std.BoundedArray(usize, 16){};
-    for (0..app.data.rooms.get(.smol).len) |i| {
-        big_room_idxs.append(i) catch unreachable;
-    }
-    run.rng.random().shuffleWithIndex(usize, big_room_idxs.slice(), u32);
+        var big_room_idxs = std.BoundedArray(usize, 16){};
+        for (0..app.data.rooms.get(.smol).len) |i| {
+            big_room_idxs.append(i) catch unreachable;
+        }
+        run.rng.random().shuffleWithIndex(usize, big_room_idxs.slice(), u32);
 
-    for (0..3) |i| {
-        try places.append(.{ .room = .{
-            .difficulty = 0,
-            .kind = .big,
-            .idx = big_room_idxs.get(i),
-        } });
-    }
+        for (0..3) |i| {
+            try places.append(.{ .room = .{
+                .difficulty = 0,
+                .kind = .big,
+                .idx = big_room_idxs.get(i),
+            } });
+        }
 
-    for (places.slice(), 0..) |*place, i| {
-        place.room.difficulty = 4 + u.as(f32, i) * 2;
+        for (places.slice(), 0..) |*place, i| {
+            place.room.difficulty = 4 + u.as(f32, i) * 2;
+        }
+        try places.insert(places.len / 2, .{ .shop = .{ .num = 0 } });
+        try places.insert(0, .{ .room = .{ .difficulty = 0, .kind = .first, .idx = 0 } });
+        try places.append(.{ .shop = .{ .num = 1 } });
+        try places.append(.{ .room = .{ .difficulty = places.get(places.len - 2).room.difficulty, .kind = .boss, .idx = 0 } });
     }
-    try places.insert(places.len / 2, .{ .shop = .{ .num = 0 } });
-    try places.insert(0, .{ .room = .{ .difficulty = 0, .kind = .first, .idx = 0 } });
-    try places.append(.{ .shop = .{ .num = 1 } });
-    try places.append(.{ .room = .{ .difficulty = places.get(places.len - 2).room.difficulty, .kind = .boss, .idx = 0 } });
+    try places.append(.{ .room = .{ .difficulty = 4, .idx = 0, .kind = .testu } });
     run.places = places;
 
     return run;
@@ -256,8 +258,8 @@ pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
     }
     switch (self.places.get(self.curr_place_idx)) {
         .room => |r| {
-            const packed_room = data.rooms.get(r.kind).get(r.idx);
-            const exit_doors = self.makeExitDoors(packed_room);
+            const tilemap = data.tilemaps.items[data.room_kind_tilemaps.get(r.kind).get(r.idx)];
+            const exit_doors = self.makeExitDoors(tilemap);
             var waves_params = Room.WavesParams{
                 .difficulty = r.difficulty,
                 .room_kind = r.kind,
@@ -268,7 +270,7 @@ pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
             _ = try Room.init(&self.room, .{
                 .deck = self.deck,
                 .waves_params = waves_params,
-                .packed_room = packed_room,
+                .tilemap = tilemap,
                 .seed = self.rng.random().int(u64),
                 .exits = exit_doors,
                 .player = self.player_thing,
@@ -288,9 +290,11 @@ pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
     }
 }
 
-pub fn makeExitDoors(_: *Run, packed_room: PackedRoom) std.BoundedArray(gameUI.ExitDoor, 4) {
+const TileMap = @import("TileMap.zig");
+
+pub fn makeExitDoors(_: *Run, tilemap: TileMap) std.BoundedArray(gameUI.ExitDoor, 4) {
     var ret = std.BoundedArray(gameUI.ExitDoor, 4){};
-    for (packed_room.exits.constSlice()) |pos| {
+    for (tilemap.exits.constSlice()) |pos| {
         ret.append(.{ .pos = pos }) catch unreachable;
     }
     return ret;
@@ -385,10 +389,10 @@ pub fn gameUpdate(self: *Run) Error!void {
             if (plat.input_buffer.getNumberKeyJustPressed()) |num| {
                 const app = App.get();
                 const n: usize = if (num == 0) 9 else num - 1;
-                const test_rooms = app.data.rooms.getPtr(.testu);
+                const test_rooms = app.data.room_kind_tilemaps.getPtr(.testu);
                 if (n < test_rooms.len) {
-                    const packed_room = test_rooms.get(n);
-                    try room.reloadFromPackedRoom(packed_room);
+                    const tilemap = app.data.tilemaps.items[test_rooms.get(n)];
+                    try room.reloadFromTileMap(tilemap);
                 }
             }
         }

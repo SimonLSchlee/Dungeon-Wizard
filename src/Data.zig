@@ -818,12 +818,22 @@ pub fn loadTileMapFromJsonString(tilemap: *TileMap, json_string: []u8) Error!voi
         tree.get("width").?.integer,
         tree.get("height").?.integer,
     );
+    const game_dims = map_dims.sub(v2i(1, 1));
 
     tilemap.* = .{
         .dims_tiles = map_dims,
-        .dims_game = map_dims.sub(v2i(1, 1)),
-        //.tile_dims = tile_dims,
+        .dims_game = game_dims,
+        .rect_dims = map_dims.toV2f().scale(TileMap.tile_sz_f),
     };
+    var game_tile_coord: V2i = .{};
+    for (0..u.as(usize, tilemap.dims_game.x * tilemap.dims_game.y)) |_| {
+        tilemap.game_tiles.append(.{ .coord = game_tile_coord }) catch unreachable;
+        game_tile_coord.x += 1;
+        if (game_tile_coord.x >= tilemap.dims_game.x) {
+            game_tile_coord.x = 0;
+            game_tile_coord.y += 1;
+        }
+    }
     {
         const props = tree.get("properties").?.array;
         for (props.items) |p| {
@@ -889,22 +899,19 @@ pub fn loadTileMapFromJsonString(tilemap: *TileMap, json_string: []u8) Error!voi
                                 .integer => |i| u.as(f64, i),
                                 else => return Error.ParseFail,
                             }),
-                        );
+                        ).scale(core.pixel_art_scaling);
                         if (startsWith(u8, obj_name, "creature")) {
-                            try tilemap.points.append(.{
-                                .kind = .{ .creature = .player },
+                            var it = std.mem.tokenizeScalar(u8, obj_name, ':');
+                            _ = it.next() orelse return Error.ParseFail;
+                            const creature_kind_str = it.next() orelse return Error.ParseFail;
+                            try tilemap.creatures.append(.{
+                                .kind = std.meta.stringToEnum(Thing.CreatureKind, creature_kind_str) orelse return Error.ParseFail,
                                 .pos = pos,
                             });
                         } else if (startsWith(u8, obj_name, "exit")) {
-                            try tilemap.points.append(.{
-                                .kind = .exit,
-                                .pos = pos,
-                            });
+                            try tilemap.exits.append(pos);
                         } else if (startsWith(u8, obj_name, "spawn")) {
-                            try tilemap.points.append(.{
-                                .kind = .spawn,
-                                .pos = pos,
-                            });
+                            try tilemap.wave_spawns.append(pos);
                         }
                     } else {
                         // ??
@@ -964,18 +971,14 @@ pub fn loadTileMaps(self: *Data) Error!void {
                         const is_coll = e.value.*;
                         const dir = TileSet.GameTileCorner.dir_map.get(e.key);
                         const game_tile_coord = tile_coord.add(dir);
-                        if (tilemap.tileCoordToGameTile(game_tile_coord)) |game_tile| {
-                            if (game_tile.updated) {
-                                assert(game_tile.passable == !is_coll);
-                            }
-                            game_tile.coord = game_tile_coord;
-                            game_tile.updated = true;
+                        if (tilemap.gameTileCoordToGameTile(game_tile_coord)) |game_tile| {
                             game_tile.passable = !is_coll;
                         }
                     }
                 }
                 tile_coord.x += 1;
                 if (tile_coord.x >= tilemap.dims_tiles.x) {
+                    tile_coord.x = 0;
                     tile_coord.y += 1;
                 }
             }

@@ -335,7 +335,7 @@ pub fn getHidingPlaces(room: *const Room, fleer_pos: V2f, flee_from_pos: V2f, mi
             const dir_v = TileMap.neighbor_dirs_coords.get(dir);
             const next = curr.add(dir_v);
             //std.debug.print("neighbor {}, {}\n", .{ next.p.x, next.p.y });
-            if (tilemap.tiles.get(next)) |tile| {
+            if (tilemap.gameTileCoordToConstGameTile(next)) |tile| {
                 if (!tile.passable) continue;
             }
             if (seen.get(next)) |_| continue;

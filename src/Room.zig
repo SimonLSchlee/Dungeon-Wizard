@@ -27,14 +27,13 @@ const gameUI = @import("gameUI.zig");
 const Spell = @import("Spell.zig");
 const Item = @import("Item.zig");
 const Run = @import("Run.zig");
-const PackedRoom = @import("PackedRoom.zig");
 
 pub const max_things_in_room = 128;
 
 pub const ThingBoundedArray = std.BoundedArray(pool.Id, max_things_in_room);
 
 pub const InitParams = struct {
-    packed_room: PackedRoom,
+    tilemap: TileMap,
     player: Thing,
     waves_params: WavesParams,
     seed: u64,
@@ -73,15 +72,14 @@ pub const Wave = struct {
 };
 pub const WavesArray = std.BoundedArray(Wave, 8);
 
-fn makeWaves(packed_room: PackedRoom, rng: std.Random, params: WavesParams) WavesArray {
+fn makeWaves(tilemap: TileMap, rng: std.Random, params: WavesParams) WavesArray {
     const data = App.get().data;
     var ret = WavesArray{};
     switch (params.room_kind) {
         .first => {
-            const wave0 = packed_room.waves[0];
-            if (wave0.len > 0) {
+            if (tilemap.wave_spawns.len > 0) {
                 var wave = Wave{};
-                wave.spawns.append(.{ .pos = wave0.get(0), .proto = data.creatures.get(.dummy) }) catch unreachable;
+                wave.spawns.append(.{ .pos = tilemap.wave_spawns.get(0), .proto = data.creatures.get(.dummy) }) catch unreachable;
                 ret.append(wave) catch unreachable;
                 return ret;
             }
@@ -100,11 +98,8 @@ fn makeWaves(packed_room: PackedRoom, rng: std.Random, params: WavesParams) Wave
     const difficulty_error_per_wave = params.difficulty_error / u.as(f32, num_waves);
     std.debug.print("num_waves: {}, difficulty per wave: {d:.1}\n", .{ num_waves, difficulty_per_wave });
 
-    var all_spawn_positions = std.BoundedArray(V2f, 16){};
-    for (packed_room.waves) |wave_positions| {
-        if (wave_positions.len == 0) continue;
-        all_spawn_positions.insertSlice(all_spawn_positions.len, wave_positions.constSlice()) catch unreachable;
-    }
+    var all_spawn_positions = @TypeOf(tilemap.wave_spawns){};
+    all_spawn_positions.insertSlice(0, tilemap.wave_spawns.constSlice()) catch unreachable;
     std.debug.print("  total spawn positions: {}\n", .{all_spawn_positions.len});
 
     for (0..num_waves) |i| {
@@ -229,7 +224,6 @@ pub fn init(room: *Room, params: InitParams) Error!*Room {
 pub fn deinit(self: *Room) void {
     self.clearThings();
     self.fog.deinit();
-    self.tilemap.deinit();
 }
 
 fn clearThings(self: *Room) void {
@@ -259,11 +253,10 @@ pub fn reset(self: *Room) Error!void {
     self.progress_state = .none;
     self.paused = false;
     self.draw_pile = self.init_params.deck;
-    self.tilemap.deinit();
-    self.tilemap = try TileMap.init(self.init_params.packed_room.tiles.constSlice(), self.init_params.packed_room.dims);
-    self.waves = makeWaves(self.init_params.packed_room, self.rng.random(), self.init_params.waves_params);
+    self.tilemap = self.init_params.tilemap;
+    self.waves = makeWaves(self.init_params.tilemap, self.rng.random(), self.init_params.waves_params);
 
-    for (self.init_params.packed_room.thing_spawns.constSlice()) |spawn| {
+    for (self.init_params.tilemap.creatures.constSlice()) |spawn| {
         std.debug.print("Room init: spawning a {any}\n", .{spawn.kind});
         if (spawn.kind == .player) {
             self.player_id = try self.queueSpawnThing(&self.init_params.player, spawn.pos);
@@ -275,9 +268,8 @@ pub fn reset(self: *Room) Error!void {
     self.ui_slots = gameUI.Slots.init(self, self.init_params.slots_params);
 }
 
-pub fn reloadFromPackedRoom(self: *Room, packed_room: PackedRoom) Error!void {
-    self.tilemap.deinit();
-    self.init_params.packed_room = packed_room;
+pub fn reloadFromTileMap(self: *Room, tilemap: TileMap) Error!void {
+    self.init_params.tilemap = tilemap;
     try self.reset();
 }
 
@@ -494,9 +486,10 @@ pub fn update(self: *Room) Error!void {
             if (!thing.isActive()) continue;
             try thing.update(self);
         }
-        // fog
+        // fog and camera
         self.fog.clearVisible();
         if (self.getPlayer()) |player| {
+            // TODO better
             self.camera.pos = player.pos.add(v2f(0, plat.native_rect_cropped_dims.y * 0.08));
             try self.fog.addVisibleCircle(
                 self.tilemap.getRoomRect(),
@@ -526,7 +519,7 @@ pub fn update(self: *Room) Error!void {
 pub fn render(self: *const Room, native_render_texture: Platform.RenderTexture2D) Error!void {
     const plat = getPlat();
 
-    const fog_enabled = !self.edit_mode;
+    const fog_enabled = false and !self.edit_mode;
     if (fog_enabled) {
         try self.fog.renderToTexture(self.camera);
     }
@@ -537,8 +530,9 @@ pub fn render(self: *const Room, native_render_texture: Platform.RenderTexture2D
 
     plat.startCamera2D(self.camera);
 
-    try self.tilemap.render();
-    //try self.tilemap.debugDrawGrid(self.camera);
+    //try self.tilemap.render();
+    try self.tilemap.debugDraw();
+
     // exit
     for (self.init_params.exits.constSlice()) |exit| {
         try exit.render(self);
