@@ -33,6 +33,14 @@ pub const TileSet = struct {
         SW,
         SE,
         const Map = std.EnumArray(GameTileCorner, bool);
+        // map a tile coordinate to a game tile coordinate by adding these
+        // note they don't actually point in NW/NE etc directions!
+        const dir_map = std.EnumArray(GameTileCorner, V2i).init(.{
+            .NW = v2i(-1, -1),
+            .NE = v2i(0, -1),
+            .SW = v2i(-1, 0),
+            .SE = v2i(0, 0),
+        });
     };
     pub const TileProperties = struct {
         coll: GameTileCorner.Map = GameTileCorner.Map.initFill(false),
@@ -296,6 +304,7 @@ pub const MiscIcon = enum {
 };
 
 pub const PackedRoomBuf = std.BoundedArray(PackedRoom, 16);
+pub const TileMapIdxBuf = std.BoundedArray(usize, 16);
 
 pub const SFX = enum {
     thwack,
@@ -381,6 +390,7 @@ misc_icons: IconSprites(MiscIcon) = undefined,
 sounds: std.EnumArray(SFX, ?Platform.Sound) = undefined,
 // roooms
 rooms: std.EnumArray(RoomKind, PackedRoomBuf) = undefined,
+room_kind_tilemaps: std.EnumArray(RoomKind, TileMapIdxBuf) = undefined,
 
 pub fn init() Error!*Data {
     const plat = App.getPlat();
@@ -741,6 +751,7 @@ pub fn loadTileSetFromJsonString(tileset: *TileSet, json_string: []u8, assets_re
     assert(tileset.texture.dims.x == image_dims.x);
     assert(tileset.texture.dims.y == image_dims.y);
 
+    try tileset.tiles.resize(u.as(usize, tileset.sheet_dims.x * tileset.sheet_dims.y));
     if (tree.get("tiles")) |tiles| {
         for (tiles.array.items) |t| {
             const id = t.object.get("id").?.integer;
@@ -760,6 +771,7 @@ pub fn loadTileSetFromJsonString(tileset: *TileSet, json_string: []u8, assets_re
                     }
                 }
             }
+            assert(idx < tileset.tiles.len);
             tileset.tiles.buffer[idx] = prop;
         }
     }
@@ -809,6 +821,7 @@ pub fn loadTileMapFromJsonString(tilemap: *TileMap, json_string: []u8) Error!voi
 
     tilemap.* = .{
         .dims_tiles = map_dims,
+        .dims_game = map_dims.sub(v2i(1, 1)),
         //.tile_dims = tile_dims,
     };
     {
@@ -818,6 +831,10 @@ pub fn loadTileMapFromJsonString(tilemap: *TileMap, json_string: []u8) Error!voi
             if (std.mem.eql(u8, p_name, "name")) {
                 const name = p.object.get("value").?.string;
                 tilemap.name = try TileMap.NameBuf.init(name);
+                continue;
+            } else if (std.mem.eql(u8, p_name, "room_kind")) {
+                const kind_str = p.object.get("value").?.string;
+                tilemap.kind = std.meta.stringToEnum(RoomKind, kind_str).?;
                 continue;
             }
         }
@@ -899,6 +916,15 @@ pub fn loadTileMapFromJsonString(tilemap: *TileMap, json_string: []u8) Error!voi
     }
 }
 
+pub fn tileIdxAndTileSetRefToTileProperties(self: *Data, tileset_ref: TileMap.TileSetReference, tile_idx: usize) ?Data.TileSet.TileProperties {
+    assert(tileset_ref.data_idx < self.tilesets.items.len);
+    const tileset = &self.tilesets.items[tileset_ref.data_idx];
+    assert(tile_idx >= tileset_ref.first_gid);
+    const tileset_tile_idx = tile_idx - tileset_ref.first_gid;
+    assert(tileset_tile_idx < tileset.tiles.len);
+    return tileset.tiles.get(tileset_tile_idx);
+}
+
 pub fn loadTileMaps(self: *Data) Error!void {
     const plat = App.getPlat();
 
@@ -910,9 +936,50 @@ pub fn loadTileMaps(self: *Data) Error!void {
     while (try file_it.nextFileAsOwnedString()) |str| {
         defer plat.heap.free(str);
         const id = u.as(i32, self.tilemaps.items.len);
-        const tilemap = try self.tilemaps.addOne();
+        const tilemap: *TileMap = try self.tilemaps.addOne();
         try loadTileMapFromJsonString(tilemap, str);
         tilemap.id = id;
+        // init tilemap refs
+        for (tilemap.tilesets.slice()) |*ts_ref| {
+            for (self.tilesets.items) |*ts| {
+                if (std.mem.eql(u8, ts_ref.name.constSlice(), ts.name.constSlice())) {
+                    ts_ref.data_idx = u.as(usize, ts.id);
+                    break;
+                }
+            }
+        }
+        // init game tiles
+        for (tilemap.tile_layers.constSlice()) |layer| {
+            var tile_coord: V2i = .{};
+            for (layer.constSlice()) |tile_idx| {
+                var props = blk: {
+                    if (tilemap.tileIdxToTileSetRef(tile_idx)) |ref| {
+                        break :blk self.tileIdxAndTileSetRefToTileProperties(ref, tile_idx);
+                    }
+                    break :blk null;
+                };
+                if (props) |*tile_props| {
+                    var it = tile_props.coll.iterator();
+                    while (it.next()) |e| {
+                        const is_coll = e.value.*;
+                        const dir = TileSet.GameTileCorner.dir_map.get(e.key);
+                        const game_tile_coord = tile_coord.add(dir);
+                        if (tilemap.tileCoordToGameTile(game_tile_coord)) |game_tile| {
+                            if (game_tile.updated) {
+                                assert(game_tile.passable == !is_coll);
+                            }
+                            game_tile.coord = game_tile_coord;
+                            game_tile.updated = true;
+                            game_tile.passable = !is_coll;
+                        }
+                    }
+                }
+                tile_coord.x += 1;
+                if (tile_coord.x >= tilemap.dims_tiles.x) {
+                    tile_coord.y += 1;
+                }
+            }
+        }
         std.debug.print("Loaded tilemap: {s}\n", .{tilemap.name.constSlice()});
     }
 }
@@ -941,6 +1008,13 @@ pub fn reload(self: *Data) Error!void {
         const packed_rooms = self.rooms.getPtr(kind);
         for (strs) |s| {
             try packed_rooms.append(try PackedRoom.init(s));
+        }
+        const tilemaps = self.room_kind_tilemaps.getPtr(kind);
+        tilemaps.clear();
+        for (self.tilemaps.items) |tilemap| {
+            if (tilemap.kind == kind) {
+                try tilemaps.append(u.as(usize, tilemap.id));
+            }
         }
     }
 }

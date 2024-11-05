@@ -14,7 +14,8 @@ const v2f = V2f.v2f;
 const V2i = @import("V2i.zig");
 const v2i = V2i.v2i;
 
-const getPlat = @import("App.zig").getPlat;
+const App = @import("App.zig");
+const getPlat = App.getPlat;
 const Thing = @import("Thing.zig");
 const Room = @import("Room.zig");
 const Data = @import("Data.zig");
@@ -53,6 +54,7 @@ pub const Tile = struct {
 
 pub const GameTile = struct {
     coord: V2i,
+    updated: bool = false,
     passable: bool = true,
 };
 
@@ -83,6 +85,7 @@ pub const NameBuf = utl.BoundedString(64);
 
 initted: bool = false,
 name: NameBuf = .{},
+kind: Data.RoomKind = .testu,
 id: i32 = 0,
 tiles: std.AutoArrayHashMap(V2i, Tile) = undefined,
 game_tiles: std.BoundedArray(GameTile, max_map_tiles) = .{},
@@ -90,7 +93,32 @@ tile_layers: std.BoundedArray(TileLayer, max_map_layers) = .{},
 tilesets: std.BoundedArray(TileSetReference, max_map_tilesets) = .{},
 points: std.BoundedArray(Point, max_map_objects) = .{},
 dims_tiles: V2i = .{},
+dims_game: V2i = .{},
 dims: V2f = .{},
+
+pub fn tileIdxToTileSetRef(self: *const TileMap, tile_idx: usize) ?TileSetReference {
+    if (tile_idx == 0) return null;
+    assert(self.tilesets.len > 0);
+
+    var tileset_ref = self.tilesets.get(self.tilesets.len - 1);
+    for (0..self.tilesets.len - 1) |i| {
+        const curr_ts_ref = self.tilesets.get(i);
+        const next_ts_ref = self.tilesets.get(i + 1);
+        if (tile_idx >= curr_ts_ref.first_gid and tile_idx < next_ts_ref.first_gid) {
+            tileset_ref = curr_ts_ref;
+            break;
+        }
+    }
+    return tileset_ref;
+}
+
+pub fn tileCoordToGameTile(self: *TileMap, tile_coord: V2i) ?*GameTile {
+    const idxi = tile_coord.x + tile_coord.y * self.dims_tiles.x;
+    if (idxi < 0) return null;
+    const idx = utl.as(usize, idxi);
+    if (idx >= self.game_tiles.len) return null;
+    return &self.game_tiles.buffer[idx];
+}
 
 pub fn init(tiles: []const Tile, dims: V2f) Error!TileMap {
     var ret = TileMap{};
