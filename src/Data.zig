@@ -312,6 +312,52 @@ pub const RoomKind = enum {
     boss,
 };
 
+// iterates over files in a directory, with a given suffix (including dot, e.g. ".json")
+pub fn FileWalkerIterator(assets_rel_dir: []const u8, file_suffix: []const u8) type {
+    return struct {
+        allocator: std.mem.Allocator,
+        dir: std.fs.Dir,
+        walker: std.fs.Dir.Walker,
+
+        pub fn init(allocator: std.mem.Allocator) Error!@This() {
+            const plat = App.getPlat();
+            const path = try u.bufPrintLocal("{s}/{s}", .{ plat.assets_path, assets_rel_dir });
+            var dir = std.fs.cwd().openDir(path, .{ .iterate = true }) catch return Error.FileSystemFail;
+            const walker = try dir.walk(allocator);
+
+            return .{
+                .allocator = allocator,
+                .dir = dir,
+                .walker = walker,
+            };
+        }
+
+        pub fn deinit(self: *@This()) void {
+            self.walker.deinit();
+            self.dir.close();
+        }
+
+        pub fn nextFile(self: *@This()) Error!?std.fs.File {
+            while (self.walker.next() catch return Error.FileSystemFail) |entry| {
+                if (!std.mem.endsWith(u8, entry.basename, file_suffix)) continue;
+                const file = self.dir.openFile(entry.basename, .{}) catch return Error.FileSystemFail;
+                return file;
+            }
+            return null;
+        }
+
+        pub fn nextFileAsOwnedString(self: *@This()) Error!?[]u8 {
+            while (self.walker.next() catch return Error.FileSystemFail) |entry| {
+                if (!std.mem.endsWith(u8, entry.basename, file_suffix)) continue;
+                const file = self.dir.openFile(entry.basename, .{}) catch return Error.FileSystemFail;
+                const str = file.readToEndAlloc(self.allocator, 8 * 1024 * 1024) catch return Error.FileSystemFail;
+                return str;
+            }
+            return null;
+        }
+    };
+}
+
 pub const room_strs = std.EnumArray(RoomKind, []const []const u8).init(.{
     .testu = &test_rooms_strs,
     .first = &.{first_room_str},
@@ -395,12 +441,11 @@ pub fn loadSounds(self: *Data) Error!void {
     }
 }
 
-pub fn loadSpriteSheetFromJson(json_file: std.fs.File, assets_rel_dir_path: []const u8) Error!SpriteSheet {
+pub fn loadSpriteSheetFromJsonString(json_string: []u8, assets_rel_dir_path: []const u8) Error!SpriteSheet {
     const plat = App.getPlat();
-    const s = json_file.readToEndAlloc(plat.heap, 8 * 1024 * 1024) catch return Error.FileSystemFail;
     //std.debug.print("{s}\n", .{s});
-    var scanner = std.json.Scanner.initCompleteInput(plat.heap, s);
-    var tree = std.json.Value.jsonParse(plat.heap, &scanner, .{ .max_value_len = s.len }) catch return Error.ParseFail;
+    var scanner = std.json.Scanner.initCompleteInput(plat.heap, json_string);
+    var tree = std.json.Value.jsonParse(plat.heap, &scanner, .{ .max_value_len = json_string.len }) catch return Error.ParseFail;
     // TODO I guess tree just leaks rn? use arena?
 
     const meta = tree.object.get("meta").?.object;
@@ -492,7 +537,9 @@ pub fn loadSpriteSheetFromJsonPath(_: *Data, assets_rel_dir: []const u8, json_fi
     const plat = App.getPlat();
     const path = try u.bufPrintLocal("{s}/{s}/{s}", .{ plat.assets_path, assets_rel_dir, json_file_name });
     const icons_json = std.fs.cwd().openFile(path, .{}) catch return Error.FileSystemFail;
-    const sheet = try loadSpriteSheetFromJson(icons_json, assets_rel_dir);
+    const str = icons_json.readToEndAlloc(plat.heap, 8 * 1024 * 1024) catch return Error.FileSystemFail;
+    defer plat.heap.free(str);
+    const sheet = try loadSpriteSheetFromJsonString(str, assets_rel_dir);
     return sheet;
 }
 
@@ -502,16 +549,13 @@ pub fn loadCreatureSpriteSheets(self: *Data) Error!void {
     self.creature_anims = @TypeOf(self.creature_anims).initFill(CreatureAnimArray.initFill(null));
     self.creature_sprite_sheets = @TypeOf(self.creature_sprite_sheets).initFill(CreatureSpriteSheetArray.initFill(null));
 
-    const path = try u.bufPrintLocal("{s}/images/creature", .{plat.assets_path});
-    var creature = std.fs.cwd().openDir(path, .{ .iterate = true }) catch return Error.FileSystemFail;
-    defer creature.close();
-    var walker = try creature.walk(plat.heap);
-    defer walker.deinit();
+    var file_it = try FileWalkerIterator("images/creature", ".json").init(plat.heap);
+    defer file_it.deinit();
 
-    while (walker.next() catch return Error.FileSystemFail) |w_entry| {
-        if (!std.mem.endsWith(u8, w_entry.basename, ".json")) continue;
-        const json_file = creature.openFile(w_entry.basename, .{}) catch return Error.FileSystemFail;
-        const sheet = try loadSpriteSheetFromJson(json_file, "images/creature");
+    while (try file_it.nextFileAsOwnedString()) |str| {
+        defer plat.heap.free(str);
+
+        const sheet = try loadSpriteSheetFromJsonString(str, "images/creature");
 
         var it_dash = std.mem.tokenizeScalar(u8, sheet.name.constSlice(), '-');
         const creature_name = it_dash.next().?;
@@ -594,17 +638,13 @@ pub fn loadVFXSpriteSheets(self: *Data) Error!void {
     self.vfx_sprite_sheets.clearRetainingCapacity();
     self.vfx_sprite_sheet_mappings = @TypeOf(self.vfx_sprite_sheet_mappings).initFill(sprites.VFXAnim.AnimNameIdxMapping.initFill(null));
 
-    const path = try u.bufPrintLocal("{s}/images/vfx", .{plat.assets_path});
-    var vfx = std.fs.cwd().openDir(path, .{ .iterate = true }) catch return Error.FileSystemFail;
-    defer vfx.close();
-    var walker = try vfx.walk(plat.heap);
-    defer walker.deinit();
+    var file_it = try FileWalkerIterator("images/vfx", ".json").init(plat.heap);
+    defer file_it.deinit();
 
-    while (walker.next() catch return Error.FileSystemFail) |w_entry| {
-        if (!std.mem.endsWith(u8, w_entry.basename, ".json")) continue;
-        const json_file = vfx.openFile(w_entry.basename, .{}) catch return Error.FileSystemFail;
+    while (try file_it.nextFileAsOwnedString()) |str| {
+        defer plat.heap.free(str);
 
-        const sheet = try loadSpriteSheetFromJson(json_file, "images/vfx");
+        const sheet = try loadSpriteSheetFromJsonString(str, "images/vfx");
         const sheet_idx = self.vfx_sprite_sheets.items.len;
         try self.vfx_sprite_sheets.append(sheet);
 
@@ -665,12 +705,11 @@ pub fn loadSpriteSheets(self: *Data) Error!void {
     self.misc_icons = try @TypeOf(self.misc_icons).init(try self.loadSpriteSheetFromJsonPath("images/ui", "misc_icons.json"));
 }
 
-pub fn loadTileSetFromJson(json_file: std.fs.File, assets_rel_path: []const u8) Error!TileSet {
+pub fn loadTileSetFromJsonString(tileset: *TileSet, json_string: []u8, assets_rel_path: []const u8) Error!void {
     const plat = App.getPlat();
-    const s = json_file.readToEndAlloc(plat.heap, 8 * 1024 * 1024) catch return Error.FileSystemFail;
     //std.debug.print("{s}\n", .{s});
-    var scanner = std.json.Scanner.initCompleteInput(plat.heap, s);
-    const _tree = std.json.Value.jsonParse(plat.heap, &scanner, .{ .max_value_len = s.len }) catch return Error.ParseFail;
+    var scanner = std.json.Scanner.initCompleteInput(plat.heap, json_string);
+    const _tree = std.json.Value.jsonParse(plat.heap, &scanner, .{ .max_value_len = json_string.len }) catch return Error.ParseFail;
     var tree = _tree.object;
     // TODO I guess tree just leaks rn? use arena?
 
@@ -691,7 +730,7 @@ pub fn loadTileSetFromJson(json_file: std.fs.File, assets_rel_path: []const u8) 
     const columns = tree.get("columns").?.integer;
     const sheet_dims = V2i.iToV2i(i64, columns, @divExact(image_dims.y, tile_dims.y));
 
-    var tileset = TileSet{
+    tileset.* = .{
         .name = try TileSet.NameBuf.init(name),
         .sheet_dims = sheet_dims,
         .tile_dims = tile_dims,
@@ -722,7 +761,6 @@ pub fn loadTileSetFromJson(json_file: std.fs.File, assets_rel_path: []const u8) 
             tileset.tiles.buffer[idx] = prop;
         }
     }
-    return tileset;
 }
 
 pub fn loadTileSets(self: *Data) Error!void {
@@ -733,18 +771,15 @@ pub fn loadTileSets(self: *Data) Error!void {
     }
     self.tilesets.clearRetainingCapacity();
 
-    const path = try u.bufPrintLocal("{s}/maps/tilesets", .{plat.assets_path});
-    var dir = std.fs.cwd().openDir(path, .{ .iterate = true }) catch return Error.FileSystemFail;
-    defer dir.close();
-    var walker = try dir.walk(plat.heap);
-    defer walker.deinit();
+    var file_it = try FileWalkerIterator("maps/tilesets", ".tsj").init(plat.heap);
+    defer file_it.deinit();
 
-    while (walker.next() catch return Error.FileSystemFail) |w_entry| {
-        if (!std.mem.endsWith(u8, w_entry.basename, ".tsj")) continue;
-        const json_file = dir.openFile(w_entry.basename, .{}) catch return Error.FileSystemFail;
-        var tileset = try loadTileSetFromJson(json_file, "maps/tilesets/");
-        tileset.id = u.as(i32, self.tilesets.items.len);
-        try (self.tilesets.append(tileset));
+    while (try file_it.nextFileAsOwnedString()) |str| {
+        defer plat.heap.free(str);
+        const id = u.as(i32, self.tilesets.items.len);
+        const tileset = try self.tilesets.addOne();
+        try loadTileSetFromJsonString(tileset, str, "maps/tilesets");
+        tileset.id = id;
         std.debug.print("Loaded tileset: {s}\n", .{tileset.name.constSlice()});
     }
 }
