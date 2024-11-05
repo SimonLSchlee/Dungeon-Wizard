@@ -186,6 +186,11 @@
          "name":"name",
          "type":"string",
          "value":"map-1"
+        },
+        {
+         "name":"room_kind",
+         "type":"string",
+         "value":"testu"
         }],
  "renderorder":"right-down",
  "tiledversion":"1.11.0",
