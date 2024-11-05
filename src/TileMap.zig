@@ -17,7 +17,20 @@ const v2i = V2i.v2i;
 const getPlat = @import("App.zig").getPlat;
 const Thing = @import("Thing.zig");
 const Room = @import("Room.zig");
+const Data = @import("Data.zig");
 const TileMap = @This();
+
+pub const max_map_sz: i64 = 64;
+pub const max_map_sz_f: f32 = max_map_sz;
+pub const max_map_tiles: i64 = max_map_sz * max_map_sz;
+pub const max_map_layers = 8;
+pub const max_map_tilesets = 16;
+pub const max_map_objects = 32;
+
+pub const tile_sz: i64 = 64;
+pub const tile_sz_f: f32 = tile_sz;
+pub const tile_dims = V2f.splat(tile_sz);
+pub const tile_dims_2 = V2f.splat(tile_sz_f * 0.5);
 
 pub const NeighborDir = enum {
     N,
@@ -38,13 +51,44 @@ pub const Tile = struct {
     passable: bool = true,
 };
 
-pub const tile_sz: i64 = 64;
-pub const tile_sz_f: f32 = tile_sz;
-pub const tile_dims = V2f.splat(tile_sz);
-pub const tile_dims_2 = V2f.splat(tile_sz_f * 0.5);
+pub const GameTile = struct {
+    coord: V2i,
+    passable: bool = true,
+};
+
+pub const TileIndex = u32;
+pub const TileLayer = std.BoundedArray(TileIndex, max_map_tiles);
+pub const TileSetReference = struct {
+    name: Data.TileSet.NameBuf,
+    data_idx: usize = 0,
+    first_gid: usize = 1,
+};
+pub const Point = struct {
+    pub const Kind = enum {
+        creature,
+        spawn,
+        exit,
+    };
+    pub const KindData = union(enum) {
+        creature: Thing.CreatureKind,
+        spawn,
+        exit,
+    };
+
+    kind: KindData,
+    pos: V2f,
+};
+
+pub const NameBuf = utl.BoundedString(64);
 
 initted: bool = false,
+name: NameBuf = .{},
+id: i32 = 0,
 tiles: std.AutoArrayHashMap(V2i, Tile) = undefined,
+game_tiles: std.BoundedArray(GameTile, max_map_tiles) = .{},
+tile_layers: std.BoundedArray(TileLayer, max_map_layers) = .{},
+tilesets: std.BoundedArray(TileSetReference, max_map_tilesets) = .{},
+points: std.BoundedArray(Point, max_map_objects) = .{},
 dims_tiles: V2i = .{},
 dims: V2f = .{},
 

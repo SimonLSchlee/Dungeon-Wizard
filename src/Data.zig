@@ -367,6 +367,7 @@ pub const room_strs = std.EnumArray(RoomKind, []const []const u8).init(.{
 });
 
 tilesets: std.ArrayList(TileSet) = undefined,
+tilemaps: std.ArrayList(TileMap) = undefined,
 creatures: std.EnumArray(Thing.CreatureKind, Thing) = undefined,
 creature_sprite_sheets: AllCreatureSpriteSheetArrays = undefined,
 creature_anims: AllCreatureAnimArrays = undefined,
@@ -388,6 +389,7 @@ pub fn init() Error!*Data {
     data.vfx_anims = @TypeOf(data.vfx_anims).init(plat.heap);
     data.vfx_sprite_sheets = @TypeOf(data.vfx_sprite_sheets).init(plat.heap);
     data.tilesets = @TypeOf(data.tilesets).init(plat.heap);
+    data.tilemaps = @TypeOf(data.tilemaps).init(plat.heap);
     try data.reload();
     return data;
 }
@@ -784,6 +786,137 @@ pub fn loadTileSets(self: *Data) Error!void {
     }
 }
 
+pub fn loadTileMapFromJsonString(tilemap: *TileMap, json_string: []u8) Error!void {
+    const plat = App.getPlat();
+    //std.debug.print("{s}\n", .{s});
+    var scanner = std.json.Scanner.initCompleteInput(plat.heap, json_string);
+    const _tree = std.json.Value.jsonParse(plat.heap, &scanner, .{ .max_value_len = json_string.len }) catch return Error.ParseFail;
+    var tree = _tree.object;
+    // TODO I guess tree just leaks rn? use arena?
+
+    // TODO use?
+    const tile_dims = V2i.iToV2i(
+        i64,
+        tree.get("tilewidth").?.integer,
+        tree.get("tileheight").?.integer,
+    );
+    _ = tile_dims;
+    const map_dims = V2i.iToV2i(
+        i64,
+        tree.get("width").?.integer,
+        tree.get("height").?.integer,
+    );
+
+    tilemap.* = .{
+        .dims_tiles = map_dims,
+        //.tile_dims = tile_dims,
+    };
+    {
+        const props = tree.get("properties").?.array;
+        for (props.items) |p| {
+            const p_name = p.object.get("name").?.string;
+            if (std.mem.eql(u8, p_name, "name")) {
+                const name = p.object.get("value").?.string;
+                tilemap.name = try TileMap.NameBuf.init(name);
+                continue;
+            }
+        }
+    }
+    {
+        // get tilesets without looking them up yet
+        const tilesets = tree.get("tilesets").?.array;
+        for (tilesets.items) |ts| {
+            const first_gid = ts.object.get("firstgid").?.integer;
+            const tileset_path = ts.object.get("source").?.string;
+            const tileset_file_name = std.fs.path.basename(tileset_path);
+            const tileset_name = tileset_file_name[0..(tileset_file_name.len - 4)];
+            try tilemap.tilesets.append(.{
+                .name = try TileSet.NameBuf.init(tileset_name),
+                .first_gid = u.as(usize, first_gid),
+            });
+        }
+    }
+    {
+        const startsWith = std.mem.startsWith;
+        const layers = tree.get("layers").?.array;
+        for (layers.items) |_layer| {
+            const layer = _layer.object;
+            const visible = layer.get("visible").?.bool;
+            if (!visible) continue;
+            const kind = layer.get("type").?.string;
+            if (std.mem.eql(u8, kind, "tilelayer")) {
+                var tile_layer = TileMap.TileLayer{};
+                // TODO x,y,width,height?
+                const data = layer.get("data").?.array;
+                for (data.items) |d| {
+                    const tile_gid = d.integer;
+                    try tile_layer.append(u.as(TileMap.TileIndex, tile_gid));
+                }
+                try tilemap.tile_layers.append(tile_layer);
+            } else if (std.mem.eql(u8, kind, "objectgroup")) {
+                const objects = layer.get("objects").?.array;
+                for (objects.items) |_obj| {
+                    const obj = _obj.object;
+                    if (!obj.get("visible").?.bool) continue;
+                    if (obj.get("point").?.bool) {
+                        const obj_name = obj.get("name").?.string;
+                        // TODO clean up arrgh
+                        const pos = v2f(
+                            u.as(f32, switch (obj.get("x").?) {
+                                .float => |f| f,
+                                .integer => |i| u.as(f64, i),
+                                else => return Error.ParseFail,
+                            }),
+                            u.as(f32, switch (obj.get("y").?) {
+                                .float => |f| f,
+                                .integer => |i| u.as(f64, i),
+                                else => return Error.ParseFail,
+                            }),
+                        );
+                        if (startsWith(u8, obj_name, "creature")) {
+                            try tilemap.points.append(.{
+                                .kind = .{ .creature = .player },
+                                .pos = pos,
+                            });
+                        } else if (startsWith(u8, obj_name, "exit")) {
+                            try tilemap.points.append(.{
+                                .kind = .exit,
+                                .pos = pos,
+                            });
+                        } else if (startsWith(u8, obj_name, "spawn")) {
+                            try tilemap.points.append(.{
+                                .kind = .spawn,
+                                .pos = pos,
+                            });
+                        }
+                    } else {
+                        // ??
+                        @panic("unimplemented");
+                    }
+                }
+            }
+        }
+    }
+}
+
+pub fn loadTileMaps(self: *Data) Error!void {
+    const plat = App.getPlat();
+
+    self.tilemaps.clearRetainingCapacity();
+
+    var file_it = try FileWalkerIterator("maps", ".tmj").init(plat.heap);
+    defer file_it.deinit();
+
+    while (try file_it.nextFileAsOwnedString()) |str| {
+        defer plat.heap.free(str);
+        const id = u.as(i32, self.tilemaps.items.len);
+        const tilemap = try self.tilemaps.addOne();
+        try loadTileMapFromJsonString(tilemap, str);
+        tilemap.id = id;
+        std.debug.print("Loaded tilemap: {s}\n", .{tilemap.name.constSlice()});
+    }
+}
+
 pub fn reload(self: *Data) Error!void {
     self.loadSpriteSheets() catch std.debug.print("WARNING: failed to load all sprites\n", .{});
     self.loadSounds() catch std.debug.print("WARNING: failed to load all sounds\n", .{});
@@ -800,6 +933,7 @@ pub fn reload(self: *Data) Error!void {
         },
     );
     try self.loadTileSets();
+    try self.loadTileMaps();
     self.rooms = @TypeOf(self.rooms).initDefault(.{}, .{});
     inline for (std.meta.fields(RoomKind)) |f| {
         const kind: RoomKind = @enumFromInt(f.value);
