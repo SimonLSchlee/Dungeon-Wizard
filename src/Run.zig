@@ -412,7 +412,7 @@ pub fn gameUpdate(self: *Run) Error!void {
         },
         .won => {
             const curr_room_place = self.places.get(self.curr_place_idx).room;
-            if (self.reward == null and curr_room_place.kind == .smol or curr_room_place.kind == .big) {
+            if (!self.room.took_reward and (curr_room_place.kind == .smol or curr_room_place.kind == .big or curr_room_place.kind == .boss)) {
                 self.makeReward();
                 // TODO bettterrr?
                 self.gold += u.as(i32, @floor(curr_room_place.difficulty)) + self.rng.random().uintAtMost(u8, 5);
@@ -458,6 +458,8 @@ pub fn rewardUpdate(self: *Run) Error!void {
     const reward_ui = self.reward_ui;
     if (reward_ui.skip_or_continue_button.isClicked()) {
         self.screen = .game;
+        assert(self.room_exists);
+        self.room.took_reward = true;
     } else {
         for (reward_ui.spell_rects.constSlice(), 0..) |crect, i| {
             if (crect.isClicked()) {

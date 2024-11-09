@@ -188,6 +188,7 @@ progress_state: union(enum) {
     won,
     exited: gameUI.ExitDoor,
 } = .none,
+took_reward: bool = false,
 // reinit stuff, never needs saving or copying, probably?:
 moused_over_thing: ?struct {
     thing: Thing.Id,
