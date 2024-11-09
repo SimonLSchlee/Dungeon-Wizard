@@ -521,7 +521,7 @@ pub fn debugDrawPath(_: *const TileMap, camera: draw.Camera2D, path: []const V2i
     }
 }
 
-pub fn debugDrawGrid(_: *const TileMap, camera: draw.Camera2D) Error!void {
+pub fn debugDrawGrid(_: *const TileMap, camera: draw.Camera2D) void {
     const plat = getPlat();
     const inv_zoom = 1 / camera.zoom;
     const camera_dims = core.native_dims_f.scale(inv_zoom);
@@ -545,14 +545,13 @@ pub fn debugDrawGrid(_: *const TileMap, camera: draw.Camera2D) Error!void {
     }
 }
 
-pub fn debugDraw(self: *const TileMap) Error!void {
+pub fn debugDraw(self: *const TileMap, camera: draw.Camera2D) void {
     const plat = getPlat();
-    const room_rect = self.getRoomRect();
-    plat.rectf(room_rect.pos, room_rect.dims, .{ .fill_color = Colorf.rgb(0.4, 0.4, 0.4) });
     for (self.game_tiles.constSlice()) |game_tile| {
-        const color = if (game_tile.passable) Colorf.gray else Colorf.rgb(0.1, 0.1, 0.1);
+        const color = if (game_tile.passable) continue else Colorf.red.fade(0.3);
         plat.rectf(tileCoordToPos(game_tile.coord), tile_dims, .{ .fill_color = color });
     }
+    self.debugDrawGrid(camera);
 }
 
 pub fn getRoomRect(self: *const TileMap) geom.Rectf {
