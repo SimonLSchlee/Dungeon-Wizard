@@ -11,27 +11,32 @@ uniform vec4 colDiffuse;
 // Output fragment color
 out vec4 finalColor;
 
-uniform float seconds;
+struct Circle {
+    vec2 pos;
+    float radius;
+};
 
-uniform vec2 size = vec2(1280, 800);
+#define MAX_CIRCLES  128
 
-uniform float freqX = 25;
-uniform float freqY = 25;
-uniform float ampX = 5;
-uniform float ampY = 5;
-uniform float speedX = 8;
-uniform float speedY = 8;
+uniform Circle circles[MAX_CIRCLES];
+uniform int numCircles = 0;
+uniform float falloff_dist = 20;
 
 void main() {
-    float pixelWidth = 1.0 / size.x;
-    float pixelHeight = 1.0 / size.y;
-    float aspect = pixelHeight / pixelWidth;
-    float boxLeft = 0.0;
-    float boxTop = 0.0;
+    vec2 pos = vec2(gl_FragCoord.x, gl_FragCoord.y);
+    vec4 color = texture(texture0, fragTexCoord)*fragColor;
+    vec4 vAlpha = vec4(1,1,1,1);
+    int cCount = min(numCircles, MAX_CIRCLES);
+    for (int i = 0; i < cCount; i++) {
+        float dist = distance(pos, circles[i].pos);
+        if (dist < circles[i].radius) {
+            color.a = 0;
+            break;
+        } else if (dist < circles[i].radius + falloff_dist) {
+            float t = smoothstep(falloff_dist, 0, dist - circles[i].radius);
+            color.a = clamp(color.a - t, 0, 1);
+        }
+    }
 
-    vec2 p = fragTexCoord;
-    p.x += cos((fragTexCoord.y - boxTop) * freqX / ( pixelWidth * 750.0) + (seconds * speedX)) * ampX * pixelWidth;
-    p.y += sin((fragTexCoord.x - boxLeft) * freqY * aspect / ( pixelHeight * 750.0) + (seconds * speedY)) * ampY * pixelHeight;
-
-    finalColor = texture(texture0, p)*colDiffuse*fragColor;
+    finalColor = color;
 }

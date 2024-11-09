@@ -646,9 +646,8 @@ pub fn screenPosToCamPos(self: *Platform, cam: draw.Camera2D, pos: V2f) V2f {
 }
 
 pub fn camPosToScreenPos(self: *Platform, cam: draw.Camera2D, pos: V2f) V2f {
-    var c = cam;
-    c.offset = c.offset.add(self.native_to_screen_offset);
-    return zVec(r.GetWorldToScreen2D(cVec(pos), cCam(c)));
+    _ = self;
+    return zVec(r.GetWorldToScreen2D(cVec(pos), cCam(cam)));
 }
 
 pub fn getMousePosWorld(self: *Platform, cam: draw.Camera2D) V2f {
@@ -774,7 +773,48 @@ pub fn loadShader(self: *Platform, vert_path: ?[]const u8, frag_path: ?[]const u
     return ret;
 }
 
-pub fn setShaderValues(_: *Platform, shader: Shader, args: anytype) void {
+fn getShaderUniformKind(T: type) c_int {
+    const type_info = @typeInfo(T);
+    switch (type_info) {
+        .@"struct" => |s| {
+            if (s.fields.len != 2)
+                @compileError("Invalid struct type for shader uniform; must have 2 fields (x and y)")
+            else if (@hasField(T, "x") and @hasField(T, "y"))
+                switch (@typeInfo(s.fields[std.meta.fieldIndex(T, "x").?].type)) {
+                    .float => |f| if (f.bits == 32) return r.SHADER_UNIFORM_VEC2 else @compileError("Shader float uniform must be 32 bits"),
+                    .int => |i| if (i.bits == 32) return r.SHADER_UNIFORM_IVEC2 else @compileError("Shader int uniform must be 32 bits"),
+                    else => @compileError("Invalid struct type for shader uniform; field \"x\" is not float or int"),
+                }
+            else
+                @compileError("Invalid struct type for shader uniform");
+        },
+        .@"enum" => return r.SHADER_UNIFORM_INT,
+        .float => return r.SHADER_UNIFORM_FLOAT,
+        .int => return r.SHADER_UNIFORM_INT,
+        else => @compileError("Invalid type for shader uniform"),
+    }
+}
+
+pub fn setShaderValuesArray(self: *Platform, shader: Shader, arr_name: []const u8, member_name: ?[]const u8, T: type, args: []T) Error!void {
+    const uniform_kind = getShaderUniformKind(T);
+    for (args, 0..) |a, i| {
+        const name_z = if (member_name) |mb|
+            try std.fmt.bufPrintZ(self.str_fmt_buf, "{s}[{}].{s}", .{ arr_name, i, mb })
+        else
+            try std.fmt.bufPrintZ(self.str_fmt_buf, "{s}[{}]", .{ arr_name, i });
+        const loc = r.GetShaderLocation(shader.r_shader, name_z);
+        r.SetShaderValue(shader.r_shader, loc, &a, uniform_kind);
+    }
+}
+
+pub fn setShaderValue(self: *Platform, shader: Shader, loc_name: []const u8, value: anytype) Error!void {
+    const uniform_kind = getShaderUniformKind(@TypeOf(value));
+    const name_z = try std.fmt.bufPrintZ(self.str_fmt_buf, "{s}", .{loc_name});
+    const loc = r.GetShaderLocation(shader.r_shader, name_z);
+    r.SetShaderValue(shader.r_shader, loc, &value, uniform_kind);
+}
+
+pub fn setShaderValuesScalar(_: *Platform, shader: Shader, args: anytype) void {
     const ArgsType = @TypeOf(args);
     const args_type_info = @typeInfo(ArgsType);
     if (args_type_info != .@"struct") {
@@ -787,7 +827,8 @@ pub fn setShaderValues(_: *Platform, shader: Shader, args: anytype) void {
     }
     inline for (args_type_info.@"struct".fields) |f| {
         const loc = r.GetShaderLocation(shader.r_shader, f.name);
-        r.SetShaderValue(shader.r_shader, loc, &@field(args, f.name), r.SHADER_UNIFORM_FLOAT);
+        const uniform_kind = getShaderUniformKind(f.type);
+        r.SetShaderValue(shader.r_shader, loc, &@field(args, f.name), uniform_kind);
     }
 }
 

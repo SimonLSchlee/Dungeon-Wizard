@@ -1122,3 +1122,18 @@ pub inline fn isAliveCreature(self: *const Thing) bool {
 pub inline fn isAttackableCreature(self: *const Thing) bool {
     return self.isActive() and self.isCreature() and self.hurtbox != null;
 }
+
+pub fn getApproxVisibleCircle(self: *const Thing) struct { pos: V2f, radius: f32 } {
+    var ret = .{
+        .pos = self.pos,
+        .radius = self.coll_radius,
+    };
+    if (self.selectable) |s| {
+        ret.pos = self.pos.add(v2f(0, -(s.height - s.radius) * 0.5));
+        ret.radius = (s.height) * 0.5;
+    } else if (self.hitbox) |h| {
+        ret.pos = self.pos.add(h.rel_pos);
+        ret.radius = @max(h.radius, self.coll_radius);
+    }
+    return ret;
+}

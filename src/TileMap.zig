@@ -568,7 +568,7 @@ pub fn getRoomRect(self: *const TileMap) geom.Rectf {
     };
 }
 
-fn renderTile(self: *const TileMap, pos: V2f, tile: TileLayer.Tile, opacity: f32) void {
+fn renderTile(self: *const TileMap, pos: V2f, tile: TileLayer.Tile) void {
     const plat = getPlat();
     const data = App.get().data;
     const ref = self.tileIdxToTileSetRef(tile.idx) orelse {
@@ -588,43 +588,17 @@ fn renderTile(self: *const TileMap, pos: V2f, tile: TileLayer.Tile, opacity: f32
         .src_dims = tileset.tile_dims.toV2f(),
         .src_pos = src_px_coord.toV2f(),
         .uniform_scaling = core.pixel_art_scaling,
-        .tint = Colorf.white.fade(opacity),
     };
     plat.texturef(pos, tileset.texture, opt);
 }
 
-fn renderLayer(self: *const TileMap, layer: *const TileLayer, things: []const *const Thing) void {
+fn renderLayer(self: *const TileMap, layer: *const TileLayer) void {
     const room_rect = self.getRoomRect();
     var map_coord: V2i = .{};
     for (layer.tiles.constSlice()) |tile| {
         if (tile.idx != 0) {
             const pos = room_rect.pos.add(tileCoordToPos(map_coord));
-            const bottom_y = pos.y + tile_sz_f;
-            const center_pos = pos.add(tile_dims_2);
-            var opacity: f32 = 1;
-            for (things) |thing| {
-                if (thing.pos.y >= bottom_y) continue;
-                var extra_radius: f32 = 10;
-                if (thing.selectable) |s| {
-                    extra_radius = s.radius;
-                } else {}
-                if (thing.pos.dist(center_pos) < tile_sz_f) {
-                    opacity = 0.5;
-                    break;
-                }
-                if (thing.selectable) |s| {
-                    const thing_top_pos = thing.pos.sub(v2f(0, s.height));
-                    if (thing_top_pos.dist(center_pos) < tile_sz_f + s.radius) {
-                        opacity = 0.5;
-                        break;
-                    }
-                }
-            }
-            self.renderTile(
-                pos,
-                tile,
-                opacity,
-            );
+            self.renderTile(pos, tile);
         }
         map_coord.x += 1;
         if (map_coord.x >= self.dims_tiles.x) {
@@ -640,21 +614,35 @@ pub fn renderUnderObjects(self: *const TileMap) Error!void {
     plat.rectf(room_rect.pos, room_rect.dims, .{ .fill_color = Colorf.rgb(0.4, 0.4, 0.4) });
     for (self.tile_layers.constSlice()) |*layer| {
         if (layer.above_objects) continue;
-        self.renderLayer(layer, &.{});
+        self.renderLayer(layer);
     }
 }
 
-pub fn renderOverObjects(self: *const TileMap, things: []const *const Thing) Error!void {
+pub fn renderOverObjects(self: *const TileMap, cam: draw.Camera2D, things: []const *const Thing) Error!void {
     const plat = App.getPlat();
     const data = App.get().data;
     const shader = data.shaders.get(.tile_foreground_fade);
-    plat.setShaderValues(shader, .{
-        .seconds = utl.as(f32, plat.getGameTimeNanosecs()) / 1000000000,
+    var num_circles: usize = 0;
+    for (things, 0..) |t, i| {
+        if (num_circles >= 128) break; // MAX_CIRCLES in shader
+        const visible_circle = t.getApproxVisibleCircle();
+        var pos = plat.camPosToScreenPos(cam, visible_circle.pos);
+        // shader screen pos needs y inverted!
+        pos.y = core.native_dims_f.y - pos.y;
+        const radius = visible_circle.radius;
+        const pos_name = try utl.bufPrintLocal("circles[{}].pos", .{i});
+        try plat.setShaderValue(shader, pos_name, pos);
+        const radius_name = try utl.bufPrintLocal("circles[{}].radius", .{i});
+        try plat.setShaderValue(shader, radius_name, radius);
+        num_circles += 1;
+    }
+    plat.setShaderValuesScalar(shader, .{
+        .numCircles = num_circles,
     });
     plat.setShader(shader);
     for (self.tile_layers.constSlice()) |*layer| {
         if (!layer.above_objects) continue;
-        self.renderLayer(layer, things);
+        self.renderLayer(layer);
     }
     plat.setDefaultShader();
 }

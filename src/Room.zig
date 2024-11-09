@@ -490,7 +490,7 @@ pub fn update(self: *Room) Error!void {
         self.fog.clearVisible();
         if (self.getPlayer()) |player| {
             // TODO better
-            self.camera.pos = player.pos.add(v2f(0, plat.native_rect_cropped_dims.y * 0.08));
+            self.camera.pos = player.pos; //.add(v2f(0, plat.native_rect_cropped_dims.y * 0.08));
             try self.fog.addVisibleCircle(
                 self.tilemap.getRoomRect(),
                 player.pos,
@@ -586,7 +586,7 @@ pub fn render(self: *const Room, native_render_texture: Platform.RenderTexture2D
         for (thing_arr.constSlice()) |thing| {
             try thing.render(self);
         }
-        try self.tilemap.renderOverObjects(thing_arr.constSlice());
+        try self.tilemap.renderOverObjects(self.camera, thing_arr.constSlice());
         for (thing_arr.constSlice()) |thing| {
             try thing.renderOver(self);
         }
