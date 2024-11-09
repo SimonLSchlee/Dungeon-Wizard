@@ -194,7 +194,10 @@ pub fn FileWalkerIterator(assets_rel_dir: []const u8, file_suffix: []const u8) t
         pub fn init(allocator: std.mem.Allocator) Error!@This() {
             const plat = App.getPlat();
             const path = try u.bufPrintLocal("{s}/{s}", .{ plat.assets_path, assets_rel_dir });
-            var dir = std.fs.cwd().openDir(path, .{ .iterate = true }) catch return Error.FileSystemFail;
+            var dir = std.fs.cwd().openDir(path, .{ .iterate = true }) catch |err| {
+                std.debug.print("Error opening dir \"{s}\": {any}\n", .{ path, err });
+                return Error.FileSystemFail;
+            };
             const walker = try dir.walk(allocator);
 
             return .{
@@ -866,8 +869,8 @@ pub fn loadShaders(self: *Data) Error!void {
 }
 
 pub fn reload(self: *Data) Error!void {
-    self.loadSpriteSheets() catch std.debug.print("WARNING: failed to load all sprites\n", .{});
-    self.loadSounds() catch std.debug.print("WARNING: failed to load all sounds\n", .{});
+    self.loadSpriteSheets() catch |err| std.debug.print("WARNING: failed to load all sprites: {any}\n", .{err});
+    self.loadSounds() catch |err| std.debug.print("WARNING: failed to load all sounds: {any}\n", .{err});
     self.creatures = @TypeOf(self.creatures).init(
         .{
             .player = player.basePrototype(),
@@ -880,8 +883,8 @@ pub fn reload(self: *Data) Error!void {
             .impling = try @import("spells/Impling.zig").implingProto(),
         },
     );
-    try self.loadTileSets();
-    try self.loadTileMaps();
+    self.loadTileSets() catch |err| std.debug.print("WARNING: failed to load all tilesets: {any}\n", .{err});
+    self.loadTileMaps() catch |err| std.debug.print("WARNING: failed to load all tilemaps: {any}\n", .{err});
     inline for (std.meta.fields(RoomKind)) |f| {
         const kind: RoomKind = @enumFromInt(f.value);
         const tilemaps = self.room_kind_tilemaps.getPtr(kind);
@@ -892,5 +895,5 @@ pub fn reload(self: *Data) Error!void {
             }
         }
     }
-    try self.loadShaders();
+    self.loadShaders() catch |err| std.debug.print("WARNING: failed to load all shaders: {any}\n", .{err});
 }
