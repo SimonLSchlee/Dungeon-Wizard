@@ -182,44 +182,43 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
     // init places
     var places = Place.Array{};
 
-    if (false) {
-        var smol_room_idxs = std.BoundedArray(usize, 16){};
-        for (0..app.data.rooms.get(.smol).len) |i| {
-            smol_room_idxs.append(i) catch unreachable;
-        }
-        run.rng.random().shuffleWithIndex(usize, smol_room_idxs.slice(), u32);
-
-        for (0..3) |i| {
-            try places.append(.{ .room = .{
-                .difficulty = 0,
-                .kind = .smol,
-                .idx = smol_room_idxs.get(i),
-            } });
-        }
-
-        var big_room_idxs = std.BoundedArray(usize, 16){};
-        for (0..app.data.rooms.get(.smol).len) |i| {
-            big_room_idxs.append(i) catch unreachable;
-        }
-        run.rng.random().shuffleWithIndex(usize, big_room_idxs.slice(), u32);
-
-        for (0..3) |i| {
-            try places.append(.{ .room = .{
-                .difficulty = 0,
-                .kind = .big,
-                .idx = big_room_idxs.get(i),
-            } });
-        }
-
-        for (places.slice(), 0..) |*place, i| {
-            place.room.difficulty = 4 + u.as(f32, i) * 2;
-        }
-        try places.insert(places.len / 2, .{ .shop = .{ .num = 0 } });
-        try places.insert(0, .{ .room = .{ .difficulty = 0, .kind = .first, .idx = 0 } });
-        try places.append(.{ .shop = .{ .num = 1 } });
-        try places.append(.{ .room = .{ .difficulty = places.get(places.len - 2).room.difficulty, .kind = .boss, .idx = 0 } });
+    var smol_room_idxs = std.BoundedArray(usize, 16){};
+    for (0..app.data.rooms.get(.smol).len) |i| {
+        smol_room_idxs.append(i) catch unreachable;
     }
-    try places.append(.{ .room = .{ .difficulty = 4, .idx = 0, .kind = .testu } });
+    run.rng.random().shuffleWithIndex(usize, smol_room_idxs.slice(), u32);
+
+    for (0..@min(smol_room_idxs.len, 3)) |i| {
+        try places.append(.{ .room = .{
+            .difficulty = 0,
+            .kind = .smol,
+            .idx = smol_room_idxs.get(i),
+        } });
+    }
+
+    var big_room_idxs = std.BoundedArray(usize, 16){};
+    for (0..app.data.rooms.get(.smol).len) |i| {
+        big_room_idxs.append(i) catch unreachable;
+    }
+    run.rng.random().shuffleWithIndex(usize, big_room_idxs.slice(), u32);
+
+    for (0..@min(big_room_idxs.len, 3)) |i| {
+        try places.append(.{ .room = .{
+            .difficulty = 0,
+            .kind = .big,
+            .idx = big_room_idxs.get(i),
+        } });
+    }
+
+    for (places.slice(), 0..) |*place, i| {
+        place.room.difficulty = 4 + u.as(f32, i) * 2;
+    }
+    try places.insert(places.len / 2, .{ .shop = .{ .num = 0 } });
+    try places.insert(0, .{ .room = .{ .difficulty = 0, .kind = .first, .idx = 0 } });
+    try places.append(.{ .shop = .{ .num = 1 } });
+    try places.append(.{ .room = .{ .difficulty = places.get(places.len - 2).room.difficulty, .kind = .boss, .idx = 0 } });
+
+    //try places.append(.{ .room = .{ .difficulty = 4, .idx = 0, .kind = .testu } });
     run.places = places;
 
     return run;
