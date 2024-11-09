@@ -60,7 +60,10 @@ pub const GameTile = struct {
 };
 
 pub const TileIndex = u32;
-pub const TileLayer = std.BoundedArray(TileIndex, max_map_tiles);
+pub const TileLayer = struct {
+    above_objects: bool = false,
+    tiles: std.BoundedArray(TileIndex, max_map_tiles) = .{},
+};
 pub const TileSetReference = struct {
     name: Data.TileSet.NameBuf,
     data_idx: usize = 0,
@@ -569,7 +572,7 @@ pub fn render(self: *const TileMap) Error!void {
     plat.rectf(room_rect.pos, room_rect.dims, .{ .fill_color = Colorf.rgb(0.4, 0.4, 0.4) });
     for (self.tile_layers.constSlice()) |layer| {
         var map_coord: V2i = .{};
-        for (layer.constSlice()) |tile_idx| {
+        for (layer.tiles.constSlice()) |tile_idx| {
             if (self.tileIdxToTileSetRef(tile_idx)) |ref| {
                 assert(ref.data_idx < data.tilesets.items.len);
                 const tileset = &data.tilesets.items[ref.data_idx];

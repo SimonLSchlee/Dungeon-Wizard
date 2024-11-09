@@ -834,8 +834,8 @@ pub fn loadTileMapFromJsonString(tilemap: *TileMap, json_string: []u8) Error!voi
             game_tile_coord.y += 1;
         }
     }
-    {
-        const props = tree.get("properties").?.array;
+    if (tree.get("properties")) |_props| {
+        const props = _props.array;
         for (props.items) |p| {
             const p_name = p.object.get("name").?.string;
             if (std.mem.eql(u8, p_name, "name")) {
@@ -866,21 +866,25 @@ pub fn loadTileMapFromJsonString(tilemap: *TileMap, json_string: []u8) Error!voi
     {
         const startsWith = std.mem.startsWith;
         const layers = tree.get("layers").?.array;
+        var above_objects = false;
         for (layers.items) |_layer| {
             const layer = _layer.object;
             const visible = layer.get("visible").?.bool;
             if (!visible) continue;
             const kind = layer.get("type").?.string;
             if (std.mem.eql(u8, kind, "tilelayer")) {
-                var tile_layer = TileMap.TileLayer{};
+                var tile_layer = TileMap.TileLayer{
+                    .above_objects = above_objects,
+                };
                 // TODO x,y,width,height?
                 const data = layer.get("data").?.array;
                 for (data.items) |d| {
                     const tile_gid = d.integer;
-                    try tile_layer.append(u.as(TileMap.TileIndex, tile_gid));
+                    try tile_layer.tiles.append(u.as(TileMap.TileIndex, tile_gid));
                 }
                 try tilemap.tile_layers.append(tile_layer);
             } else if (std.mem.eql(u8, kind, "objectgroup")) {
+                above_objects = true;
                 const objects = layer.get("objects").?.array;
                 for (objects.items) |_obj| {
                     const obj = _obj.object;
@@ -958,8 +962,9 @@ pub fn loadTileMaps(self: *Data) Error!void {
         }
         // init game tiles
         for (tilemap.tile_layers.constSlice()) |layer| {
+            if (layer.above_objects) continue;
             var tile_coord: V2i = .{};
-            for (layer.constSlice()) |tile_idx| {
+            for (layer.tiles.constSlice()) |tile_idx| {
                 var props = blk: {
                     if (tilemap.tileIdxToTileSetRef(tile_idx)) |ref| {
                         break :blk self.tileIdxAndTileSetRefToTileProperties(ref, tile_idx);
