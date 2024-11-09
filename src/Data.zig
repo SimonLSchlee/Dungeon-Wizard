@@ -313,6 +313,11 @@ pub const SFX = enum {
     spell_fizzle,
 };
 
+pub const ShaderName = enum {
+    tile_foreground_fade,
+};
+pub const ShaderArr = std.EnumArray(ShaderName, Platform.Shader);
+
 pub const RoomKind = enum {
     testu,
     first,
@@ -355,6 +360,14 @@ pub fn FileWalkerIterator(assets_rel_dir: []const u8, file_suffix: []const u8) t
             return null;
         }
 
+        pub fn nextFileAsBaseName(self: *@This()) Error!?[]const u8 {
+            while (self.walker.next() catch return Error.FileSystemFail) |entry| {
+                if (!std.mem.endsWith(u8, entry.basename, file_suffix)) continue;
+                return entry.basename;
+            }
+            return null;
+        }
+
         pub fn nextFileAsOwnedString(self: *@This()) Error!?[]u8 {
             while (self.walker.next() catch return Error.FileSystemFail) |entry| {
                 if (!std.mem.endsWith(u8, entry.basename, file_suffix)) continue;
@@ -388,8 +401,8 @@ spell_icons: IconSprites(Spell.Kind) = undefined,
 item_icons: IconSprites(Item.Kind) = undefined,
 misc_icons: IconSprites(MiscIcon) = undefined,
 sounds: std.EnumArray(SFX, ?Platform.Sound) = undefined,
+shaders: ShaderArr = undefined,
 // roooms
-rooms: std.EnumArray(RoomKind, PackedRoomBuf) = undefined,
 room_kind_tilemaps: std.EnumArray(RoomKind, TileMapIdxBuf) = undefined,
 
 pub fn init() Error!*Data {
@@ -880,7 +893,9 @@ pub fn loadTileMapFromJsonString(tilemap: *TileMap, json_string: []u8) Error!voi
                 const data = layer.get("data").?.array;
                 for (data.items) |d| {
                     const tile_gid = d.integer;
-                    try tile_layer.tiles.append(u.as(TileMap.TileIndex, tile_gid));
+                    try tile_layer.tiles.append(.{
+                        .idx = u.as(TileMap.TileIndex, tile_gid),
+                    });
                 }
                 try tilemap.tile_layers.append(tile_layer);
             } else if (std.mem.eql(u8, kind, "objectgroup")) {
@@ -964,10 +979,10 @@ pub fn loadTileMaps(self: *Data) Error!void {
         for (tilemap.tile_layers.constSlice()) |layer| {
             if (layer.above_objects) continue;
             var tile_coord: V2i = .{};
-            for (layer.tiles.constSlice()) |tile_idx| {
+            for (layer.tiles.constSlice()) |tile| {
                 var props = blk: {
-                    if (tilemap.tileIdxToTileSetRef(tile_idx)) |ref| {
-                        break :blk self.tileIdxAndTileSetRefToTileProperties(ref, tile_idx);
+                    if (tilemap.tileIdxToTileSetRef(tile.idx)) |ref| {
+                        break :blk self.tileIdxAndTileSetRefToTileProperties(ref, tile.idx);
                     }
                     break :blk null;
                 };
@@ -993,6 +1008,13 @@ pub fn loadTileMaps(self: *Data) Error!void {
     }
 }
 
+pub fn loadShaders(self: *Data) Error!void {
+    const plat = App.getPlat();
+    // TODO deinit?
+
+    self.shaders.getPtr(.tile_foreground_fade).* = try plat.loadShader(null, "tile_foreground_fade.fs");
+}
+
 pub fn reload(self: *Data) Error!void {
     self.loadSpriteSheets() catch std.debug.print("WARNING: failed to load all sprites\n", .{});
     self.loadSounds() catch std.debug.print("WARNING: failed to load all sounds\n", .{});
@@ -1010,14 +1032,8 @@ pub fn reload(self: *Data) Error!void {
     );
     try self.loadTileSets();
     try self.loadTileMaps();
-    self.rooms = @TypeOf(self.rooms).initDefault(.{}, .{});
     inline for (std.meta.fields(RoomKind)) |f| {
         const kind: RoomKind = @enumFromInt(f.value);
-        const strs = room_strs.get(kind);
-        const packed_rooms = self.rooms.getPtr(kind);
-        for (strs) |s| {
-            try packed_rooms.append(try PackedRoom.init(s));
-        }
         const tilemaps = self.room_kind_tilemaps.getPtr(kind);
         tilemaps.clear();
         for (self.tilemaps.items) |tilemap| {
@@ -1026,4 +1042,5 @@ pub fn reload(self: *Data) Error!void {
             }
         }
     }
+    try self.loadShaders();
 }

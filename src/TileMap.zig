@@ -61,8 +61,11 @@ pub const GameTile = struct {
 
 pub const TileIndex = u32;
 pub const TileLayer = struct {
+    pub const Tile = struct {
+        idx: u32 = undefined,
+    };
     above_objects: bool = false,
-    tiles: std.BoundedArray(TileIndex, max_map_tiles) = .{},
+    tiles: std.BoundedArray(TileLayer.Tile, max_map_tiles) = .{},
 };
 pub const TileSetReference = struct {
     name: Data.TileSet.NameBuf,
@@ -565,17 +568,17 @@ pub fn getRoomRect(self: *const TileMap) geom.Rectf {
     };
 }
 
-fn renderTile(self: *const TileMap, pos: V2f, tile_idx: u32) void {
+fn renderTile(self: *const TileMap, pos: V2f, tile: TileLayer.Tile, opacity: f32) void {
     const plat = getPlat();
     const data = App.get().data;
-    const ref = self.tileIdxToTileSetRef(tile_idx) orelse {
+    const ref = self.tileIdxToTileSetRef(tile.idx) orelse {
         std.debug.print("unknown tileset ref!\n", .{});
         return;
     };
     assert(ref.data_idx < data.tilesets.items.len);
     const tileset = &data.tilesets.items[ref.data_idx];
-    assert(tile_idx >= ref.first_gid);
-    const tileset_tile_idx = tile_idx - ref.first_gid;
+    assert(tile.idx >= ref.first_gid);
+    const tileset_tile_idx = tile.idx - ref.first_gid;
     assert(tileset_tile_idx < tileset.tiles.len);
     const tileset_tile_idxi = utl.as(i32, tileset_tile_idx);
     const sheet_coord = v2i(@mod(tileset_tile_idxi, tileset.sheet_dims.x), @divFloor(tileset_tile_idxi, tileset.sheet_dims.x));
@@ -585,17 +588,43 @@ fn renderTile(self: *const TileMap, pos: V2f, tile_idx: u32) void {
         .src_dims = tileset.tile_dims.toV2f(),
         .src_pos = src_px_coord.toV2f(),
         .uniform_scaling = core.pixel_art_scaling,
+        .tint = Colorf.white.fade(opacity),
     };
     plat.texturef(pos, tileset.texture, opt);
 }
 
-fn renderLayer(self: *const TileMap, layer: *const TileLayer) void {
+fn renderLayer(self: *const TileMap, layer: *const TileLayer, things: []const *const Thing) void {
     const room_rect = self.getRoomRect();
     var map_coord: V2i = .{};
-    for (layer.tiles.constSlice()) |tile_idx| {
-        if (tile_idx != 0) {
+    for (layer.tiles.constSlice()) |tile| {
+        if (tile.idx != 0) {
             const pos = room_rect.pos.add(tileCoordToPos(map_coord));
-            self.renderTile(pos, tile_idx);
+            const bottom_y = pos.y + tile_sz_f;
+            const center_pos = pos.add(tile_dims_2);
+            var opacity: f32 = 1;
+            for (things) |thing| {
+                if (thing.pos.y >= bottom_y) continue;
+                var extra_radius: f32 = 10;
+                if (thing.selectable) |s| {
+                    extra_radius = s.radius;
+                } else {}
+                if (thing.pos.dist(center_pos) < tile_sz_f) {
+                    opacity = 0.5;
+                    break;
+                }
+                if (thing.selectable) |s| {
+                    const thing_top_pos = thing.pos.sub(v2f(0, s.height));
+                    if (thing_top_pos.dist(center_pos) < tile_sz_f + s.radius) {
+                        opacity = 0.5;
+                        break;
+                    }
+                }
+            }
+            self.renderTile(
+                pos,
+                tile,
+                opacity,
+            );
         }
         map_coord.x += 1;
         if (map_coord.x >= self.dims_tiles.x) {
@@ -611,13 +640,21 @@ pub fn renderUnderObjects(self: *const TileMap) Error!void {
     plat.rectf(room_rect.pos, room_rect.dims, .{ .fill_color = Colorf.rgb(0.4, 0.4, 0.4) });
     for (self.tile_layers.constSlice()) |*layer| {
         if (layer.above_objects) continue;
-        self.renderLayer(layer);
+        self.renderLayer(layer, &.{});
     }
 }
 
-pub fn renderOverObjects(self: *const TileMap) Error!void {
+pub fn renderOverObjects(self: *const TileMap, things: []const *const Thing) Error!void {
+    const plat = App.getPlat();
+    const data = App.get().data;
+    const shader = data.shaders.get(.tile_foreground_fade);
+    plat.setShaderValues(shader, .{
+        .seconds = utl.as(f32, plat.getGameTimeNanosecs()) / 1000000000,
+    });
+    plat.setShader(shader);
     for (self.tile_layers.constSlice()) |*layer| {
         if (!layer.above_objects) continue;
-        self.renderLayer(layer);
+        self.renderLayer(layer, things);
     }
+    plat.setDefaultShader();
 }

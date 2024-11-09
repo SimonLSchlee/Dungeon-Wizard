@@ -586,7 +586,7 @@ pub fn render(self: *const Room, native_render_texture: Platform.RenderTexture2D
         for (thing_arr.constSlice()) |thing| {
             try thing.render(self);
         }
-        try self.tilemap.renderOverObjects();
+        try self.tilemap.renderOverObjects(thing_arr.constSlice());
         for (thing_arr.constSlice()) |thing| {
             try thing.renderOver(self);
         }

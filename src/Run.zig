@@ -183,7 +183,7 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
     var places = Place.Array{};
 
     var smol_room_idxs = std.BoundedArray(usize, 16){};
-    for (0..app.data.rooms.get(.smol).len) |i| {
+    for (0..app.data.room_kind_tilemaps.get(.smol).len) |i| {
         smol_room_idxs.append(i) catch unreachable;
     }
     run.rng.random().shuffleWithIndex(usize, smol_room_idxs.slice(), u32);
@@ -197,7 +197,7 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
     }
 
     var big_room_idxs = std.BoundedArray(usize, 16){};
-    for (0..app.data.rooms.get(.smol).len) |i| {
+    for (0..app.data.room_kind_tilemaps.get(.big).len) |i| {
         big_room_idxs.append(i) catch unreachable;
     }
     run.rng.random().shuffleWithIndex(usize, big_room_idxs.slice(), u32);
@@ -257,7 +257,9 @@ pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
     }
     switch (self.places.get(self.curr_place_idx)) {
         .room => |r| {
-            const tilemap = data.tilemaps.items[data.room_kind_tilemaps.get(r.kind).get(r.idx)];
+            const room_indices = data.room_kind_tilemaps.get(r.kind);
+            const room_idx = room_indices.get(r.idx);
+            const tilemap = data.tilemaps.items[room_idx];
             const exit_doors = self.makeExitDoors(tilemap);
             var waves_params = Room.WavesParams{
                 .difficulty = r.difficulty,

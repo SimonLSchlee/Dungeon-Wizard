@@ -753,3 +753,48 @@ pub fn loadSound(self: *Platform, path: []const u8) Error!Sound {
 pub fn exit(self: *Platform) void {
     self.should_exit = true;
 }
+pub const Shader = struct {
+    r_shader: r.Shader,
+};
+
+pub fn loadShader(self: *Platform, vert_path: ?[]const u8, frag_path: ?[]const u8) Error!Shader {
+    @setRuntimeSafety(core.rt_safe_blocks);
+    const vert_path_z: [*c]const u8 = if (vert_path) |p|
+        try std.fmt.bufPrintZ(self.str_fmt_buf, "{s}/shaders/{s}", .{ self.assets_path, p })
+    else
+        null;
+    const frag_path_z: [*c]const u8 = if (frag_path) |p|
+        try std.fmt.bufPrintZ(self.str_fmt_buf[1000..], "{s}/shaders/{s}", .{ self.assets_path, p })
+    else
+        null;
+    const r_shader = r.LoadShader(vert_path_z, frag_path_z);
+    const ret: Shader = .{
+        .r_shader = r_shader,
+    };
+    return ret;
+}
+
+pub fn setShaderValues(_: *Platform, shader: Shader, args: anytype) void {
+    const ArgsType = @TypeOf(args);
+    const args_type_info = @typeInfo(ArgsType);
+    if (args_type_info != .@"struct") {
+        @compileError("expected tuple or struct argument, found " ++ @typeName(ArgsType));
+    }
+
+    const fields_info = args_type_info.@"struct".fields;
+    if (fields_info.len > 32) {
+        @compileError("32 arguments max are supported per setShaderValue");
+    }
+    inline for (args_type_info.@"struct".fields) |f| {
+        const loc = r.GetShaderLocation(shader.r_shader, f.name);
+        r.SetShaderValue(shader.r_shader, loc, &@field(args, f.name), r.SHADER_UNIFORM_FLOAT);
+    }
+}
+
+pub fn setShader(_: *Platform, shader: Shader) void {
+    r.BeginShaderMode(shader.r_shader);
+}
+
+pub fn setDefaultShader(_: *Platform) void {
+    r.EndShaderMode();
+}
