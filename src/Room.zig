@@ -530,7 +530,7 @@ pub fn render(self: *const Room, native_render_texture: Platform.RenderTexture2D
 
     plat.startCamera2D(self.camera);
 
-    try self.tilemap.render();
+    try self.tilemap.renderUnderObjects();
     if (debug.show_tilemap_grid) {
         try self.tilemap.debugDraw();
     }
@@ -586,6 +586,7 @@ pub fn render(self: *const Room, native_render_texture: Platform.RenderTexture2D
         for (thing_arr.constSlice()) |thing| {
             try thing.render(self);
         }
+        try self.tilemap.renderOverObjects();
         for (thing_arr.constSlice()) |thing| {
             try thing.renderOver(self);
         }

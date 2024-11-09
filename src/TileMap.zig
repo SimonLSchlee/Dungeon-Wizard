@@ -565,41 +565,59 @@ pub fn getRoomRect(self: *const TileMap) geom.Rectf {
     };
 }
 
-pub fn render(self: *const TileMap) Error!void {
+fn renderTile(self: *const TileMap, pos: V2f, tile_idx: u32) void {
     const plat = getPlat();
     const data = App.get().data;
+    const ref = self.tileIdxToTileSetRef(tile_idx) orelse {
+        std.debug.print("unknown tileset ref!\n", .{});
+        return;
+    };
+    assert(ref.data_idx < data.tilesets.items.len);
+    const tileset = &data.tilesets.items[ref.data_idx];
+    assert(tile_idx >= ref.first_gid);
+    const tileset_tile_idx = tile_idx - ref.first_gid;
+    assert(tileset_tile_idx < tileset.tiles.len);
+    const tileset_tile_idxi = utl.as(i32, tileset_tile_idx);
+    const sheet_coord = v2i(@mod(tileset_tile_idxi, tileset.sheet_dims.x), @divFloor(tileset_tile_idxi, tileset.sheet_dims.x));
+    assert(sheet_coord.x < tileset.sheet_dims.x and sheet_coord.y < tileset.sheet_dims.y);
+    const src_px_coord = v2i(sheet_coord.x * tileset.tile_dims.x, sheet_coord.y * tileset.tile_dims.y);
+    const opt = draw.TextureOpt{
+        .src_dims = tileset.tile_dims.toV2f(),
+        .src_pos = src_px_coord.toV2f(),
+        .uniform_scaling = core.pixel_art_scaling,
+    };
+    plat.texturef(pos, tileset.texture, opt);
+}
+
+fn renderLayer(self: *const TileMap, layer: *const TileLayer) void {
     const room_rect = self.getRoomRect();
-    plat.rectf(room_rect.pos, room_rect.dims, .{ .fill_color = Colorf.rgb(0.4, 0.4, 0.4) });
-    for (self.tile_layers.constSlice()) |layer| {
-        var map_coord: V2i = .{};
-        for (layer.tiles.constSlice()) |tile_idx| {
-            if (self.tileIdxToTileSetRef(tile_idx)) |ref| {
-                assert(ref.data_idx < data.tilesets.items.len);
-                const tileset = &data.tilesets.items[ref.data_idx];
-                assert(tile_idx >= ref.first_gid);
-                const tileset_tile_idx = tile_idx - ref.first_gid;
-                assert(tileset_tile_idx < tileset.tiles.len);
-                const tileset_tile_idxi = utl.as(i32, tileset_tile_idx);
-                const sheet_coord = v2i(@mod(tileset_tile_idxi, tileset.sheet_dims.x), @divFloor(tileset_tile_idxi, tileset.sheet_dims.x));
-                assert(sheet_coord.x < tileset.sheet_dims.x and sheet_coord.y < tileset.sheet_dims.y);
-                const src_px_coord = v2i(sheet_coord.x * tileset.tile_dims.x, sheet_coord.y * tileset.tile_dims.y);
-                const opt = draw.TextureOpt{
-                    .src_dims = tileset.tile_dims.toV2f(),
-                    .src_pos = src_px_coord.toV2f(),
-                    .uniform_scaling = core.pixel_art_scaling,
-                };
-                plat.texturef(room_rect.pos.add(tileCoordToPos(map_coord)), tileset.texture, opt);
-            }
-            map_coord.x += 1;
-            if (map_coord.x >= self.dims_tiles.x) {
-                map_coord.x = 0;
-                map_coord.y += 1;
-            }
+    var map_coord: V2i = .{};
+    for (layer.tiles.constSlice()) |tile_idx| {
+        if (tile_idx != 0) {
+            const pos = room_rect.pos.add(tileCoordToPos(map_coord));
+            self.renderTile(pos, tile_idx);
+        }
+        map_coord.x += 1;
+        if (map_coord.x >= self.dims_tiles.x) {
+            map_coord.x = 0;
+            map_coord.y += 1;
         }
     }
-    // TODO
-    //for (self.tiles.values()) |tile| {
-    //    const color = if (tile.passable) Colorf.lightgray else Colorf.rgb(0.1, 0.1, 0.1);
-    //    plat.rectf(tileCoordToPos(tile.coord), tile_dims, .{ .fill_color = color });
-    //}
+}
+
+pub fn renderUnderObjects(self: *const TileMap) Error!void {
+    const plat = getPlat();
+    const room_rect = self.getRoomRect();
+    plat.rectf(room_rect.pos, room_rect.dims, .{ .fill_color = Colorf.rgb(0.4, 0.4, 0.4) });
+    for (self.tile_layers.constSlice()) |*layer| {
+        if (layer.above_objects) continue;
+        self.renderLayer(layer);
+    }
+}
+
+pub fn renderOverObjects(self: *const TileMap) Error!void {
+    for (self.tile_layers.constSlice()) |*layer| {
+        if (!layer.above_objects) continue;
+        self.renderLayer(layer);
+    }
 }
