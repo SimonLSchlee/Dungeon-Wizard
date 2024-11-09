@@ -1124,6 +1124,17 @@ pub inline fn isAttackableCreature(self: *const Thing) bool {
 }
 
 pub fn getApproxVisibleCircle(self: *const Thing) struct { pos: V2f, radius: f32 } {
+    switch (self.controller) {
+        .spawner => |s| {
+            // TODO very hack for spawners - this leaves no frame gap where visible circle is different to spawning creature's
+            if (s.state != .fade_out_circle or s.timer.curr_tick == 0) {
+                var proto = App.get().data.creatures.get(s.creature_kind);
+                proto.pos = self.pos;
+                return proto.getApproxVisibleCircle();
+            }
+        },
+        else => {},
+    }
     var ret = .{
         .pos = self.pos,
         .radius = self.coll_radius,
