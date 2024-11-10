@@ -35,7 +35,7 @@ const TileSizes = struct {
     }
 };
 
-const world_tiles = TileSizes.init(32);
+const world_tiles = TileSizes.init(16);
 //const screen_tiles = TileSizes.init(32);
 
 const State = enum {
@@ -90,18 +90,58 @@ pub fn clearVisible(self: *Fog) void {
     }
 }
 
+pub fn addVisiblePoly(self: *Fog, room_rect: geom.Rectf, points: []const V2f) Error!void {
+    if (points.len < 3) return;
+    var topleft = points[0];
+    var botright = points[0];
+    for (points) |p| {
+        topleft.x = @min(p.x, topleft.x);
+        topleft.y = @min(p.y, topleft.y);
+        botright.x = @max(p.x, botright.x);
+        botright.y = @max(p.y, botright.y);
+    }
+    const tl_coord = posToTileCoord(topleft, world_tiles.sz_f);
+    const br_coord = posToTileCoord(botright, world_tiles.sz_f);
+    const right_x = tileCoordToPos(br_coord, world_tiles.sz).x + world_tiles.sz_f * 2;
+    var coord = v2i(tl_coord.x, tl_coord.y);
+    while (coord.y < br_coord.y) {
+        while (coord.x < br_coord.x) {
+            defer coord.x += 1;
+            const center_pos = tileCoordToCenterPos(coord, world_tiles.sz, world_tiles.dims_2);
+            if (!geom.pointIsInRectf(center_pos, room_rect)) continue;
+            const v = v2f(right_x, center_pos.y);
+            var num_intersections: usize = 0;
+            for (points, 0..) |curr_p, i| {
+                const next_p = points[(i + 1) % points.len];
+                const line_seg_v = next_p.sub(curr_p);
+                const intersect: bool = switch (geom.lineSegsIntersect(curr_p, line_seg_v, center_pos, v)) {
+                    .intersection => true,
+                    .colinear => |c| (c != null),
+                    .none => false,
+                };
+                if (intersect) num_intersections += 1;
+            }
+            if (num_intersections % 2 == 1) {
+                try self.visited.put(coord, .visible);
+            }
+        }
+        coord.y += 1;
+        coord.x = tl_coord.x;
+    }
+}
+
 pub fn addVisibleCircle(self: *Fog, room_rect: geom.Rectf, pos: V2f, radius: f32) Error!void {
     assert(radius >= 0);
     const center_coord = posToTileCoord(pos, world_tiles.sz_f);
     const radius_i: i32 = utl.as(i32, @floor(radius / world_tiles.sz_f));
     const tl_offset = V2i.splat(radius_i);
     const tl_coord = center_coord.sub(tl_offset);
-    const bl_coord = center_coord.add(tl_offset);
+    const br_coord = center_coord.add(tl_offset);
     //std.debug.print("{any}\n", .{bl_coord.sub(tl_coord)});
     var coord = tl_coord;
 
-    while (coord.y < bl_coord.y) {
-        while (coord.x < bl_coord.x) {
+    while (coord.y < br_coord.y) {
+        while (coord.x < br_coord.x) {
             // TODO this is slow but w/e
             const tile_center_pos = tileCoordToCenterPos(coord, world_tiles.sz, world_tiles.dims_2);
             if (geom.pointIsInRectf(tile_center_pos, room_rect)) {
