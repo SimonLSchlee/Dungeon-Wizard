@@ -40,7 +40,7 @@ pub const proto = Spell.makeProto(
         .targeting_data = .{
             .kind = .thing,
             .target_faction_mask = Thing.Faction.Mask.initOne(.enemy),
-            .max_range = 150,
+            .max_range = 175,
             .show_max_range_ring = true,
             .ray_to_mouse = .{ .thickness = 1 },
             .requires_los_to_thing = true,
@@ -57,43 +57,59 @@ pub const Projectile = struct {
 
     target_pos: V2f = .{},
     target_radius: f32 = 10,
+    state: enum {
+        loop,
+        end,
+    } = .loop,
 
     pub fn update(self: *Thing, room: *Room) Error!void {
         const spell_controller = &self.controller.spell;
         const spell = spell_controller.spell;
         const unherring = spell.kind.unherring;
         const params = spell_controller.params;
-        const projectile = &spell_controller.controller.unherring_projectile;
+        const projectile: *Projectile = &spell_controller.controller.unherring_projectile;
         const target_id = params.target.thing;
         const _target = room.getThingById(target_id);
-        var done = false;
+        const animator = &self.animator.?;
 
-        if (_target) |target| {
-            projectile.target_pos = target.pos;
-            projectile.target_radius = target.coll_radius;
-            if (target.hurtbox) |*hurtbox| {
-                projectile.target_pos = target.pos.add(hurtbox.rel_pos);
-                projectile.target_radius = hurtbox.radius;
-            }
-        }
-
-        const v = projectile.target_pos.sub(self.pos);
-        if (v.length() < self.coll_radius + projectile.target_radius) {
-            done = true;
-            if (_target) |target| {
-                if (target.hurtbox) |*hurtbox| {
-                    hurtbox.hit(target, room, unherring.hit_effect, self);
+        switch (projectile.state) {
+            .loop => {
+                _ = animator.play(.loop, .{ .loop = true });
+                if (_target) |target| {
+                    projectile.target_pos = target.pos;
+                    projectile.target_radius = target.coll_radius;
+                    if (target.hurtbox) |*hurtbox| {
+                        projectile.target_pos = target.pos.add(hurtbox.rel_pos);
+                        projectile.target_radius = hurtbox.radius;
+                    }
                 }
-            }
-        }
 
-        if (done) {
-            // explode/vfx?
-            self.deferFree(room);
-        } else {
-            self.updateVel(v.normalized(), self.accel_params);
-            self.updateDir(self.vel, .{ .ang_accel = 999, .max_ang_vel = 999 });
-            self.moveAndCollide(room);
+                const v = projectile.target_pos.sub(self.pos);
+                if (v.length() < self.coll_radius + projectile.target_radius) {
+                    projectile.state = .end;
+                    if (_target) |target| {
+                        if (target.hurtbox) |*hurtbox| {
+                            hurtbox.hit(target, room, unherring.hit_effect, self);
+                        }
+                    }
+                }
+                self.updateVel(v.normalized(), self.accel_params);
+                if (self.vel.normalizedChecked()) |n| {
+                    self.dir = n;
+                }
+                self.moveAndCollide(room);
+            },
+            .end => {
+                self.renderer.vfx.draw_normal = false;
+                self.renderer.vfx.draw_over = true;
+                self.updateVel(.{}, .{});
+                if (animator.play(.end, .{}).contains(.end)) {
+                    self.deferFree(room);
+                }
+                if (animator.curr_anim_frame == 1) {
+                    self.renderer.vfx.rotate_to_dir = false;
+                }
+            },
         }
     }
 };
@@ -113,8 +129,8 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
         .kind = .projectile,
         .coll_radius = 5,
         .accel_params = .{
-            .accel = 0.5,
-            .max_speed = 5,
+            .accel = 99,
+            .max_speed = 7.5,
         },
         .controller = .{ .spell = .{
             .spell = self.*,
@@ -124,10 +140,15 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
                 .target_radius = target.coll_radius,
             } },
         } },
-        .renderer = .{ .shape = .{
-            .kind = .{ .circle = .{ .radius = 5 } },
-            .poly_opt = .{ .fill_color = Colorf.white },
-        } },
+        .renderer = .{
+            .vfx = .{
+                .draw_over = false,
+                .draw_normal = true,
+                .rotate_to_dir = true,
+                .flip_x_to_dir = true,
+            },
+        },
+        .animator = .{ .kind = .{ .vfx = .{ .sheet_name = .herring } } },
     };
     _ = try room.queueSpawnThing(&herring, caster.pos);
 }

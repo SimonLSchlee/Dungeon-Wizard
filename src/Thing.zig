@@ -470,18 +470,25 @@ pub const VFXRenderer = struct {
     sprite_tint: Colorf = .white,
     draw_normal: bool = true,
     draw_over: bool = false,
+    rotate_to_dir: bool = false,
+    flip_x_to_dir: bool = false,
 
     pub fn _render(self: *const Thing, renderer: *const VFXRenderer, _: *const Room) void {
         const plat = App.getPlat();
         const frame = self.animator.?.getCurrRenderFrame();
         const tint: Colorf = renderer.sprite_tint;
-        const opt = draw.TextureOpt{
+        var opt = draw.TextureOpt{
             .origin = frame.origin,
             .src_pos = frame.pos.toV2f(),
             .src_dims = frame.size.toV2f(),
             .uniform_scaling = core.pixel_art_scaling,
             .tint = tint,
+            .flip_x = renderer.flip_x_to_dir and self.dir.x < 0,
+            .rot_rads = if (renderer.rotate_to_dir) self.dir.toAngleRadians() else 0,
         };
+        if (opt.flip_x and renderer.rotate_to_dir and self.dir.x < 0) {
+            opt.rot_rads += utl.pi;
+        }
         plat.texturef(self.pos, frame.texture, opt);
     }
 
