@@ -121,7 +121,8 @@ pub fn addVisiblePoly(self: *Fog, room_rect: geom.Rectf, points: []const V2f) Er
                 };
                 if (intersect) num_intersections += 1;
             }
-            if (num_intersections % 2 == 1) {
+            const in_poly = num_intersections % 2 == 1;
+            if (in_poly) {
                 try self.visited.put(coord, .visible);
             }
         }

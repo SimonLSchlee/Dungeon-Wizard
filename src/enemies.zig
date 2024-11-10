@@ -496,6 +496,7 @@ pub fn troll() Error!Thing {
     };
     ret.controller = .{ .enemy = .{
         .attack_cooldown = utl.TickCounter.initStopped(60),
+        .LOS_thiccness = ret.coll_radius * 2,
     } };
     ret.hitbox = .{
         .mask = Thing.Faction.opposing_masks.get(.enemy),
@@ -536,7 +537,7 @@ pub fn sharpboi() Error!Thing {
             },
             .hit_to_side_force = 2.5,
         } },
-        .LOS_thiccness = 30,
+        .LOS_thiccness = ret.coll_radius * 2,
     } };
 
     ret.hitbox = .{
