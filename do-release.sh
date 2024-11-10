@@ -3,6 +3,7 @@
 set -xe
 
 ASSETS="$(pwd)/assets"
+VERSION="v0.0006-tilesnmana"
 
 rm -rf zig-out/release
 
@@ -15,7 +16,7 @@ for DIR in */; do
 	pushd "$DIR"
 	pushd "action-deckbuilder"
 	rsync -av --exclude='*tilemaps.tiled-*' $ASSETS .
-	ZIPNAME="wizardboi-${DIR%/}.zip"
+	ZIPNAME="wizardboi-${DIR%/}-${VERSION}.zip"
 	zip -r "$ZIPNAME" *
 	popd # arch dir
 	popd # release dir
