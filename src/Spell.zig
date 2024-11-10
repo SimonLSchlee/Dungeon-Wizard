@@ -188,8 +188,10 @@ pub const TargetingData = struct {
             .pos => {
                 const caster_to_mouse = mouse_pos.sub(caster.pos);
                 const target_dir = if (caster_to_mouse.normalizedChecked()) |d| d else V2f.right;
-                const mouse_pos_dist = if (targeting_data.fixed_range) targeting_data.max_range else @min(targeting_data.max_range, caster_to_mouse.length());
-                const target_pos = caster.pos.add(target_dir.scale(mouse_pos_dist));
+                const max_radius = targeting_data.max_range + caster.coll_radius;
+                const capped_dist = if (targeting_data.fixed_range) max_radius else @min(max_radius, caster_to_mouse.length());
+                const capped_vec = target_dir.scale(capped_dist);
+                const target_pos = caster.pos.add(capped_vec);
                 return .{
                     .target = .{ .pos = target_pos },
                     .face_dir = target_pos.sub(caster.pos).normalizedChecked() orelse caster.dir,
