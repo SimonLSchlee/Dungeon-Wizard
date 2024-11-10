@@ -43,6 +43,7 @@ pub const proto = Spell.makeProto(
             .max_range = 150,
             .show_max_range_ring = true,
             .ray_to_mouse = .{ .thickness = 1 },
+            .requires_los_to_thing = true,
         },
     },
 );

@@ -138,6 +138,7 @@ pub const TargetingData = struct {
         radius: f32,
         radians: f32,
     } = null,
+    requires_los_to_thing: bool = false,
 
     fn fmtRange(self: *const TargetingData, buf: []u8) Error![]u8 {
         if (self.max_range == std.math.inf(f32)) return buf[0..0];
@@ -209,6 +210,7 @@ pub const TargetingData = struct {
                     if (range > targeting_data.max_range) {
                         return null;
                     }
+                    if (targeting_data.requires_los_to_thing and !room.tilemap.isLOSBetween(caster.pos, thing.pos)) return null;
                     if (targeting_data.target_faction_mask.contains(thing.faction)) {
                         return .{
                             .target = .{ .thing = thing.id },
@@ -282,24 +284,36 @@ pub const TargetingData = struct {
                     if (range > targeting_data.max_range) continue;
                     const selectable = thing.selectable.?;
                     var draw_radius = selectable.radius - 10;
+                    var targeting_color = targeting_data.color;
                     if (@constCast(room).getMousedOverThing(targeting_data.target_faction_mask)) |moused_over_thing| {
+                        if (targeting_data.requires_los_to_thing) {
+                            if (room.tilemap.raycastLOS(caster.pos, moused_over_thing.pos)) |tile_coord| {
+                                targeting_color = .red;
+                                const rect = TileMap.tileCoordToRect(tile_coord);
+                                plat.rectf(rect.pos, rect.dims, .{
+                                    .fill_color = null,
+                                    .outline_color = Colorf.red.fade(0.6),
+                                    .outline_thickness = 3,
+                                });
+                            }
+                        }
                         if (thing.id.eql(moused_over_thing.id)) {
                             draw_radius = selectable.radius;
                             if (targeting_data.radius_at_target) |r| {
-                                plat.circlef(caster.pos, r, .{ .fill_color = targeting_data.color.fade(0.4) });
+                                plat.circlef(caster.pos, r, .{ .fill_color = targeting_color.fade(0.4) });
                             }
                         }
                         if (targeting_data.ray_to_mouse) |ray| {
                             const target_circle_pos = targeting_data.getRayEnd(room, caster, ray, thing.pos);
                             const ray_radius = ray.thickness * 0.5;
-                            plat.linef(caster.pos, target_circle_pos, ray.thickness, targeting_data.color);
-                            plat.circlef(target_circle_pos, ray_radius, .{ .fill_color = targeting_data.color });
+                            plat.linef(caster.pos, target_circle_pos, ray.thickness, targeting_color);
+                            plat.circlef(target_circle_pos, ray_radius, .{ .fill_color = targeting_color });
                             //if (coll) |c| {
                             //    plat.circlef(c.pos, 3, .{ .fill_color = .red });
                             //}
                         }
                     }
-                    plat.circlef(thing.pos, draw_radius, .{ .fill_color = targeting_data.color.fade(0.5) });
+                    plat.circlef(thing.pos, draw_radius, .{ .fill_color = targeting_color.fade(0.5) });
                 }
             },
         }

@@ -308,7 +308,7 @@ pub fn isLOSBetweenThicc(self: *const TileMap, a: V2f, b: V2f, thickness: f32) b
     return self.isLOSBetween(a_right, b_right) and self.isLOSBetween(a_left, b_left);
 }
 
-pub fn isLOSBetween(self: *const TileMap, _a: V2f, _b: V2f) bool {
+pub fn raycastLOS(self: *const TileMap, _a: V2f, _b: V2f) ?V2i {
     const a_coord = posToTileCoord(_a);
     const b_coord = posToTileCoord(_b);
     const a = _a.scale(1 / tile_sz_f);
@@ -348,7 +348,7 @@ pub fn isLOSBetween(self: *const TileMap, _a: V2f, _b: V2f) bool {
     //std.debug.print("d: {}, {}\n", .{ dx, dy });
     while (true) {
         //std.debug.print("curr: {}, {}\n", .{ curr.x, curr.y });
-        if (!self.tileCoordIsPassable(curr)) return false;
+        if (!self.tileCoordIsPassable(curr)) return curr;
         if (curr.eql(b_coord)) break;
         //std.debug.print("e: {}\n", .{err});
 
@@ -361,7 +361,11 @@ pub fn isLOSBetween(self: *const TileMap, _a: V2f, _b: V2f) bool {
         }
     }
     //std.debug.print("\n", .{});
-    return true;
+    return null;
+}
+
+pub fn isLOSBetween(self: *const TileMap, _a: V2f, _b: V2f) bool {
+    return self.raycastLOS(_a, _b) == null;
 }
 
 pub fn findPathThetaStar(self: *const TileMap, allocator: std.mem.Allocator, start: V2f, goal: V2f, radius: f32, coords_searched: *std.BoundedArray(V2i, 128)) Error!std.BoundedArray(V2f, 32) {
