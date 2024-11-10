@@ -53,43 +53,24 @@ pub const proto = Spell.makeProto(
 );
 
 pub fn implingProto() Error!Thing {
-    return Thing{
-        .kind = .creature,
-        .creature_kind = .impling,
-        .spawn_state = .instance,
-        .coll_radius = 15,
-        .vision_range = 160,
-        .coll_mask = Thing.Collision.Mask.initMany(&.{ .creature, .tile }),
-        .coll_layer = Thing.Collision.Mask.initMany(&.{.creature}),
-        .accel_params = .{
-            .max_speed = 1.0,
-        },
-        .controller = .{ .enemy = .{
-            .attack_range = 30,
-            .attack_cooldown = utl.TickCounter.initStopped(50),
-            .LOS_thiccness = 20,
-        } },
-        .renderer = .{ .creature = .{
-            .draw_color = .yellow,
-            .draw_radius = 15,
-        } },
-        .animator = .{ .kind = .{ .creature = .{ .kind = .impling } } },
-        .hitbox = .{
-            .mask = Thing.Faction.opposing_masks.get(.ally),
-            .radius = 20,
-            .rel_pos = V2f.right.scale(30),
-            .effect = .{ .damage = 6 },
-        },
-        .hurtbox = .{
-            .radius = 15,
-        },
-        .selectable = .{
-            .height = 13 * 4, // TODO pixellszslz
-            .radius = 8 * 4,
-        },
-        .hp = Thing.HP.init(16),
-        .faction = .ally,
+    var ret = Thing.creatureProto(.impling, .impling, .ally, 25, .medium, 13);
+
+    ret.accel_params = .{
+        .max_speed = 1.0,
     };
+    ret.controller = .{ .enemy = .{
+        .attack_range = 30,
+        .attack_cooldown = utl.TickCounter.initStopped(50),
+        .LOS_thiccness = 20,
+    } };
+
+    ret.hitbox = .{
+        .mask = Thing.Faction.opposing_masks.get(.ally),
+        .radius = 20,
+        .rel_pos = V2f.right.scale(30),
+        .effect = .{ .damage = 6 },
+    };
+    return ret;
 }
 
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {

@@ -465,242 +465,101 @@ pub const AcolyteAIController = struct {
     }
 };
 
-pub fn creature() Thing {
-    return Thing{
-        .kind = .creature,
-        .spawn_state = .instance,
-        .vision_range = 160,
-        .coll_mask = Thing.Collision.Mask.initMany(&.{ .creature, .tile }),
-        .coll_layer = Thing.Collision.Mask.initMany(&.{.creature}),
-        .renderer = .{ .creature = .{
-            .draw_color = .yellow,
-            .draw_radius = 15,
-        } },
-        .animator = .{ .kind = .{ .creature = .{ .kind = .creature } } },
-        .hurtbox = .{
-            .radius = 15,
-        },
-        .selectable = .{
-            .height = 20 * 4, // TODO pixellszslz
-            .radius = 7 * 4,
-        },
-        .hp = Thing.HP.init(30),
-        .faction = .enemy,
-    };
-}
-
 const sprites = @import("sprites.zig");
 
 pub fn bat() Error!Thing {
-    var c = creature();
-    c.creature_kind = .bat;
-    c.coll_radius = 9;
+    var c = Thing.creatureProto(.bat, .bat, .enemy, 5, .smol, 17);
     c.accel_params = .{
         .max_speed = 1,
     };
     c.controller = .{ .enemy = .{
         .attack_cooldown = utl.TickCounter.initStopped(60),
     } };
-    c.renderer.creature.draw_radius = 10;
-    c.animator.?.kind.creature.kind = .bat;
-
     c.hitbox = .{
         .mask = Thing.Faction.opposing_masks.get(.enemy),
         .radius = 10,
         .rel_pos = V2f.right.scale(60),
         .effect = .{ .damage = 4 },
     };
-    c.hurtbox = .{
-        .radius = 10,
-    };
-    c.selectable = .{
-        .height = 17 * 4, // TODO pixellszslz
-        .radius = 6 * 4,
-    };
-    c.hp = Thing.HP.init(5);
-    c.faction = .enemy;
     c.enemy_difficulty = 0.25;
     return c;
 }
 
 pub fn troll() Error!Thing {
-    return Thing{
-        .kind = .creature,
-        .creature_kind = .troll,
-        .spawn_state = .instance,
-        .coll_radius = 20,
-        .accel_params = .{
-            .max_speed = 0.7,
-        },
-        .vision_range = 160,
-        .coll_mask = Thing.Collision.Mask.initMany(&.{ .creature, .tile }),
-        .coll_layer = Thing.Collision.Mask.initMany(&.{.creature}),
-        .controller = .{ .enemy = .{
-            .attack_cooldown = utl.TickCounter.initStopped(60),
-        } },
-        .renderer = .{ .creature = .{
-            .draw_color = .yellow,
-            .draw_radius = 20,
-        } },
-        .animator = .{ .kind = .{ .creature = .{ .kind = .troll } } },
-        .hitbox = .{
-            .mask = Thing.Faction.opposing_masks.get(.enemy),
-            .radius = 15,
-            .rel_pos = V2f.right.scale(60),
-            .effect = .{ .damage = 12 },
-        },
-        .hurtbox = .{
-            .radius = 15,
-        },
-        .selectable = .{
-            .height = 20 * 4, // TODO pixellszslz
-            .radius = 9 * 4,
-        },
-        .hp = Thing.HP.init(40),
-        .faction = .enemy,
-        .enemy_difficulty = 2.5,
+    var ret = Thing.creatureProto(.troll, .troll, .enemy, 40, .big, 20);
+    ret.accel_params = .{
+        .max_speed = 0.7,
     };
+    ret.controller = .{ .enemy = .{
+        .attack_cooldown = utl.TickCounter.initStopped(60),
+    } };
+    ret.hitbox = .{
+        .mask = Thing.Faction.opposing_masks.get(.enemy),
+        .radius = 15,
+        .rel_pos = V2f.right.scale(60),
+        .effect = .{ .damage = 12 },
+    };
+    ret.enemy_difficulty = 2.5;
+    return ret;
 }
 
 pub fn gobbow() Error!Thing {
-    return Thing{
-        .kind = .creature,
-        .creature_kind = .gobbow,
-        .spawn_state = .instance,
-        .coll_radius = 15,
-        .vision_range = 160,
-        .coll_mask = Thing.Collision.Mask.initMany(&.{ .creature, .tile }),
-        .coll_layer = Thing.Collision.Mask.initMany(&.{.creature}),
-        .controller = .{ .enemy = .{
-            .attack_range = 270,
-            .attack_cooldown = utl.TickCounter.initStopped(60),
-            .attack_type = .{ .projectile = .arrow },
-        } },
-        .renderer = .{ .creature = .{
-            .draw_color = .yellow,
-            .draw_radius = 15,
-        } },
-        .animator = .{ .kind = .{ .creature = .{ .kind = .gobbow } } },
-        .hurtbox = .{
-            .radius = 15,
-        },
-        .selectable = .{
-            .height = 12 * 4, // TODO pixellszslz
-            .radius = 6 * 4,
-        },
-        .hp = Thing.HP.init(18),
-        .faction = .enemy,
-        .enemy_difficulty = 1.5,
-    };
+    var ret = Thing.creatureProto(.gobbow, .gobbow, .enemy, 18, .medium, 12);
+    ret.controller = .{ .enemy = .{
+        .attack_range = 270,
+        .attack_cooldown = utl.TickCounter.initStopped(60),
+        .attack_type = .{ .projectile = .arrow },
+    } };
+    ret.enemy_difficulty = 1.5;
+    return ret;
 }
 
 pub fn sharpboi() Error!Thing {
-    return Thing{
-        .kind = .creature,
-        .creature_kind = .sharpboi,
-        .spawn_state = .instance,
-        .accel_params = .{
-            .max_speed = 0.9,
-        },
-        .coll_radius = 15,
-        .vision_range = 160,
-        .coll_mask = Thing.Collision.Mask.initMany(&.{ .creature, .tile }),
-        .coll_layer = Thing.Collision.Mask.initMany(&.{.creature}),
-        .controller = .{ .enemy = .{
-            .attack_range = 110,
-            .attack_cooldown = utl.TickCounter.initStopped(140),
-            .attack_type = .{ .melee = .{
-                .lunge_accel = .{
-                    .accel = 5,
-                    .max_speed = 5,
-                    .friction = 0,
-                },
-                .hit_to_side_force = 2.5,
-            } },
-            .LOS_thiccness = 30,
-        } },
-        .renderer = .{ .creature = .{
-            .draw_color = .yellow,
-            .draw_radius = 15,
-        } },
-        .animator = .{ .kind = .{ .creature = .{ .kind = .sharpboi } } },
-        .hitbox = .{
-            .mask = Thing.Faction.opposing_masks.get(.enemy),
-            .radius = 15,
-            .rel_pos = V2f.right.scale(40),
-            .effect = .{ .damage = 8 },
-            .deactivate_on_update = false,
-            .deactivate_on_hit = true,
-        },
-        .hurtbox = .{
-            .radius = 15,
-        },
-        .selectable = .{
-            .height = 18 * 4, // TODO pixellszslz
-            .radius = 8 * 4,
-        },
-        .hp = Thing.HP.init(25),
-        .faction = .enemy,
-        .enemy_difficulty = 2.5,
+    var ret = Thing.creatureProto(.sharpboi, .sharpboi, .enemy, 25, .medium, 18);
+
+    ret.accel_params = .{
+        .max_speed = 0.9,
     };
+    ret.controller = .{ .enemy = .{
+        .attack_range = 110,
+        .attack_cooldown = utl.TickCounter.initStopped(140),
+        .attack_type = .{ .melee = .{
+            .lunge_accel = .{
+                .accel = 5,
+                .max_speed = 5,
+                .friction = 0,
+            },
+            .hit_to_side_force = 2.5,
+        } },
+        .LOS_thiccness = 30,
+    } };
+
+    ret.hitbox = .{
+        .mask = Thing.Faction.opposing_masks.get(.enemy),
+        .radius = 15,
+        .rel_pos = V2f.right.scale(40),
+        .effect = .{ .damage = 8 },
+        .deactivate_on_update = false,
+        .deactivate_on_hit = true,
+    };
+    ret.enemy_difficulty = 2.5;
+    return ret;
 }
 
 pub fn acolyte() Error!Thing {
-    return Thing{
-        .kind = .creature,
-        .creature_kind = .acolyte,
-        .spawn_state = .instance,
-        .accel_params = .{
-            .accel = 0.3,
-            .friction = 0.09,
-            .max_speed = 1.25,
-        },
-        .coll_radius = 15,
-        .vision_range = 160,
-        .coll_mask = Thing.Collision.Mask.initMany(&.{ .creature, .tile }),
-        .coll_layer = Thing.Collision.Mask.initMany(&.{.creature}),
-        .controller = .{ .acolyte_enemy = .{} },
-        .renderer = .{ .creature = .{
-            .draw_color = .yellow,
-            .draw_radius = 15,
-        } },
-        .animator = .{ .kind = .{ .creature = .{ .kind = .acolyte } } },
-        .hitbox = null,
-        .hurtbox = .{
-            .radius = 15,
-        },
-        .selectable = .{
-            .height = 12 * 4, // TODO pixellszslz
-            .radius = 6 * 4,
-        },
-        .hp = Thing.HP.init(30),
-        .faction = .enemy,
-        .enemy_difficulty = 3,
+    var ret = Thing.creatureProto(.acolyte, .acolyte, .enemy, 25, .medium, 12);
+    ret.accel_params = .{
+        .accel = 0.3,
+        .friction = 0.09,
+        .max_speed = 1.25,
     };
+    ret.controller = .{ .acolyte_enemy = .{} };
+    ret.enemy_difficulty = 3;
+    return ret;
 }
 
 pub fn dummy() Thing {
-    return Thing{
-        .kind = .creature,
-        .creature_kind = .dummy,
-        .spawn_state = .instance,
-        .coll_radius = 15,
-        .coll_mask = Thing.Collision.Mask.initMany(&.{ .creature, .tile }),
-        .coll_layer = Thing.Collision.Mask.initMany(&.{.creature}),
-        .renderer = .{ .creature = .{
-            .draw_color = .yellow,
-            .draw_radius = 15,
-        } },
-        .animator = .{ .kind = .{ .creature = .{ .kind = .dummy } } },
-        .hurtbox = .{
-            .radius = 15,
-        },
-        .selectable = .{
-            .height = 20 * 4, // TODO pixellszslz
-            .radius = 7 * 4,
-        },
-        .hp = Thing.HP.init(30),
-        .faction = .enemy,
-        .enemy_difficulty = 0,
-    };
+    var ret = Thing.creatureProto(.dummy, .dummy, .enemy, 25, .medium, 20);
+    ret.enemy_difficulty = 0;
+    return ret;
 }

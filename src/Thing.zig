@@ -50,6 +50,38 @@ pub const CreatureKind = enum {
     acolyte,
 };
 
+pub const SizeCategory = enum {
+    none,
+    smol,
+    medium,
+    big,
+
+    pub const coll_radii = std.EnumArray(SizeCategory, f32).init(.{
+        .none = 0,
+        .smol = 4,
+        .medium = 7,
+        .big = 10,
+    });
+    pub const draw_radii = std.EnumArray(SizeCategory, f32).init(.{
+        .none = 0,
+        .smol = 14,
+        .medium = 20,
+        .big = 25,
+    });
+    pub const hurtbox_radii = std.EnumArray(SizeCategory, f32).init(.{
+        .none = 0,
+        .smol = 12,
+        .medium = 15,
+        .big = 20,
+    });
+    pub const select_radii = std.EnumArray(SizeCategory, f32).init(.{
+        .none = 0,
+        .smol = 18,
+        .medium = 24,
+        .big = 30,
+    });
+};
+
 pub const Pool = pool.BoundedPool(Thing, Room.max_things_in_room);
 // TODO wrap
 pub const Id = pool.Id;
@@ -72,6 +104,7 @@ dir_accel_params: DirAccelParams = .{},
 // motion and collision
 accel_params: AccelParams = .{},
 vel: V2f = .{},
+size_category: SizeCategory = .none,
 coll_radius: f32 = 0,
 coll_mask: Collision.Mask = .{},
 coll_layer: Collision.Mask = .{},
@@ -653,8 +686,8 @@ pub const CreatureRenderer = struct {
 
         if (debug.show_selectable) {
             if (self.selectable) |s| {
-                if (room.moused_over_thing) |id| {
-                    if (id.eql(self.id)) {
+                if (room.moused_over_thing) |m| {
+                    if (m.thing.eql(self.id)) {
                         const opt = draw.PolyOpt{ .fill_color = Colorf.cyan };
                         plat.circlef(self.pos, s.radius, opt);
                         plat.rectf(self.pos.sub(v2f(s.radius, s.height)), v2f(s.radius * 2, s.height), opt);
@@ -875,6 +908,7 @@ pub fn renderOver(self: *const Thing, room: *const Room) Error!void {
 
     const plat = App.getPlat();
     if (debug.show_thing_collisions) {
+        plat.circlef(self.pos, self.coll_radius, .{ .outline_color = .red, .fill_color = null });
         if (self.last_coll) |coll| {
             plat.arrowf(coll.pos, coll.pos.add(coll.normal.scale(self.coll_radius * 0.75)), 3, Colorf.red);
         }
@@ -1147,4 +1181,30 @@ pub fn getApproxVisibleCircle(self: *const Thing) struct { pos: V2f, radius: f32
         ret.radius = @max(h.radius, self.coll_radius);
     }
     return ret;
+}
+
+pub fn creatureProto(creature_kind: CreatureKind, sprite_kind: sprites.CreatureAnim.Kind, faction: Thing.Faction, hp: f32, size_cat: Thing.SizeCategory, select_height_px: f32) Thing {
+    return Thing{
+        .kind = .creature,
+        .creature_kind = creature_kind,
+        .spawn_state = .instance,
+        .vision_range = 160,
+        .coll_radius = Thing.SizeCategory.coll_radii.get(size_cat),
+        .coll_mask = Thing.Collision.Mask.initMany(&.{ .creature, .tile }),
+        .coll_layer = Thing.Collision.Mask.initMany(&.{.creature}),
+        .renderer = .{ .creature = .{
+            .draw_color = .yellow,
+            .draw_radius = Thing.SizeCategory.draw_radii.get(size_cat),
+        } },
+        .animator = .{ .kind = .{ .creature = .{ .kind = sprite_kind } } },
+        .hurtbox = .{
+            .radius = Thing.SizeCategory.hurtbox_radii.get(size_cat),
+        },
+        .selectable = .{
+            .height = select_height_px * core.pixel_art_scaling,
+            .radius = Thing.SizeCategory.select_radii.get(size_cat),
+        },
+        .hp = Thing.HP.init(hp),
+        .faction = faction,
+    };
 }

@@ -28,36 +28,17 @@ const Player = @This();
 pub const enum_name = "player";
 
 pub fn basePrototype() Thing {
-    return Thing{
-        .kind = .creature,
-        .creature_kind = .player,
-        .spawn_state = .instance,
-        .accel_params = .{
-            .accel = 0.15,
-            .friction = 0.09,
-            .max_speed = 1.2,
-        },
-        .coll_radius = 20,
-        .vision_range = 300,
-        .coll_mask = Thing.Collision.Mask.initMany(&.{ .creature, .tile }),
-        .coll_layer = Thing.Collision.Mask.initMany(&.{.creature}),
-        .player_input = Input{},
-        .controller = .{ .player = .{} },
-        .renderer = .{ .creature = .{
-            .draw_color = .cyan,
-            .draw_radius = 20,
-        } },
-        .animator = .{ .kind = .{ .creature = .{ .kind = .wizard } } },
-        .hurtbox = .{
-            .radius = 15,
-        },
-        .selectable = .{
-            .height = 15 * 4, // TODO pixellszslz
-            .radius = 6 * 4,
-        },
-        .hp = Thing.HP.init(40),
-        .faction = .player,
+    var ret = Thing.creatureProto(.player, .wizard, .player, 40, .medium, 15);
+    ret.accel_params = .{
+        .accel = 0.15,
+        .friction = 0.09,
+        .max_speed = 1.2,
     };
+    ret.vision_range = 300;
+    ret.player_input = Input{};
+    ret.controller = .{ .player = .{} };
+
+    return ret;
 }
 
 pub fn modePrototype(mode: Run.Mode) Thing {
