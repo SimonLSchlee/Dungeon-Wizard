@@ -173,6 +173,7 @@ pub const SFX = enum {
 
 pub const ShaderName = enum {
     tile_foreground_fade,
+    fog_blur,
 };
 pub const ShaderArr = std.EnumArray(ShaderName, Platform.Shader);
 
@@ -866,6 +867,7 @@ pub fn loadShaders(self: *Data) Error!void {
     // TODO deinit?
 
     self.shaders.getPtr(.tile_foreground_fade).* = try plat.loadShader(null, "tile_foreground_fade.fs");
+    self.shaders.getPtr(.fog_blur).* = try plat.loadShader(null, "fog_blur.fs");
 }
 
 pub fn reload(self: *Data) Error!void {
