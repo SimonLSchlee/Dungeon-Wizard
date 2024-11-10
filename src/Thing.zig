@@ -113,7 +113,7 @@ last_coll: ?Collision = null,
 vision_range: f32 = 0,
 dbg: struct {
     coords_searched: std.BoundedArray(V2i, 128) = .{},
-    last_tick_hitbox_was_active: i64 = -10000,
+    hitbox_active_timer: utl.TickCounter = utl.TickCounter.initStopped(60),
 } = .{},
 player_input: ?player.Input = null,
 controller: union(enum) {
@@ -269,9 +269,12 @@ pub const HitBox = struct {
 
     pub fn update(_: *HitBox, self: *Thing, room: *Room) void {
         const hitbox = &self.hitbox.?;
-        if (!hitbox.active) return;
+        if (!hitbox.active) {
+            _ = self.dbg.hitbox_active_timer.tick(false);
+            return;
+        }
         // for debug vis
-        self.dbg.last_tick_hitbox_was_active = room.curr_tick;
+        self.dbg.hitbox_active_timer.restart();
 
         const start_pos = self.pos.add(hitbox.rel_pos);
         const maybe_ray_v: ?V2f = if (hitbox.sweep_to_rel_pos) |e| e.sub(hitbox.rel_pos) else null;
@@ -283,6 +286,7 @@ pub const HitBox = struct {
             const hurtbox_pos = thing.pos.add(hurtbox.rel_pos);
 
             const effective_radius = hitbox.radius + hurtbox.radius;
+
             const did_hit = blk: {
                 if (maybe_ray_v) |ray_v| {
                     if (Collision.getRayCircleCollision(start_pos, ray_v, hurtbox_pos, effective_radius)) |_| {
@@ -941,13 +945,13 @@ pub fn renderOver(self: *const Thing, room: *const Room) Error!void {
     }
     if (debug.show_hitboxes) {
         if (self.hitbox) |hitbox| {
-            const ticks_since = room.curr_tick - self.dbg.last_tick_hitbox_was_active;
-            if (ticks_since < 60) {
-                const color = Colorf.red.fade(utl.remapClampf(0, 60, 0.5, 0, utl.as(f32, ticks_since)));
+            if (self.dbg.hitbox_active_timer.running) {
+                const f = self.dbg.hitbox_active_timer.remapTo0_1();
+                const color = Colorf.red.fade(1 - f);
                 const pos: V2f = self.pos.add(hitbox.rel_pos);
                 plat.circlef(pos, hitbox.radius, .{ .fill_color = color });
                 if (hitbox.sweep_to_rel_pos) |rel_end| {
-                    const end_pos = pos.add(rel_end);
+                    const end_pos = self.pos.add(rel_end);
                     plat.linef(pos, end_pos, hitbox.radius * 2, color);
                     plat.circlef(end_pos, hitbox.radius, .{ .fill_color = color });
                 }

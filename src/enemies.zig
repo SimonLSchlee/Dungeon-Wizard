@@ -244,7 +244,11 @@ pub const AIController = struct {
                             if (self.hitbox) |*hitbox| {
                                 //std.debug.print("hit targetu\n", .{});
                                 hitbox.mask = Thing.Faction.opposing_masks.get(self.faction);
-                                hitbox.rel_pos = self.dir.scale(hitbox.rel_pos.length());
+                                const dir_ang = self.dir.toAngleRadians();
+                                hitbox.rel_pos = V2f.fromAngleRadians(dir_ang).scale(hitbox.rel_pos.length());
+                                if (hitbox.sweep_to_rel_pos) |*sw| {
+                                    sw.* = V2f.fromAngleRadians(dir_ang).scale(sw.length());
+                                }
                                 hitbox.active = true;
                                 if (m.hit_to_side_force > 0) {
                                     const d = if (self.dir.cross(target.pos.sub(self.pos)) > 0) self.dir.rotRadians(-utl.pi / 3) else self.dir.rotRadians(utl.pi / 3);
@@ -496,7 +500,8 @@ pub fn troll() Error!Thing {
     ret.hitbox = .{
         .mask = Thing.Faction.opposing_masks.get(.enemy),
         .radius = 15,
-        .rel_pos = V2f.right.scale(60),
+        .rel_pos = V2f.right.scale(20),
+        .sweep_to_rel_pos = V2f.right.scale(50),
         .effect = .{ .damage = 12 },
     };
     ret.enemy_difficulty = 2.5;

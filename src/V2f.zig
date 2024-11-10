@@ -154,6 +154,10 @@ pub fn rotRadians(self: Self, radians: f32) Self {
     );
 }
 
+pub fn fromAngleRadians(radians: f32) Self {
+    return right.rotRadians(radians);
+}
+
 pub fn toV2i(self: Self) V2i {
     return .{
         .x = @intFromFloat(self.x),
