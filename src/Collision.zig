@@ -351,9 +351,32 @@ pub fn getNextSweptCircleCollisionWithTiles(ray_pos: V2f, ray_v: V2f, radius: f3
         if (getPointCollisionInTile(ray_pos, tile, passable_neighbors)) |c| {
             return c;
         }
-        // if ray hits edge, swept circle hits edge
+
         for (edges_cw.constSlice()) |edge| {
             const edge_v = edge[1].sub(edge[0]);
+            // circle around ray endpoints touch edge (i.e. beginning and end of ray)
+            {
+                // the 'ray' here is actually the edge
+                if (getRayCircleCollision(edge[0], edge_v, ray_pos, radius)) |r_coll| {
+                    var coll = r_coll;
+                    coll.pos = coll.pos.add(coll.normal.neg().scale(radius));
+                    const dist = coll.pos.dist(ray_pos);
+                    if (best_coll == null or dist < best_dist) {
+                        best_coll = coll;
+                        best_dist = dist;
+                    }
+                }
+                if (getRayCircleCollision(edge[0], edge_v, ray_pos.add(ray_v), radius)) |r_coll| {
+                    var coll = r_coll;
+                    coll.pos = coll.pos.add(coll.normal.neg().scale(radius));
+                    const dist = coll.pos.dist(ray_pos);
+                    if (best_coll == null or dist < best_dist) {
+                        best_coll = coll;
+                        best_dist = dist;
+                    }
+                }
+            }
+            // ray hits edge means swept circle hits edge
             const intersection = geom.lineSegsIntersect(ray_pos, ray_v, edge[0], edge_v);
             const intersect_point = switch (intersection) {
                 .none => continue,
@@ -385,7 +408,7 @@ pub fn getNextSweptCircleCollisionWithTiles(ray_pos: V2f, ray_v: V2f, radius: f3
         for (corners_cw.constSlice()) |corner_pos| {
             if (getRayCircleCollision(ray_pos, ray_v, corner_pos, radius)) |r_coll| {
                 var coll = r_coll;
-                coll.pos = coll.pos.add(coll.normal.neg().scale(radius));
+                coll.pos = corner_pos.add(coll.normal.neg().scale(radius));
                 const dist = coll.pos.dist(ray_pos);
                 if (best_coll == null or dist < best_dist) {
                     best_coll = coll;
