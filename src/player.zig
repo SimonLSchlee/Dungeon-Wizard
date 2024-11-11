@@ -158,10 +158,18 @@ pub const Input = struct {
         const plat = getPlat();
         const input = &self.player_input.?;
         const ui_slots = &room.ui_slots;
+        const controller = &self.controller.player;
 
         if (ui_slots.getSelectedSlot()) |slot| {
             switch (slot.kind.?) {
-                inline else => |k| try k.renderTargeting(room, self),
+                inline else => |k| try k.renderTargeting(room, self, null),
+            }
+        } else {
+            const maybe_buffered: ?Action.Buffered = if (controller.action_buffered) |b| b else if (controller.action_casting) |a| a else null;
+            if (maybe_buffered) |buffered| {
+                switch (buffered.action) {
+                    inline else => |k| try k.renderTargeting(room, self, buffered.params),
+                }
             }
         }
 

@@ -325,8 +325,8 @@ pub inline fn getTargetParams(self: *const Item, room: *Room, caster: *const Thi
     return self.targeting_data.getParams(room, caster, mouse_pos);
 }
 
-pub inline fn renderTargeting(self: *const Item, room: *const Room, caster: *const Thing) Error!void {
-    return self.targeting_data.render(room, caster);
+pub inline fn renderTargeting(self: *const Item, room: *const Room, caster: *const Thing, params: ?Params) Error!void {
+    return self.targeting_data.render(room, caster, params);
 }
 
 pub inline fn renderIcon(self: *const Item, rect: geom.Rectf) Error!void {

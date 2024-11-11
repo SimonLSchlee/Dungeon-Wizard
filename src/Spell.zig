@@ -237,16 +237,18 @@ pub const TargetingData = struct {
         return null;
     }
 
-    pub fn render(targeting_data: *const TargetingData, room: *const Room, caster: *const Thing) Error!void {
+    pub fn render(targeting_data: *const TargetingData, room: *const Room, caster: *const Thing, params: ?Params) Error!void {
         const plat = App.getPlat();
-        const mouse_pos = plat.getMousePosWorld(room.camera);
 
-        if (targeting_data.show_max_range_ring and targeting_data.max_range < 99999) {
-            plat.circlef(caster.pos, targeting_data.max_range + caster.coll_radius, .{ .outline_color = targeting_data.color.fade(0.5), .fill_color = null });
+        if (params == null) {
+            if (targeting_data.show_max_range_ring and targeting_data.max_range < 99999) {
+                plat.circlef(caster.pos, targeting_data.max_range + caster.coll_radius, .{ .outline_color = targeting_data.color.fade(0.5), .fill_color = null });
+            }
         }
 
         switch (targeting_data.kind) {
             .pos => {
+                const mouse_pos = if (params) |p| p.target.pos else plat.getMousePosWorld(room.camera);
                 const caster_to_mouse = mouse_pos.sub(caster.pos);
                 const target_dir = if (caster_to_mouse.normalizedChecked()) |d| d else V2f.right;
                 const max_radius = targeting_data.max_range + caster.coll_radius;
@@ -299,6 +301,11 @@ pub const TargetingData = struct {
                 }
             },
             .thing => {
+                const maybe_targeted_thing = if (params) |p|
+                    room.getConstThingById(p.target.thing)
+                else
+                    @constCast(room).getMousedOverThing(targeting_data.target_faction_mask);
+
                 for (&room.things.items) |*thing| {
                     if (!thing.isActive()) continue;
                     if (thing.selectable == null) continue;
@@ -308,9 +315,9 @@ pub const TargetingData = struct {
                     const selectable = thing.selectable.?;
                     var draw_radius = selectable.radius - 10;
                     var targeting_color = targeting_data.color;
-                    if (@constCast(room).getMousedOverThing(targeting_data.target_faction_mask)) |moused_over_thing| {
+                    if (maybe_targeted_thing) |targeted_thing| {
                         if (targeting_data.requires_los_to_thing) {
-                            if (room.tilemap.raycastLOS(caster.pos, moused_over_thing.pos)) |tile_coord| {
+                            if (room.tilemap.raycastLOS(caster.pos, targeted_thing.pos)) |tile_coord| {
                                 targeting_color = .red;
                                 const rect = TileMap.tileCoordToRect(tile_coord);
                                 plat.rectf(rect.pos, rect.dims, .{
@@ -320,7 +327,7 @@ pub const TargetingData = struct {
                                 });
                             }
                         }
-                        if (thing.id.eql(moused_over_thing.id)) {
+                        if (thing.id.eql(targeted_thing.id)) {
                             draw_radius = selectable.radius;
                             if (targeting_data.radius_at_target) |r| {
                                 plat.circlef(caster.pos, r, .{ .fill_color = targeting_color.fade(0.4) });
@@ -530,8 +537,8 @@ pub inline fn getTargetParams(self: *const Spell, room: *Room, caster: *const Th
     return self.targeting_data.getParams(room, caster, mouse_pos);
 }
 
-pub inline fn renderTargeting(self: *const Spell, room: *const Room, caster: *const Thing) Error!void {
-    return self.targeting_data.render(room, caster);
+pub inline fn renderTargeting(self: *const Spell, room: *const Room, caster: *const Thing, params: ?Params) Error!void {
+    return self.targeting_data.render(room, caster, params);
 }
 
 pub inline fn renderIcon(self: *const Spell, rect: geom.Rectf) Error!void {
