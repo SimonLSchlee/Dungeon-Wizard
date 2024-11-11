@@ -198,12 +198,19 @@ pub const TargetingData = struct {
                 const max_radius = targeting_data.max_range + caster.coll_radius;
                 const capped_dist = if (targeting_data.fixed_range) max_radius else @min(max_radius, caster_to_mouse.length());
                 const capped_vec = target_dir.scale(capped_dist);
-                const target_pos = caster.pos.add(capped_vec);
-                return .{
+                var target_pos = caster.pos.add(capped_vec);
+                var ret = Params{
                     .target = .{ .pos = target_pos },
                     .face_dir = target_pos.sub(caster.pos).normalizedChecked() orelse caster.dir,
-                    .cast_orig = if (targeting_data.ray_to_mouse) |ray| caster.pos.add(target_dir.scale(ray.cast_orig_dist)) else null,
                 };
+                if (targeting_data.ray_to_mouse) |ray| {
+                    const cast_orig = caster.pos.add(target_dir.scale(ray.cast_orig_dist));
+                    if (target_pos.sub(cast_orig).dot(target_dir) < 0) {
+                        ret.target.pos = cast_orig;
+                    }
+                    ret.cast_orig = cast_orig;
+                }
+                return ret;
             },
             .self => {
                 return .{
@@ -249,9 +256,13 @@ pub const TargetingData = struct {
 
                 if (targeting_data.ray_to_mouse) |ray| {
                     const cast_orig = caster.pos.add(target_dir.scale(ray.cast_orig_dist));
-                    const ray_end = targeting_data.getRayEnd(room, caster, ray, target_circle_pos);
-                    if (ray_end.sub(caster.pos).length() < capped_dist) {
-                        target_circle_pos = ray_end;
+                    if (mouse_pos.sub(cast_orig).dot(target_dir) > 0) {
+                        const ray_end = targeting_data.getRayEnd(room, caster, ray, target_circle_pos);
+                        if (ray_end.sub(caster.pos).length() < capped_dist) {
+                            target_circle_pos = ray_end;
+                        }
+                    } else {
+                        target_circle_pos = cast_orig;
                     }
                     const ray_radius = ray.thickness * 0.5;
                     plat.circlef(cast_orig, ray_radius, .{ .fill_color = targeting_data.color });

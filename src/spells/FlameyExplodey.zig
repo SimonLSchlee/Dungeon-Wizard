@@ -51,7 +51,7 @@ pub const proto = Spell.makeProto(
             .ray_to_mouse = .{
                 .ends_at_coll_mask = Collision.Mask.initMany(&.{.tile}),
                 .thickness = base_ball_radius * 2, // TODO use radius below?
-                .cast_orig_dist = 40,
+                .cast_orig_dist = 30,
             },
             .radius_at_target = base_explode_radius,
         },
