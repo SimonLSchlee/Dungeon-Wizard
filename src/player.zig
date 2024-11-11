@@ -116,7 +116,7 @@ pub const Input = struct {
             _ = input.move_press_ui_timer.tick(true);
             input.move_release_ui_timer.restart();
         } else {
-            _ = input.move_press_ui_timer.tick(false);
+            _ = input.move_press_ui_timer.tick(true);
             _ = input.move_release_ui_timer.tick(false);
         }
 
@@ -173,9 +173,9 @@ pub const Input = struct {
             }
         }
 
-        if (input.move_release_ui_timer.running and self.path.len > 0) {
+        if (self.path.len > 0) { // and input.move_release_ui_timer.running
             const move_pos = self.path.get(self.path.len - 1);
-            const release_f = input.move_release_ui_timer.remapTo0_1();
+            const release_f = 0; //input.move_release_ui_timer.remapTo0_1();
             const bounce_f = input.move_press_ui_timer.remapTo0_1();
             const bounce_t = @sin(bounce_f * 3);
             const bounce_range = 10;
