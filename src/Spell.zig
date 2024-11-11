@@ -113,6 +113,7 @@ pub const TargetKind = enum {
 
 pub const Params = struct {
     face_dir: ?V2f = null,
+    cast_orig: ?V2f = null,
     target: union(TargetKind) {
         self,
         thing: Thing.Id,
@@ -124,6 +125,7 @@ pub const TargetingData = struct {
     pub const Ray = struct {
         ends_at_coll_mask: Collision.Mask = Collision.Mask.initEmpty(),
         thickness: f32 = 1,
+        cast_orig_dist: f32 = 0,
     };
     kind: TargetKind = .self,
     color: Colorf = .cyan,
@@ -161,16 +163,20 @@ pub const TargetingData = struct {
     pub fn getRayEnd(self: *const TargetingData, room: *const Room, caster: *const Thing, ray: Ray, target_pos: V2f) V2f {
         const caster_to_target = target_pos.sub(caster.pos);
         const target_dir = if (caster_to_target.normalizedChecked()) |d| d else return target_pos;
+        const cast_orig = caster.pos.add(target_dir.scale(ray.cast_orig_dist));
+        const cast_orig_to_target = target_pos.sub(cast_orig);
+        if (cast_orig_to_target.dot(target_dir) < 0) return cast_orig;
+
         const max_radius = self.max_range + caster.coll_radius;
-        const capped_dist = if (self.fixed_range) max_radius else @min(max_radius, caster_to_target.length());
+        const capped_dist = if (self.fixed_range) max_radius else @min(max_radius, cast_orig.length());
         const capped_vec = target_dir.scale(capped_dist);
         const ray_radius = ray.thickness * 0.5;
 
-        var target_hit_pos = caster.pos.add(capped_vec);
+        var target_hit_pos = cast_orig.add(capped_vec);
         var end_ray_pos = target_hit_pos;
 
         if (Collision.getNextSweptCircleCollision(
-            caster.pos,
+            cast_orig,
             capped_vec,
             ray_radius,
             ray.ends_at_coll_mask,
@@ -196,6 +202,7 @@ pub const TargetingData = struct {
                 return .{
                     .target = .{ .pos = target_pos },
                     .face_dir = target_pos.sub(caster.pos).normalizedChecked() orelse caster.dir,
+                    .cast_orig = if (targeting_data.ray_to_mouse) |ray| caster.pos.add(target_dir.scale(ray.cast_orig_dist)) else null,
                 };
             },
             .self => {
@@ -241,9 +248,14 @@ pub const TargetingData = struct {
                 var target_circle_pos = caster.pos.add(capped_vec);
 
                 if (targeting_data.ray_to_mouse) |ray| {
-                    target_circle_pos = targeting_data.getRayEnd(room, caster, ray, target_circle_pos);
+                    const cast_orig = caster.pos.add(target_dir.scale(ray.cast_orig_dist));
+                    const ray_end = targeting_data.getRayEnd(room, caster, ray, target_circle_pos);
+                    if (ray_end.sub(caster.pos).length() < capped_dist) {
+                        target_circle_pos = ray_end;
+                    }
                     const ray_radius = ray.thickness * 0.5;
-                    plat.linef(caster.pos, target_circle_pos, ray.thickness, targeting_data.color);
+                    plat.circlef(cast_orig, ray_radius, .{ .fill_color = targeting_data.color });
+                    plat.linef(cast_orig, target_circle_pos, ray.thickness, targeting_data.color);
                     plat.circlef(target_circle_pos, ray_radius, .{ .fill_color = targeting_data.color });
                     //if (coll) |c| {
                     //    plat.circlef(c.pos, 3, .{ .fill_color = .red });

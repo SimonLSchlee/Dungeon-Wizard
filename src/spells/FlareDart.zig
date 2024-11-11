@@ -33,7 +33,7 @@ pub const title = "Flare Dart";
 pub const enum_name = "flare_dart";
 pub const Controllers = [_]type{Projectile};
 
-const base_ball_radius = 8;
+const base_ball_radius = 6.5;
 const base_range = 250;
 
 pub const proto = Spell.makeProto(
@@ -48,6 +48,7 @@ pub const proto = Spell.makeProto(
             .ray_to_mouse = .{
                 .ends_at_coll_mask = Collision.Mask.initMany(&.{.tile}),
                 .thickness = base_ball_radius * 2, // TODO use radius below?
+                .cast_orig_dist = 20,
             },
         },
     },

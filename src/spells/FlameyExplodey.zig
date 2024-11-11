@@ -34,7 +34,7 @@ pub const enum_name = "flamey_explodey";
 pub const Controllers = [_]type{Projectile};
 
 const base_explode_radius = 70;
-const base_ball_radius = 12;
+const base_ball_radius = 10;
 const base_range = 300;
 
 pub const proto = Spell.makeProto(
@@ -51,6 +51,7 @@ pub const proto = Spell.makeProto(
             .ray_to_mouse = .{
                 .ends_at_coll_mask = Collision.Mask.initMany(&.{.tile}),
                 .thickness = base_ball_radius * 2, // TODO use radius below?
+                .cast_orig_dist = 40,
             },
             .radius_at_target = base_explode_radius,
         },
@@ -180,7 +181,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             .radius = flamey_explodey.ball_radius,
         },
     };
-    _ = try room.queueSpawnThing(&ball, caster.pos);
+    _ = try room.queueSpawnThing(&ball, params.cast_orig.?);
 }
 
 pub const description =

@@ -59,8 +59,8 @@ pub const SizeCategory = enum {
     pub const coll_radii = std.EnumArray(SizeCategory, f32).init(.{
         .none = 0,
         .smol = 4,
-        .medium = 7,
-        .big = 10,
+        .medium = 9,
+        .big = 11,
     });
     pub const draw_radii = std.EnumArray(SizeCategory, f32).init(.{
         .none = 0,

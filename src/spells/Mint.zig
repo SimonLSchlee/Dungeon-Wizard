@@ -33,7 +33,7 @@ pub const title = "Mint 'Em";
 pub const enum_name = "mint";
 pub const Controllers = [_]type{Projectile};
 
-const base_radius = 7;
+const base_radius = 6.5;
 const base_range = 200;
 
 pub const proto = Spell.makeProto(
@@ -48,6 +48,7 @@ pub const proto = Spell.makeProto(
             .max_range = base_range,
             .ray_to_mouse = .{
                 .thickness = base_radius, // TODO use radius below?
+                .cast_orig_dist = 20,
             },
         },
         .mislay = true,
