@@ -197,6 +197,7 @@ moused_over_thing: ?struct {
 edit_mode: bool = false,
 ui_clicked: bool = false,
 next_pool_id: u32 = 0, // i hate this, can we change it?
+highest_num_things: usize = 0,
 rng: std.Random.DefaultPrng = undefined,
 // fields to save/load for level loading
 //  - spawns, tiles, zones
@@ -276,6 +277,7 @@ pub fn reloadFromTileMap(self: *Room, tilemap: TileMap) Error!void {
 
 pub fn queueSpawnThing(self: *Room, proto: *const Thing, pos: V2f) Error!?pool.Id {
     const t = self.things.alloc();
+    self.highest_num_things = @max(self.things.num_allocated, self.highest_num_things);
     if (t) |thing| {
         try proto.copyTo(thing);
         thing.spawn_state = .spawning;
@@ -283,6 +285,11 @@ pub fn queueSpawnThing(self: *Room, proto: *const Thing, pos: V2f) Error!?pool.I
         try self.spawn_queue.append(thing.id);
         if (thing.isEnemy()) self.num_enemies_alive += 1;
         return thing.id;
+    } else {
+        std.debug.print(
+            "#################\nWARNING: Failed to allocate Thing\n{} / {} Things allocated\n",
+            .{ self.things.num_allocated, max_things_in_room },
+        );
     }
     return null;
 }
@@ -622,5 +629,8 @@ pub fn render(self: *const Room, native_render_texture: Platform.RenderTexture2D
 
     if (debug.show_num_enemies) {
         try plat.textf(v2f(10, 10), "num_enemies_alive: {}", .{self.num_enemies_alive}, .{ .color = .white });
+    }
+    if (debug.show_highest_num_things_in_room) {
+        try plat.textf(v2f(10, 30), "highest_num_things: {} / {}", .{ self.highest_num_things, max_things_in_room }, .{ .color = .white });
     }
 }
