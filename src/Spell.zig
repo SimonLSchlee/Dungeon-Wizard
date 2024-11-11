@@ -327,10 +327,9 @@ pub const TargetingData = struct {
                             }
                         }
                         if (targeting_data.ray_to_mouse) |ray| {
-                            const target_circle_pos = targeting_data.getRayEnd(room, caster, ray, thing.pos);
                             const ray_radius = ray.thickness * 0.5;
-                            plat.linef(caster.pos, target_circle_pos, ray.thickness, targeting_color);
-                            plat.circlef(target_circle_pos, ray_radius, .{ .fill_color = targeting_color });
+                            plat.linef(caster.pos, thing.pos, ray.thickness, targeting_color);
+                            plat.circlef(thing.pos, ray_radius, .{ .fill_color = targeting_color });
                             //if (coll) |c| {
                             //    plat.circlef(c.pos, 3, .{ .fill_color = .red });
                             //}
