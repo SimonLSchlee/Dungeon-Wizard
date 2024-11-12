@@ -56,14 +56,16 @@ pub const Action = struct {
     pub const Kind = enum {
         spell,
         item,
+        discard,
     };
     pub const KindData = union(Kind) {
         spell: Spell,
         item: Item,
+        discard: struct {}, // @hasField etc doesn't work with void, so empty struct
     };
     pub const Buffered = struct {
         action: KindData,
-        params: Spell.Params,
+        params: ?Spell.Params = null,
         slot_idx: i32,
     };
 };
@@ -80,33 +82,23 @@ pub const Input = struct {
         const ui_slots = &room.ui_slots;
         const mouse_pos = plat.getMousePosWorld(room.camera);
 
-        ui_slots.updateSelected(room, self);
+        try ui_slots.update(room, self);
         if (!room.paused) {
             ui_slots.updateTimerAndDrawSpell(room);
         }
+
+        // automatically discard when out of mana
+        // TODO when no cards are playable?
         if (self.mana) |*mana| {
-            if (mana.curr == 0 or ui_slots.pressedDiscard()) {
-                const max_extra_mana_cooldown_secs: f32 = 2;
-                const per_mana_secs = max_extra_mana_cooldown_secs / utl.as(f32, mana.max);
-                const num_secs: f32 = 1 + per_mana_secs * utl.as(f32, mana.curr);
-                const num_ticks = core.secsToTicks(num_secs);
-                for (ui_slots.getSlotsByKindConst(.spell)) |*slot| {
-                    if (slot.kind) |k| {
-                        const spell = k.spell;
-                        room.discardSpell(spell);
-                    }
-                    ui_slots.clearSlotByKind(slot.idx, .spell);
-                    ui_slots.setSlotCooldown(slot.idx, .spell, num_ticks);
-                }
-                ui_slots.discard_button.?.cooldown_timer = utl.TickCounter.init(num_ticks);
-                mana.curr = mana.max;
+            if (mana.curr == 0 and controller.action_buffered == null) {
+                ui_slots.selectSlot(.discard, .quick_release, 0);
             }
         }
 
         // clicking rmb cancels buffered action
         if (plat.input_buffer.mouseBtnIsJustPressed(.right)) {
             input.move_press_ui_timer.restart();
-            ui_slots.select_state = null;
+            ui_slots.unselectSlot();
             controller.action_buffered = null;
         }
         // holding rmb sets path, only if an action isn't buffered
@@ -129,10 +121,11 @@ pub const Input = struct {
                 .quick_release => !plat.input_buffer.keyIsDown(slot.key),
             };
             if (do_cast) {
-                const _params: ?Spell.Params = blk: switch (slot.kind.?) {
-                    inline else => |action| {
-                        break :blk action.getTargetParams(room, self, mouse_pos);
-                    },
+                const _params: ?Spell.Params = switch (slot.kind.?) {
+                    inline else => |action| if (std.meta.hasMethod(@TypeOf(action), "getTargetParams"))
+                        action.getTargetParams(room, self, mouse_pos)
+                    else
+                        null,
                 };
                 if (_params) |params| {
                     self.path.len = 0; // cancel the current path on cast, but you can buffer a new one
@@ -141,13 +134,15 @@ pub const Input = struct {
                         .params = params,
                         .slot_idx = utl.as(i32, slot.idx),
                     };
-                    ui_slots.select_state = .{
-                        .slot_idx = slot.idx,
-                        .select_kind = .buffered,
-                        .slot_kind = slot.kind.?,
+                    ui_slots.changeSelectedSlotToBuffered();
+                } else if (slot.kind.? == .discard) {
+                    controller.action_buffered = Action.Buffered{
+                        .action = .{ .discard = .{} },
+                        .slot_idx = 0,
                     };
+                    ui_slots.changeSelectedSlotToBuffered();
                 } else if (cast_method == .quick_press or cast_method == .quick_release) {
-                    ui_slots.select_state = null;
+                    ui_slots.unselectSlot();
                     controller.action_buffered = null;
                 }
             }
@@ -162,13 +157,13 @@ pub const Input = struct {
 
         if (ui_slots.getSelectedSlot()) |slot| {
             switch (slot.kind.?) {
-                inline else => |k| try k.renderTargeting(room, self, null),
+                inline else => |k| if (std.meta.hasMethod(@TypeOf(k), "renderTargeting")) try k.renderTargeting(room, self, null),
             }
         } else {
             const maybe_buffered: ?Action.Buffered = if (controller.action_buffered) |b| b else if (controller.action_casting) |a| a else null;
             if (maybe_buffered) |buffered| {
                 switch (buffered.action) {
-                    inline else => |k| try k.renderTargeting(room, self, buffered.params),
+                    inline else => |k| if (std.meta.hasMethod(@TypeOf(k), "renderTargeting")) try k.renderTargeting(room, self, buffered.params),
                 }
             }
         }
@@ -216,9 +211,10 @@ pub const Controller = struct {
         if (controller.action_buffered) |buffered| {
             if (controller.action_casting == null) {
                 const slot_idx = utl.as(usize, buffered.slot_idx);
-                room.ui_slots.clearSlotByKind(slot_idx, std.meta.activeTag(buffered.action));
+
                 switch (buffered.action) {
                     .spell => |spell| {
+                        room.ui_slots.clearSlotByKind(slot_idx, .spell);
                         if (spell.mislay) {
                             room.mislaySpell(spell);
                         } else {
@@ -236,6 +232,9 @@ pub const Controller = struct {
                             room.ui_slots.setSlotCooldown(slot_idx, .spell, spell.getSlotCooldownTicks());
                         }
                         controller.cast_counter = utl.TickCounter.init(spell.cast_ticks);
+                    },
+                    .item => {
+                        room.ui_slots.clearSlotByKind(slot_idx, .item);
                     },
                     else => {},
                 }
@@ -289,8 +288,10 @@ pub const Controller = struct {
                     const cast_end_volume = 0.4;
                     const s = controller.action_casting.?;
                     if (controller.ticks_in_state == 0) {
-                        if (s.params.face_dir) |dir| {
-                            self.dir = dir;
+                        if (s.params) |params| {
+                            if (params.face_dir) |dir| {
+                                self.dir = dir;
+                            }
                         }
                         switch (controller.action_casting.?.action) {
                             .spell => {
@@ -304,9 +305,30 @@ pub const Controller = struct {
                     }
                     if (controller.cast_counter.tick(false)) {
                         switch (controller.action_casting.?.action) {
-                            .item => |item| try item.use(self, room, s.params),
+                            .item => |item| try item.use(self, room, s.params.?),
                             .spell => |spell| {
-                                try spell.cast(self, room, s.params);
+                                try spell.cast(self, room, s.params.?);
+                            },
+                            .discard => {
+                                const ui_slots = &room.ui_slots;
+                                // TODO discard != mana?
+                                if (self.mana) |*mana| {
+                                    const max_extra_mana_cooldown_secs: f32 = 1.33;
+                                    const per_mana_secs = max_extra_mana_cooldown_secs / utl.as(f32, mana.max);
+                                    const num_secs: f32 = 0.66 + per_mana_secs * utl.as(f32, mana.curr);
+                                    const num_ticks = core.secsToTicks(num_secs);
+                                    for (ui_slots.getSlotsByKindConst(.spell)) |*slot| {
+                                        if (slot.kind) |k| {
+                                            const spell = k.spell;
+                                            room.discardSpell(spell);
+                                        }
+                                        ui_slots.clearSlotByKind(slot.idx, .spell);
+                                        ui_slots.setSlotCooldown(slot.idx, .spell, num_ticks);
+                                    }
+                                    ui_slots.setSlotCooldown(0, .discard, num_ticks);
+                                    ui_slots.unselectSlot();
+                                    mana.curr = mana.max;
+                                }
                             },
                         }
                         getPlat().stopSound(cast_loop_sound);

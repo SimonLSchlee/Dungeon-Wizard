@@ -26,6 +26,143 @@ const sprites = @import("sprites.zig");
 const Item = @import("Item.zig");
 const player = @import("player.zig");
 const menuUI = @import("menuUI.zig");
+const ImmUI = @import("ImmUI.zig");
+
+// unq == update and queue (render)
+// Handle all updating and rendering of a generic action Slot, returning a CastMethod if it was activated
+pub fn unqActionSlot(cmd_buf: *ImmUI.CmdBuf, slot_rect: geom.Rectf, slot: *Slots.Slot, caster: *const Thing, room: *Room) Error!?Options.CastMethod {
+    const plat = getPlat();
+
+    var ret: ?Options.CastMethod = null;
+    const mouse_pos = plat.getMousePosScreen();
+    const hovered = geom.pointIsInRectf(mouse_pos, slot_rect);
+    const clicked = hovered and plat.input_buffer.mouseBtnIsJustPressed(.left);
+    // TODO anything else here?
+    const slot_enabled = slot.kind != null and caster.isAliveCreature() and (if (slot.cooldown_timer) |timer| !timer.running else true);
+    const can_activate_slot = slot_enabled and switch (slot.kind.?) {
+        inline else => |a| !std.meta.hasMethod(@TypeOf(a), "canUse") or a.canUse(room, caster),
+    };
+    const bg_color = Colorf.rgb(0.07, 0.05, 0.05);
+    var rect = slot_rect;
+    var border_color = Colorf.darkgray;
+    var key_color = Colorf.gray;
+
+    if (hovered) {
+        _ = slot.hover_timer.tick(false);
+    } else {
+        slot.hover_timer.restart();
+    }
+    slot.is_long_hovered = (hovered and !slot.hover_timer.running);
+
+    // background rect
+    if (can_activate_slot and hovered) {
+        // TODO animate
+        rect.pos = slot_rect.pos.add(v2f(0, -5));
+    }
+    cmd_buf.append(.{ .rect = .{
+        .pos = rect.pos,
+        .dims = rect.dims,
+        .opt = .{
+            .fill_color = bg_color,
+        },
+    } }) catch @panic("Fail to append rect cmd");
+
+    // slot contents
+    if (slot_enabled) {
+        const kind_data = slot.kind.?;
+
+        if (can_activate_slot) {
+            key_color = .white;
+            border_color = if (slot.selection_kind) |s| Slots.SelectionKind.colors.get(s) else .blue;
+            // activated this frame?
+            var activated = false;
+            if (hovered and clicked) {
+                activated = true;
+                room.ui_clicked = true;
+            } else if (plat.input_buffer.keyIsJustPressed(slot.key)) {
+                activated = true;
+            }
+            if (activated) {
+                ret = App.get().options.cast_method;
+                // auto-target self-cast
+                switch (kind_data) {
+                    inline else => |k| {
+                        if (@hasField(@TypeOf(k), "targeting_data")) {
+                            if (k.targeting_data.kind == .self) {
+                                ret = .quick_release;
+                            }
+                        }
+                    },
+                }
+            }
+        }
+
+        // render
+        switch (kind_data) {
+            .discard => {
+                const data = App.get().data;
+                const info = sprites.RenderIconInfo{ .frame = data.misc_icons.getRenderFrame(.discard).? };
+                try info.unqRenderTint(cmd_buf, rect, Colorf.rgb(0.7, 0, 0));
+            },
+            inline else => |inner| try inner.unqRenderIcon(cmd_buf, rect),
+        }
+        if (caster.mana) |mana| {
+            switch (kind_data) {
+                .spell => |spell| {
+                    spell.renderManaCost(rect);
+                    if (mana.curr < spell.mana_cost) {
+                        // red insufficient mana overlay
+                        cmd_buf.append(.{
+                            .rect = .{
+                                .pos = rect.pos,
+                                .dims = rect.dims,
+                                .opt = .{ .fill_color = Colorf.red.fade(0.25) },
+                            },
+                        }) catch @panic("Fail to append rect cmd");
+                    }
+                    // TODO mana cost circles
+                    //spell.renderManaCost(rect);
+                },
+                else => {},
+            }
+        }
+    }
+    if (slot.cooldown_timer) |*timer| {
+        // NOTE rn the timers are ticked in updateTimerAndDrawSpell, that's fine...
+        if (timer.running) {
+            menuUI.unqSectorTimer(
+                cmd_buf,
+                rect.pos.add(rect.dims.scale(0.5)),
+                rect.dims.x * 0.5 * 0.7,
+                timer,
+                .{ .fill_color = .blue },
+            );
+        }
+    }
+
+    // border
+    cmd_buf.append(.{ .rect = .{
+        .pos = rect.pos,
+        .dims = rect.dims,
+        .opt = .{
+            .fill_color = null,
+            .outline_color = border_color,
+            .outline_thickness = 4,
+        },
+    } }) catch @panic("Fail to append rect cmd");
+
+    // hotkey
+    cmd_buf.append(.{ .label = .{
+        .pos = rect.pos.add(v2f(1, 1)),
+        .text = ImmUI.Command.LabelString.initTrunc(&slot.key_str),
+        .opt = .{
+            .color = key_color,
+            .size = 20,
+        },
+    } }) catch @panic("Fail to append label cmd");
+
+    return ret;
+}
 
 pub const Slots = struct {
     pub const SelectionKind = enum {
@@ -39,14 +176,16 @@ pub const Slots = struct {
     };
     pub const Slot = struct {
         pub const Kind = player.Action.Kind;
-        pub const SpellOrItem = player.Action.KindData;
+        pub const KindData = player.Action.KindData;
 
         idx: usize,
         key: core.Key,
         key_str: [3]u8,
-        kind: ?SpellOrItem = null,
+        kind: ?KindData = null,
         cooldown_timer: ?utl.TickCounter = null,
         hover_timer: utl.TickCounter = utl.TickCounter.init(15),
+        is_long_hovered: bool = false,
+        selection_kind: ?SelectionKind = null,
     };
     pub const InitParams = struct {
         num_spell_slots: usize = 4, // populated from deck
@@ -93,7 +232,10 @@ pub const Slots = struct {
         slot_idx: usize,
     } = null,
     selected_method: Options.CastMethod = .left_click,
-    discard_button: ?menuUI.HotKeyedButton = null,
+    discard_slot: ?Slot = null,
+    immui: struct {
+        commands: ImmUI.CmdBuf = .{},
+    } = .{},
 
     pub fn init(room: *Room, params: InitParams) Slots {
         assert(params.num_spell_slots < max_spell_slots);
@@ -125,26 +267,11 @@ pub const Slots = struct {
         }
 
         if (params.discard_button) {
-            const data = App.get().data;
-            const spell_rects = ret.getSlotRects(.spell);
-            const last = spell_rects.get(spell_rects.len - 1);
-            const right_middle = last.pos.add(v2f(last.dims.x, last.dims.y * 0.5));
-            const discard_btn_dims = v2f(48, 48);
-            const rect_center = right_middle.add(v2f(spell_slot_spacing + discard_btn_dims.x * 0.5, 0));
-            ret.discard_button = .{
+            ret.discard_slot = .{
+                .idx = 0,
                 .key = discard_key,
                 .key_str = discard_key_str,
-                .crect = .{ .rect = .{
-                    .pos = rect_center.sub(discard_btn_dims.scale(0.5)),
-                    .dims = discard_btn_dims,
-                } },
-                .icon = .{
-                    .render_info = .{ .frame = data.misc_icons.getRenderFrame(.discard).? },
-                    .tint = Colorf.rgb(0.7, 0, 0),
-                },
-                .poly_opt = .{
-                    .fill_color = Colorf.rgb(0.1, 0.1, 0.1),
-                },
+                .kind = .discard,
             };
         }
 
@@ -159,6 +286,18 @@ pub const Slots = struct {
             plat.native_rect_cropped_dims.y - 60 - spell_slot_dims.y * 0.5,
         ));
         switch (kind) {
+            .discard => {
+                assert(ret.buffer.len > 0);
+                const spell_rects = self.getSlotRects(.spell);
+                const last = spell_rects.get(spell_rects.len - 1);
+                const right_middle = last.pos.add(v2f(last.dims.x, last.dims.y * 0.5));
+                const discard_btn_dims = v2f(48, 48);
+                const rect_center = right_middle.add(v2f(spell_slot_spacing + discard_btn_dims.x * 0.5, 0));
+                ret.append(.{
+                    .pos = rect_center.sub(discard_btn_dims.scale(0.5)),
+                    .dims = discard_btn_dims,
+                }) catch unreachable;
+            },
             .spell => {
                 ret.resize(self.spells.len) catch unreachable;
                 layoutRectsFixedSize(self.spells.len, spell_slot_dims, spells_center_pos, .{ .space_between = spell_slot_spacing }, ret.slice());
@@ -176,6 +315,7 @@ pub const Slots = struct {
         return switch (kind) {
             .spell => self.spells.slice(),
             .item => self.items.slice(),
+            .discard => (&self.discard_slot.?)[0..1],
         };
     }
 
@@ -183,6 +323,7 @@ pub const Slots = struct {
         return switch (kind) {
             .spell => self.spells.constSlice(),
             .item => self.items.constSlice(),
+            .discard => (&self.discard_slot.?)[0..1],
         };
     }
 
@@ -209,27 +350,50 @@ pub const Slots = struct {
         slot.cooldown_timer = if (ticks) |t| utl.TickCounter.init(t) else null;
     }
 
-    pub fn clearAndSetAllSlotsAndDiscardCooldown(self: *Slots, slot_kind: Slot.Kind, ticks: ?i64) void {
-        const slots = self.getSlotsByKind(slot_kind);
-        for (0..slots.len) |i| {
-            self.clearSlotByKind(i, slot_kind);
-            self.setSlotCooldown(i, slot_kind, ticks);
-        }
-        if (self.discard_button) |*btn| {
-            btn.cooldown_timer = if (ticks) |t| utl.TickCounter.init(t) else null;
-        }
-    }
-
     pub fn clearSlotByKind(self: *Slots, slot_idx: usize, slot_kind: Slot.Kind) void {
         const slots = self.getSlotsByKind(slot_kind);
         const slot = &slots[slot_idx];
 
         slot.kind = null;
+        slot.selection_kind = null;
 
-        if (self.select_state) |*state| {
-            if (state.slot_kind == slot_kind) {
+        if (self.select_state) |*s| {
+            if (s.slot_kind == slot_kind and s.slot_idx == slot_idx) {
                 self.select_state = null;
             }
+        }
+    }
+
+    pub fn selectSlot(self: *Slots, kind: Slot.Kind, cast_method: Options.CastMethod, idx: usize) void {
+        switch (kind) {
+            .spell => assert(idx < self.spells.len),
+            .item => assert(idx < self.items.len),
+            .discard => assert(idx == 0),
+        }
+        self.unselectSlot();
+        const slots = self.getSlotsByKind(kind);
+        self.select_state = .{
+            .slot_idx = idx,
+            .select_kind = .selected,
+            .slot_kind = kind,
+        };
+        self.selected_method = cast_method;
+        slots[idx].selection_kind = .selected;
+    }
+
+    pub fn changeSelectedSlotToBuffered(self: *Slots) void {
+        if (self.select_state) |*s| {
+            const slots = self.getSlotsByKind(s.slot_kind);
+            s.select_kind = .buffered;
+            slots[s.slot_idx].selection_kind = .buffered;
+        }
+    }
+
+    pub fn unselectSlot(self: *Slots) void {
+        if (self.select_state) |*s| {
+            const slots = self.getSlotsByKind(s.slot_kind);
+            s.select_kind = .buffered;
+            slots[s.slot_idx].selection_kind = null;
         }
     }
 
@@ -246,206 +410,31 @@ pub const Slots = struct {
                 }
             }
         }
-        if (self.discard_button) |*btn| {
-            btn.update();
+        if (self.discard_slot) |*slot| {
+            if (slot.cooldown_timer) |*timer| {
+                if (timer.tick(false)) {
+                    slot.kind = .discard;
+                }
+            }
         }
     }
 
-    fn updateSelectedSlots(self: *Slots, room: *const Room, caster: *const Thing, slots: []Slot, kind: Slot.Kind) bool {
-        const plat = App.getPlat();
+    fn unqSlots(self: *Slots, room: *Room, caster: *const Thing, slots: []Slot, kind: Slot.Kind) Error!void {
         const rects = self.getSlotRects(kind);
-        const mouse_pressed = plat.input_buffer.mouseBtnIsJustPressed(.left);
-
-        var ui_clicked = false;
-        var selection_idx: ?usize = null;
-        var cast_method: Options.CastMethod = .left_click;
-        for (0..slots.len) |i| {
-            const rect = rects.get(i);
-            const slot = &slots[i];
-            const mouse_pos = plat.getMousePosScreen();
-            const hovered = geom.pointIsInRectf(mouse_pos, rect);
-
-            if (hovered) {
-                _ = slot.hover_timer.tick(false);
-            } else {
-                slot.hover_timer.restart();
+        assert(rects.len == slots.len);
+        for (slots, 0..) |*slot, i| {
+            if (try unqActionSlot(&self.immui.commands, rects.get(i), slot, caster, room)) |cast_method| {
+                self.selectSlot(kind, cast_method, i);
             }
-
-            if (slot.kind) |k| {
-                switch (k) {
-                    inline else => |a| {
-                        const A = @TypeOf(a);
-                        if (std.meta.hasMethod(A, "canUse")) {
-                            if (!a.canUse(room, caster)) continue;
-                        }
-                    },
-                }
-            } else continue;
-
-            if (hovered and mouse_pressed) {
-                ui_clicked = true;
-                selection_idx = i;
-                break;
-            }
-
-            if (plat.input_buffer.keyIsJustPressed(slot.key)) {
-                selection_idx = i;
-                cast_method = App.get().options.cast_method;
-                break;
-            }
-        }
-
-        if (selection_idx) |new_idx| {
-            self.select_state = .{
-                .slot_idx = new_idx,
-                .select_kind = .selected,
-                .slot_kind = kind,
-            };
-            self.selected_method = cast_method;
-            const kind_data = self.getSlotsByKindConst(kind)[new_idx].kind.?;
-            switch (kind_data) {
-                inline else => |k| {
-                    if (k.targeting_data.kind == .self) {
-                        self.selected_method = .quick_release;
-                    }
-                },
-            }
-        }
-
-        return ui_clicked;
-    }
-
-    pub fn updateSelected(self: *Slots, room: *Room, caster: *const Thing) void {
-        const clicked_a = self.updateSelectedSlots(room, caster, self.spells.slice(), .spell);
-        const clicked_b = self.updateSelectedSlots(room, caster, self.items.slice(), .item);
-        var clicked_c = false;
-        if (self.discard_button) |*d| {
-            clicked_c = d.isClicked();
-        }
-
-        if (clicked_a or clicked_b or clicked_c) {
-            room.ui_clicked = true;
         }
     }
 
-    pub fn discardEnabled(self: *const Slots) bool {
-        if (self.discard_button) |btn| {
-            if (btn.cooldown_timer) |timer| {
-                return !timer.running;
-            }
-            return true;
-        }
-        return false;
-    }
-
-    pub fn pressedDiscard(self: *const Slots) bool {
-        if (self.discard_button) |btn| {
-            if (btn.cooldown_timer) |timer| {
-                if (timer.running) return false;
-            }
-            if (btn.isClicked() or btn.isHotkeyed()) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    fn renderSlots(self: *const Slots, room: *const Room, caster: *const Thing, slots: []const Slot, kind: Slot.Kind, slots_are_enabled: bool) Error!void {
-        const plat = App.getPlat();
-        const rects = self.getSlotRects(kind);
-        var slot_selected_or_buffered: ?struct { idx: usize, color: Colorf } = null;
-        if (self.select_state) |state| {
-            if (state.slot_kind == kind) {
-                slot_selected_or_buffered = .{
-                    .idx = state.slot_idx,
-                    .color = SelectionKind.colors.get(state.select_kind),
-                };
-            }
-        }
-
-        for (slots, 0..) |slot, i| {
-            const slot_is_enabled = blk: {
-                if (!slots_are_enabled) {
-                    break :blk false;
-                } else if (slot.kind) |k| {
-                    switch (k) {
-                        inline else => |a| {
-                            const A = @TypeOf(a);
-                            if (std.meta.hasMethod(A, "canUse")) {
-                                break :blk a.canUse(room, caster);
-                            }
-                        },
-                    }
-                }
-                break :blk false;
-            };
-            var rect = rects.get(i);
-            const mouse_pos = plat.getMousePosScreen();
-            const hovered = geom.pointIsInRectf(mouse_pos, rect);
-            if (slot_is_enabled and hovered) {
-                const new_dims = rect.dims.scale(1.1);
-                rect.pos = rect.pos.sub(new_dims.sub(rect.dims).scale(0.5));
-                rect.dims = new_dims;
-            }
-            const slot_center_pos = rect.pos.add(rect.dims.scale(0.5));
-
-            plat.rectf(rect.pos, rect.dims, .{ .fill_color = Colorf.rgb(0.07, 0.05, 0.05) });
-
-            var key_color = Colorf.gray;
-            var border_color = Colorf.darkgray;
-
-            // slot could be disabled but still have something in it
-            if (slot.kind) |k| {
-                switch (k) {
-                    inline else => |inner| try inner.renderIcon(rect),
-                }
-                // TODO maybe dont tie these together (mana and discard button)
-                if (self.discard_button != null) {
-                    switch (k) {
-                        .spell => |spell| {
-                            spell.renderManaCost(rect);
-                            if (caster.mana) |mana| {
-                                if (mana.curr < spell.mana_cost) {
-                                    plat.rectf(rect.pos, rect.dims, .{ .fill_color = Colorf.red.fade(0.25) });
-                                }
-                            }
-                        },
-                        else => {},
-                    }
-                }
-            } else if (slot.cooldown_timer) |timer| {
-                if (timer.running) {
-                    menuUI.sectorTimer(slot_center_pos, rect.dims.x * 0.5 * 0.7, timer, .{ .fill_color = .blue });
-                }
-            }
-
-            if (slot_is_enabled) {
-                border_color = .blue;
-                key_color = .white;
-                if (slot_selected_or_buffered) |s| {
-                    if (s.idx == i) {
-                        border_color = s.color;
-                    }
-                }
-            }
-
-            // border
-            plat.rectf(
-                rect.pos,
-                rect.dims,
-                .{
-                    .fill_color = null,
-                    .outline_color = border_color,
-                    .outline_thickness = 4,
-                },
-            );
-            // hotkey
-            try plat.textf(
-                rect.pos.add(v2f(1, 1)),
-                "{s}",
-                .{&slot.key_str},
-                .{ .color = key_color },
-            );
+    pub fn update(self: *Slots, room: *Room, caster: *const Thing) Error!void {
+        self.immui.commands.clear();
+        try self.unqSlots(room, caster, self.spells.slice(), .spell);
+        try self.unqSlots(room, caster, self.items.slice(), .item);
+        if (self.discard_slot) |*d| {
+            try self.unqSlots(room, caster, d[0..1], .discard);
         }
     }
 
@@ -457,6 +446,9 @@ pub const Slots = struct {
             if (!slot.hover_timer.running) {
                 if (slot.kind) |k| {
                     switch (k) {
+                        .discard => {
+                            // TODO
+                        },
                         inline else => |inner| try inner.renderToolTip(pos),
                     }
                 }
@@ -466,26 +458,10 @@ pub const Slots = struct {
 
     pub fn render(self: *const Slots, room: *const Room) Error!void {
         const plat = App.getPlat();
-        const caster = blk: {
-            if (room.getConstPlayer()) |p| {
-                if (p.hp.?.curr > 0) {
-                    break :blk p;
-                }
-            }
-            return;
-        };
-        const slots_are_enabled = caster.hp.?.curr > 0;
+        const right_side_rect = if (self.discard_slot) |_| self.getSlotRects(.discard).get(0) else self.getSlotRects(.spell).get(self.spells.len - 1);
+        const right_center = right_side_rect.pos.add(v2f(right_side_rect.dims.x, right_side_rect.dims.y * 0.5));
 
         { // debug deck stuff
-            var right_center: V2f = .{};
-            if (self.discard_button) |d| {
-                const rect = d.toRectf();
-                right_center = rect.pos.add(v2f(rect.dims.x, rect.dims.y * 0.5));
-            } else {
-                const rects = self.getSlotRects(.spell);
-                const last_rect = rects.get(rects.len - 1);
-                right_center = last_rect.pos.add(v2f(last_rect.dims.x, last_rect.dims.y * 0.5));
-            }
             const p = right_center.add(v2f(10, -30));
             try plat.textf(
                 p,
@@ -499,17 +475,13 @@ pub const Slots = struct {
             );
         }
 
-        try self.renderSlots(room, caster, self.spells.constSlice(), .spell, slots_are_enabled);
-        try self.renderSlots(room, caster, self.items.constSlice(), .item, slots_are_enabled);
-        if (self.discard_button) |btn| {
-            const enabled = self.discardEnabled();
-            try btn.render(enabled);
-            if (btn.isLongHovered()) {
-                const rect = btn.toRectf();
-                try menuUI.renderToolTip("Discard hand", "", rect.pos.add(v2f(rect.dims.x, 0)));
+        try ImmUI.render(&self.immui.commands);
+        // tooltips on top of everything
+        if (self.discard_slot) |slot| {
+            if (slot.is_long_hovered) {
+                try menuUI.renderToolTip("Discard hand", "", right_center);
             }
         }
-        // tooltips on top of everything
         try self.renderToolTips(self.spells.constSlice(), .spell);
         try self.renderToolTips(self.items.constSlice(), .item);
     }

@@ -38,16 +38,27 @@ pub const Command = union(enum) {
         pos: V2f,
         dims: V2f,
         opt: draw.PolyOpt,
-        pub fn render(self: *@This()) Error!void {
+        pub fn render(self: *const @This()) Error!void {
             const plat = getPlat();
             plat.rectf(self.pos, self.dims, self.opt);
+        }
+    },
+    sector: struct {
+        pos: V2f,
+        radius: f32,
+        start_ang_rads: f32,
+        end_ang_rads: f32,
+        opt: draw.PolyOpt,
+        pub fn render(self: *const @This()) Error!void {
+            const plat = getPlat();
+            plat.sectorf(self.pos, self.radius, self.start_ang_rads, self.end_ang_rads, self.opt);
         }
     },
     label: struct {
         pos: V2f,
         text: LabelString,
         opt: draw.TextOpt,
-        pub fn render(self: *@This()) Error!void {
+        pub fn render(self: *const @This()) Error!void {
             const plat = getPlat();
             try plat.textf(self.pos, "{s}", .{self.text.constSlice()}, self.opt);
         }
@@ -56,7 +67,7 @@ pub const Command = union(enum) {
         pos: V2f,
         texture: Platform.Texture2D,
         opt: draw.TextureOpt,
-        pub fn render(self: *@This()) Error!void {
+        pub fn render(self: *const @This()) Error!void {
             const plat = getPlat();
             plat.texturef(self.pos, self.texture, self.opt);
         }
@@ -65,7 +76,7 @@ pub const Command = union(enum) {
 
 pub const CmdBuf = std.BoundedArray(Command, 256);
 
-pub fn render(cmd_buf: *CmdBuf) Error!void {
+pub fn render(cmd_buf: *const CmdBuf) Error!void {
     for (cmd_buf.slice()) |*command| {
         switch (command.*) {
             inline else => |*c| {

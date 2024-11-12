@@ -19,6 +19,7 @@ const App = @import("App.zig");
 const getPlat = App.getPlat;
 const Data = @import("Data.zig");
 const Thing = @import("Thing.zig");
+const ImmUI = @import("ImmUI.zig");
 
 pub const RenderFrame = struct {
     pos: V2i,
@@ -63,6 +64,41 @@ pub const RenderIconInfo = union(enum) {
                         .center = true,
                     },
                 );
+            },
+        }
+    }
+
+    pub fn unqRender(icon: *const RenderIconInfo, cmd_buf: *ImmUI.CmdBuf, rect: geom.Rectf) Error!void {
+        try icon.unqRenderTint(cmd_buf, rect, .white);
+    }
+
+    pub fn unqRenderTint(icon: *const RenderIconInfo, cmd_buf: *ImmUI.CmdBuf, rect: geom.Rectf, tint: Colorf) Error!void {
+        const icon_center_pos = rect.pos.add(rect.dims.scale(0.5));
+        // TODO retain aspect ratio of texture always!
+        switch (icon.*) {
+            .frame => |frame| {
+                cmd_buf.append(.{ .texture = .{
+                    .pos = icon_center_pos,
+                    .texture = frame.texture,
+                    .opt = .{
+                        .origin = .center,
+                        .src_pos = frame.pos.toV2f(),
+                        .src_dims = frame.size.toV2f(),
+                        .scaled_dims = rect.dims,
+                        .tint = tint,
+                    },
+                } }) catch @panic("Fail to append texture cmd");
+            },
+            .letter => |letter| {
+                cmd_buf.append(.{ .label = .{
+                    .pos = icon_center_pos,
+                    .text = ImmUI.Command.LabelString.initTrunc(&letter.str),
+                    .opt = .{
+                        .color = letter.color,
+                        .size = utl.as(u32, rect.dims.y),
+                        .center = true,
+                    },
+                } }) catch @panic("Fail to append label cmd");
             },
         }
     }

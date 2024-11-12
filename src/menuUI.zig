@@ -18,6 +18,7 @@ const Run = @This();
 const App = @import("App.zig");
 const getPlat = App.getPlat;
 const sprites = @import("sprites.zig");
+const ImmUI = @import("ImmUI.zig");
 
 // render text at the right size to fit into a rect, with padding
 pub fn textInRect(topleft: V2f, dims: V2f, rect_opt: draw.PolyOpt, text_padding: V2f, comptime fmt: []const u8, args: anytype, text_opt: draw.TextOpt) Error!void {
@@ -261,4 +262,27 @@ pub fn sectorTimer(pos: V2f, radius: f32, timer: utl.TickCounter, poly_opt: draw
         .color = .white,
         .size = utl.as(u32, radius * 1.5),
     }) catch {};
+}
+
+pub fn unqSectorTimer(cmd_buf: *ImmUI.CmdBuf, pos: V2f, radius: f32, timer: *const utl.TickCounter, poly_opt: draw.PolyOpt) void {
+    const rads = timer.remapTo0_1() * utl.tau;
+    cmd_buf.append(.{ .sector = .{
+        .pos = pos,
+        .radius = radius,
+        .start_ang_rads = 0,
+        .end_ang_rads = rads,
+        .opt = poly_opt,
+    } }) catch @panic("Fail to append sector cmd");
+
+    const secs_left = utl.as(u32, @ceil(core.fups_to_secsf(timer.num_ticks - timer.curr_tick)));
+    const secs_left_str = utl.bufPrintLocal("{}", .{secs_left}) catch @panic("Fail to format secs_left");
+    cmd_buf.append(.{ .label = .{
+        .pos = pos,
+        .text = ImmUI.Command.LabelString.initTrunc(secs_left_str),
+        .opt = .{
+            .center = true,
+            .color = .white,
+            .size = utl.as(u32, radius * 1.5),
+        },
+    } }) catch @panic("Fail to append label cmd");
 }

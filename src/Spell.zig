@@ -25,6 +25,7 @@ const pool = @import("pool.zig");
 const Collision = @import("Collision.zig");
 const menuUI = @import("menuUI.zig");
 const sprites = @import("sprites.zig");
+const ImmUI = @import("ImmUI.zig");
 
 const Spell = @This();
 
@@ -563,6 +564,10 @@ pub inline fn renderTargeting(self: *const Spell, room: *const Room, caster: *co
 
 pub inline fn renderIcon(self: *const Spell, rect: geom.Rectf) Error!void {
     return try self.getRenderIconInfo().render(rect);
+}
+
+pub inline fn unqRenderIcon(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, rect: geom.Rectf) Error!void {
+    return try self.getRenderIconInfo().unqRender(cmd_buf, rect);
 }
 
 pub fn renderManaCost(self: *const Spell, rect: geom.Rectf) void {
