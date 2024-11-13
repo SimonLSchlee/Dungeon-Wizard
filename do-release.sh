@@ -3,7 +3,7 @@
 set -xe
 
 ASSETS="$(pwd)/assets"
-VERSION="v0.0006-tilesnmana"
+VERSION="v0.0007-fishnslime"
 
 rm -rf zig-out/release
 
