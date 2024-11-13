@@ -518,7 +518,7 @@ pub fn troll() Thing {
     ret.controller = .{ .enemy = .{
         .attack_cooldown = utl.TickCounter.initStopped(90),
         .LOS_thiccness = ret.coll_radius * 2,
-        .attack_range = 45,
+        .attack_range = 55,
     } };
     ret.hitbox = .{
         .mask = Thing.Faction.opposing_masks.get(.enemy),
