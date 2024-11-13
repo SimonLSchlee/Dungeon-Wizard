@@ -214,6 +214,7 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
     }
 
     for (places.slice(), 0..) |*place, i| {
+        // TODO this better
         if (i < 2) {
             place.room.waves_params.enemy_probabilities.getPtr(.slime).* = 1;
             place.room.waves_params.enemy_probabilities.getPtr(.bat).* = 0.5;
@@ -225,10 +226,12 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
             place.room.waves_params.enemy_probabilities.getPtr(.troll).* = 1;
         }
         if (i >= 4) {
-            place.room.waves_params.enemy_probabilities.getPtr(.sharpboi).* = 1;
-            place.room.waves_params.enemy_probabilities.getPtr(.acolyte).* = 1;
+            place.room.waves_params.enemy_probabilities.getPtr(.slime).* = 0;
+            place.room.waves_params.enemy_probabilities.getPtr(.bat).* = 0;
             place.room.waves_params.enemy_probabilities.getPtr(.gobbow).* = 0.5;
             place.room.waves_params.enemy_probabilities.getPtr(.troll).* = 0.5;
+            place.room.waves_params.enemy_probabilities.getPtr(.sharpboi).* = 1;
+            place.room.waves_params.enemy_probabilities.getPtr(.acolyte).* = 1;
         }
         place.room.difficulty = 2 + u.as(f32, i) * 2;
         //TODO unhack this?
@@ -237,7 +240,17 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
     try places.insert(places.len / 2, .{ .shop = .{ .num = 0 } });
     try places.insert(0, .{ .room = .{ .difficulty = 0, .kind = .first, .idx = 0, .waves_params = .{ .room_kind = .first } } });
     try places.append(.{ .shop = .{ .num = 1 } });
-    try places.append(.{ .room = .{ .difficulty = places.get(places.len - 2).room.difficulty + 2, .kind = .boss, .idx = 0, .waves_params = .{ .room_kind = .first } } });
+    try places.append(.{ .room = .{ .difficulty = 15, .kind = .boss, .idx = 0, .waves_params = .{ .room_kind = .boss } } });
+    // TODO this better
+    {
+        const boss_params = &places.buffer[places.len - 1].room.waves_params;
+        boss_params.difficulty = 15;
+        boss_params.enemy_probabilities.getPtr(.slime).* = 0;
+        boss_params.enemy_probabilities.getPtr(.sharpboi).* = 1;
+        boss_params.enemy_probabilities.getPtr(.acolyte).* = 1;
+        boss_params.enemy_probabilities.getPtr(.gobbow).* = 1;
+        boss_params.enemy_probabilities.getPtr(.troll).* = 0.5;
+    }
 
     //try places.append(.{ .room = .{ .difficulty = 4, .idx = 0, .kind = .testu } });
     run.places = places;

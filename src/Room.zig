@@ -43,14 +43,6 @@ pub const InitParams = struct {
 };
 
 pub const WavesParams = struct {
-    const all_enemy_kinds = [_]Thing.CreatureKind{
-        .bat,
-        .troll,
-        .gobbow,
-        .sharpboi,
-        .acolyte,
-        .slime,
-    };
     const max_max_kinds_per_wave = 4;
 
     difficulty: f32 = 0,
@@ -111,11 +103,12 @@ fn makeWaves(tilemap: TileMap, rng: std.Random, params: WavesParams) WavesArray 
         std.debug.print(" Wave {}:\n", .{i});
 
         var enemy_protos: std.BoundedArray(Thing, WavesParams.max_max_kinds_per_wave) = .{};
+
         for (0..params.max_kinds_per_wave) |_| {
             const idx = rng.weightedIndex(f32, &params.enemy_probabilities.values);
             const kind: Thing.CreatureKind = @enumFromInt(idx);
             enemy_protos.append(data.creatures.get(kind)) catch unreachable;
-            std.debug.print("  possible enemy: {any}\n", .{kind});
+            std.debug.print("  possible enemy: {any} : probability: {d:.2}\n", .{ kind, params.enemy_probabilities.get(kind) });
         }
 
         rng.shuffleWithIndex(V2f, all_spawn_positions.slice(), u32);
