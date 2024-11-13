@@ -120,6 +120,7 @@ pub const Place = union(PlaceKind) {
         kind: Data.RoomKind,
         idx: usize,
         difficulty: f32,
+        waves_params: Room.WavesParams,
     },
     shop: struct {
         num: usize,
@@ -193,6 +194,7 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
             .difficulty = 0,
             .kind = .smol,
             .idx = smol_room_idxs.get(i),
+            .waves_params = .{ .room_kind = .smol },
         } });
     }
 
@@ -207,16 +209,35 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
             .difficulty = 0,
             .kind = .big,
             .idx = big_room_idxs.get(i),
+            .waves_params = .{ .room_kind = .big },
         } });
     }
 
     for (places.slice(), 0..) |*place, i| {
-        place.room.difficulty = 4 + u.as(f32, i) * 2;
+        if (i < 2) {
+            place.room.waves_params.enemy_probabilities.getPtr(.slime).* = 1;
+            place.room.waves_params.enemy_probabilities.getPtr(.bat).* = 0.5;
+        }
+        if (i >= 2) {
+            place.room.waves_params.enemy_probabilities.getPtr(.slime).* = 0.5;
+            place.room.waves_params.enemy_probabilities.getPtr(.bat).* = 0.5;
+            place.room.waves_params.enemy_probabilities.getPtr(.gobbow).* = 1;
+            place.room.waves_params.enemy_probabilities.getPtr(.troll).* = 1;
+        }
+        if (i >= 4) {
+            place.room.waves_params.enemy_probabilities.getPtr(.sharpboi).* = 1;
+            place.room.waves_params.enemy_probabilities.getPtr(.acolyte).* = 1;
+            place.room.waves_params.enemy_probabilities.getPtr(.gobbow).* = 0.5;
+            place.room.waves_params.enemy_probabilities.getPtr(.troll).* = 0.5;
+        }
+        place.room.difficulty = 2 + u.as(f32, i) * 2;
+        //TODO unhack this?
+        place.room.waves_params.difficulty = place.room.difficulty;
     }
     try places.insert(places.len / 2, .{ .shop = .{ .num = 0 } });
-    try places.insert(0, .{ .room = .{ .difficulty = 0, .kind = .first, .idx = 0 } });
+    try places.insert(0, .{ .room = .{ .difficulty = 0, .kind = .first, .idx = 0, .waves_params = .{ .room_kind = .first } } });
     try places.append(.{ .shop = .{ .num = 1 } });
-    try places.append(.{ .room = .{ .difficulty = places.get(places.len - 2).room.difficulty, .kind = .boss, .idx = 0 } });
+    try places.append(.{ .room = .{ .difficulty = places.get(places.len - 2).room.difficulty + 2, .kind = .boss, .idx = 0, .waves_params = .{ .room_kind = .first } } });
 
     //try places.append(.{ .room = .{ .difficulty = 4, .idx = 0, .kind = .testu } });
     run.places = places;
@@ -261,16 +282,9 @@ pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
             const room_idx = room_indices.get(r.idx);
             const tilemap = data.tilemaps.items[room_idx];
             const exit_doors = self.makeExitDoors(tilemap);
-            var waves_params = Room.WavesParams{
-                .difficulty = r.difficulty,
-                .room_kind = r.kind,
-            };
-            if (r.kind == .first) {
-                waves_params.first_wave_delay_ticks = 0;
-            }
             _ = try Room.init(&self.room, .{
                 .deck = self.deck,
-                .waves_params = waves_params,
+                .waves_params = r.waves_params,
                 .tilemap = tilemap,
                 .seed = self.rng.random().int(u64),
                 .exits = exit_doors,

@@ -53,13 +53,15 @@ pub const WavesParams = struct {
     };
     const max_max_kinds_per_wave = 4;
 
-    difficulty: f32,
+    difficulty: f32 = 0,
     first_wave_delay_ticks: i64 = 5 * core.fups_per_sec,
-    difficulty_error: f32 = 2,
+    difficulty_error: f32 = 1,
     max_kinds_per_wave: usize = 2,
     min_waves: usize = 2,
     max_waves: usize = 4,
-    enemy_kinds: []const Thing.CreatureKind = &all_enemy_kinds,
+    enemy_probabilities: std.EnumArray(Thing.CreatureKind, f32) = std.EnumArray(Thing.CreatureKind, f32).initDefault(0, .{
+        .slime = 1,
+    }),
     room_kind: Data.RoomKind,
 };
 
@@ -110,8 +112,8 @@ fn makeWaves(tilemap: TileMap, rng: std.Random, params: WavesParams) WavesArray 
 
         var enemy_protos: std.BoundedArray(Thing, WavesParams.max_max_kinds_per_wave) = .{};
         for (0..params.max_kinds_per_wave) |_| {
-            const idx = rng.uintLessThan(usize, params.enemy_kinds.len);
-            const kind = params.enemy_kinds[idx];
+            const idx = rng.weightedIndex(f32, &params.enemy_probabilities.values);
+            const kind: Thing.CreatureKind = @enumFromInt(idx);
             enemy_protos.append(data.creatures.get(kind)) catch unreachable;
             std.debug.print("  possible enemy: {any}\n", .{kind});
         }
