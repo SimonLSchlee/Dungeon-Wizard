@@ -49,6 +49,7 @@ pub const WavesParams = struct {
         .gobbow,
         .sharpboi,
         .acolyte,
+        .slime,
     };
     const max_max_kinds_per_wave = 4;
 

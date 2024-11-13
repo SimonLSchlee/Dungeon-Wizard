@@ -471,32 +471,54 @@ pub const AcolyteAIController = struct {
 
 const sprites = @import("sprites.zig");
 
-pub fn bat() Error!Thing {
-    var c = Thing.creatureProto(.bat, .bat, .enemy, 5, .smol, 17);
+pub fn slime() Thing {
+    var c = Thing.creatureProto(.slime, .slime, .enemy, 14, .big, 13);
     c.accel_params = .{
-        .max_speed = 1,
+        .max_speed = 0.7,
     };
     c.controller = .{ .enemy = .{
-        .attack_cooldown = utl.TickCounter.initStopped(60),
+        .attack_cooldown = utl.TickCounter.initStopped(90),
+        .attack_range = 45,
     } };
     c.hitbox = .{
         .mask = Thing.Faction.opposing_masks.get(.enemy),
         .radius = 10,
-        .rel_pos = V2f.right.scale(60),
-        .effect = .{ .damage = 4 },
+        .rel_pos = V2f.right.scale(20),
+        .sweep_to_rel_pos = V2f.right.scale(50),
+        .effect = .{ .damage = 6 },
+    };
+    c.enemy_difficulty = 0.75;
+    return c;
+}
+
+pub fn bat() Thing {
+    var c = Thing.creatureProto(.bat, .bat, .enemy, 5, .smol, 17);
+    c.accel_params = .{
+        .max_speed = 1.1,
+    };
+    c.controller = .{ .enemy = .{
+        .attack_cooldown = utl.TickCounter.initStopped(60),
+        .attack_range = 30,
+    } };
+    c.hitbox = .{
+        .mask = Thing.Faction.opposing_masks.get(.enemy),
+        .radius = 10,
+        .rel_pos = V2f.right.scale(30),
+        .effect = .{ .damage = 3 },
     };
     c.enemy_difficulty = 0.25;
     return c;
 }
 
-pub fn troll() Error!Thing {
+pub fn troll() Thing {
     var ret = Thing.creatureProto(.troll, .troll, .enemy, 40, .big, 20);
     ret.accel_params = .{
         .max_speed = 0.7,
     };
     ret.controller = .{ .enemy = .{
-        .attack_cooldown = utl.TickCounter.initStopped(60),
+        .attack_cooldown = utl.TickCounter.initStopped(90),
         .LOS_thiccness = ret.coll_radius * 2,
+        .attack_range = 45,
     } };
     ret.hitbox = .{
         .mask = Thing.Faction.opposing_masks.get(.enemy),
@@ -509,7 +531,7 @@ pub fn troll() Error!Thing {
     return ret;
 }
 
-pub fn gobbow() Error!Thing {
+pub fn gobbow() Thing {
     var ret = Thing.creatureProto(.gobbow, .gobbow, .enemy, 18, .medium, 12);
     ret.controller = .{ .enemy = .{
         .attack_range = 270,
@@ -520,7 +542,7 @@ pub fn gobbow() Error!Thing {
     return ret;
 }
 
-pub fn sharpboi() Error!Thing {
+pub fn sharpboi() Thing {
     var ret = Thing.creatureProto(.sharpboi, .sharpboi, .enemy, 25, .medium, 18);
 
     ret.accel_params = .{
@@ -552,7 +574,7 @@ pub fn sharpboi() Error!Thing {
     return ret;
 }
 
-pub fn acolyte() Error!Thing {
+pub fn acolyte() Thing {
     var ret = Thing.creatureProto(.acolyte, .acolyte, .enemy, 25, .medium, 12);
     ret.accel_params = .{
         .accel = 0.3,

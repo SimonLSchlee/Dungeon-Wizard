@@ -126,6 +126,7 @@ pub const CreatureAnim = struct {
         sharpboi,
         impling,
         acolyte,
+        slime,
     };
 
     pub const kind_strings: Data.EnumToBoundedStringArrayType(Kind) = Data.enumToBoundedStringArray(Kind);

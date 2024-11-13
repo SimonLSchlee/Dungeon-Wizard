@@ -882,12 +882,13 @@ pub fn reload(self: *Data) Error!void {
     self.creatures = @TypeOf(self.creatures).init(
         .{
             .player = player.basePrototype(),
-            .dummy = @import("enemies.zig").dummy(),
-            .bat = try @import("enemies.zig").bat(),
-            .troll = try @import("enemies.zig").troll(),
-            .gobbow = try @import("enemies.zig").gobbow(),
-            .sharpboi = try @import("enemies.zig").sharpboi(),
-            .acolyte = try @import("enemies.zig").acolyte(),
+            .dummy = enemies.dummy(),
+            .bat = enemies.bat(),
+            .troll = enemies.troll(),
+            .gobbow = enemies.gobbow(),
+            .sharpboi = enemies.sharpboi(),
+            .acolyte = enemies.acolyte(),
+            .slime = enemies.slime(),
             .impling = try @import("spells/Impling.zig").implingProto(),
         },
     );

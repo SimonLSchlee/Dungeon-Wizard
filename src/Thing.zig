@@ -48,6 +48,7 @@ pub const CreatureKind = enum {
     impling,
     bat,
     acolyte,
+    slime,
 };
 
 pub const SizeCategory = enum {
