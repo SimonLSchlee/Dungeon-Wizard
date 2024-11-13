@@ -23,6 +23,7 @@ const Item = @import("Item.zig");
 const PackedRoom = @import("PackedRoom.zig");
 const player = @import("player.zig");
 const TileMap = @import("TileMap.zig");
+pub const enemies = @import("enemies.zig");
 const Data = @This();
 
 pub const TileSet = struct {
@@ -222,20 +223,25 @@ pub fn FileWalkerIterator(assets_rel_dir: []const u8, file_suffix: []const u8) t
             return null;
         }
 
-        pub fn nextFileAsBaseName(self: *@This()) Error!?[]const u8 {
-            while (self.walker.next() catch return Error.FileSystemFail) |entry| {
-                if (!std.mem.endsWith(u8, entry.basename, file_suffix)) continue;
-                return entry.basename;
-            }
-            return null;
-        }
-
         pub fn nextFileAsOwnedString(self: *@This()) Error!?[]u8 {
             while (self.walker.next() catch return Error.FileSystemFail) |entry| {
                 if (!std.mem.endsWith(u8, entry.basename, file_suffix)) continue;
                 const file = self.dir.openFile(entry.basename, .{}) catch return Error.FileSystemFail;
                 const str = file.readToEndAlloc(self.allocator, 8 * 1024 * 1024) catch return Error.FileSystemFail;
                 return str;
+            }
+            return null;
+        }
+
+        pub fn next(self: *@This()) Error!?struct { basename: []const u8, owned_string: []u8 } {
+            while (self.walker.next() catch return Error.FileSystemFail) |entry| {
+                if (!std.mem.endsWith(u8, entry.basename, file_suffix)) continue;
+                const file = self.dir.openFile(entry.basename, .{}) catch return Error.FileSystemFail;
+                const str = file.readToEndAlloc(self.allocator, 8 * 1024 * 1024) catch return Error.FileSystemFail;
+                return .{
+                    .basename = entry.basename,
+                    .owned_string = str,
+                };
             }
             return null;
         }
@@ -320,7 +326,7 @@ pub fn loadSounds(self: *Data) Error!void {
     }
 }
 
-pub fn loadSpriteSheetFromJsonString(json_string: []u8, assets_rel_dir_path: []const u8) Error!SpriteSheet {
+pub fn loadSpriteSheetFromJsonString(sheet_filename: []const u8, json_string: []u8, assets_rel_dir_path: []const u8) Error!SpriteSheet {
     const plat = App.getPlat();
     //std.debug.print("{s}\n", .{s});
     var scanner = std.json.Scanner.initCompleteInput(plat.heap, json_string);
@@ -332,7 +338,7 @@ pub fn loadSpriteSheetFromJsonString(json_string: []u8, assets_rel_dir_path: []c
     const image_path = try u.bufPrintLocal("{s}/{s}", .{ assets_rel_dir_path, image_filename });
 
     var sheet = SpriteSheet{};
-    var it_dot = std.mem.tokenizeScalar(u8, image_filename, '.');
+    var it_dot = std.mem.tokenizeScalar(u8, sheet_filename, '.');
     const sheet_name = it_dot.next().?;
     sheet.name = try @TypeOf(sheet.name).init(sheet_name);
     const tex = try plat.loadTexture(image_path);
@@ -418,7 +424,7 @@ pub fn loadSpriteSheetFromJsonPath(_: *Data, assets_rel_dir: []const u8, json_fi
     const icons_json = std.fs.cwd().openFile(path, .{}) catch return Error.FileSystemFail;
     const str = icons_json.readToEndAlloc(plat.heap, 8 * 1024 * 1024) catch return Error.FileSystemFail;
     defer plat.heap.free(str);
-    const sheet = try loadSpriteSheetFromJsonString(str, assets_rel_dir);
+    const sheet = try loadSpriteSheetFromJsonString(json_file_name, str, assets_rel_dir);
     return sheet;
 }
 
@@ -431,10 +437,10 @@ pub fn loadCreatureSpriteSheets(self: *Data) Error!void {
     var file_it = try FileWalkerIterator("images/creature", ".json").init(plat.heap);
     defer file_it.deinit();
 
-    while (try file_it.nextFileAsOwnedString()) |str| {
-        defer plat.heap.free(str);
+    while (try file_it.next()) |s| {
+        defer plat.heap.free(s.owned_string);
 
-        const sheet = try loadSpriteSheetFromJsonString(str, "images/creature");
+        const sheet = try loadSpriteSheetFromJsonString(s.basename, s.owned_string, "images/creature");
 
         var it_dash = std.mem.tokenizeScalar(u8, sheet.name.constSlice(), '-');
         const creature_name = it_dash.next().?;
@@ -520,10 +526,10 @@ pub fn loadVFXSpriteSheets(self: *Data) Error!void {
     var file_it = try FileWalkerIterator("images/vfx", ".json").init(plat.heap);
     defer file_it.deinit();
 
-    while (try file_it.nextFileAsOwnedString()) |str| {
-        defer plat.heap.free(str);
+    while (try file_it.next()) |s| {
+        defer plat.heap.free(s.owned_string);
 
-        const sheet = try loadSpriteSheetFromJsonString(str, "images/vfx");
+        const sheet = try loadSpriteSheetFromJsonString(s.basename, s.owned_string, "images/vfx");
         const sheet_idx = self.vfx_sprite_sheets.items.len;
         try self.vfx_sprite_sheets.append(sheet);
 
