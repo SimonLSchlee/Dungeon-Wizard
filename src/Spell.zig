@@ -333,36 +333,39 @@ pub const TargetingData = struct {
                 }
                 // selected target, if any
                 if (maybe_targeted_thing) |thing| {
-                    var targeting_color = targeting_data.color;
-                    if (targeting_data.requires_los_to_thing) {
-                        if (room.tilemap.raycastLOS(caster.pos, thing.pos)) |tile_coord| {
-                            targeting_color = .red;
-                            const rect = TileMap.tileCoordToRect(tile_coord);
-                            plat.rectf(rect.pos, rect.dims, .{
-                                .fill_color = null,
-                                .outline_color = Colorf.red.fade(0.6),
-                                .outline_thickness = 3,
-                            });
+                    const range = @max(caster.pos.dist(thing.pos) - caster.coll_radius - thing.coll_radius, 0);
+                    if (range <= targeting_data.max_range) {
+                        var targeting_color = targeting_data.color;
+                        if (targeting_data.requires_los_to_thing) {
+                            if (room.tilemap.raycastLOS(caster.pos, thing.pos)) |tile_coord| {
+                                targeting_color = .red;
+                                const rect = TileMap.tileCoordToRect(tile_coord);
+                                plat.rectf(rect.pos, rect.dims, .{
+                                    .fill_color = null,
+                                    .outline_color = Colorf.red.fade(0.6),
+                                    .outline_thickness = 3,
+                                });
+                            }
                         }
-                    }
-                    if (targeting_data.radius_at_target) |r| {
-                        plat.circlef(caster.pos, r, .{ .fill_color = targeting_color.fade(0.4) });
-                    }
-                    if (targeting_data.ray_to_mouse) |ray| {
-                        const ray_radius = ray.thickness * 0.5;
-                        plat.linef(caster.pos, thing.pos, ray.thickness, targeting_color);
-                        plat.circlef(thing.pos, ray_radius, .{ .fill_color = targeting_color });
-                    }
-                    if (targeting_data.radius_at_target) |r| {
-                        plat.circlef(caster.pos, r, .{ .fill_color = targeting_color.fade(0.4) });
-                    }
-                    // we always gotta check this... things can become unselectable e.g. when dying
-                    if (thing.selectable) |s| {
-                        plat.circlef(
-                            thing.pos,
-                            s.radius,
-                            .{ .fill_color = targeting_color.fade(0.5) },
-                        );
+                        if (targeting_data.radius_at_target) |r| {
+                            plat.circlef(caster.pos, r, .{ .fill_color = targeting_color.fade(0.4) });
+                        }
+                        if (targeting_data.ray_to_mouse) |ray| {
+                            const ray_radius = ray.thickness * 0.5;
+                            plat.linef(caster.pos, thing.pos, ray.thickness, targeting_color);
+                            plat.circlef(thing.pos, ray_radius, .{ .fill_color = targeting_color });
+                        }
+                        if (targeting_data.radius_at_target) |r| {
+                            plat.circlef(caster.pos, r, .{ .fill_color = targeting_color.fade(0.4) });
+                        }
+                        // we always gotta check this... things can become unselectable e.g. when dying
+                        if (thing.selectable) |s| {
+                            plat.circlef(
+                                thing.pos,
+                                s.radius,
+                                .{ .fill_color = targeting_color.fade(0.5) },
+                            );
+                        }
                     }
                 }
             },
