@@ -120,8 +120,7 @@ pub fn unqActionSlot(cmd_buf: *ImmUI.CmdBuf, slot_rect: geom.Rectf, slot: *Slots
                             },
                         }) catch @panic("Fail to append rect cmd");
                     }
-                    // TODO mana cost circles
-                    //spell.renderManaCost(rect);
+                    spell.unqRenderManaCost(cmd_buf, rect);
                 },
                 else => {},
             }

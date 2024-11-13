@@ -54,6 +54,15 @@ pub const Command = union(enum) {
             plat.sectorf(self.pos, self.radius, self.start_ang_rads, self.end_ang_rads, self.opt);
         }
     },
+    circle: struct {
+        pos: V2f,
+        radius: f32,
+        opt: draw.PolyOpt,
+        pub fn render(self: *const @This()) Error!void {
+            const plat = getPlat();
+            plat.circlef(self.pos, self.radius, self.opt);
+        }
+    },
     label: struct {
         pos: V2f,
         text: LabelString,

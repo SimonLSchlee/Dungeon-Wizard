@@ -594,6 +594,32 @@ pub fn renderManaCost(self: *const Spell, rect: geom.Rectf) void {
     }
 }
 
+pub fn unqRenderManaCost(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, rect: geom.Rectf) void {
+    const mana_bar_padding = rect.dims.x * 0.1;
+    const mana_bar_width = rect.dims.x - mana_bar_padding * 2;
+    const mana_bar_height = rect.dims.y * 0.2;
+    const mana_topleft = rect.pos.add(v2f(mana_bar_padding, rect.dims.y - mana_bar_height - mana_bar_padding));
+    const mana_inc_px = mana_bar_width / utl.as(f32, mana_cost_max);
+    // restrict radius to keep 4 pixels around it even when only 1-2 mana
+    const mana_diam = @min(mana_inc_px * 0.8, mana_bar_height - 4);
+    const mana_radius = mana_diam * 0.5;
+    const mana_spacing = (mana_inc_px - mana_diam) * 0.666666; // this makes sense cos of reasons
+    var curr_pos = mana_topleft.add(v2f(mana_spacing + mana_radius, mana_bar_height * 0.5));
+    for (0..utl.as(usize, self.mana_cost)) |_| {
+        cmd_buf.append(.{ .circle = .{
+            .pos = curr_pos,
+            .radius = mana_radius,
+            .opt = .{
+                .fill_color = Colorf.rgb(0, 0.5, 1),
+                .outline_color = .black,
+            },
+        } }) catch {
+            @panic("Fail to append circle to cmd buf\n");
+        };
+        curr_pos.x += mana_spacing + mana_diam;
+    }
+}
+
 pub fn getRenderIconInfo(self: *const Spell) sprites.RenderIconInfo {
     const data = App.get().data;
     const kind = std.meta.activeTag(self.kind);
