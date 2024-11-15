@@ -231,8 +231,10 @@ pub const Controller = struct {
                             room.discardSpell(spell);
                         }
                         if (self.mana) |*mana| {
-                            assert(mana.curr >= spell.mana_cost);
-                            mana.curr -= spell.mana_cost;
+                            if (spell.mana_cost.getActualCost(self)) |cost| {
+                                assert(mana.curr >= cost);
+                                mana.curr -= cost;
+                            }
                             if (spell.draw_immediate) {
                                 room.ui_slots.setActionSlotCooldown(slot_idx, .spell, 0);
                             } else {

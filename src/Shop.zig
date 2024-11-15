@@ -26,6 +26,7 @@ const PackedRoom = @import("PackedRoom.zig");
 const menuUI = @import("menuUI.zig");
 const gameUI = @import("gameUI.zig");
 const Item = @import("Item.zig");
+const ImmUI = @import("ImmUI.zig");
 const Shop = @This();
 
 pub const SpellOrItem = union(enum) {
@@ -53,6 +54,9 @@ state: enum {
     shopping,
     done,
 } = .shopping,
+imm_ui: struct {
+    commands: ImmUI.CmdBuf = .{},
+} = .{},
 
 pub fn init(seed: u64) Error!Shop {
     const plat = App.getPlat();
@@ -168,13 +172,19 @@ pub fn canBuy(run: *const Run, product: *const Product) bool {
 }
 
 pub fn update(self: *Shop, run: *const Run) Error!?Product {
-    const plat = getPlat();
-    _ = plat;
+    self.imm_ui.commands.clear();
     var ret: ?Product = null;
 
     for (self.products.slice()) |*slot| {
+        try self.imm_ui.commands.append(.{ .rect = .{
+            .pos = slot.crect.rect.pos,
+            .dims = slot.crect.rect.dims,
+            .opt = .{
+                .fill_color = Colorf.rgb(0.07, 0.05, 0.05),
+            },
+        } });
         if (slot.product == null) continue;
-        const product = &slot.product.?;
+        const product: *Product = &slot.product.?;
         var hovered_rect = slot.crect.rect;
         if (slot.crect.isHovered()) {
             const new_dims = hovered_rect.dims.scale(1.1);
@@ -182,6 +192,27 @@ pub fn update(self: *Shop, run: *const Run) Error!?Product {
             hovered_rect.pos = new_pos;
             hovered_rect.dims = new_dims;
         }
+        // renderr
+        switch (product.kind) {
+            .spell => |spell| {
+                spell.unqRenderCard(&self.imm_ui.commands, hovered_rect.pos, null);
+            },
+            .item => |item| {
+                try item.unqRenderIcon(&self.imm_ui.commands, hovered_rect);
+            },
+        }
+        const price_pos = hovered_rect.pos.add(hovered_rect.dims).sub(v2f(50, 40));
+        const price_str = try u.bufPrintLocal("${}", .{product.price.gold});
+        try self.imm_ui.commands.append(.{ .label = .{
+            .pos = price_pos,
+            .text = ImmUI.Command.LabelString.initTrunc(price_str),
+            .opt = .{
+                .center = true,
+                .color = .yellow,
+                .size = 30,
+            },
+        } });
+        // buyy
         if (slot.crect.isClicked()) {
             if (canBuy(run, product)) {
                 ret = product.*;
@@ -198,62 +229,16 @@ pub fn update(self: *Shop, run: *const Run) Error!?Product {
 }
 
 pub fn render(self: *Shop, run: *Run, native_render_texture: Platform.RenderTexture2D) Error!void {
+    _ = run;
     const plat = getPlat();
 
     plat.startRenderToTexture(native_render_texture);
     plat.clear(Colorf.rgb(0.2, 0.2, 0.2));
     plat.setBlend(.render_tex_alpha);
 
+    try ImmUI.render(&self.imm_ui.commands);
+
     try plat.textf(v2f(core.native_dims_f.x * 0.5, 50), "Shoppy woppy", .{}, .{ .center = true, .color = .white, .size = 45 });
 
-    var hovered: ?SpellOrItem = null;
-    var hovered_pos: V2f = .{};
-
-    for (self.products.constSlice()) |slot| {
-        var hovered_rect = slot.crect.rect;
-        var text_sz: u32 = 40;
-        if (slot.crect.isHovered()) {
-            const new_dims = hovered_rect.dims.scale(1.1);
-            text_sz = 44;
-            const new_pos = hovered_rect.pos.sub(new_dims.sub(hovered_rect.dims).scale(0.5));
-            hovered_rect.pos = new_pos;
-            hovered_rect.dims = new_dims;
-            if (slot.product) |product| {
-                hovered = product.kind;
-                hovered_pos = hovered_rect.pos.add(v2f(hovered_rect.dims.x, 0));
-            }
-        }
-        plat.rectf(hovered_rect.pos, hovered_rect.dims, .{ .fill_color = .darkgray });
-        const hovered_square = V2f.splat(@min(hovered_rect.dims.x, hovered_rect.dims.y));
-        plat.rectf(hovered_rect.pos, hovered_square, .{ .fill_color = Colorf.rgb(0.07, 0.05, 0.05) });
-
-        if (slot.product == null) continue;
-        const product = slot.product.?;
-        const product_square = geom.Rectf{ .pos = hovered_rect.pos, .dims = hovered_square };
-        switch (product.kind) {
-            inline else => |k| {
-                try k.renderIcon(product_square);
-            },
-        }
-        if (run.mode == ._mana_mandy) {
-            switch (product.kind) {
-                .spell => |spell| {
-                    spell.renderManaCost(product_square);
-                },
-                else => {},
-            }
-        }
-        const price_pos = hovered_rect.pos.add(hovered_rect.dims).sub(v2f(50, 40));
-        try plat.textf(price_pos, "${}", .{product.price.gold}, .{ .center = true, .color = .yellow, .size = text_sz });
-    }
-
     try self.proceed_button.render();
-
-    if (hovered) |h| {
-        switch (h) {
-            inline else => |t| {
-                try t.renderToolTip(hovered_pos);
-            },
-        }
-    }
 }

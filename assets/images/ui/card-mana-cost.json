@@ -1,0 +1,138 @@
+{ "frames": [
+   {
+    "filename": "zero  0",
+    "frame": { "x": 0, "y": 0, "w": 12, "h": 13 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 12, "h": 13 },
+    "sourceSize": { "w": 12, "h": 13 },
+    "duration": 100
+   },
+   {
+    "filename": "one  0",
+    "frame": { "x": 0, "y": 13, "w": 12, "h": 13 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 12, "h": 13 },
+    "sourceSize": { "w": 12, "h": 13 },
+    "duration": 100
+   },
+   {
+    "filename": "two  0",
+    "frame": { "x": 0, "y": 26, "w": 12, "h": 13 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 12, "h": 13 },
+    "sourceSize": { "w": 12, "h": 13 },
+    "duration": 100
+   },
+   {
+    "filename": "three  0",
+    "frame": { "x": 0, "y": 39, "w": 12, "h": 13 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 12, "h": 13 },
+    "sourceSize": { "w": 12, "h": 13 },
+    "duration": 100
+   },
+   {
+    "filename": "four  0",
+    "frame": { "x": 0, "y": 52, "w": 12, "h": 13 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 12, "h": 13 },
+    "sourceSize": { "w": 12, "h": 13 },
+    "duration": 100
+   },
+   {
+    "filename": "five  0",
+    "frame": { "x": 0, "y": 65, "w": 12, "h": 13 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 12, "h": 13 },
+    "sourceSize": { "w": 12, "h": 13 },
+    "duration": 100
+   },
+   {
+    "filename": "six  0",
+    "frame": { "x": 0, "y": 78, "w": 12, "h": 13 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 12, "h": 13 },
+    "sourceSize": { "w": 12, "h": 13 },
+    "duration": 100
+   },
+   {
+    "filename": "seven  0",
+    "frame": { "x": 0, "y": 91, "w": 12, "h": 13 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 12, "h": 13 },
+    "sourceSize": { "w": 12, "h": 13 },
+    "duration": 100
+   },
+   {
+    "filename": "eight  0",
+    "frame": { "x": 0, "y": 104, "w": 12, "h": 13 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 12, "h": 13 },
+    "sourceSize": { "w": 12, "h": 13 },
+    "duration": 100
+   },
+   {
+    "filename": "nine  0",
+    "frame": { "x": 0, "y": 117, "w": 12, "h": 13 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 12, "h": 13 },
+    "sourceSize": { "w": 12, "h": 13 },
+    "duration": 100
+   },
+   {
+    "filename": "X  0",
+    "frame": { "x": 0, "y": 130, "w": 12, "h": 13 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 12, "h": 13 },
+    "sourceSize": { "w": 12, "h": 13 },
+    "duration": 100
+   },
+   {
+    "filename": "unknown  0",
+    "frame": { "x": 0, "y": 143, "w": 12, "h": 13 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 12, "h": 13 },
+    "sourceSize": { "w": 12, "h": 13 },
+    "duration": 100
+   }
+ ],
+ "meta": {
+  "app": "https://www.aseprite.org/",
+  "version": "1.3.6-arm64",
+  "image": "card-mana-cost.png",
+  "format": "RGBA8888",
+  "size": { "w": 12, "h": 156 },
+  "scale": "1",
+  "frameTags": [
+   { "name": "zero", "from": 0, "to": 0, "direction": "forward", "color": "#000000ff" },
+   { "name": "one", "from": 1, "to": 1, "direction": "forward", "color": "#000000ff" },
+   { "name": "two", "from": 2, "to": 2, "direction": "forward", "color": "#000000ff" },
+   { "name": "three", "from": 3, "to": 3, "direction": "forward", "color": "#000000ff" },
+   { "name": "four", "from": 4, "to": 4, "direction": "forward", "color": "#000000ff" },
+   { "name": "five", "from": 5, "to": 5, "direction": "forward", "color": "#000000ff" },
+   { "name": "six", "from": 6, "to": 6, "direction": "forward", "color": "#000000ff" },
+   { "name": "seven", "from": 7, "to": 7, "direction": "forward", "color": "#000000ff" },
+   { "name": "eight", "from": 8, "to": 8, "direction": "forward", "color": "#000000ff" },
+   { "name": "nine", "from": 9, "to": 9, "direction": "forward", "color": "#000000ff" },
+   { "name": "X", "from": 10, "to": 10, "direction": "forward", "color": "#000000ff" },
+   { "name": "unknown", "from": 11, "to": 11, "direction": "forward", "color": "#000000ff" }
+  ],
+  "layers": [
+   { "name": "Layer 2", "opacity": 255, "blendMode": "normal" }
+  ],
+  "slices": [
+  ]
+ }
+}

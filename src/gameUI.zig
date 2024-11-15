@@ -138,9 +138,7 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, 
                     try info.unqRenderTint(cmd_buf, rect, Colorf.rgb(0.7, 0, 0));
                 },
                 .spell => |*spell| {
-                    const red_mana = if (caster.mana) |mana| (mana.curr < spell.mana_cost) else false;
-
-                    _ = spell.unqRenderCard(cmd_buf, rect.pos, .{ .red_mana_cost = red_mana });
+                    _ = spell.unqRenderCard(cmd_buf, rect.pos, caster);
                 },
                 inline else => |inner| try inner.unqRenderIcon(cmd_buf, rect),
             },

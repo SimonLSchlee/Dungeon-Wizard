@@ -499,14 +499,23 @@ pub const ManaCost = union(enum) {
     unknown,
 
     pub fn num(n: u8) ManaCost {
+        assert(n < 10);
         return ManaCost{ .number = n };
     }
 
     pub fn getActualCost(self: ManaCost, caster: *const Thing) ?u8 {
         return switch (self) {
             .number => |n| n,
-            .X => if (caster.mana) |mana| mana.curr else 0,
+            .X => if (caster.mana) |mana| utl.as(u8, mana.curr) else 0,
             .unknown => null,
+        };
+    }
+
+    pub fn toSpriteEnum(self: ManaCost) SpriteEnum {
+        return switch (self) {
+            .number => |n| @enumFromInt(n),
+            .X => .X,
+            .unknown => .unknown,
         };
     }
 };
@@ -523,8 +532,6 @@ pub const cast_time_to_secs = std.EnumArray(CastTime, f32).init(.{
     .fast = 0.667,
 });
 
-const mana_cost_max: i32 = 5;
-
 kind: KindData = undefined,
 rarity: Rarity = .pedestrian,
 obtainableness: Obtainableness.Mask = Obtainableness.Mask.initMany(&.{ .room_reward, .shop }),
@@ -538,8 +545,7 @@ after_cast_slot_cooldown_secs: f32 = 4,
 after_cast_slot_cooldown_ticks: i32 = 4 * 60,
 mislay: bool = false,
 draw_immediate: bool = false,
-mana_cost_new: ManaCost = .{ .number = 0 },
-mana_cost: i32 = 1,
+mana_cost: ManaCost = .{ .number = 1 },
 
 pub fn getSlotCooldownTicks(self: *const Spell) i32 {
     return self.cast_ticks + self.after_cast_slot_cooldown_ticks;
@@ -567,7 +573,9 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
 
 pub fn canUse(self: *const Spell, room: *const Room, caster: *const Thing) bool {
     if (caster.mana) |mana| {
-        if (mana.curr < self.mana_cost) return false;
+        if (self.mana_cost.getActualCost(caster)) |cost| {
+            if (mana.curr < cost) return false;
+        }
     }
     switch (self.kind) {
         inline else => |k| {
@@ -624,32 +632,7 @@ pub inline fn unqRenderIcon(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, rect: ge
     return try self.getRenderIconInfo().unqRender(cmd_buf, rect);
 }
 
-pub fn renderManaCost(self: *const Spell, rect: geom.Rectf) void {
-    const plat = getPlat();
-    const mana_bar_padding = rect.dims.x * 0.1;
-    const mana_bar_width = rect.dims.x - mana_bar_padding * 2;
-    const mana_bar_height = rect.dims.y * 0.2;
-    const mana_topleft = rect.pos.add(v2f(mana_bar_padding, rect.dims.y - mana_bar_height - mana_bar_padding));
-    const mana_inc_px = mana_bar_width / utl.as(f32, mana_cost_max);
-    // restrict radius to keep 4 pixels around it even when only 1-2 mana
-    const mana_diam = @min(mana_inc_px * 0.8, mana_bar_height - 4);
-    const mana_radius = mana_diam * 0.5;
-    const mana_spacing = (mana_inc_px - mana_diam) * 0.666666; // this makes sense cos of reasons
-    var curr_pos = mana_topleft.add(v2f(mana_spacing + mana_radius, mana_bar_height * 0.5));
-    for (0..utl.as(usize, self.mana_cost)) |_| {
-        plat.circlef(curr_pos, mana_radius, .{
-            .fill_color = Colorf.rgb(0, 0.5, 1),
-            .outline_color = .black,
-        });
-        curr_pos.x += mana_spacing + mana_diam;
-    }
-}
-
-pub const RenderCardParams = struct {
-    red_mana_cost: bool = false,
-};
-
-pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, params: RenderCardParams) void {
+pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caster: ?*const Thing) void {
     const data = App.get().data;
 
     if (data.card_designs.getRenderFrame(self.card_design)) |rf| {
@@ -698,53 +681,31 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, param
             },
         } });
     }
+    //mana cost
     const mana_topleft = pos.add(card_mana_topleft_offset.scale(ui_art_scaling));
-    // TODO mana graphic
-    cmd_buf.appendAssumeCapacity(.{ .circle = .{
-        .pos = mana_topleft.add(v2f(3.5, 3.5).scale(ui_art_scaling)),
-        .radius = 3.5 * ui_art_scaling,
-        .opt = .{
-            .fill_color = Colorf.rgb(0.4, 0.1, 1),
-            .outline_color = .black,
-        },
-    } });
-    // TODO fontu
-    const mana_cost_str = utl.bufPrintLocal("{}", .{self.mana_cost}) catch "ERROR";
-    cmd_buf.appendAssumeCapacity(.{ .label = .{
-        .pos = mana_topleft.add(v2f(9 * ui_art_scaling, 0)),
-        .text = ImmUI.Command.LabelString.initTrunc(mana_cost_str),
-        .opt = .{
-            .color = if (params.red_mana_cost) .red else .white,
-            .size = 10 * ui_art_scaling,
-        },
-    } });
-    // TODO tags
-}
-
-pub fn unqRenderManaCost(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, rect: geom.Rectf) void {
-    const mana_bar_padding = rect.dims.x * 0.1;
-    const mana_bar_width = rect.dims.x - mana_bar_padding * 2;
-    const mana_bar_height = rect.dims.y * 0.2;
-    const mana_topleft = rect.pos.add(v2f(mana_bar_padding, rect.dims.y - mana_bar_height - mana_bar_padding));
-    const mana_inc_px = mana_bar_width / utl.as(f32, mana_cost_max);
-    // restrict radius to keep 4 pixels around it even when only 1-2 mana
-    const mana_diam = @min(mana_inc_px * 0.8, mana_bar_height - 4);
-    const mana_radius = mana_diam * 0.5;
-    const mana_spacing = (mana_inc_px - mana_diam) * 0.666666; // this makes sense cos of reasons
-    var curr_pos = mana_topleft.add(v2f(mana_spacing + mana_radius, mana_bar_height * 0.5));
-    for (0..utl.as(usize, self.mana_cost)) |_| {
-        cmd_buf.append(.{ .circle = .{
-            .pos = curr_pos,
-            .radius = mana_radius,
+    if (data.card_mana_cost.getRenderFrame(self.mana_cost.toSpriteEnum())) |rf| {
+        var tint = Colorf.white;
+        if (caster) |c| {
+            if (c.mana) |mana| {
+                if (self.mana_cost.getActualCost(c)) |cost| {
+                    if (cost > mana.curr) {
+                        tint = .red;
+                    }
+                }
+            }
+        }
+        cmd_buf.appendAssumeCapacity(.{ .texture = .{
+            .pos = mana_topleft.add(v2f(9 * ui_art_scaling, 0)),
+            .texture = rf.texture,
             .opt = .{
-                .fill_color = Colorf.rgb(0, 0.5, 1),
-                .outline_color = .black,
+                .src_dims = rf.size.toV2f(),
+                .src_pos = rf.pos.toV2f(),
+                .uniform_scaling = ui_art_scaling,
+                .tint = tint,
             },
-        } }) catch {
-            @panic("Fail to append circle to cmd buf\n");
-        };
-        curr_pos.x += mana_spacing + mana_diam;
+        } });
     }
+    // TODO tags
 }
 
 pub fn getRenderIconInfo(self: *const Spell) sprites.RenderIconInfo {

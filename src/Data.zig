@@ -263,7 +263,7 @@ misc_icons: EnumSpriteSheet(MiscIcon),
 spell_icons_2: EnumSpriteSheet(Spell.Kind),
 card_designs: EnumSpriteSheet(Spell.CardDesign),
 card_rarity_frames: EnumSpriteSheet(Spell.Rarity),
-card_mana_crystals: EnumSpriteSheet(Spell.ManaCost.SpriteEnum),
+card_mana_cost: EnumSpriteSheet(Spell.ManaCost.SpriteEnum),
 sounds: std.EnumArray(SFX, ?Platform.Sound),
 shaders: ShaderArr,
 // roooms
@@ -594,7 +594,7 @@ pub fn loadSpriteSheets(self: *Data) Error!void {
     self.spell_icons_2 = try @TypeOf(self.spell_icons_2).init(try loadSpriteSheetFromJsonPath("images/ui", "spell-icons.json"));
     self.card_designs = try @TypeOf(self.card_designs).init(try loadSpriteSheetFromJsonPath("images/ui", "card.json"));
     self.card_rarity_frames = try @TypeOf(self.card_rarity_frames).init(try loadSpriteSheetFromJsonPath("images/ui", "card-rarity-frame.json"));
-    self.card_mana_crystals = try @TypeOf(self.card_mana_crystals).init(try loadSpriteSheetFromJsonPath("images/ui", "card-mana-crystal.json"));
+    self.card_mana_cost = try @TypeOf(self.card_mana_cost).init(try loadSpriteSheetFromJsonPath("images/ui", "card-mana-cost.json"));
 }
 
 pub fn loadTileSetFromJsonString(tileset: *TileSet, json_string: []u8, assets_rel_path: []const u8) Error!void {
