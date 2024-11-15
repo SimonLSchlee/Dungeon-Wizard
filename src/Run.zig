@@ -381,7 +381,7 @@ pub fn pickupProduct(self: *Run, product: *const Shop.Product) void {
             // TODO ugh?
             if (self.room_exists) {
                 if (self.room.ui_slots.getNextEmptyItemSlot()) |slot| {
-                    self.room.ui_slots.items.buffer[slot.idx].kind = .{ .item = item };
+                    self.room.ui_slots.items.buffer[slot.idx].kind = .{ .action = .{ .item = item } };
                 } else {
                     unreachable;
                 }
@@ -451,7 +451,7 @@ pub fn gameUpdate(self: *Run) Error!void {
             // TODO make it betterrrs?
             self.slots_init_params.items = .{};
             for (room.ui_slots.items.constSlice()) |slot| {
-                const item: ?Item = if (slot.kind) |k| k.item else null;
+                const item: ?Item = if (slot.kind) |k| k.action.item else null;
                 self.slots_init_params.items.append(item) catch unreachable;
             }
             self.loadNextPlace();
@@ -857,21 +857,16 @@ pub fn render(self: *Run, native_render_texture: Platform.RenderTexture2D) Error
     plat.startRenderToTexture(native_render_texture);
     plat.setBlend(.render_tex_alpha);
     { // gold
-        const fill_color = Colorf.rgb(1, 0.9, 0);
-        const text_color = Colorf.rgb(0.44, 0.3, 0.0);
-        const poly_opt = .{ .fill_color = fill_color, .outline_color = text_color, .outline_thickness = 10 };
-        const center = plat.native_rect_cropped_offset.add(v2f(
-            150,
-            plat.native_rect_cropped_dims.y - 100,
+        const gold_fill_color = Colorf.rgb(1, 0.9, 0);
+        const topleft = plat.native_rect_cropped_offset.add(v2f(
+            10,
+            plat.native_rect_cropped_dims.y - 30,
         ));
-        const num = 3;
-        const lower = center.add(v2f(0, 7 * num));
-        for (0..num) |i| {
-            plat.circlef(lower.add(v2f(0, u.as(f32, i) * -7)), 55, poly_opt);
-        }
-        const gold_width = (try plat.measureText("Gold", .{ .size = 25 })).x;
-        try plat.textf(center.sub(v2f(gold_width, 0)), "Gold: {}", .{self.gold}, .{
-            .color = text_color,
+        const rect_dims = v2f(20, 60);
+        plat.rectf(topleft, rect_dims, .{ .fill_color = Colorf.black.fade(0.5) });
+        plat.circlef(topleft.add(v2f(10, 10)), 8, .{ .fill_color = gold_fill_color });
+        try plat.textf(topleft.add(v2f(16 + 4, 0)), "{}", .{self.gold}, .{
+            .color = .white,
             .size = 25,
         });
     }

@@ -450,10 +450,18 @@ pub fn rectf(_: *Platform, topleft: V2f, dims: V2f, opt: draw.PolyOpt) void {
         .height = dims.y,
     };
     if (opt.fill_color) |color| {
-        r.DrawRectangleRec(rec, cColorf(color));
+        if (opt.edge_radius > 0) {
+            r.DrawRectangleRounded(rec, opt.edge_radius, 10, cColorf(color));
+        } else {
+            r.DrawRectangleRec(rec, cColorf(color));
+        }
     }
     if (opt.outline_color) |color| {
-        r.DrawRectangleLinesEx(rec, opt.outline_thickness, cColorf(color));
+        if (opt.edge_radius > 0) {
+            r.DrawRectangleRoundedLinesEx(rec, opt.edge_radius, 10, opt.outline_thickness, cColorf(color));
+        } else {
+            r.DrawRectangleLinesEx(rec, opt.outline_thickness, cColorf(color));
+        }
     }
 }
 

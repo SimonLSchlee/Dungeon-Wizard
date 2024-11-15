@@ -169,6 +169,7 @@ pub const PolyOpt = struct {
     fill_color: ?Colorf = Colorf.black,
     outline_thickness: f32 = 1,
     outline_color: ?Colorf = null,
+    edge_radius: f32 = 0, // rectangles only
 };
 
 pub const TextureOrigin = union(enum) {

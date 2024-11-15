@@ -119,23 +119,23 @@ pub const AllCreatureAnimArrays = std.EnumArray(sprites.CreatureAnim.Kind, Creat
 pub const CreatureSpriteSheetArray = std.EnumArray(sprites.AnimName, ?SpriteSheet);
 pub const AllCreatureSpriteSheetArrays = std.EnumArray(sprites.CreatureAnim.Kind, CreatureSpriteSheetArray);
 
-fn IconSprites(EnumType: type) type {
+fn EnumSpriteSheet(EnumType: type) type {
     return struct {
-        pub const IconsFrameIndexArray = std.EnumArray(EnumType, ?i32);
+        pub const SpriteFrameIndexArray = std.EnumArray(EnumType, ?i32);
 
         sprite_sheet: SpriteSheet = undefined,
-        icon_indices: IconsFrameIndexArray = undefined,
+        sprite_indices: SpriteFrameIndexArray = undefined,
 
         pub fn init(sprite_sheet: SpriteSheet) Error!@This() {
             var ret = @This(){
                 .sprite_sheet = sprite_sheet,
-                .icon_indices = IconsFrameIndexArray.initFill(null),
+                .sprite_indices = SpriteFrameIndexArray.initFill(null),
             };
             tags: for (sprite_sheet.tags) |t| {
                 inline for (@typeInfo(EnumType).@"enum".fields) |f| {
                     if (std.mem.eql(u8, f.name, t.name.constSlice())) {
                         const kind = std.meta.stringToEnum(EnumType, f.name).?;
-                        ret.icon_indices.set(kind, t.from_frame);
+                        ret.sprite_indices.set(kind, t.from_frame);
                         continue :tags;
                     }
                 }
@@ -143,7 +143,7 @@ fn IconSprites(EnumType: type) type {
             return ret;
         }
         pub fn getRenderFrame(self: @This(), kind: EnumType) ?sprites.RenderFrame {
-            if (self.icon_indices.get(kind)) |idx| {
+            if (self.sprite_indices.get(kind)) |idx| {
                 const sheet = self.sprite_sheet;
                 const frame = sheet.frames[u.as(usize, idx)];
                 return .{
@@ -248,27 +248,30 @@ pub fn FileWalkerIterator(assets_rel_dir: []const u8, file_suffix: []const u8) t
     };
 }
 
-tilesets: std.ArrayList(TileSet) = undefined,
-tilemaps: std.ArrayList(TileMap) = undefined,
-creatures: std.EnumArray(Thing.CreatureKind, Thing) = undefined,
-creature_sprite_sheets: AllCreatureSpriteSheetArrays = undefined,
-creature_anims: AllCreatureAnimArrays = undefined,
-vfx_sprite_sheets: std.ArrayList(SpriteSheet) = undefined,
-vfx_sprite_sheet_mappings: sprites.VFXAnim.IdxMapping = undefined,
-vfx_anims: std.ArrayList(sprites.VFXAnim) = undefined,
-vfx_anim_mappings: sprites.VFXAnim.IdxMapping = undefined,
-spell_icons: IconSprites(Spell.Kind) = undefined,
-item_icons: IconSprites(Item.Kind) = undefined,
-misc_icons: IconSprites(MiscIcon) = undefined,
-sounds: std.EnumArray(SFX, ?Platform.Sound) = undefined,
-shaders: ShaderArr = undefined,
+tilesets: std.ArrayList(TileSet),
+tilemaps: std.ArrayList(TileMap),
+creatures: std.EnumArray(Thing.CreatureKind, Thing),
+creature_sprite_sheets: AllCreatureSpriteSheetArrays,
+creature_anims: AllCreatureAnimArrays,
+vfx_sprite_sheets: std.ArrayList(SpriteSheet),
+vfx_sprite_sheet_mappings: sprites.VFXAnim.IdxMapping,
+vfx_anims: std.ArrayList(sprites.VFXAnim),
+vfx_anim_mappings: sprites.VFXAnim.IdxMapping,
+spell_icons: EnumSpriteSheet(Spell.Kind),
+item_icons: EnumSpriteSheet(Item.Kind),
+misc_icons: EnumSpriteSheet(MiscIcon),
+spell_icons_2: EnumSpriteSheet(Spell.Kind),
+card_designs: EnumSpriteSheet(Spell.CardDesign),
+card_rarity_frames: EnumSpriteSheet(Spell.Rarity),
+card_mana_crystals: EnumSpriteSheet(Spell.ManaCost.SpriteEnum),
+sounds: std.EnumArray(SFX, ?Platform.Sound),
+shaders: ShaderArr,
 // roooms
-room_kind_tilemaps: std.EnumArray(RoomKind, TileMapIdxBuf) = undefined,
+room_kind_tilemaps: std.EnumArray(RoomKind, TileMapIdxBuf),
 
 pub fn init() Error!*Data {
     const plat = App.getPlat();
     const data = plat.heap.create(Data) catch @panic("Out of memory");
-    data.* = .{};
     data.vfx_anims = @TypeOf(data.vfx_anims).init(plat.heap);
     data.vfx_sprite_sheets = @TypeOf(data.vfx_sprite_sheets).init(plat.heap);
     data.tilesets = @TypeOf(data.tilesets).init(plat.heap);
@@ -418,7 +421,7 @@ pub fn loadSpriteSheetFromJsonString(sheet_filename: []const u8, json_string: []
     return sheet;
 }
 
-pub fn loadSpriteSheetFromJsonPath(_: *Data, assets_rel_dir: []const u8, json_file_name: []const u8) Error!SpriteSheet {
+pub fn loadSpriteSheetFromJsonPath(assets_rel_dir: []const u8, json_file_name: []const u8) Error!SpriteSheet {
     const plat = App.getPlat();
     const path = try u.bufPrintLocal("{s}/{s}/{s}", .{ plat.assets_path, assets_rel_dir, json_file_name });
     const icons_json = std.fs.cwd().openFile(path, .{}) catch return Error.FileSystemFail;
@@ -585,9 +588,13 @@ pub fn loadVFXSpriteSheets(self: *Data) Error!void {
 pub fn loadSpriteSheets(self: *Data) Error!void {
     try self.loadCreatureSpriteSheets();
     try self.loadVFXSpriteSheets();
-    self.item_icons = try @TypeOf(self.item_icons).init(try self.loadSpriteSheetFromJsonPath("images/ui", "item_icons.json"));
-    self.spell_icons = try @TypeOf(self.spell_icons).init(try self.loadSpriteSheetFromJsonPath("images/ui", "spell_icons.json"));
-    self.misc_icons = try @TypeOf(self.misc_icons).init(try self.loadSpriteSheetFromJsonPath("images/ui", "misc_icons.json"));
+    self.item_icons = try @TypeOf(self.item_icons).init(try loadSpriteSheetFromJsonPath("images/ui", "item_icons.json"));
+    self.spell_icons = try @TypeOf(self.spell_icons).init(try loadSpriteSheetFromJsonPath("images/ui", "spell_icons.json"));
+    self.misc_icons = try @TypeOf(self.misc_icons).init(try loadSpriteSheetFromJsonPath("images/ui", "misc_icons.json"));
+    self.spell_icons_2 = try @TypeOf(self.spell_icons_2).init(try loadSpriteSheetFromJsonPath("images/ui", "spell-icons.json"));
+    self.card_designs = try @TypeOf(self.card_designs).init(try loadSpriteSheetFromJsonPath("images/ui", "card.json"));
+    self.card_rarity_frames = try @TypeOf(self.card_rarity_frames).init(try loadSpriteSheetFromJsonPath("images/ui", "card-rarity-frame.json"));
+    self.card_mana_crystals = try @TypeOf(self.card_mana_crystals).init(try loadSpriteSheetFromJsonPath("images/ui", "card-mana-crystal.json"));
 }
 
 pub fn loadTileSetFromJsonString(tileset: *TileSet, json_string: []u8, assets_rel_path: []const u8) Error!void {

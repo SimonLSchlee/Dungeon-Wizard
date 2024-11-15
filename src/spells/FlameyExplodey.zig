@@ -59,11 +59,11 @@ pub const proto = Spell.makeProto(
 );
 
 explode_hit_effect: Thing.HitEffect = .{
-    .damage = 10,
+    .damage = 14,
     .status_stacks = StatusEffect.StacksArray.initDefault(0, .{ .lit = 1 }),
 },
 ball_hit_effect: Thing.HitEffect = .{
-    .damage = 7,
+    .damage = 0,
 },
 ball_radius: f32 = base_ball_radius,
 explode_radius: f32 = base_explode_radius,

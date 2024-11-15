@@ -423,10 +423,6 @@ pub fn update(self: *Room) Error!void {
             //std.debug.print("spawn sheep at {d:0.2}, {d:0.2}\n", .{ pos.x, pos.y });
             _ = try self.queueSpawnCreatureByKind(.troll, pos);
         }
-    } else {
-        if (plat.input_buffer.keyIsJustPressed(.space)) {
-            self.paused = !self.paused;
-        }
     }
     for (self.spawn_queue.constSlice()) |id| {
         const t = self.getThingById(id);
@@ -614,13 +610,14 @@ pub fn render(self: *const Room, native_render_texture: Platform.RenderTexture2D
         try self.ui_slots.render(self);
     }
 
-    { // bottom screen msg and ui slots
-        const opt: draw.TextOpt = .{ .center = true, .size = 30, .color = .white };
-        const txt = if (self.edit_mode) "edit mode" else if (self.paused) "[paused]" else "<spacebar to pause>";
-        const dims = (try plat.measureText(txt, opt)).add(v2f(10, 4));
+    // edit mode msg
+    if (self.edit_mode) {
+        const text_opt: draw.TextOpt = .{ .center = true, .size = 30, .color = .white };
+        const txt = "edit mode";
+        const dims = (try plat.measureText(txt, text_opt)).add(v2f(10, 4));
         const p: V2f = plat.native_rect_cropped_offset.add(v2f(plat.native_rect_cropped_dims.x * 0.5, plat.native_rect_cropped_dims.y - 35));
         plat.rectf(p.sub(dims.scale(0.5)), dims, .{ .fill_color = Colorf.black.fade(0.5) });
-        try plat.textf(p, "{s}", .{txt}, opt);
+        try plat.textf(p, "{s}", .{txt}, text_opt);
     }
 
     if (debug.show_num_enemies) {

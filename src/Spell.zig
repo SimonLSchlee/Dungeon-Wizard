@@ -32,6 +32,16 @@ const Spell = @This();
 pub const Pool = pool.BoundedPool(Spell, 32);
 pub const Id = pool.Id;
 
+pub const ui_art_scaling: f32 = 3;
+// no scaling applied
+pub const card_dims = v2f(45, 63);
+pub const card_art_frame_topleft_offset = v2f(7, 9);
+pub const card_art_frame_dims = v2f(31, 31);
+pub const card_mana_topleft_offset = v2f(28, 2);
+pub const card_tags_topleft_offset = v2f(3, 41);
+pub const card_tags_dims = v2f(39, 17);
+pub const card_tag_icon_dims = v2f(6, 6);
+
 var desc_buf: [2048]u8 = undefined;
 
 pub const SpellTypes = [_]type{
@@ -462,6 +472,45 @@ pub const Obtainableness = enum {
     shop,
 };
 
+pub const CardDesign = enum {
+    magic,
+    water,
+    fire,
+    lightning,
+};
+
+pub const ManaCost = union(enum) {
+    pub const SpriteEnum = enum {
+        zero,
+        one,
+        two,
+        three,
+        four,
+        five,
+        six,
+        seven,
+        eight,
+        nine,
+        X,
+        unknown,
+    };
+    number: u8,
+    X,
+    unknown,
+
+    pub fn num(n: u8) ManaCost {
+        return ManaCost{ .number = n };
+    }
+
+    pub fn getActualCost(self: ManaCost, caster: *const Thing) ?u8 {
+        return switch (self) {
+            .number => |n| n,
+            .X => if (caster.mana) |mana| mana.curr else 0,
+            .unknown => null,
+        };
+    }
+};
+
 pub const CastTime = enum {
     slow,
     medium,
@@ -480,6 +529,7 @@ kind: KindData = undefined,
 rarity: Rarity = .pedestrian,
 obtainableness: Obtainableness.Mask = Obtainableness.Mask.initMany(&.{ .room_reward, .shop }),
 color: Colorf = .black,
+card_design: CardDesign = .magic,
 targeting_data: TargetingData = .{},
 cast_time: CastTime,
 cast_secs: f32 = 1, // time from spell starting to when it's cast() is called - caster can't move or do anything except buffer inputs
@@ -488,7 +538,8 @@ after_cast_slot_cooldown_secs: f32 = 4,
 after_cast_slot_cooldown_ticks: i32 = 4 * 60,
 mislay: bool = false,
 draw_immediate: bool = false,
-mana_cost: i32 = 1, // only applies to Things that have mana!
+mana_cost_new: ManaCost = .{ .number = 0 },
+mana_cost: i32 = 1,
 
 pub fn getSlotCooldownTicks(self: *const Spell) i32 {
     return self.cast_ticks + self.after_cast_slot_cooldown_ticks;
@@ -592,6 +643,82 @@ pub fn renderManaCost(self: *const Spell, rect: geom.Rectf) void {
         });
         curr_pos.x += mana_spacing + mana_diam;
     }
+}
+
+pub const RenderCardParams = struct {
+    red_mana_cost: bool = false,
+};
+
+pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, params: RenderCardParams) void {
+    const data = App.get().data;
+
+    if (data.card_designs.getRenderFrame(self.card_design)) |rf| {
+        cmd_buf.appendAssumeCapacity(.{ .texture = .{
+            .pos = pos,
+            .texture = rf.texture,
+            .opt = .{
+                .src_dims = rf.size.toV2f(),
+                .src_pos = rf.pos.toV2f(),
+                .uniform_scaling = ui_art_scaling,
+            },
+        } });
+    } else {
+        cmd_buf.appendAssumeCapacity(.{ .rect = .{
+            .pos = pos,
+            .dims = card_dims,
+            .opt = .{
+                .fill_color = self.color,
+                .outline_color = .black,
+            },
+        } });
+    }
+    // art and rarity frame
+    const frame_topleft = pos.add(card_art_frame_topleft_offset.scale(ui_art_scaling));
+    const rii: sprites.RenderIconInfo = blk: {
+        const kind = std.meta.activeTag(self.kind);
+        if (data.spell_icons_2.getRenderFrame(kind)) |render_frame| {
+            break :blk .{ .frame = render_frame };
+        } else {
+            const name = spell_names.get(kind);
+            break :blk .{ .letter = .{
+                .str = [1]u8{std.ascii.toUpper(name[0])},
+                .color = self.color,
+            } };
+        }
+    };
+    rii.unqRender(cmd_buf, .{ .pos = frame_topleft, .dims = card_art_frame_dims.scale(ui_art_scaling) }) catch @panic("failed renderino");
+    if (data.card_rarity_frames.getRenderFrame(self.rarity)) |rf| {
+        cmd_buf.appendAssumeCapacity(.{ .texture = .{
+            .pos = frame_topleft,
+            .texture = rf.texture,
+            .opt = .{
+                .src_dims = rf.size.toV2f(),
+                .src_pos = rf.pos.toV2f(),
+                .uniform_scaling = ui_art_scaling,
+            },
+        } });
+    }
+    const mana_topleft = pos.add(card_mana_topleft_offset.scale(ui_art_scaling));
+    // TODO mana graphic
+    cmd_buf.appendAssumeCapacity(.{ .circle = .{
+        .pos = mana_topleft.add(v2f(3.5, 3.5).scale(ui_art_scaling)),
+        .radius = 3.5 * ui_art_scaling,
+        .opt = .{
+            .fill_color = Colorf.rgb(0.4, 0.1, 1),
+            .outline_color = .black,
+        },
+    } });
+    // TODO fontu
+    const mana_cost_str = utl.bufPrintLocal("{}", .{self.mana_cost}) catch "ERROR";
+    cmd_buf.appendAssumeCapacity(.{ .label = .{
+        .pos = mana_topleft.add(v2f(9 * ui_art_scaling, 0)),
+        .text = ImmUI.Command.LabelString.initTrunc(mana_cost_str),
+        .opt = .{
+            .color = if (params.red_mana_cost) .red else .white,
+            .size = 10 * ui_art_scaling,
+        },
+    } });
+    // TODO tags
 }
 
 pub fn unqRenderManaCost(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, rect: geom.Rectf) void {

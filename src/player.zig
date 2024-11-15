@@ -91,7 +91,7 @@ pub const Input = struct {
         // TODO when no cards are playable?
         if (self.mana) |*mana| {
             if (mana.curr == 0 and controller.action_buffered == null) {
-                ui_slots.selectSlot(.discard, .quick_release, 0);
+                ui_slots.selectSlot(.action, .discard, .quick_release, 0);
             }
         }
 
@@ -112,8 +112,10 @@ pub const Input = struct {
             _ = input.move_release_ui_timer.tick(false);
         }
 
-        if (ui_slots.getSelectedSlot()) |slot| {
+        if (ui_slots.getSelectedActionSlot()) |slot| {
             assert(slot.kind != null);
+            assert(std.meta.activeTag(slot.kind.?) == .action);
+            const action = slot.kind.?.action;
             const cast_method = ui_slots.selected_method;
             const do_cast = switch (cast_method) {
                 .left_click => !room.ui_clicked and plat.input_buffer.mouseBtnIsJustPressed(.left),
@@ -121,21 +123,21 @@ pub const Input = struct {
                 .quick_release => !plat.input_buffer.keyIsDown(slot.key),
             };
             if (do_cast) {
-                const _params: ?Spell.Params = switch (slot.kind.?) {
-                    inline else => |action| if (std.meta.hasMethod(@TypeOf(action), "getTargetParams"))
-                        action.getTargetParams(room, self, mouse_pos)
+                const _params: ?Spell.Params = switch (action) {
+                    inline else => |a| if (std.meta.hasMethod(@TypeOf(a), "getTargetParams"))
+                        a.getTargetParams(room, self, mouse_pos)
                     else
                         null,
                 };
                 if (_params) |params| {
                     self.path.len = 0; // cancel the current path on cast, but you can buffer a new one
                     controller.action_buffered = Action.Buffered{
-                        .action = slot.kind.?,
+                        .action = action,
                         .params = params,
                         .slot_idx = utl.as(i32, slot.idx),
                     };
                     ui_slots.changeSelectedSlotToBuffered();
-                } else if (slot.kind.? == .discard) {
+                } else if (action == .discard) {
                     controller.action_buffered = Action.Buffered{
                         .action = .{ .discard = .{} },
                         .slot_idx = 0,
@@ -155,16 +157,24 @@ pub const Input = struct {
         const ui_slots = &room.ui_slots;
         const controller = &self.controller.player;
 
-        if (ui_slots.getSelectedSlot()) |slot| {
-            switch (slot.kind.?) {
-                inline else => |k| if (std.meta.hasMethod(@TypeOf(k), "renderTargeting")) try k.renderTargeting(room, self, null),
-            }
-        } else {
-            const maybe_buffered: ?Action.Buffered = if (controller.action_buffered) |b| b else if (controller.action_casting) |a| a else null;
-            if (maybe_buffered) |buffered| {
-                switch (buffered.action) {
-                    inline else => |k| if (std.meta.hasMethod(@TypeOf(k), "renderTargeting")) try k.renderTargeting(room, self, buffered.params),
+        const targeting: ?struct { action: Action.KindData, params: ?Spell.Params } = blk: {
+            if (ui_slots.getSelectedActionSlot()) |slot| {
+                break :blk .{ .action = slot.kind.?.action, .params = null };
+            } else {
+                const maybe_buffered: ?Action.Buffered = if (controller.action_buffered) |b| b else if (controller.action_casting) |a| a else null;
+                if (maybe_buffered) |buffered| {
+                    break :blk .{ .action = buffered.action, .params = buffered.params };
                 }
+            }
+            break :blk null;
+        };
+        if (targeting) |t| {
+            switch (t.action) {
+                inline else => |action| {
+                    if (std.meta.hasMethod(@TypeOf(action), "renderTargeting")) {
+                        try action.renderTargeting(room, self, t.params);
+                    }
+                },
             }
         }
 
@@ -214,7 +224,7 @@ pub const Controller = struct {
 
                 switch (buffered.action) {
                     .spell => |spell| {
-                        room.ui_slots.clearSlotByKind(slot_idx, .spell);
+                        room.ui_slots.clearSlotByActionKind(slot_idx, .spell);
                         if (spell.mislay) {
                             room.mislaySpell(spell);
                         } else {
@@ -224,17 +234,17 @@ pub const Controller = struct {
                             assert(mana.curr >= spell.mana_cost);
                             mana.curr -= spell.mana_cost;
                             if (spell.draw_immediate) {
-                                room.ui_slots.setSlotCooldown(slot_idx, .spell, 0);
+                                room.ui_slots.setActionSlotCooldown(slot_idx, .spell, 0);
                             } else {
-                                room.ui_slots.setSlotCooldown(slot_idx, .spell, null);
+                                room.ui_slots.setActionSlotCooldown(slot_idx, .spell, null);
                             }
                         } else {
-                            room.ui_slots.setSlotCooldown(slot_idx, .spell, spell.getSlotCooldownTicks());
+                            room.ui_slots.setActionSlotCooldown(slot_idx, .spell, spell.getSlotCooldownTicks());
                         }
                         controller.cast_counter = utl.TickCounter.init(spell.cast_ticks);
                     },
                     .item => {
-                        room.ui_slots.clearSlotByKind(slot_idx, .item);
+                        room.ui_slots.clearSlotByActionKind(slot_idx, .item);
                     },
                     else => {},
                 }
@@ -317,15 +327,15 @@ pub const Controller = struct {
                                     const per_mana_secs = max_extra_mana_cooldown_secs / utl.as(f32, mana.max);
                                     const num_secs: f32 = 0.66 + per_mana_secs * utl.as(f32, mana.curr);
                                     const num_ticks = core.secsToTicks(num_secs);
-                                    for (ui_slots.getSlotsByKindConst(.spell)) |*slot| {
+                                    for (ui_slots.getSlotsByActionKindConst(.spell)) |*slot| {
                                         if (slot.kind) |k| {
-                                            const spell = k.spell;
+                                            const spell = k.action.spell;
                                             room.discardSpell(spell);
                                         }
-                                        ui_slots.clearSlotByKind(slot.idx, .spell);
-                                        ui_slots.setSlotCooldown(slot.idx, .spell, num_ticks);
+                                        ui_slots.clearSlotByActionKind(slot.idx, .spell);
+                                        ui_slots.setActionSlotCooldown(slot.idx, .spell, num_ticks);
                                     }
-                                    ui_slots.setSlotCooldown(0, .discard, num_ticks);
+                                    ui_slots.setActionSlotCooldown(0, .discard, num_ticks);
                                     ui_slots.unselectSlot();
                                     mana.curr = mana.max;
                                 }
