@@ -27,7 +27,7 @@ const TargetKind = Spell.TargetKind;
 const TargetingData = Spell.TargetingData;
 const Params = Spell.Params;
 
-pub const title = "Frost Vomit";
+pub const title = "Frost Vom";
 
 pub const enum_name = "frost_vom";
 pub const Controllers = [_]type{Projectile};

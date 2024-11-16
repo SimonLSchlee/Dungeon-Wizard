@@ -28,7 +28,7 @@ const TargetKind = Spell.TargetKind;
 const TargetingData = Spell.TargetingData;
 const Params = Spell.Params;
 
-pub const title = "Flamey Explodey";
+pub const title = "Fire Boom";
 
 pub const enum_name = "flamey_explodey";
 pub const Controllers = [_]type{Projectile};

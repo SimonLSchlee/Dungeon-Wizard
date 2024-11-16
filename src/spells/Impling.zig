@@ -27,7 +27,7 @@ const TargetKind = Spell.TargetKind;
 const TargetingData = Spell.TargetingData;
 const Params = Spell.Params;
 
-pub const title = "Invite Impling";
+pub const title = "Impling";
 
 pub const enum_name = "impling";
 pub const Controllers = [_]type{};

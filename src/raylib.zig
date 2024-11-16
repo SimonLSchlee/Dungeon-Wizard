@@ -650,7 +650,11 @@ pub fn texturef(_: *Platform, pos: V2f, tex: Texture2D, opt: draw.TextureOpt) vo
         .offset => |o| o.scale(opt.uniform_scaling),
     };
     const r_filter = switch (opt.smoothing) {
-        .none => r.TEXTURE_FILTER_POINT,
+        .none => blk: {
+            dest.x = @floor(dest.x);
+            dest.y = @floor(dest.y);
+            break :blk r.TEXTURE_FILTER_POINT;
+        },
         .bilinear => r.TEXTURE_FILTER_BILINEAR,
     };
     r.SetTextureFilter(tex.r_tex, r_filter);
