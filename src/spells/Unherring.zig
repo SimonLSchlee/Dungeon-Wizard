@@ -26,7 +26,7 @@ const TargetKind = Spell.TargetKind;
 const TargetingData = Spell.TargetingData;
 const Params = Spell.Params;
 
-pub const title = "Unherring Missile";
+pub const title = "Unherring";
 
 pub const enum_name = "unherring";
 pub const Controllers = [_]type{Projectile};

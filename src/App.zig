@@ -133,6 +133,7 @@ pub fn menuButton(cmd_buf: *ImmUI.CmdBuf, pos: V2f, str: []const u8, dims: V2f) 
             },
         },
     }) catch @panic("Fail to append rect cmd");
+    const font = App.get().data.fonts.get(.pixeloid);
     cmd_buf.append(.{
         .label = .{
             .pos = pos.add(dims.scale(0.5)),
@@ -140,7 +141,9 @@ pub fn menuButton(cmd_buf: *ImmUI.CmdBuf, pos: V2f, str: []const u8, dims: V2f) 
             .opt = .{
                 .center = true,
                 .color = .black,
-                .size = 20,
+                .size = font.base_size * 2,
+                .font = font,
+                .smoothing = .none,
             },
         },
     }) catch @panic("Fail to append text cmd");

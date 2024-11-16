@@ -83,16 +83,16 @@ pub const SpriteSheet = struct {
         duration_ms: i64,
     };
     pub const Tag = struct {
-        name: u.BoundedString(16),
+        name: u.BoundedString(32),
         from_frame: i32,
         to_frame: i32,
     };
     pub const Meta = struct {
-        name: u.BoundedString(16) = .{},
+        name: u.BoundedString(32) = .{},
         data: union(enum) {
             int: i64,
             float: f32,
-            string: u.BoundedString(16),
+            string: u.BoundedString(32),
         } = undefined,
 
         pub fn asf32(self: @This()) Error!f32 {
@@ -180,6 +180,7 @@ pub const ShaderArr = std.EnumArray(ShaderName, Platform.Shader);
 
 pub const FontName = enum {
     alagard,
+    pixeloid,
 };
 pub const FontArr = std.EnumArray(FontName, Platform.Font);
 
@@ -266,8 +267,7 @@ spell_icons: EnumSpriteSheet(Spell.Kind),
 item_icons: EnumSpriteSheet(Item.Kind),
 misc_icons: EnumSpriteSheet(MiscIcon),
 spell_icons_2: EnumSpriteSheet(Spell.Kind),
-card_designs: EnumSpriteSheet(Spell.CardDesign),
-card_rarity_frames: EnumSpriteSheet(Spell.Rarity),
+card_sprites: EnumSpriteSheet(Spell.CardSpriteEnum),
 card_mana_cost: EnumSpriteSheet(Spell.ManaCost.SpriteEnum),
 sounds: std.EnumArray(SFX, ?Platform.Sound),
 shaders: ShaderArr,
@@ -598,8 +598,7 @@ pub fn loadSpriteSheets(self: *Data) Error!void {
     self.spell_icons = try @TypeOf(self.spell_icons).init(try loadSpriteSheetFromJsonPath("images/ui", "spell_icons.json"));
     self.misc_icons = try @TypeOf(self.misc_icons).init(try loadSpriteSheetFromJsonPath("images/ui", "misc_icons.json"));
     self.spell_icons_2 = try @TypeOf(self.spell_icons_2).init(try loadSpriteSheetFromJsonPath("images/ui", "spell-icons.json"));
-    self.card_designs = try @TypeOf(self.card_designs).init(try loadSpriteSheetFromJsonPath("images/ui", "card.json"));
-    self.card_rarity_frames = try @TypeOf(self.card_rarity_frames).init(try loadSpriteSheetFromJsonPath("images/ui", "card-rarity-frame.json"));
+    self.card_sprites = try @TypeOf(self.card_sprites).init(try loadSpriteSheetFromJsonPath("images/ui", "card.json"));
     self.card_mana_cost = try @TypeOf(self.card_mana_cost).init(try loadSpriteSheetFromJsonPath("images/ui", "card-mana-cost.json"));
 }
 
@@ -893,7 +892,8 @@ pub fn loadFonts(self: *Data) Error!void {
     const plat = App.getPlat();
     // TODO deinit?
 
-    self.fonts.getPtr(.alagard).* = try plat.loadPixelFont("alagard.png");
+    self.fonts.getPtr(.alagard).* = try plat.loadPixelFont("alagard.png", 16);
+    self.fonts.getPtr(.pixeloid).* = try plat.loadPixelFont("PixeloidSans.ttf", 11);
 }
 
 pub fn reload(self: *Data) Error!void {

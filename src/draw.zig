@@ -164,6 +164,10 @@ pub const TextOpt = struct {
     color: Colorf = Colorf.black,
     center: bool = false,
     smoothing: Smoothing = .bilinear,
+    border: ?struct {
+        color: Colorf,
+        dist: f32,
+    } = null,
 };
 
 pub const PolyOpt = struct {

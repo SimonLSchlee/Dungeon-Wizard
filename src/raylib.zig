@@ -27,6 +27,7 @@ const str_fmt_buf_size = 4096;
 
 pub const Font = struct {
     name: []const u8,
+    base_size: u32,
     r_font: r.Font,
 };
 
@@ -427,6 +428,24 @@ pub fn textf(self: *Platform, pos: V2f, comptime fmt: []const u8, args: anytype,
         .bilinear => r.TEXTURE_FILTER_BILINEAR,
     };
     r.SetTextureFilter(font.r_font.texture, r_filter);
+    // outline
+    if (opt.border) |border| {
+        const offsets = [_]V2f{ v2f(0, 1), v2f(1, 0), v2f(0, -1), v2f(-1, 0) };
+        for (offsets) |offset| {
+            const p = r.Vector2{
+                .x = draw_pos.x + offset.x * border.dist,
+                .y = draw_pos.y + offset.y * border.dist,
+            };
+            r.DrawTextEx(
+                font.r_font,
+                text_z,
+                p,
+                font_size_f,
+                0,
+                cColorf(border.color),
+            );
+        }
+    }
     r.DrawTextEx(
         font.r_font,
         text_z,
@@ -541,18 +560,20 @@ pub fn loadFont(self: *Platform, path: []const u8) Error!Font {
     r.GenTextureMipmaps(&r_font.texture);
     const ret: Font = .{
         .name = path,
+        .base_size = u.as(u32, r_font.baseSize),
         .r_font = r_font,
     };
     return ret;
 }
 
-pub fn loadPixelFont(self: *Platform, path: []const u8) Error!Font {
+pub fn loadPixelFont(self: *Platform, path: []const u8, sz: u32) Error!Font {
     @setRuntimeSafety(core.rt_safe_blocks);
     const path_z = try std.fmt.bufPrintZ(self.str_fmt_buf, "{s}/fonts/{s}", .{ self.assets_path, path });
-    var r_font = r.LoadFont(path_z);
+    var r_font = r.LoadFontEx(path_z, u.as(c_int, sz), 0, 250);
     r.GenTextureMipmaps(&r_font.texture);
     const ret: Font = .{
         .name = path,
+        .base_size = u.as(u32, r_font.baseSize),
         .r_font = r_font,
     };
     return ret;

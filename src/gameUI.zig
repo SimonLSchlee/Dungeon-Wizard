@@ -108,16 +108,18 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, 
             }
 
             // border
-            cmd_buf.appendAssumeCapacity(.{ .rect = .{
-                .pos = rect.pos.sub(v2f(0.25, 0.5)),
-                .dims = rect.dims.add(v2f(0.5, 1)),
-                .opt = .{
-                    .fill_color = null,
-                    .outline_color = border_color,
-                    .outline_thickness = 4,
-                    .edge_radius = 0.12,
-                },
-            } });
+            if (slot.selection_kind != null) {
+                cmd_buf.appendAssumeCapacity(.{ .rect = .{
+                    .pos = rect.pos.sub(v2f(0.25, 0.5)),
+                    .dims = rect.dims.add(v2f(0.5, 1)),
+                    .opt = .{
+                        .fill_color = null,
+                        .outline_color = border_color,
+                        .outline_thickness = 4,
+                        .edge_radius = 0.12,
+                    },
+                } });
+            }
         }
 
         // card/icon
@@ -161,13 +163,29 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, 
     }
 
     // hotkey
-    cmd_buf.append(.{ .label = .{
-        .pos = rect.pos.add(v2f(1, 1)),
-        .text = ImmUI.Command.LabelString.initTrunc(slot.key_str.constSlice()),
+    const data = App.get().data;
+    const font = data.fonts.get(.pixeloid);
+    const key_text_opt = draw.TextOpt{
+        .color = key_color,
+        .size = font.base_size * utl.as(u32, ui_scaling),
+        .font = font,
+        .smoothing = .none,
+    };
+    const key_str = slot.key_str.constSlice();
+    const str_sz = try plat.measureText(key_str, key_text_opt);
+    const key_rect_pos = rect.pos.add(V2f.splat(-str_sz.y * 0.25).scale(ui_scaling));
+    cmd_buf.append(.{ .rect = .{
+        .pos = key_rect_pos,
+        .dims = str_sz.add(V2f.splat(4).scale(ui_scaling)),
         .opt = .{
-            .color = key_color,
-            .size = 20,
+            .fill_color = Colorf.black.fade(0.7),
+            .edge_radius = 0.25,
         },
+    } }) catch @panic("Fail to append label cmd");
+    cmd_buf.append(.{ .label = .{
+        .pos = key_rect_pos.add(v2f(2, 2).scale(ui_scaling)),
+        .text = ImmUI.Command.LabelString.initTrunc(key_str),
+        .opt = key_text_opt,
     } }) catch @panic("Fail to append label cmd");
 
     return ret;

@@ -33,14 +33,14 @@ pub const Pool = pool.BoundedPool(Spell, 32);
 pub const Id = pool.Id;
 
 // no scaling applied
-pub const card_dims = v2f(51, 71);
-pub const card_art_frame_topleft_offset = v2f(4, 14);
-pub const card_art_frame_dims = v2f(43, 32);
-pub const card_mana_topleft_offset = v2f(42, -3);
-pub const card_tags_topleft_offset = v2f(6, 48);
-pub const card_tags_dims = v2f(39, 17);
-pub const card_tag_icon_dims = v2f(6, 6);
-pub const card_title_center_offset = v2f(25, 9);
+pub const card_dims = v2f(71, 99);
+pub const card_art_topleft_offset = v2f(3, 3);
+pub const card_art_dims = v2f(65, 46);
+pub const card_mana_topleft_offset = v2f(58, 1);
+pub const card_tags_topleft_offset = v2f(5, 65);
+pub const card_tags_dims = v2f(61, 29);
+pub const card_tag_icon_dims = v2f(7, 7);
+pub const card_title_center_offset = v2f(36, 56);
 
 var desc_buf: [2048]u8 = undefined;
 
@@ -108,6 +108,23 @@ pub fn getProto(kind: Kind) Spell {
         },
     }
 }
+
+pub const CardSpriteEnum = enum {
+    card_base,
+    rarity_pedestrian,
+    rarity_interesting,
+    rarity_exceptional,
+    rarity_brilliant,
+
+    pub fn fromRarity(r: Rarity) CardSpriteEnum {
+        return switch (r) {
+            .pedestrian => .rarity_pedestrian,
+            .interesting => .rarity_interesting,
+            .exceptional => .rarity_exceptional,
+            .brilliant => .rarity_brilliant,
+        };
+    }
+};
 
 pub const Rarity = enum {
     pedestrian,
@@ -472,13 +489,6 @@ pub const Obtainableness = enum {
     shop,
 };
 
-pub const CardDesign = enum {
-    magic,
-    water,
-    fire,
-    lightning,
-};
-
 pub const ManaCost = union(enum) {
     pub const SpriteEnum = enum {
         zero,
@@ -537,7 +547,6 @@ kind: KindData = undefined,
 rarity: Rarity = .pedestrian,
 obtainableness: Obtainableness.Mask = Obtainableness.Mask.initMany(&.{ .room_reward, .shop }),
 color: Colorf = .black,
-card_design: CardDesign = .magic,
 targeting_data: TargetingData = .{},
 cast_time: CastTime,
 cast_secs: f32 = 1, // time from spell starting to when it's cast() is called - caster can't move or do anything except buffer inputs
@@ -641,7 +650,7 @@ pub fn getName(self: *const Spell) []const u8 {
 pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caster: ?*const Thing, scaling: f32) void {
     const data = App.get().data;
 
-    if (data.card_designs.getRenderFrame(self.card_design)) |rf| {
+    if (data.card_sprites.getRenderFrame(.card_base)) |rf| {
         cmd_buf.appendAssumeCapacity(.{ .texture = .{
             .pos = pos,
             .texture = rf.texture,
@@ -651,31 +660,9 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caste
                 .uniform_scaling = scaling,
             },
         } });
-    } else {
-        cmd_buf.appendAssumeCapacity(.{ .rect = .{
-            .pos = pos,
-            .dims = card_dims,
-            .opt = .{
-                .fill_color = self.color,
-                .outline_color = .black,
-            },
-        } });
     }
-    // title
-    const title_center_pos = pos.add(card_title_center_offset.scale(scaling));
-    cmd_buf.appendAssumeCapacity(.{ .label = .{
-        .pos = title_center_pos,
-        .text = ImmUI.Command.LabelString.initTrunc(self.getName()),
-        .opt = .{
-            .color = .black,
-            .size = 16 * utl.as(u32, scaling - 1),
-            .center = true,
-            .font = data.fonts.get(.alagard),
-            .smoothing = .none,
-        },
-    } });
     // art and rarity frame
-    const frame_topleft = pos.add(card_art_frame_topleft_offset.scale(scaling));
+    const art_topleft = pos.add(card_art_topleft_offset.scale(scaling));
     const rii: sprites.RenderIconInfo = blk: {
         const kind = std.meta.activeTag(self.kind);
         if (data.spell_icons_2.getRenderFrame(kind)) |render_frame| {
@@ -688,10 +675,10 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caste
             } };
         }
     };
-    rii.unqRender(cmd_buf, .{ .pos = frame_topleft, .dims = card_art_frame_dims.scale(scaling) }) catch @panic("failed renderino");
-    if (data.card_rarity_frames.getRenderFrame(self.rarity)) |rf| {
+    rii.unqRender(cmd_buf, .{ .pos = art_topleft, .dims = card_art_dims.scale(scaling) }) catch @panic("failed renderino");
+    if (data.card_sprites.getRenderFrame(CardSpriteEnum.fromRarity(self.rarity))) |rf| {
         cmd_buf.appendAssumeCapacity(.{ .texture = .{
-            .pos = frame_topleft,
+            .pos = pos,
             .texture = rf.texture,
             .opt = .{
                 .src_dims = rf.size.toV2f(),
@@ -700,6 +687,24 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caste
             },
         } });
     }
+    // title
+    const title_center_pos = pos.add(card_title_center_offset.scale(scaling));
+    const title_font = data.fonts.get(.pixeloid);
+    cmd_buf.appendAssumeCapacity(.{ .label = .{
+        .pos = title_center_pos,
+        .text = ImmUI.Command.LabelString.initTrunc(self.getName()),
+        .opt = .{
+            .color = .white,
+            .size = title_font.base_size * utl.as(u32, scaling),
+            .center = true,
+            .font = title_font,
+            .smoothing = .none,
+            .border = .{
+                .color = .black,
+                .dist = scaling,
+            },
+        },
+    } });
     // mana crystal
     const mana_topleft = pos.add(card_mana_topleft_offset.scale(scaling));
     if (data.card_mana_cost.getRenderFrame(.crystal)) |rf| {
