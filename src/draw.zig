@@ -163,6 +163,7 @@ pub const TextOpt = struct {
     size: u32 = 20,
     color: Colorf = Colorf.black,
     center: bool = false,
+    smoothing: Smoothing = .bilinear,
 };
 
 pub const PolyOpt = struct {

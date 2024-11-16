@@ -418,8 +418,15 @@ pub fn textf(self: *Platform, pos: V2f, comptime fmt: []const u8, args: anytype,
     const font = if (opt.font) |f| f else self.default_font;
     const font_size_f: f32 = u.as(f32, opt.size);
     const text_width = r.MeasureTextEx(font.r_font, text_z, font_size_f, 0);
-    const draw_pos: r.Vector2 = if (opt.center) .{ .x = pos.x - u.as(f32, text_width.x) / 2, .y = pos.y - text_width.y / 2 } else cVec(pos);
-    r.SetTextureFilter(font.r_font.texture, r.TEXTURE_FILTER_BILINEAR);
+    const draw_pos: r.Vector2 = if (opt.center) .{
+        .x = @floor(pos.x - u.as(f32, text_width.x) / 2),
+        .y = @floor(pos.y - text_width.y / 2),
+    } else cVec(pos);
+    const r_filter = switch (opt.smoothing) {
+        .none => r.TEXTURE_FILTER_POINT,
+        .bilinear => r.TEXTURE_FILTER_BILINEAR,
+    };
+    r.SetTextureFilter(font.r_font.texture, r_filter);
     r.DrawTextEx(
         font.r_font,
         text_z,
@@ -531,6 +538,18 @@ pub fn loadFont(self: *Platform, path: []const u8) Error!Font {
     @setRuntimeSafety(core.rt_safe_blocks);
     const path_z = try std.fmt.bufPrintZ(self.str_fmt_buf, "{s}/fonts/{s}", .{ self.assets_path, path });
     var r_font = r.LoadFontEx(path_z, 200, 0, 0);
+    r.GenTextureMipmaps(&r_font.texture);
+    const ret: Font = .{
+        .name = path,
+        .r_font = r_font,
+    };
+    return ret;
+}
+
+pub fn loadPixelFont(self: *Platform, path: []const u8) Error!Font {
+    @setRuntimeSafety(core.rt_safe_blocks);
+    const path_z = try std.fmt.bufPrintZ(self.str_fmt_buf, "{s}/fonts/{s}", .{ self.assets_path, path });
+    var r_font = r.LoadFont(path_z);
     r.GenTextureMipmaps(&r_font.texture);
     const ret: Font = .{
         .name = path,

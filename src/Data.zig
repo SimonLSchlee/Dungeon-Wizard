@@ -178,6 +178,11 @@ pub const ShaderName = enum {
 };
 pub const ShaderArr = std.EnumArray(ShaderName, Platform.Shader);
 
+pub const FontName = enum {
+    alagard,
+};
+pub const FontArr = std.EnumArray(FontName, Platform.Font);
+
 pub const RoomKind = enum {
     testu,
     first,
@@ -266,6 +271,7 @@ card_rarity_frames: EnumSpriteSheet(Spell.Rarity),
 card_mana_cost: EnumSpriteSheet(Spell.ManaCost.SpriteEnum),
 sounds: std.EnumArray(SFX, ?Platform.Sound),
 shaders: ShaderArr,
+fonts: FontArr,
 // roooms
 room_kind_tilemaps: std.EnumArray(RoomKind, TileMapIdxBuf),
 
@@ -883,6 +889,13 @@ pub fn loadShaders(self: *Data) Error!void {
     self.shaders.getPtr(.fog_blur).* = try plat.loadShader(null, "fog_blur.fs");
 }
 
+pub fn loadFonts(self: *Data) Error!void {
+    const plat = App.getPlat();
+    // TODO deinit?
+
+    self.fonts.getPtr(.alagard).* = try plat.loadPixelFont("alagard.png");
+}
+
 pub fn reload(self: *Data) Error!void {
     self.loadSpriteSheets() catch |err| std.debug.print("WARNING: failed to load all sprites: {any}\n", .{err});
     self.loadSounds() catch |err| std.debug.print("WARNING: failed to load all sounds: {any}\n", .{err});
@@ -912,4 +925,5 @@ pub fn reload(self: *Data) Error!void {
         }
     }
     self.loadShaders() catch |err| std.debug.print("WARNING: failed to load all shaders: {any}\n", .{err});
+    self.loadFonts() catch |err| std.debug.print("WARNING: failed to load all fonts: {any}\n", .{err});
 }
