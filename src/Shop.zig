@@ -174,6 +174,7 @@ pub fn canBuy(run: *const Run, product: *const Product) bool {
 pub fn update(self: *Shop, run: *const Run) Error!?Product {
     self.imm_ui.commands.clear();
     var ret: ?Product = null;
+    const ui_scaling: f32 = 3;
 
     for (self.products.slice()) |*slot| {
         try self.imm_ui.commands.append(.{ .rect = .{
@@ -195,7 +196,7 @@ pub fn update(self: *Shop, run: *const Run) Error!?Product {
         // renderr
         switch (product.kind) {
             .spell => |spell| {
-                spell.unqRenderCard(&self.imm_ui.commands, hovered_rect.pos, null);
+                spell.unqRenderCard(&self.imm_ui.commands, hovered_rect.pos, null, ui_scaling);
             },
             .item => |item| {
                 try item.unqRenderIcon(&self.imm_ui.commands, hovered_rect);

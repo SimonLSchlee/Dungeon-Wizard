@@ -32,6 +32,7 @@ const ImmUI = @import("ImmUI.zig");
 // Handle all updating and rendering of a generic action Slot, returning a CastMethod if it was activated
 pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, room: *Room) Error!?Options.CastMethod {
     const plat = getPlat();
+    const ui_scaling: f32 = 2;
 
     var ret: ?Options.CastMethod = null;
     const mouse_pos = plat.getMousePosScreen();
@@ -127,7 +128,7 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, 
                     .text = ImmUI.Command.LabelString.initTrunc(if (room.paused) "paused" else "not paused"),
                     .opt = .{
                         .color = .white,
-                        .size = 10 * Spell.ui_art_scaling,
+                        .size = 10 * ui_scaling,
                     },
                 } });
             },
@@ -138,7 +139,9 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, 
                     try info.unqRenderTint(cmd_buf, rect, Colorf.rgb(0.7, 0, 0));
                 },
                 .spell => |*spell| {
-                    _ = spell.unqRenderCard(cmd_buf, rect.pos, caster);
+                    // TODO maybe?
+                    //const scaling = if (slot.is_long_hovered) ui_scaling + 1 else ui_scaling;
+                    _ = spell.unqRenderCard(cmd_buf, rect.pos, caster, ui_scaling);
                 },
                 inline else => |inner| try inner.unqRenderIcon(cmd_buf, rect),
             },
@@ -230,8 +233,7 @@ pub const Slots = struct {
     };
     pub const discard_key = core.Key.d;
 
-    const spell_slot_dims = Spell.card_dims.scale(Spell.ui_art_scaling);
-    const spell_slot_spacing: f32 = 12;
+    const spell_slot_spacing: f32 = 16;
 
     const item_slot_dims = v2f(48, 48);
     const item_slot_spacing: f32 = 8;
@@ -302,6 +304,9 @@ pub const Slots = struct {
 
     pub fn reflowRects(self: *Slots) void {
         const plat = getPlat();
+        // TODO Options
+        const ui_scaling: f32 = 2;
+        const spell_slot_dims = Spell.card_dims.scale(ui_scaling);
         // spells must be centered on screen
         const spells_center_pos: V2f = plat.native_rect_cropped_offset.add(v2f(
             plat.native_rect_cropped_dims.x * 0.5,

@@ -32,15 +32,15 @@ const Spell = @This();
 pub const Pool = pool.BoundedPool(Spell, 32);
 pub const Id = pool.Id;
 
-pub const ui_art_scaling: f32 = 3;
 // no scaling applied
-pub const card_dims = v2f(45, 63);
-pub const card_art_frame_topleft_offset = v2f(7, 9);
-pub const card_art_frame_dims = v2f(31, 31);
-pub const card_mana_topleft_offset = v2f(28, 2);
-pub const card_tags_topleft_offset = v2f(3, 41);
+pub const card_dims = v2f(51, 71);
+pub const card_art_frame_topleft_offset = v2f(4, 14);
+pub const card_art_frame_dims = v2f(43, 32);
+pub const card_mana_topleft_offset = v2f(42, -3);
+pub const card_tags_topleft_offset = v2f(6, 48);
 pub const card_tags_dims = v2f(39, 17);
 pub const card_tag_icon_dims = v2f(6, 6);
+pub const card_title_center_offset = v2f(25, 9);
 
 var desc_buf: [2048]u8 = undefined;
 
@@ -493,6 +493,7 @@ pub const ManaCost = union(enum) {
         nine,
         X,
         unknown,
+        crystal,
     };
     number: u8,
     X,
@@ -632,7 +633,12 @@ pub inline fn unqRenderIcon(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, rect: ge
     return try self.getRenderIconInfo().unqRender(cmd_buf, rect);
 }
 
-pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caster: ?*const Thing) void {
+pub fn getName(self: *const Spell) []const u8 {
+    const kind = std.meta.activeTag(self.kind);
+    return spell_names.get(kind);
+}
+
+pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caster: ?*const Thing, scaling: f32) void {
     const data = App.get().data;
 
     if (data.card_designs.getRenderFrame(self.card_design)) |rf| {
@@ -642,7 +648,7 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caste
             .opt = .{
                 .src_dims = rf.size.toV2f(),
                 .src_pos = rf.pos.toV2f(),
-                .uniform_scaling = ui_art_scaling,
+                .uniform_scaling = scaling,
             },
         } });
     } else {
@@ -655,8 +661,21 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caste
             },
         } });
     }
+    // title
+    const title_center_pos = pos.add(card_title_center_offset.scale(scaling));
+    cmd_buf.appendAssumeCapacity(.{ .label = .{
+        .pos = title_center_pos,
+        .text = ImmUI.Command.LabelString.initTrunc(self.getName()),
+        .opt = .{
+            .color = .black,
+            .size = 16 * utl.as(u32, scaling - 1),
+            .center = true,
+            .font = data.fonts.get(.alagard),
+            .smoothing = .none,
+        },
+    } });
     // art and rarity frame
-    const frame_topleft = pos.add(card_art_frame_topleft_offset.scale(ui_art_scaling));
+    const frame_topleft = pos.add(card_art_frame_topleft_offset.scale(scaling));
     const rii: sprites.RenderIconInfo = blk: {
         const kind = std.meta.activeTag(self.kind);
         if (data.spell_icons_2.getRenderFrame(kind)) |render_frame| {
@@ -669,7 +688,7 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caste
             } };
         }
     };
-    rii.unqRender(cmd_buf, .{ .pos = frame_topleft, .dims = card_art_frame_dims.scale(ui_art_scaling) }) catch @panic("failed renderino");
+    rii.unqRender(cmd_buf, .{ .pos = frame_topleft, .dims = card_art_frame_dims.scale(scaling) }) catch @panic("failed renderino");
     if (data.card_rarity_frames.getRenderFrame(self.rarity)) |rf| {
         cmd_buf.appendAssumeCapacity(.{ .texture = .{
             .pos = frame_topleft,
@@ -677,12 +696,24 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caste
             .opt = .{
                 .src_dims = rf.size.toV2f(),
                 .src_pos = rf.pos.toV2f(),
-                .uniform_scaling = ui_art_scaling,
+                .uniform_scaling = scaling,
+            },
+        } });
+    }
+    // mana crystal
+    const mana_topleft = pos.add(card_mana_topleft_offset.scale(scaling));
+    if (data.card_mana_cost.getRenderFrame(.crystal)) |rf| {
+        cmd_buf.appendAssumeCapacity(.{ .texture = .{
+            .pos = mana_topleft,
+            .texture = rf.texture,
+            .opt = .{
+                .src_dims = rf.size.toV2f(),
+                .src_pos = rf.pos.toV2f(),
+                .uniform_scaling = scaling,
             },
         } });
     }
     //mana cost
-    const mana_topleft = pos.add(card_mana_topleft_offset.scale(ui_art_scaling));
     if (data.card_mana_cost.getRenderFrame(self.mana_cost.toSpriteEnum())) |rf| {
         var tint = Colorf.white;
         if (caster) |c| {
@@ -695,12 +726,12 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caste
             }
         }
         cmd_buf.appendAssumeCapacity(.{ .texture = .{
-            .pos = mana_topleft.add(v2f(9 * ui_art_scaling, 0)),
+            .pos = mana_topleft,
             .texture = rf.texture,
             .opt = .{
                 .src_dims = rf.size.toV2f(),
                 .src_pos = rf.pos.toV2f(),
-                .uniform_scaling = ui_art_scaling,
+                .uniform_scaling = scaling,
                 .tint = tint,
             },
         } });
@@ -727,49 +758,4 @@ pub fn renderToolTip(self: *const Spell, pos: V2f) Error!void {
     const name = spell_names.get(kind);
     const desc = try self.getDescription();
     return menuUI.renderToolTip(name, desc, pos);
-}
-
-pub fn renderInfo(self: *const Spell, rect: geom.Rectf) Error!void {
-    const plat = App.getPlat();
-    const title_rect_dims = v2f(rect.dims.x, rect.dims.y * 0.2);
-    const icon_rect_dims = v2f(rect.dims.x, rect.dims.y * 0.4);
-    const description_dims = v2f(rect.dims.x, rect.dims.y * 0.4);
-
-    const kind = std.meta.activeTag(self.kind);
-    const name = spell_names.get(kind);
-
-    plat.rectf(rect.pos, rect.dims, .{ .fill_color = .darkgray });
-    try menuUI.textInRect(rect.pos, title_rect_dims, .{ .fill_color = null }, v2f(5, 5), "{s}", .{name}, .{ .color = .white });
-
-    const icon_center_pos = rect.pos.add(v2f(0, title_rect_dims.y)).add(icon_rect_dims.scale(0.5));
-    // spell image
-    plat.rectf(icon_center_pos.sub(icon_rect_dims.scale(0.5)), icon_rect_dims, .{ .fill_color = .black });
-    const icon_square_dim = @min(icon_rect_dims.x, icon_rect_dims.y);
-    const icon_square = V2f.splat(icon_square_dim);
-
-    switch (self.getRenderIconInfo()) {
-        .frame => |frame| {
-            plat.texturef(icon_center_pos, frame.texture, .{
-                .origin = .center,
-                .src_pos = frame.pos.toV2f(),
-                .src_dims = frame.size.toV2f(),
-                .scaled_dims = icon_square,
-            });
-        },
-        .letter => |letter| {
-            try plat.textf(
-                icon_center_pos,
-                "{s}",
-                .{&letter.str},
-                .{
-                    .color = letter.color,
-                    .size = 40,
-                    .center = true,
-                },
-            );
-        },
-    }
-    const description_text = try self.getDescription();
-    const description_rect_topleft = rect.pos.add(v2f(0, title_rect_dims.y + icon_rect_dims.y));
-    try menuUI.textInRect(description_rect_topleft, description_dims, .{ .fill_color = null }, v2f(10, 10), "{s}", .{description_text}, .{ .color = .white });
 }

@@ -27,31 +27,29 @@ const gameUI = @import("gameUI.zig");
 const Shop = @import("Shop.zig");
 const Item = @import("Item.zig");
 const player = @import("player.zig");
+const ImmUI = @import("ImmUI.zig");
 
 pub const Mode = enum {
     _4_slot_frank,
     _mana_mandy,
 };
 
-pub const Reward = struct {
-    pub const UI = struct {
-        modal_topleft: V2f,
-        modal_dims: V2f,
-        modal_opt: draw.PolyOpt,
-        title_center: V2f,
-        title_opt: draw.TextOpt,
-        spell_rects: std.BoundedArray(menuUI.ClickableRect, max_spells),
-        item_rects: std.BoundedArray(menuUI.ClickableRect, max_items),
-        skip_or_continue_button: menuUI.Button,
-    };
-
+pub const Reward = union(enum) {
+    const max_rewards: usize = 8;
     const base_spells: usize = 3;
     const max_spells = 8;
     const base_items = 1;
     const max_items = 8;
 
-    spells: std.BoundedArray(Spell, max_spells) = .{},
-    items: std.BoundedArray(Item, max_items) = .{},
+    pub const UI = struct {
+        rewards: std.BoundedArray(Reward, max_rewards) = .{},
+        selected_spell_choice_idx: ?usize = null,
+    };
+    pub const SpellChoiceArray = std.BoundedArray(Spell, max_spells);
+
+    spell_choice: SpellChoiceArray,
+    item: Item,
+    gold: i32,
 };
 
 pub const GamePauseUI = struct {
@@ -130,9 +128,8 @@ pub const Place = union(PlaceKind) {
 gold: i32 = 0,
 room: Room = undefined,
 room_exists: bool = false,
-reward: ?Reward = null,
+reward_ui: ?Reward.UI = null,
 shop: ?Shop = null,
-reward_ui: Reward.UI = undefined,
 game_pause_ui: GamePauseUI = undefined,
 dead_menu: DeadMenu = undefined,
 screen: enum {
@@ -157,6 +154,9 @@ load_state: enum {
     fade_out,
 } = .fade_in,
 curr_tick: i64 = 0,
+imm_ui: struct {
+    commands: ImmUI.CmdBuf = .{},
+} = .{},
 
 pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
     const app = App.get();
@@ -328,20 +328,35 @@ pub fn makeExitDoors(_: *Run, tilemap: TileMap) std.BoundedArray(gameUI.ExitDoor
     return ret;
 }
 
-pub fn makeReward(self: *Run) void {
+pub fn makeRewards(self: *Run, difficulty: f32) void {
     const random = self.rng.random();
-    var reward = Reward{};
-    reward.spells.resize(Reward.base_spells) catch unreachable;
-    const num_spells_generated = Spell.makeRoomReward(random, reward.spells.slice());
-    reward.spells.resize(num_spells_generated) catch unreachable;
-    const num_items = random.uintAtMost(usize, Reward.base_items);
-    if (num_items > 0) {
-        reward.items.resize(num_items) catch unreachable;
-        const num_items_generated = Item.makeRoomReward(random, reward.items.slice());
-        reward.items.resize(num_items_generated) catch unreachable;
+    var reward_ui = Reward.UI{};
+
+    { // spells
+        var reward: Reward = .{ .spell_choice = .{} };
+        reward.spell_choice.resize(Reward.base_spells) catch unreachable;
+        const num_spells_generated = Spell.makeRoomReward(random, reward.spell_choice.slice());
+        reward.spell_choice.resize(num_spells_generated) catch unreachable;
+        reward_ui.rewards.appendAssumeCapacity(reward);
     }
-    self.reward = reward;
-    self.reward_ui = makeRewardUI(&reward);
+    { // items
+        const num_items = random.uintAtMost(usize, Reward.base_items);
+        if (num_items > 0) {
+            var items = std.BoundedArray(Item, Reward.max_items){};
+            items.resize(num_items) catch unreachable;
+            const num_items_generated = Item.makeRoomReward(random, items.slice());
+            items.resize(num_items_generated) catch unreachable;
+            for (items.constSlice()) |item| {
+                reward_ui.rewards.appendAssumeCapacity(.{ .item = item });
+            }
+        }
+    }
+    { // gold
+        const gold = u.as(i32, @floor(difficulty)) + self.rng.random().uintAtMost(u8, 5);
+        reward_ui.rewards.appendAssumeCapacity(.{ .gold = gold });
+    }
+
+    self.reward_ui = reward_ui;
     self.screen = .reward;
 }
 
@@ -440,9 +455,7 @@ pub fn gameUpdate(self: *Run) Error!void {
         .won => {
             const curr_room_place = self.places.get(self.curr_place_idx).room;
             if (!self.room.took_reward and (curr_room_place.kind == .smol or curr_room_place.kind == .big or curr_room_place.kind == .boss)) {
-                self.makeReward();
-                // TODO bettterrr?
-                self.gold += u.as(i32, @floor(curr_room_place.difficulty)) + self.rng.random().uintAtMost(u8, 5);
+                self.makeRewards(curr_room_place.difficulty);
             }
         },
         .exited => |exit_door| {
@@ -476,42 +489,225 @@ pub fn pauseMenuUpdate(self: *Run) Error!void {
     }
 }
 
+pub fn rewardSpellChoiceUI(self: *Run, idx: usize) Error!void {
+    const plat = getPlat();
+
+    // modal background
+    const modal_dims = v2f(core.native_dims_f.x * 0.6, core.native_dims_f.y * 0.6);
+    const modal_topleft = core.native_dims_f.sub(modal_dims).scale(0.5);
+    self.imm_ui.commands.appendAssumeCapacity(.{ .rect = .{
+        .pos = modal_topleft,
+        .dims = modal_dims,
+        .opt = .{
+            .fill_color = Colorf.rgba(0.1, 0.1, 0.1, 0.8),
+            .outline_color = Colorf.rgba(0.1, 0.1, 0.2, 0.8),
+            .outline_thickness = 4,
+        },
+    } });
+
+    var curr_row_y = modal_topleft.y + 20;
+    const modal_center_x = modal_topleft.x + modal_dims.x * 0.5;
+
+    // title
+    const title_center = v2f(modal_center_x, curr_row_y + 40);
+    self.imm_ui.commands.appendAssumeCapacity(.{ .label = .{
+        .pos = title_center,
+        .text = ImmUI.Command.LabelString.initTrunc("Choose a spell"),
+        .opt = .{
+            .size = 40,
+            .color = .white,
+            .center = true,
+        },
+    } });
+    curr_row_y += 80;
+
+    // spells
+    const spell_choices = self.reward_ui.?.rewards.get(idx).spell_choice;
+    assert(spell_choices.len > 0);
+    const spell_scaling: f32 = 3;
+    const spell_dims = Spell.card_dims.scale(spell_scaling);
+    var spell_rects = std.BoundedArray(geom.Rectf, Reward.max_spells){};
+    spell_rects.resize(spell_choices.len) catch unreachable;
+    gameUI.layoutRectsFixedSize(
+        spell_rects.len,
+        spell_dims,
+        v2f(modal_center_x, curr_row_y + spell_dims.y * 0.5),
+        .{ .direction = .horizontal, .space_between = 20 },
+        spell_rects.slice(),
+    );
+
+    const mouse_pos = plat.getMousePosScreen();
+    for (spell_choices.constSlice(), 0..) |spell, i| {
+        var rect = spell_rects.get(i);
+        const hovered = geom.pointIsInRectf(mouse_pos, rect);
+        const clicked = hovered and plat.input_buffer.mouseBtnIsJustPressed(.left);
+        if (hovered) {
+            rect.pos.y -= 4;
+        }
+        _ = spell.unqRenderCard(&self.imm_ui.commands, rect.pos, null, spell_scaling);
+        if (clicked) {
+            const product = Shop.Product{ .kind = .{ .spell = spell } };
+            if (self.canPickupProduct(&product)) {
+                self.pickupProduct(&product);
+                _ = self.reward_ui.?.rewards.orderedRemove(idx);
+                self.reward_ui.?.selected_spell_choice_idx = null;
+                break;
+            }
+        }
+    }
+
+    // anchor button to bottom of modal
+    const btn_dims = v2f(150, 70);
+    const btn_topleft = v2f(
+        modal_topleft.x + (modal_dims.x - btn_dims.x) * 0.5,
+        modal_topleft.y + modal_dims.y - 10 - btn_dims.y * 0.5,
+    );
+    if (App.menuButton(&self.imm_ui.commands, btn_topleft, "Back", btn_dims)) {
+        self.reward_ui.?.selected_spell_choice_idx = null;
+    }
+}
+
 pub fn rewardUpdate(self: *Run) Error!void {
     const plat = getPlat();
-    _ = plat;
-    // TODO could get rewards not in room?
-    assert(self.reward != null);
-    const reward = &self.reward.?;
-    const reward_ui = self.reward_ui;
-    if (reward_ui.skip_or_continue_button.isClicked()) {
+    assert(self.reward_ui != null);
+    const reward_ui = &self.reward_ui.?;
+
+    if (reward_ui.selected_spell_choice_idx) |idx| {
+        try self.rewardSpellChoiceUI(idx);
+        return;
+    }
+
+    // modal background
+    const modal_dims = v2f(core.native_dims_f.x * 0.6, core.native_dims_f.y * 0.6);
+    const modal_topleft = core.native_dims_f.sub(modal_dims).scale(0.5);
+    self.imm_ui.commands.appendAssumeCapacity(.{ .rect = .{
+        .pos = modal_topleft,
+        .dims = modal_dims,
+        .opt = .{
+            .fill_color = Colorf.rgba(0.1, 0.1, 0.1, 0.8),
+            .outline_color = Colorf.rgba(0.1, 0.1, 0.2, 0.8),
+            .outline_thickness = 4,
+        },
+    } });
+
+    var curr_row_y = modal_topleft.y + 20;
+    const modal_center_x = modal_topleft.x + modal_dims.x * 0.5;
+
+    // title
+    const title_center = v2f(modal_center_x, curr_row_y + 40);
+    self.imm_ui.commands.appendAssumeCapacity(.{ .label = .{
+        .pos = title_center,
+        .text = ImmUI.Command.LabelString.initTrunc("Found some stuff"),
+        .opt = .{
+            .size = 40,
+            .color = .white,
+            .center = true,
+        },
+    } });
+    curr_row_y += 80;
+
+    // reward rows
+    const row_rect_dims = v2f(modal_dims.x - 20, 40);
+    const row_rect_x = modal_topleft.x + 20;
+    const mouse_pos = plat.getMousePosScreen();
+
+    var removed_idx: ?usize = null;
+    for (reward_ui.rewards.constSlice(), 0..) |reward, i| {
+        var row_rect_pos = v2f(row_rect_x, curr_row_y);
+        const hovered = geom.pointIsInRectf(mouse_pos, .{ .pos = row_rect_pos, .dims = row_rect_dims });
+        const clicked = hovered and plat.input_buffer.mouseBtnIsJustPressed(.left);
+        if (hovered) {
+            row_rect_pos.y -= 4;
+        }
+        self.imm_ui.commands.appendAssumeCapacity(.{ .rect = .{
+            .pos = row_rect_pos,
+            .dims = row_rect_dims,
+            .opt = .{
+                .fill_color = Colorf.rgba(0.4, 0.4, 0.4, 0.7),
+                .edge_radius = 0.1,
+            },
+        } });
+        const row_icon_pos = row_rect_pos.add(v2f(10, 10));
+        const row_text_pos = row_icon_pos.add(v2f(0, 30));
+        switch (reward) {
+            .spell_choice => {
+                self.imm_ui.commands.appendAssumeCapacity(.{ .rect = .{
+                    .pos = row_icon_pos,
+                    .dims = v2f(20, 20),
+                    .opt = .{
+                        .fill_color = .red,
+                    },
+                } });
+                self.imm_ui.commands.appendAssumeCapacity(.{ .label = .{
+                    .pos = row_text_pos,
+                    .text = ImmUI.Command.LabelString.initTrunc("Spell"),
+                    .opt = .{
+                        .color = .white,
+                    },
+                } });
+                if (clicked) {
+                    reward_ui.selected_spell_choice_idx = i;
+                }
+            },
+            .item => |item| {
+                try item.unqRenderIcon(&self.imm_ui.commands, .{ .pos = row_icon_pos, .dims = row_rect_dims });
+                self.imm_ui.commands.appendAssumeCapacity(.{ .label = .{
+                    .pos = row_text_pos,
+                    .text = ImmUI.Command.LabelString.initTrunc(item.getName()),
+                    .opt = .{
+                        .color = .white,
+                    },
+                } });
+                if (clicked) {
+                    const product = Shop.Product{ .kind = .{ .item = item } };
+                    if (self.canPickupProduct(&product)) {
+                        self.pickupProduct(&product);
+                        removed_idx = i;
+                    }
+                }
+            },
+            .gold => |gold_amount| {
+                self.imm_ui.commands.appendAssumeCapacity(.{ .rect = .{
+                    .pos = row_icon_pos,
+                    .dims = v2f(20, 20),
+                    .opt = .{
+                        .fill_color = .yellow,
+                    },
+                } });
+                const gold_str = try u.bufPrintLocal("{}", .{gold_amount});
+                self.imm_ui.commands.appendAssumeCapacity(.{ .label = .{
+                    .pos = row_text_pos,
+                    .text = ImmUI.Command.LabelString.initTrunc(gold_str),
+                    .opt = .{
+                        .color = .white,
+                    },
+                } });
+                if (clicked) {
+                    self.gold += gold_amount;
+                    removed_idx = i;
+                }
+            },
+        }
+        curr_row_y += row_rect_dims.y + 10;
+    }
+    if (removed_idx) |idx| {
+        _ = reward_ui.rewards.orderedRemove(idx);
+    }
+
+    // anchor skip button to bottom of modal
+    const skip_btn_dims = v2f(150, 70);
+    const skip_btn_topleft = v2f(
+        modal_topleft.x + (modal_dims.x - skip_btn_dims.x) * 0.5,
+        modal_topleft.y + modal_dims.y - 10 - skip_btn_dims.y * 0.5,
+    );
+    var skip_btn_text: []const u8 = "Skip";
+    if (reward_ui.rewards.len == 0) {
+        skip_btn_text = "Continue";
+    }
+    if (App.menuButton(&self.imm_ui.commands, skip_btn_topleft, skip_btn_text, skip_btn_dims)) {
         self.screen = .game;
         assert(self.room_exists);
         self.room.took_reward = true;
-    } else {
-        for (reward_ui.spell_rects.constSlice(), 0..) |crect, i| {
-            if (crect.isClicked()) {
-                const spell = reward.spells.get(i);
-                const product = Shop.Product{ .kind = .{ .spell = spell } };
-                if (self.canPickupProduct(&product)) {
-                    self.pickupProduct(&product);
-                    reward.spells.len = 0;
-                }
-                self.reward_ui = makeRewardUI(reward);
-                break;
-            }
-        }
-        for (reward_ui.item_rects.constSlice(), 0..) |crect, i| {
-            if (crect.isClicked()) {
-                const item = reward.items.get(i);
-                const product = Shop.Product{ .kind = .{ .item = item } };
-                if (self.canPickupProduct(&product)) {
-                    self.pickupProduct(&product);
-                    _ = reward.items.orderedRemove(i);
-                }
-                self.reward_ui = makeRewardUI(reward);
-                break;
-            }
-        }
     }
 }
 
@@ -556,6 +752,7 @@ pub fn deadUpdate(self: *Run) Error!void {
 
 pub fn update(self: *Run) Error!void {
     const plat = App.getPlat();
+    self.imm_ui.commands.clear();
 
     if (debug.enable_debug_controls) {
         if (plat.input_buffer.keyIsJustPressed(.f3)) {
@@ -564,7 +761,8 @@ pub fn update(self: *Run) Error!void {
             return;
         }
         if (plat.input_buffer.keyIsJustPressed(.o)) {
-            self.makeReward();
+            const curr_room_place = self.places.get(self.curr_place_idx).room;
+            self.makeRewards(curr_room_place.difficulty);
         }
         if (plat.input_buffer.keyIsJustPressed(.l)) {
             self.loadNextPlace();
@@ -589,7 +787,7 @@ pub fn update(self: *Run) Error!void {
         .fade_out => if (self.load_timer.tick(true)) {
             self.curr_place_idx += 1;
             try self.loadPlaceFromCurrIdx();
-            self.reward = null;
+            self.reward_ui = null;
             self.load_state = .fade_in;
         },
     }
@@ -681,83 +879,6 @@ fn makeGamePauseUI() GamePauseUI {
     };
 }
 
-fn makeRewardUI(reward: *const Reward) Reward.UI {
-    const modal_dims = v2f(core.native_dims_f.x * 0.6, core.native_dims_f.y * 0.6);
-    const modal_topleft = core.native_dims_f.sub(modal_dims).scale(0.5);
-    const modal_opt = draw.PolyOpt{
-        .fill_color = Colorf.rgba(0.1, 0.1, 0.1, 0.8),
-        .outline_color = Colorf.rgba(0.1, 0.1, 0.2, 0.8),
-        .outline_thickness = 4,
-    };
-    var curr_row_y = modal_topleft.y + 20;
-    const center_x = modal_topleft.x + modal_dims.x * 0.5;
-
-    // title
-    const title_center = v2f(center_x, curr_row_y + 40);
-    const title_opt = draw.TextOpt{
-        .size = 40,
-        .color = .white,
-        .center = true,
-    };
-    curr_row_y += 80;
-
-    // spells
-    const spell_dims = v2f(150, 150.0);
-    var spell_grects = std.BoundedArray(geom.Rectf, Reward.max_spells){};
-    spell_grects.resize(reward.spells.len) catch unreachable;
-    if (spell_grects.len > 0) {
-        gameUI.layoutRectsFixedSize(spell_grects.len, spell_dims, v2f(center_x, curr_row_y + spell_dims.y * 0.5), .{ .direction = .horizontal, .space_between = 20 }, spell_grects.slice());
-    }
-    // TODO ARARGHH
-    var spell_rects = std.BoundedArray(menuUI.ClickableRect, Reward.max_spells){};
-    for (spell_grects.constSlice()) |r| {
-        spell_rects.append(.{ .rect = r }) catch unreachable;
-    }
-    curr_row_y += spell_dims.y + 40;
-
-    const item_dims = v2f(100, 100);
-    var item_grects = std.BoundedArray(geom.Rectf, Reward.max_spells){};
-    item_grects.resize(reward.items.len) catch unreachable;
-    if (item_grects.len > 0) {
-        gameUI.layoutRectsFixedSize(item_grects.len, item_dims, v2f(center_x, curr_row_y + item_dims.y * 0.5), .{ .direction = .horizontal, .space_between = 20 }, item_grects.slice());
-    }
-    // TODO ARARGHH
-    var item_rects = std.BoundedArray(menuUI.ClickableRect, Reward.max_spells){};
-    for (item_grects.constSlice()) |r| {
-        item_rects.append(.{ .rect = r }) catch unreachable;
-    }
-    curr_row_y += item_dims.y + 40;
-
-    const skip_btn_dims = v2f(150, 70);
-    const skip_btn_center = v2f(center_x, curr_row_y + skip_btn_dims.y * 0.5);
-    var skip_button = menuUI.Button{
-        .clickable_rect = .{ .rect = .{
-            .pos = skip_btn_center.sub(skip_btn_dims.scale(0.5)),
-            .dims = skip_btn_dims,
-        } },
-        .poly_opt = .{ .fill_color = .orange },
-        .text_opt = .{ .center = true, .color = .black, .size = 30 },
-        .text_rel_pos = skip_btn_dims.scale(0.5),
-    };
-    if (reward.items.len == 0 and reward.spells.len == 0) {
-        skip_button.poly_opt.fill_color = .cyan;
-        skip_button.text = @TypeOf(skip_button.text).init("Continue") catch unreachable;
-    } else {
-        skip_button.text = @TypeOf(skip_button.text).init("Skip") catch unreachable;
-    }
-
-    return .{
-        .modal_dims = modal_dims,
-        .modal_topleft = modal_topleft,
-        .modal_opt = modal_opt,
-        .title_center = title_center,
-        .title_opt = title_opt,
-        .spell_rects = spell_rects,
-        .item_rects = item_rects,
-        .skip_or_continue_button = skip_button,
-    };
-}
-
 pub fn renderIconButton(self: *const Run, spell_or_item: anytype, crect: menuUI.ClickableRect) Error!?V2f {
     var show_tooltip = false;
     var hovered_crect = crect.rect;
@@ -782,43 +903,6 @@ pub fn renderIconButton(self: *const Run, spell_or_item: anytype, crect: menuUI.
     return null;
 }
 
-pub fn renderReward(self: *Run) Error!void {
-    const plat = getPlat();
-    assert(self.reward != null);
-    const reward = &self.reward.?;
-    const reward_ui = self.reward_ui;
-    plat.rectf(reward_ui.modal_topleft, reward_ui.modal_dims, reward_ui.modal_opt);
-    try plat.textf(reward_ui.title_center, "Choose 1", .{}, reward_ui.title_opt);
-    var hovered: ?union(enum) {
-        spell: Spell,
-        item: Item,
-    } = null;
-    var hovered_pos: V2f = .{};
-    for (reward_ui.spell_rects.constSlice(), 0..) |crect, i| {
-        const spell = reward.spells.get(i);
-        if (try self.renderIconButton(spell, crect)) |p| {
-            hovered = .{ .spell = spell };
-            hovered_pos = p;
-        }
-    }
-    for (reward_ui.item_rects.constSlice(), 0..) |crect, i| {
-        const item = reward.items.get(i);
-        if (try self.renderIconButton(item, crect)) |p| {
-            hovered = .{ .item = item };
-            hovered_pos = p;
-        }
-    }
-    try reward_ui.skip_or_continue_button.render();
-
-    if (hovered) |h| {
-        switch (h) {
-            inline else => |t| {
-                try t.renderToolTip(hovered_pos);
-            },
-        }
-    }
-}
-
 pub fn render(self: *Run, native_render_texture: Platform.RenderTexture2D) Error!void {
     const plat = getPlat();
 
@@ -826,6 +910,8 @@ pub fn render(self: *Run, native_render_texture: Platform.RenderTexture2D) Error
         try self.room.render(native_render_texture);
     }
 
+    plat.startRenderToTexture(native_render_texture);
+    plat.setBlend(.render_tex_alpha);
     switch (self.screen) {
         .game => {
             assert(self.room_exists);
@@ -838,9 +924,7 @@ pub fn render(self: *Run, native_render_texture: Platform.RenderTexture2D) Error
         },
         .pause_menu => {},
         .reward => {
-            plat.startRenderToTexture(native_render_texture);
-            plat.setBlend(.render_tex_alpha);
-            try self.renderReward();
+            try ImmUI.render(&self.imm_ui.commands);
         },
         .shop => {
             assert(self.shop != null);

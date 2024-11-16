@@ -352,36 +352,12 @@ pub fn getRenderIconInfo(self: *const Item) sprites.RenderIconInfo {
     }
 }
 
-pub fn renderToolTip(self: *const Item, pos: V2f) Error!void {
+pub fn getName(self: *const Item) []const u8 {
     const kind = std.meta.activeTag(self.kind);
-    const name = item_names.get(kind);
-    const desc = try self.getDescription();
-    return menuUI.renderToolTip(name, desc, pos);
+    return item_names.get(kind);
 }
 
-pub fn renderInfo(self: *const Item, rect: geom.Rectf) Error!void {
-    const plat = App.getPlat();
-    const title_rect_dims = v2f(rect.dims.x, rect.dims.y * 0.2);
-    const icon_rect_dims = v2f(rect.dims.x, rect.dims.y * 0.4);
-    const description_dims = v2f(rect.dims.x, rect.dims.y * 0.4);
-
-    const kind = std.meta.activeTag(self.kind);
-    const name = item_names.get(kind);
-
-    plat.rectf(rect.pos, rect.dims, .{ .fill_color = .darkgray });
-    try menuUI.textInRect(rect.pos, title_rect_dims, .{ .fill_color = null }, v2f(5, 5), "{s}", .{name}, .{ .color = .white });
-
-    const icon_center_pos = rect.pos.add(v2f(0, title_rect_dims.y)).add(icon_rect_dims.scale(0.5));
-    const icon_top_left = icon_center_pos.sub(icon_rect_dims.scale(0.5));
-    // item image
-    plat.rectf(icon_top_left, icon_rect_dims, .{ .fill_color = .black });
-    const icon_square_dim = @min(icon_rect_dims.x, icon_rect_dims.y);
-    const icon_square = V2f.splat(icon_square_dim);
-    const icon_square_top_left = icon_center_pos.sub(icon_square.scale(0.5));
-
-    try self.renderIcon(.{ .pos = icon_square_top_left, .dims = icon_square });
-
-    const description_text = item_descriptions.get(kind);
-    const description_rect_topleft = rect.pos.add(v2f(0, title_rect_dims.y + icon_rect_dims.y));
-    try menuUI.textInRect(description_rect_topleft, description_dims, .{ .fill_color = null }, v2f(10, 10), "{s}", .{description_text}, .{ .color = .white });
+pub fn renderToolTip(self: *const Item, pos: V2f) Error!void {
+    const desc = try self.getDescription();
+    return menuUI.renderToolTip(self.getName(), desc, pos);
 }
