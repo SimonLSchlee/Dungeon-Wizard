@@ -125,6 +125,7 @@ fn EnumSpriteSheet(EnumType: type) type {
 
         sprite_sheet: SpriteSheet = undefined,
         sprite_indices: SpriteFrameIndexArray = undefined,
+        sprite_dims_cropped: ?std.EnumArray(EnumType, V2f) = null,
 
         pub fn init(sprite_sheet: SpriteSheet) Error!@This() {
             var ret = @This(){
@@ -136,6 +137,43 @@ fn EnumSpriteSheet(EnumType: type) type {
                     if (std.mem.eql(u8, f.name, t.name.constSlice())) {
                         const kind = std.meta.stringToEnum(EnumType, f.name).?;
                         ret.sprite_indices.set(kind, t.from_frame);
+                        continue :tags;
+                    }
+                }
+            }
+            return ret;
+        }
+        pub fn initCropped(sprite_sheet: SpriteSheet, crop_color: draw.Coloru) Error!@This() {
+            const plat = App.getPlat();
+            var ret = try @This().init(sprite_sheet);
+            ret.sprite_dims_cropped = std.EnumArray(EnumType, V2f).initFill(.{});
+            const image_buf = plat.textureToImageBuf(sprite_sheet.texture);
+            defer plat.unloadImageBuf(image_buf);
+            tags: for (sprite_sheet.tags) |t| {
+                inline for (@typeInfo(EnumType).@"enum".fields) |f| {
+                    if (std.mem.eql(u8, f.name, t.name.constSlice())) {
+                        const kind = std.meta.stringToEnum(EnumType, f.name).?;
+                        const render_frame = ret.getRenderFrame(kind).?;
+                        const cropped_dims = ret.sprite_dims_cropped.?.getPtr(kind);
+                        cropped_dims.* = render_frame.size.toV2f();
+                        for (0..u.as(usize, render_frame.size.x)) |x_off| {
+                            const x = render_frame.pos.x + u.as(i32, x_off);
+                            const y = render_frame.pos.y;
+                            const color: draw.Coloru = image_buf.data[u.as(usize, x + y * sprite_sheet.texture.dims.x)];
+                            if (color.eql(crop_color)) {
+                                cropped_dims.x = u.as(f32, x - render_frame.pos.x);
+                                break;
+                            }
+                        }
+                        for (0..u.as(usize, render_frame.size.y)) |y_off| {
+                            const y = render_frame.pos.y + u.as(i32, y_off);
+                            const x = render_frame.pos.x;
+                            const color: draw.Coloru = image_buf.data[u.as(usize, x + y * sprite_sheet.texture.dims.x)];
+                            if (color.eql(crop_color)) {
+                                cropped_dims.y = u.as(f32, y - render_frame.pos.y);
+                                break;
+                            }
+                        }
                         continue :tags;
                     }
                 }
@@ -181,6 +219,7 @@ pub const ShaderArr = std.EnumArray(ShaderName, Platform.Shader);
 pub const FontName = enum {
     alagard,
     pixeloid,
+    seven_x_five,
 };
 pub const FontArr = std.EnumArray(FontName, Platform.Font);
 
@@ -267,6 +306,7 @@ spell_icons: EnumSpriteSheet(Spell.Kind),
 item_icons: EnumSpriteSheet(Item.Kind),
 misc_icons: EnumSpriteSheet(MiscIcon),
 spell_icons_2: EnumSpriteSheet(Spell.Kind),
+spell_tags_icons: EnumSpriteSheet(Spell.Tag.SpriteEnum),
 card_sprites: EnumSpriteSheet(Spell.CardSpriteEnum),
 card_mana_cost: EnumSpriteSheet(Spell.ManaCost.SpriteEnum),
 sounds: std.EnumArray(SFX, ?Platform.Sound),
@@ -598,6 +638,7 @@ pub fn loadSpriteSheets(self: *Data) Error!void {
     self.spell_icons = try @TypeOf(self.spell_icons).init(try loadSpriteSheetFromJsonPath("images/ui", "spell_icons.json"));
     self.misc_icons = try @TypeOf(self.misc_icons).init(try loadSpriteSheetFromJsonPath("images/ui", "misc_icons.json"));
     self.spell_icons_2 = try @TypeOf(self.spell_icons_2).init(try loadSpriteSheetFromJsonPath("images/ui", "spell-icons.json"));
+    self.spell_tags_icons = try @TypeOf(self.spell_tags_icons).initCropped(try loadSpriteSheetFromJsonPath("images/ui", "spell-tags-icons.json"), .magenta);
     self.card_sprites = try @TypeOf(self.card_sprites).init(try loadSpriteSheetFromJsonPath("images/ui", "card.json"));
     self.card_mana_cost = try @TypeOf(self.card_mana_cost).init(try loadSpriteSheetFromJsonPath("images/ui", "card-mana-cost.json"));
 }
@@ -894,6 +935,7 @@ pub fn loadFonts(self: *Data) Error!void {
 
     self.fonts.getPtr(.alagard).* = try plat.loadPixelFont("alagard.png", 16);
     self.fonts.getPtr(.pixeloid).* = try plat.loadPixelFont("PixeloidSans.ttf", 11);
+    self.fonts.getPtr(.seven_x_five).* = try plat.loadPixelFont("7x5.ttf", 8);
 }
 
 pub fn reload(self: *Data) Error!void {

@@ -37,7 +37,7 @@ pub const card_dims = v2f(71, 99);
 pub const card_art_topleft_offset = v2f(3, 3);
 pub const card_art_dims = v2f(65, 46);
 pub const card_mana_topleft_offset = v2f(58, 1);
-pub const card_tags_topleft_offset = v2f(5, 65);
+pub const card_tags_topleft_offset = v2f(5, 66);
 pub const card_tags_dims = v2f(61, 29);
 pub const card_tag_icon_dims = v2f(7, 7);
 pub const card_title_center_offset = v2f(36, 56);
@@ -110,6 +110,7 @@ pub fn getProto(kind: Kind) Spell {
 }
 
 pub const CardSpriteEnum = enum {
+    card_blank,
     card_base,
     rarity_pedestrian,
     rarity_interesting,
@@ -531,6 +532,40 @@ pub const ManaCost = union(enum) {
     }
 };
 
+pub const Tag = struct {
+    pub const Array = std.BoundedArray(Tag, 16);
+    pub const Label = utl.BoundedString(8);
+    pub const SpriteEnum = enum {
+        target,
+        skull,
+        mouse,
+        wizard,
+        lightning,
+        fire,
+        icicle,
+        magic,
+        aoe_lightning,
+        aoe_fire,
+        aoe_ice,
+        aoe_magic,
+        water,
+        arrow_right,
+        heart,
+        card,
+        fast_forward,
+        shield_empty,
+        sword_hilt,
+        droplets,
+        arrow_shaft,
+    };
+    pub const Part = union(enum) {
+        icon: SpriteEnum,
+        label: Label,
+    };
+    pub const PartArray = std.BoundedArray(Part, 6);
+    parts: PartArray = .{},
+};
+
 pub const CastTime = enum {
     slow,
     medium,
@@ -556,6 +591,7 @@ after_cast_slot_cooldown_ticks: i32 = 4 * 60,
 mislay: bool = false,
 draw_immediate: bool = false,
 mana_cost: ManaCost = .{ .number = 1 },
+tags: Tag.Array = .{},
 
 pub fn getSlotCooldownTicks(self: *const Spell) i32 {
     return self.cast_ticks + self.after_cast_slot_cooldown_ticks;
@@ -626,6 +662,18 @@ pub fn getDescription(self: *const Spell) Error![]const u8 {
     return buf[0..len];
 }
 
+pub fn getTags(self: *const Spell) ?Tag.Array {
+    switch (self.kind) {
+        inline else => |k| {
+            const K = @TypeOf(k);
+            if (std.meta.hasMethod(K, "getTags")) {
+                return K.getTags(self);
+            }
+        },
+    }
+    return null;
+}
+
 pub inline fn getTargetParams(self: *const Spell, room: *Room, caster: *const Thing, mouse_pos: V2f) ?Params {
     return self.targeting_data.getParams(room, caster, mouse_pos);
 }
@@ -649,6 +697,12 @@ pub fn getName(self: *const Spell) []const u8 {
 
 pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caster: ?*const Thing, scaling: f32) void {
     const data = App.get().data;
+    var show_as_disabled = false;
+    if (caster) |c|
+        if (c.mana) |mana|
+            if (self.mana_cost.getActualCost(c)) |cost| {
+                show_as_disabled = (cost > mana.curr);
+            };
 
     if (data.card_sprites.getRenderFrame(.card_base)) |rf| {
         cmd_buf.appendAssumeCapacity(.{ .texture = .{
@@ -718,18 +772,9 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caste
             },
         } });
     }
-    //mana cost
+    // mana cost
     if (data.card_mana_cost.getRenderFrame(self.mana_cost.toSpriteEnum())) |rf| {
-        var tint = Colorf.white;
-        if (caster) |c| {
-            if (c.mana) |mana| {
-                if (self.mana_cost.getActualCost(c)) |cost| {
-                    if (cost > mana.curr) {
-                        tint = .red;
-                    }
-                }
-            }
-        }
+        const tint: Colorf = if (show_as_disabled) .red else .white;
         cmd_buf.appendAssumeCapacity(.{ .texture = .{
             .pos = mana_topleft,
             .texture = rf.texture,
@@ -741,7 +786,94 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caste
             },
         } });
     }
-    // TODO tags
+    // tags
+    if (self.getTags()) |tags| {
+        const plat = getPlat();
+        const tag_font = data.fonts.get(.seven_x_five);
+        const tag_text_opt = draw.TextOpt{
+            .color = .white,
+            .font = tag_font,
+            .size = tag_font.base_size * utl.as(u32, scaling),
+            .smoothing = .none,
+        };
+        const tag_topleft = pos.add(card_tags_topleft_offset.scale(scaling));
+        var curr_tag_topleft = tag_topleft;
+        for (tags.constSlice()) |tag| {
+            // first measure
+            var width_x: f32 = 1 * scaling;
+            for (tag.parts.constSlice()) |part| {
+                switch (part) {
+                    .icon => |icon_enum| {
+                        width_x += (data.spell_tags_icons.sprite_dims_cropped.?.get(icon_enum).x + 1) * scaling;
+                    },
+                    .label => |label| {
+                        const sz = plat.measureText(label.constSlice(), tag_text_opt) catch V2f{};
+                        width_x += sz.x + 1 * scaling;
+                    },
+                }
+            }
+            if (curr_tag_topleft.x != tag_topleft.x and curr_tag_topleft.x + width_x > tag_topleft.x + card_tags_dims.x * scaling) {
+                curr_tag_topleft.y += (9 + 1) * scaling; // TODO put somewhere
+                curr_tag_topleft.x = tag_topleft.x;
+            }
+            // now actually draw
+            cmd_buf.appendAssumeCapacity(.{
+                .rect = .{
+                    .pos = curr_tag_topleft,
+                    .dims = v2f(width_x, 9 * scaling), // TODO put somewhere
+                    .opt = .{
+                        .fill_color = .black,
+                        .edge_radius = 0.3,
+                    },
+                },
+            });
+            var curr_part_topleft = curr_tag_topleft.add(V2f.splat(1 * scaling));
+            for (tag.parts.constSlice()) |part| {
+                switch (part) {
+                    .icon => |icon_enum| {
+                        const cropped_dims = data.spell_tags_icons.sprite_dims_cropped.?.get(icon_enum);
+                        if (data.spell_tags_icons.getRenderFrame(icon_enum)) |rf| {
+                            cmd_buf.appendAssumeCapacity(.{ .texture = .{
+                                .pos = curr_part_topleft,
+                                .texture = rf.texture,
+                                .opt = .{
+                                    .src_dims = cropped_dims,
+                                    .src_pos = rf.pos.toV2f(),
+                                    .uniform_scaling = scaling,
+                                },
+                            } });
+                        }
+                        curr_part_topleft.x += (cropped_dims.x + 1) * scaling;
+                    },
+                    .label => |label| {
+                        const sz = plat.measureText(label.constSlice(), tag_text_opt) catch V2f{};
+                        cmd_buf.appendAssumeCapacity(.{ .label = .{
+                            .pos = curr_part_topleft,
+                            .text = ImmUI.Command.LabelString.initTrunc(label.constSlice()),
+                            .opt = tag_text_opt,
+                        } });
+                        curr_part_topleft.x += sz.x + 1 * scaling;
+                    },
+                }
+            }
+            curr_tag_topleft.x += width_x + 1 * scaling;
+        }
+    }
+    // tint disabled
+    if (show_as_disabled) {
+        if (data.card_sprites.getRenderFrame(.card_blank)) |rf| {
+            cmd_buf.appendAssumeCapacity(.{ .texture = .{
+                .pos = pos,
+                .texture = rf.texture,
+                .opt = .{
+                    .src_dims = rf.size.toV2f(),
+                    .src_pos = rf.pos.toV2f(),
+                    .uniform_scaling = scaling,
+                    .tint = Colorf.black.fade(0.5),
+                },
+            } });
+        }
+    }
 }
 
 pub fn getRenderIconInfo(self: *const Spell) sprites.RenderIconInfo {

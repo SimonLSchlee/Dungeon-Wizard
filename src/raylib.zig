@@ -419,12 +419,16 @@ pub fn textf(self: *Platform, pos: V2f, comptime fmt: []const u8, args: anytype,
     const font = if (opt.font) |f| f else self.default_font;
     const font_size_f: f32 = u.as(f32, opt.size);
     const text_width = r.MeasureTextEx(font.r_font, text_z, font_size_f, 0);
-    const draw_pos: r.Vector2 = if (opt.center) .{
-        .x = @floor(pos.x - u.as(f32, text_width.x) / 2),
-        .y = @floor(pos.y - text_width.y / 2),
+    var draw_pos: r.Vector2 = if (opt.center) .{
+        .x = pos.x - u.as(f32, text_width.x) / 2,
+        .y = pos.y - text_width.y / 2,
     } else cVec(pos);
     const r_filter = switch (opt.smoothing) {
-        .none => r.TEXTURE_FILTER_POINT,
+        .none => blk: {
+            draw_pos.x = @floor(draw_pos.x);
+            draw_pos.y = @floor(draw_pos.y);
+            break :blk r.TEXTURE_FILTER_POINT;
+        },
         .bilinear => r.TEXTURE_FILTER_BILINEAR,
     };
     r.SetTextureFilter(font.r_font.texture, r_filter);
@@ -592,6 +596,30 @@ pub fn loadTexture(self: *Platform, path: []const u8) Error!Texture2D {
 pub fn unloadTexture(self: *Platform, texture: Texture2D) void {
     _ = self;
     r.UnloadTexture(texture.r_tex);
+}
+
+pub const ImageBuf = struct {
+    dims: V2i,
+    data: []Coloru,
+    r_img: r.Image,
+    r_colors: [*c]r.Color,
+};
+
+pub fn textureToImageBuf(_: *Platform, texture: Texture2D) ImageBuf {
+    const r_img = r.LoadImageFromTexture(texture.r_tex);
+    const r_colors = r.LoadImageColors(r_img);
+    const dims = V2i.iToV2i(c_int, r_img.width, r_img.height);
+    return .{
+        .dims = dims,
+        .data = @alignCast(@ptrCast(r_colors[0..u.as(usize, dims.x * dims.y)])),
+        .r_img = r_img,
+        .r_colors = r_colors,
+    };
+}
+
+pub fn unloadImageBuf(_: *Platform, image_buf: ImageBuf) void {
+    r.UnloadImageColors(image_buf.r_colors);
+    r.UnloadImage(image_buf.r_img);
 }
 
 pub fn createRenderTexture(_: *Platform, name: []const u8, dims: V2i) RenderTexture2D {

@@ -170,3 +170,18 @@ pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
     const damage: i32 = utl.as(i32, unherring.hit_effect.damage);
     return std.fmt.bufPrint(buf, fmt, .{ damage, description });
 }
+
+pub fn getTags(self: *const Spell) Spell.Tag.Array {
+    const unherring: @This() = self.kind.unherring;
+    var ret = Spell.Tag.Array{};
+    ret.appendAssumeCapacity(.{ .parts = utl.initBoundedArray(Spell.Tag.PartArray, &.{
+        .{ .icon = .target },
+        .{ .icon = .skull },
+    }) });
+    const damage_str = utl.bufPrintLocal("{d:.0}", .{unherring.hit_effect.damage}) catch "";
+    ret.appendAssumeCapacity(.{ .parts = utl.initBoundedArray(Spell.Tag.PartArray, &.{
+        .{ .icon = .magic },
+        .{ .label = Spell.Tag.Label.initTrunc(damage_str) },
+    }) });
+    return ret;
+}

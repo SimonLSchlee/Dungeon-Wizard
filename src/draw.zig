@@ -12,7 +12,7 @@ const V2i = @import("V2i.zig");
 const iToV2f = V2f.iToV2f;
 const iToV2i = V2i.iToV2i;
 
-pub const Coloru = struct {
+pub const Coloru = packed struct {
     r: u8 = 0,
     g: u8 = 0,
     b: u8 = 0,
@@ -52,6 +52,10 @@ pub const Coloru = struct {
 
     pub fn makeGray(v: u8) Coloru {
         return rgb(v, v, v);
+    }
+
+    pub fn eql(self: Coloru, other: Coloru) bool {
+        return self.r == other.r and self.g == other.g and self.b == other.b and self.a == other.a;
     }
 
     pub fn toColorf(self: Coloru) Colorf {

@@ -88,7 +88,7 @@ pub inline fn clampf(x: f32, lo: f32, hi: f32) f32 {
     return clamp(f32, x, lo, hi);
 }
 
-pub fn initBoundedArray(BoundedArrayType: type, comptime items: []const @TypeOf((BoundedArrayType{}).buffer[0])) BoundedArrayType {
+pub fn initBoundedArray(BoundedArrayType: type, items: []const @TypeOf((BoundedArrayType{}).buffer[0])) BoundedArrayType {
     var ret: BoundedArrayType = .{};
     for (items) |item| {
         ret.append(item) catch break;
