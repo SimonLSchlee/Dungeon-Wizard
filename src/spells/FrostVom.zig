@@ -190,3 +190,22 @@ pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
     const damage: i32 = utl.as(i32, frost_vom.hit_effect.damage);
     return std.fmt.bufPrint(buf, fmt, .{ damage, dur_secs, description });
 }
+
+pub fn getTags(self: *const Spell) Spell.Tag.Array {
+    const frost_vom: @This() = self.kind.frost_vom;
+    const damage_str = utl.bufPrintLocal("{d:.0}", .{frost_vom.hit_effect.damage}) catch "";
+    return Spell.Tag.makeArray(&.{
+        &.{
+            .{ .icon = .{ .sprite_enum = .target } },
+            .{ .icon = .{ .sprite_enum = .mouse } },
+        },
+        &.{
+            .{ .icon = .{ .sprite_enum = .aoe_ice } },
+            .{ .label = Spell.Tag.Label.initTrunc(damage_str) },
+        },
+        &.{
+            .{ .icon = .{ .sprite_enum = .ice_ball } },
+            .{ .icon = .{ .sprite_enum = .ouchy_skull } },
+        },
+    });
+}

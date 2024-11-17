@@ -75,3 +75,22 @@ pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
     const b = try std.fmt.bufPrint(buf, fmt, .{ blank_mind.shield_amount, blank_mind.duration_secs, description });
     return b;
 }
+
+pub fn getTags(self: *const Spell) Spell.Tag.Array {
+    const blank_mind: @This() = self.kind.blank_mind;
+    const num_str = utl.bufPrintLocal("{d:.0}", .{blank_mind.shield_amount}) catch "";
+    return Spell.Tag.makeArray(&.{
+        &.{
+            .{ .icon = .{ .sprite_enum = .target } },
+            .{ .icon = .{ .sprite_enum = .wizard, .tint = .orange } },
+        },
+        &.{
+            .{ .icon = .{ .sprite_enum = .shield_empty } },
+            .{ .label = Spell.Tag.Label.initTrunc(num_str) },
+        },
+        &.{
+            .{ .icon = .{ .sprite_enum = .arrow_180_CC } },
+            .{ .icon = .{ .sprite_enum = .card } },
+        },
+    });
+}

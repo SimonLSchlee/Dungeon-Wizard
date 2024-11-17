@@ -79,3 +79,20 @@ pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
     const dur_secs: i32 = blackmail.num_stacks * utl.as(i32, @divFloor(StatusEffect.proto_array.get(.blackmailed).cooldown.num_ticks, core.fups_per_sec));
     return std.fmt.bufPrint(buf, fmt, .{ dur_secs, description });
 }
+
+pub fn getTags(self: *const Spell) Spell.Tag.Array {
+    const blackmail: @This() = self.kind.blackmail;
+    _ = blackmail;
+    //const damage_str = utl.bufPrintLocal("{d:.0}", .{blackmail.hit_effect.damage}) catch "";
+    return Spell.Tag.makeArray(&.{
+        &.{
+            .{ .icon = .{ .sprite_enum = .target } },
+            .{ .icon = .{ .sprite_enum = .skull } },
+        },
+        &.{
+            .{ .icon = .{ .sprite_enum = .ouchy_skull } },
+            .{ .icon = .{ .sprite_enum = .heart, .tint = Colorf.rgb(1, 0.4, 0.6) } },
+            .{ .icon = .{ .sprite_enum = .wizard, .tint = .orange } },
+        },
+    });
+}

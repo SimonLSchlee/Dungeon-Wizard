@@ -73,3 +73,18 @@ pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
     const b = try std.fmt.bufPrint(buf, fmt, .{ shield_fu.shield_amount, shield_fu.duration_secs, description });
     return b;
 }
+
+pub fn getTags(self: *const Spell) Spell.Tag.Array {
+    const shield_fu: @This() = self.kind.shield_fu;
+    const num_str = utl.bufPrintLocal("{d:.0}", .{shield_fu.shield_amount}) catch "";
+    return Spell.Tag.makeArray(&.{
+        &.{
+            .{ .icon = .{ .sprite_enum = .target } },
+            .{ .icon = .{ .sprite_enum = .wizard, .tint = .orange } },
+        },
+        &.{
+            .{ .icon = .{ .sprite_enum = .shield_empty } },
+            .{ .label = Spell.Tag.Label.initTrunc(num_str) },
+        },
+    });
+}

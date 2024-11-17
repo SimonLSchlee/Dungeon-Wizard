@@ -104,3 +104,18 @@ pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
     const damage: i32 = utl.as(i32, summonProto.hitbox.?.effect.damage);
     return std.fmt.bufPrint(buf, fmt, .{ hp, damage, description });
 }
+
+pub fn getTags(self: *const Spell) Spell.Tag.Array {
+    _ = self;
+    return Spell.Tag.makeArray(&.{
+        &.{
+            .{ .icon = .{ .sprite_enum = .target } },
+            .{ .icon = .{ .sprite_enum = .mouse } },
+        },
+        &.{
+            .{ .icon = .{ .sprite_enum = .doorway } },
+            .{ .icon = .{ .sprite_enum = .arrow_right } },
+            .{ .icon = .{ .sprite_enum = .monster_with_sword } },
+        },
+    });
+}

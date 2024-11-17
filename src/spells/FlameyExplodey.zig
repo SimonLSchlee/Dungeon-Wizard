@@ -59,11 +59,11 @@ pub const proto = Spell.makeProto(
 );
 
 explode_hit_effect: Thing.HitEffect = .{
-    .damage = 14,
+    .damage = 8,
     .status_stacks = StatusEffect.StacksArray.initDefault(0, .{ .lit = 1 }),
 },
 ball_hit_effect: Thing.HitEffect = .{
-    .damage = 0,
+    .damage = 6,
 },
 ball_radius: f32 = base_ball_radius,
 explode_radius: f32 = base_explode_radius,
@@ -206,4 +206,26 @@ pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
     const ball_damage: i32 = utl.as(i32, flamey_explodey.ball_hit_effect.damage);
     const explode_damage: i32 = utl.as(i32, flamey_explodey.explode_hit_effect.damage);
     return std.fmt.bufPrint(buf, fmt, .{ ball_damage, explode_damage, description });
+}
+
+pub fn getTags(self: *const Spell) Spell.Tag.Array {
+    const flamey_explodey: @This() = self.kind.flamey_explodey;
+    var line_dmg_buf: [3]u8 = undefined;
+    var aoe_dmg_buf: [3]u8 = undefined;
+    const dmg_str = std.fmt.bufPrint(&line_dmg_buf, "{d:.0}", .{flamey_explodey.ball_hit_effect.damage}) catch "";
+    const aoe_dmg_str = std.fmt.bufPrint(&aoe_dmg_buf, "{d:.0}", .{flamey_explodey.explode_hit_effect.damage}) catch "";
+    return Spell.Tag.makeArray(&.{
+        &.{
+            .{ .icon = .{ .sprite_enum = .target } },
+            .{ .icon = .{ .sprite_enum = .mouse } },
+        },
+        &.{
+            .{ .icon = .{ .sprite_enum = .fire } },
+            .{ .label = Spell.Tag.Label.initTrunc(dmg_str) },
+        },
+        &.{
+            .{ .icon = .{ .sprite_enum = .aoe_fire } },
+            .{ .label = Spell.Tag.Label.initTrunc(aoe_dmg_str) },
+        },
+    });
 }

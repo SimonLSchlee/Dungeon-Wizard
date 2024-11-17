@@ -139,3 +139,22 @@ pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
     ;
     return std.fmt.bufPrint(buf, fmt, .{ flame_purge.explode_hit_effect.damage, description, flame_purge.immune_stacks });
 }
+
+pub fn getTags(self: *const Spell) Spell.Tag.Array {
+    const flame_purge: @This() = self.kind.flame_purge;
+    const num_str = utl.bufPrintLocal("{d:.0}", .{flame_purge.explode_hit_effect.damage}) catch "";
+    return Spell.Tag.makeArray(&.{
+        &.{
+            .{ .icon = .{ .sprite_enum = .target } },
+            .{ .icon = .{ .sprite_enum = .wizard, .tint = .orange } },
+        },
+        &.{
+            .{ .icon = .{ .sprite_enum = .water } },
+            .{ .icon = .{ .sprite_enum = .wizard, .tint = .orange } },
+        },
+        &.{
+            .{ .icon = .{ .sprite_enum = .aoe_fire } },
+            .{ .label = Spell.Tag.Label.initTrunc(num_str) },
+        },
+    });
+}

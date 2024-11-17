@@ -166,3 +166,34 @@ pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
     const dur_secs: i32 = zap_dash.end_hit_effect.status_stacks.get(.stunned) * utl.as(i32, @divFloor(StatusEffect.proto_array.get(.stunned).cooldown.num_ticks, core.fups_per_sec));
     return std.fmt.bufPrint(buf, fmt ++ "\n", .{ line_damage, end_damage, dur_secs, description });
 }
+
+pub fn getTags(self: *const Spell) Spell.Tag.Array {
+    const zap_dash: @This() = self.kind.zap_dash;
+    var line_dmg_buf: [3]u8 = undefined;
+    var aoe_dmg_buf: [3]u8 = undefined;
+    const line_dmg_str = std.fmt.bufPrint(&line_dmg_buf, "{d:.0}", .{zap_dash.line_hit_effect.damage}) catch "";
+    const aoe_dmg_str = std.fmt.bufPrint(&aoe_dmg_buf, "{d:.0}", .{zap_dash.end_hit_effect.damage}) catch "";
+    return Spell.Tag.makeArray(&.{
+        &.{
+            .{ .icon = .{ .sprite_enum = .target } },
+            .{ .icon = .{ .sprite_enum = .mouse } },
+        },
+        &.{
+            .{ .icon = .{ .sprite_enum = .wizard } },
+            .{ .icon = .{ .sprite_enum = .arrow_right } },
+            .{ .icon = .{ .sprite_enum = .wizard, .tint = .orange } },
+        },
+        &.{
+            .{ .icon = .{ .sprite_enum = .lightning } },
+            .{ .label = Spell.Tag.Label.initTrunc(line_dmg_str) },
+        },
+        &.{
+            .{ .icon = .{ .sprite_enum = .aoe_lightning } },
+            .{ .label = Spell.Tag.Label.initTrunc(aoe_dmg_str) },
+        },
+        &.{
+            .{ .icon = .{ .sprite_enum = .spiral, .tint = draw.Coloru.rgb(255, 235, 147).toColorf() } },
+            .{ .icon = .{ .sprite_enum = .ouchy_skull } },
+        },
+    });
+}

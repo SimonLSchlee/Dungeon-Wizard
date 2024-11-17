@@ -149,3 +149,21 @@ pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
     const damage: i32 = utl.as(i32, expose.hit_effect.damage);
     return std.fmt.bufPrint(buf, fmt, .{ damage, dur_secs, description });
 }
+
+pub fn getTags(self: *const Spell) Spell.Tag.Array {
+    const expose: @This() = self.kind.expose;
+    const num_str = utl.bufPrintLocal("{d:.0}", .{expose.hit_effect.damage}) catch "";
+    return Spell.Tag.makeArray(&.{
+        &.{
+            .{ .icon = .{ .sprite_enum = .target } },
+            .{ .icon = .{ .sprite_enum = .mouse } },
+        },
+        &.{
+            .{ .icon = .{ .sprite_enum = .aoe_magic } },
+            .{ .label = Spell.Tag.Label.initTrunc(num_str) },
+        },
+        &.{
+            .{ .icon = .{ .sprite_enum = .ouchy_skull, .tint = draw.Coloru.rgb(161, 133, 238).toColorf() } },
+        },
+    });
+}

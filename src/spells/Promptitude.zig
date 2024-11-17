@@ -71,3 +71,17 @@ pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
     const dur_secs: i32 = promptitude.num_stacks * utl.as(i32, @divFloor(StatusEffect.proto_array.get(.promptitude).cooldown.num_ticks, core.fups_per_sec));
     return std.fmt.bufPrint(buf, fmt, .{ dur_secs, description });
 }
+
+pub fn getTags(self: *const Spell) Spell.Tag.Array {
+    _ = self;
+    return Spell.Tag.makeArray(&.{
+        &.{
+            .{ .icon = .{ .sprite_enum = .target } },
+            .{ .icon = .{ .sprite_enum = .wizard, .tint = .orange } },
+        },
+        &.{
+            .{ .icon = .{ .sprite_enum = .fast_forward } },
+            .{ .icon = .{ .sprite_enum = .wizard, .tint = .orange } },
+        },
+    });
+}

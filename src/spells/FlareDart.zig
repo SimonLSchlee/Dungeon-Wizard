@@ -147,15 +147,15 @@ pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
 
 pub fn getTags(self: *const Spell) Spell.Tag.Array {
     const flare_dart: @This() = self.kind.flare_dart;
-    var ret = Spell.Tag.Array{};
-    ret.appendAssumeCapacity(.{ .parts = utl.initBoundedArray(Spell.Tag.PartArray, &.{
-        .{ .icon = .target },
-        .{ .icon = .mouse },
-    }) });
     const damage_str = utl.bufPrintLocal("{d:.0}", .{flare_dart.hit_effect.damage}) catch "";
-    ret.appendAssumeCapacity(.{ .parts = utl.initBoundedArray(Spell.Tag.PartArray, &.{
-        .{ .icon = .fire },
-        .{ .label = Spell.Tag.Label.initTrunc(damage_str) },
-    }) });
-    return ret;
+    return Spell.Tag.makeArray(&.{
+        &.{
+            .{ .icon = .{ .sprite_enum = .target } },
+            .{ .icon = .{ .sprite_enum = .mouse } },
+        },
+        &.{
+            .{ .icon = .{ .sprite_enum = .fire } },
+            .{ .label = Spell.Tag.Label.initTrunc(damage_str) },
+        },
+    });
 }

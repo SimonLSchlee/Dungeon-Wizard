@@ -557,13 +557,32 @@ pub const Tag = struct {
         sword_hilt,
         droplets,
         arrow_shaft,
+        shoes,
+        ouchy_skull,
+        spiral,
+        doorway,
+        monster_with_sword,
+        ice_ball,
+        arrow_180_CC,
     };
     pub const Part = union(enum) {
-        icon: SpriteEnum,
+        icon: struct {
+            sprite_enum: SpriteEnum,
+            tint: Colorf = .white,
+        },
         label: Label,
     };
     pub const PartArray = std.BoundedArray(Part, 6);
+
     parts: PartArray = .{},
+
+    pub fn makeArray(grouped_parts: []const []const Spell.Tag.Part) Spell.Tag.Array {
+        var ret = Spell.Tag.Array{};
+        for (grouped_parts) |parts| {
+            ret.appendAssumeCapacity(.{ .parts = utl.initBoundedArray(Spell.Tag.PartArray, parts) });
+        }
+        return ret;
+    }
 };
 
 pub const CastTime = enum {
@@ -803,8 +822,8 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caste
             var width_x: f32 = 1 * scaling;
             for (tag.parts.constSlice()) |part| {
                 switch (part) {
-                    .icon => |icon_enum| {
-                        width_x += (data.spell_tags_icons.sprite_dims_cropped.?.get(icon_enum).x + 1) * scaling;
+                    .icon => |s| {
+                        width_x += (data.spell_tags_icons.sprite_dims_cropped.?.get(s.sprite_enum).x + 1) * scaling;
                     },
                     .label => |label| {
                         const sz = plat.measureText(label.constSlice(), tag_text_opt) catch V2f{};
@@ -830,9 +849,9 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caste
             var curr_part_topleft = curr_tag_topleft.add(V2f.splat(1 * scaling));
             for (tag.parts.constSlice()) |part| {
                 switch (part) {
-                    .icon => |icon_enum| {
-                        const cropped_dims = data.spell_tags_icons.sprite_dims_cropped.?.get(icon_enum);
-                        if (data.spell_tags_icons.getRenderFrame(icon_enum)) |rf| {
+                    .icon => |s| {
+                        const cropped_dims = data.spell_tags_icons.sprite_dims_cropped.?.get(s.sprite_enum);
+                        if (data.spell_tags_icons.getRenderFrame(s.sprite_enum)) |rf| {
                             cmd_buf.appendAssumeCapacity(.{ .texture = .{
                                 .pos = curr_part_topleft,
                                 .texture = rf.texture,
@@ -840,6 +859,7 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caste
                                     .src_dims = cropped_dims,
                                     .src_pos = rf.pos.toV2f(),
                                     .uniform_scaling = scaling,
+                                    .tint = s.tint,
                                 },
                             } });
                         }
