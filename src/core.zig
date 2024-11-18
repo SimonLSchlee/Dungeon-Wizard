@@ -169,7 +169,7 @@ pub fn nsToSecs(ns: i64) f64 {
     return utl.as(f64, ns) / utl.as(f64, ns_per_sec);
 }
 
-pub const native_dims: V2i = v2i(1280, 800);
+pub const native_dims: V2i = v2i(1280, 720);
 pub const native_dims_f: V2f = native_dims.toV2f();
 pub const native_dims_xy_ratio: f32 = native_dims_f.x / native_dims_f.y;
 pub const supported_resolutions = [_]V2i{

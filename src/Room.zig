@@ -490,7 +490,7 @@ pub fn update(self: *Room) Error!void {
         self.fog.clearVisible();
         if (self.getPlayer()) |player| {
             // TODO better
-            self.camera.pos = player.pos; //.add(v2f(0, plat.native_rect_cropped_dims.y * 0.08));
+            self.camera.pos = player.pos.add(v2f(0, plat.native_rect_cropped_dims.y * 0.125));
             try self.fog.addVisibleCircle(
                 self.tilemap.getRoomRect(),
                 player.pos,

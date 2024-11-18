@@ -679,8 +679,8 @@ pub fn texturef(_: *Platform, pos: V2f, tex: Texture2D, opt: draw.TextureOpt) vo
     };
     const r_filter = switch (opt.smoothing) {
         .none => blk: {
-            dest.x = @floor(dest.x);
-            dest.y = @floor(dest.y);
+            dest.x = @round(dest.x);
+            dest.y = @round(dest.y);
             break :blk r.TEXTURE_FILTER_POINT;
         },
         .bilinear => r.TEXTURE_FILTER_BILINEAR,
