@@ -140,118 +140,6 @@ pub const Button = struct {
     }
 };
 
-pub const HotKeyedButton = struct {
-    key: core.Key,
-    key_str: [3]u8,
-    crect: ClickableRect = .{},
-    poly_opt: draw.PolyOpt = .{
-        .fill_color = Colorf.red.fade(0.5),
-    },
-    hover_timer: ?utl.TickCounter = utl.TickCounter.init(15),
-    cooldown_timer: ?utl.TickCounter = null,
-    text: ?struct {
-        str: utl.BoundedString(64) = .{},
-        padding: V2f = v2f(20, 20),
-        rel_pos: V2f = .{},
-        opt: draw.TextOpt = .{
-            .color = Colorf.black,
-            .center = true,
-        },
-    } = null,
-    icon: ?struct {
-        render_info: sprites.RenderIconInfo,
-        tint: Colorf = .white,
-    } = null,
-
-    pub fn toRectf(self: HotKeyedButton) geom.Rectf {
-        return self.crect.toRectf();
-    }
-    pub fn isLongHovered(self: HotKeyedButton) bool {
-        const hovered = self.crect.isHovered();
-        if (self.hover_timer) |timer| {
-            if (hovered and timer.running) return false;
-        }
-        return hovered;
-    }
-    pub fn isHovered(self: HotKeyedButton) bool {
-        return self.crect.isHovered();
-    }
-    pub fn update(self: *HotKeyedButton) void {
-        const hovered = self.crect.isHovered();
-        if (self.hover_timer) |*timer| {
-            if (hovered) {
-                _ = timer.tick(false);
-            } else {
-                timer.restart();
-            }
-        }
-        if (self.cooldown_timer) |*timer| {
-            if (timer.tick(false)) {
-                self.cooldown_timer = null;
-            }
-        }
-    }
-    pub fn isClicked(self: HotKeyedButton) bool {
-        return self.crect.isClicked();
-    }
-    pub fn isHotkeyed(self: HotKeyedButton) bool {
-        const plat = App.getPlat();
-        return plat.input_buffer.keyIsJustPressed(self.key);
-    }
-    pub fn render(self: HotKeyedButton, enabled: bool) Error!void {
-        const plat = App.getPlat();
-        var rect = self.crect.rect;
-        var border_color = Colorf.darkgray;
-        var key_color = Colorf.gray;
-
-        if (enabled) {
-            key_color = .white;
-            border_color = .blue;
-            if (self.isHovered()) {
-                rect.pos = rect.pos.sub(v2f(5, 5));
-                rect.dims = rect.dims.add(v2f(10, 10));
-            }
-        }
-        plat.rectf(rect.pos, rect.dims, self.poly_opt);
-
-        if (self.cooldown_timer) |timer| {
-            if (timer.running) {
-                sectorTimer(
-                    rect.pos.add(rect.dims.scale(0.5)),
-                    rect.dims.x * 0.5 * 0.7,
-                    timer,
-                    .{ .fill_color = .blue },
-                );
-            }
-        } else {
-            if (self.icon) |icon| {
-                try icon.render_info.renderTint(rect, icon.tint);
-            }
-            if (self.text) |text| {
-                try plat.textf(rect.pos.add(text.rel_pos), "{s}", .{text.str.constSlice()}, text.opt);
-            }
-        }
-
-        // border
-        plat.rectf(
-            rect.pos,
-            rect.dims,
-            .{
-                .fill_color = null,
-                .outline_color = border_color,
-                .outline_thickness = 4,
-            },
-        );
-        // hotkey
-        try plat.textf(
-            rect.pos.add(v2f(1, 1)),
-            "{s}",
-            .{&self.key_str},
-            .{ .color = key_color },
-        );
-    }
-};
-
 pub fn sectorTimer(pos: V2f, radius: f32, timer: utl.TickCounter, poly_opt: draw.PolyOpt) void {
     const plat = App.getPlat();
     const rads = timer.remapTo0_1() * utl.tau;
@@ -278,7 +166,7 @@ pub fn unqSectorTimer(cmd_buf: *ImmUI.CmdBuf, pos: V2f, radius: f32, timer: *con
     const secs_left_str = utl.bufPrintLocal("{}", .{secs_left}) catch @panic("Fail to format secs_left");
     cmd_buf.append(.{ .label = .{
         .pos = pos,
-        .text = ImmUI.Command.LabelString.initTrunc(secs_left_str),
+        .text = ImmUI.initLabel(secs_left_str),
         .opt = .{
             .center = true,
             .color = .white,

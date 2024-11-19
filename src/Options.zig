@@ -199,7 +199,7 @@ pub fn layoutUI(self: *Options) void {
                     .value_rect = .{ .pos = curr_element_pos },
                     .kind = .{
                         .dropdown = .{
-                            .label = UIShortString.initTrunc(sfield.name),
+                            .label = UIShortString.fromSlice(sfield.name) catch unreachable,
                             .items = .{},
                             .selected_idx = if (sfield.default_value) |vptr| @intFromEnum(@as(*const sfield.type, @ptrCast(vptr)).*) else 0,
                         },
@@ -214,7 +214,7 @@ pub fn layoutUI(self: *Options) void {
                 var label_max_width: f32 = 0;
                 inline for (info.fields) |efield| {
                     var label: ClickableLabel = .{
-                        .text = UIShortString.initTrunc(efield.name),
+                        .text = UIShortString.fromSlice(efield.name) catch unreachable,
                         .rect = .{
                             .pos = curr_label_pos,
                         },
@@ -261,7 +261,7 @@ pub fn layoutUI(self: *Options) void {
                 },
             },
         };
-        self.ui.back_button.text = @TypeOf(self.ui.back_button.text).init("Back") catch unreachable;
+        self.ui.back_button.text = @TypeOf(self.ui.back_button.text).fromSlice("Back") catch unreachable;
         curr_element_pos.y += btn_dims.y + ui_el_text_padding.y * 2;
     }
     // ui rect finally

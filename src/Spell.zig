@@ -579,9 +579,15 @@ pub const Tag = struct {
     pub fn makeArray(grouped_parts: []const []const Spell.Tag.Part) Spell.Tag.Array {
         var ret = Spell.Tag.Array{};
         for (grouped_parts) |parts| {
-            ret.appendAssumeCapacity(.{ .parts = utl.initBoundedArray(Spell.Tag.PartArray, parts) });
+            ret.appendAssumeCapacity(.{
+                .parts = Spell.Tag.PartArray.fromSlice(parts) catch @panic("too many parts"),
+            });
         }
         return ret;
+    }
+    pub fn fmtLabel(comptime fmt: []const u8, args: anytype) Label {
+        const str = utl.bufPrintLocal(fmt, args) catch "E:FMT";
+        return Label.fromSlice(str) catch Label.fromSlice("E:OVRFLW") catch unreachable;
     }
 };
 
@@ -765,7 +771,7 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caste
     const title_font = data.fonts.get(.pixeloid);
     cmd_buf.appendAssumeCapacity(.{ .label = .{
         .pos = title_center_pos,
-        .text = ImmUI.Command.LabelString.initTrunc(self.getName()),
+        .text = ImmUI.initLabel(self.getName()),
         .opt = .{
             .color = .white,
             .size = title_font.base_size * utl.as(u32, scaling),
@@ -869,7 +875,7 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caste
                         const sz = plat.measureText(label.constSlice(), tag_text_opt) catch V2f{};
                         cmd_buf.appendAssumeCapacity(.{ .label = .{
                             .pos = curr_part_topleft,
-                            .text = ImmUI.Command.LabelString.initTrunc(label.constSlice()),
+                            .text = ImmUI.initLabel(label.constSlice()),
                             .opt = tag_text_opt,
                         } });
                         curr_part_topleft.x += sz.x + 1 * scaling;

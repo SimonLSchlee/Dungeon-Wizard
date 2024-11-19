@@ -73,7 +73,7 @@ pub fn init(seed: u64) Error!Shop {
         .text_opt = .{ .center = true, .color = .black, .size = 30 },
         .text_rel_pos = proceed_btn_dims.scale(0.5),
     };
-    proceed_btn.text = @TypeOf(proceed_btn.text).init("Proceed") catch unreachable;
+    proceed_btn.text = @TypeOf(proceed_btn.text).fromSlice("Proceed") catch unreachable;
 
     var ret = Shop{
         .render_texture = plat.createRenderTexture("shop", core.native_dims),
@@ -206,7 +206,7 @@ pub fn update(self: *Shop, run: *const Run) Error!?Product {
         const price_str = try u.bufPrintLocal("${}", .{product.price.gold});
         try self.imm_ui.commands.append(.{ .label = .{
             .pos = price_pos,
-            .text = ImmUI.Command.LabelString.initTrunc(price_str),
+            .text = ImmUI.initLabel(price_str),
             .opt = .{
                 .center = true,
                 .color = .yellow,

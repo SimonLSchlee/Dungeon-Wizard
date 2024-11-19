@@ -18,6 +18,15 @@ const ImmUI = @This();
 const App = @import("App.zig");
 const getPlat = App.getPlat;
 
+pub fn initLabel(str: []const u8) Command.LabelString {
+    return Command.LabelString.fromSlice(str) catch {
+        var ret = Command.LabelString{};
+        ret.len = ret.buffer.len;
+        @memcpy(&ret.buffer, str[0..ret.len]);
+        return ret;
+    };
+}
+
 pub const Command = union(enum) {
     pub const LabelString = utl.BoundedString(128);
     pub const Panel = struct {

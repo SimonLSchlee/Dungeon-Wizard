@@ -389,7 +389,7 @@ pub fn loadSpriteSheetFromJsonString(sheet_filename: []const u8, json_string: []
     var sheet = SpriteSheet{};
     var it_dot = std.mem.tokenizeScalar(u8, sheet_filename, '.');
     const sheet_name = it_dot.next().?;
-    sheet.name = try @TypeOf(sheet.name).init(sheet_name);
+    sheet.name = try @TypeOf(sheet.name).fromSlice(sheet_name);
     const tex = try plat.loadTexture(image_path);
     assert(tex.r_tex.height > 0);
     sheet.texture = tex;
@@ -408,7 +408,7 @@ pub fn loadSpriteSheetFromJsonString(sheet_filename: []const u8, json_string: []
         assert(from >= 0 and from <= frames.items.len);
         assert(to >= from and to <= frames.items.len);
         try sheet_tags.append(.{
-            .name = try @TypeOf(sheet.tags[0].name).init(name),
+            .name = try @TypeOf(sheet.tags[0].name).fromSlice(name),
             .from_frame = u.as(i32, from),
             .to_frame = u.as(i32, to),
         });
@@ -441,7 +441,7 @@ pub fn loadSpriteSheetFromJsonString(sheet_filename: []const u8, json_string: []
                             const key = it_eq.next().?;
                             const val = it_eq.next().?;
                             var m = SpriteSheet.Meta{};
-                            m.name = try @TypeOf(m.name).init(key);
+                            m.name = try @TypeOf(m.name).fromSlice(key);
                             blk: {
                                 int_blk: {
                                     const int = std.fmt.parseInt(i64, val, 0) catch break :int_blk;
@@ -453,7 +453,7 @@ pub fn loadSpriteSheetFromJsonString(sheet_filename: []const u8, json_string: []
                                     m.data.float = float;
                                     break :blk;
                                 }
-                                m.data.string = try @TypeOf(m.data.string).init(val);
+                                m.data.string = try @TypeOf(m.data.string).fromSlice(val);
                             }
                             try sheet_meta.append(m);
                         }
@@ -669,7 +669,7 @@ pub fn loadTileSetFromJsonString(tileset: *TileSet, json_string: []u8, assets_re
     const sheet_dims = V2i.iToV2i(i64, columns, @divExact(image_dims.y, tile_dims.y));
 
     tileset.* = .{
-        .name = try TileSet.NameBuf.init(name),
+        .name = try TileSet.NameBuf.fromSlice(name),
         .sheet_dims = sheet_dims,
         .tile_dims = tile_dims,
         .texture = try plat.loadTexture(image_path),
@@ -766,7 +766,7 @@ pub fn loadTileMapFromJsonString(tilemap: *TileMap, json_string: []u8) Error!voi
             const p_name = p.object.get("name").?.string;
             if (std.mem.eql(u8, p_name, "name")) {
                 const name = p.object.get("value").?.string;
-                tilemap.name = try TileMap.NameBuf.init(name);
+                tilemap.name = try TileMap.NameBuf.fromSlice(name);
                 continue;
             } else if (std.mem.eql(u8, p_name, "room_kind")) {
                 const kind_str = p.object.get("value").?.string;
@@ -784,7 +784,7 @@ pub fn loadTileMapFromJsonString(tilemap: *TileMap, json_string: []u8) Error!voi
             const tileset_file_name = std.fs.path.basename(tileset_path);
             const tileset_name = tileset_file_name[0..(tileset_file_name.len - 4)];
             try tilemap.tilesets.append(.{
-                .name = try TileSet.NameBuf.init(tileset_name),
+                .name = try TileSet.NameBuf.fromSlice(tileset_name),
                 .first_gid = u.as(usize, first_gid),
             });
         }

@@ -115,7 +115,6 @@ pub const Projectile = struct {
 
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
     assert(std.meta.activeTag(params.target) == Spell.TargetKind.thing);
-    assert(utl.unionTagEql(params.target, .{ .thing = .{} }));
 
     const _target = room.getThingById(params.target.thing);
     if (_target == null) {
@@ -172,7 +171,6 @@ pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
 
 pub fn getTags(self: *const Spell) Spell.Tag.Array {
     const unherring: @This() = self.kind.unherring;
-    const damage_str = utl.bufPrintLocal("{d:.0}", .{unherring.hit_effect.damage}) catch "";
     return Spell.Tag.makeArray(&.{
         &.{
             .{ .icon = .{ .sprite_enum = .target } },
@@ -180,7 +178,7 @@ pub fn getTags(self: *const Spell) Spell.Tag.Array {
         },
         &.{
             .{ .icon = .{ .sprite_enum = .magic } },
-            .{ .label = Spell.Tag.Label.initTrunc(damage_str) },
+            .{ .label = Spell.Tag.fmtLabel("{d:.0}", .{unherring.hit_effect.damage}) },
         },
     });
 }

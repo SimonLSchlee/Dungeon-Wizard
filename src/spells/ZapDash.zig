@@ -169,10 +169,6 @@ pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
 
 pub fn getTags(self: *const Spell) Spell.Tag.Array {
     const zap_dash: @This() = self.kind.zap_dash;
-    var line_dmg_buf: [3]u8 = undefined;
-    var aoe_dmg_buf: [3]u8 = undefined;
-    const line_dmg_str = std.fmt.bufPrint(&line_dmg_buf, "{d:.0}", .{zap_dash.line_hit_effect.damage}) catch "";
-    const aoe_dmg_str = std.fmt.bufPrint(&aoe_dmg_buf, "{d:.0}", .{zap_dash.end_hit_effect.damage}) catch "";
     return Spell.Tag.makeArray(&.{
         &.{
             .{ .icon = .{ .sprite_enum = .target } },
@@ -185,11 +181,11 @@ pub fn getTags(self: *const Spell) Spell.Tag.Array {
         },
         &.{
             .{ .icon = .{ .sprite_enum = .lightning } },
-            .{ .label = Spell.Tag.Label.initTrunc(line_dmg_str) },
+            .{ .label = Spell.Tag.fmtLabel("{d:.0}", .{zap_dash.line_hit_effect.damage}) },
         },
         &.{
             .{ .icon = .{ .sprite_enum = .aoe_lightning } },
-            .{ .label = Spell.Tag.Label.initTrunc(aoe_dmg_str) },
+            .{ .label = Spell.Tag.fmtLabel("{d:.0}", .{zap_dash.end_hit_effect.damage}) },
         },
         &.{
             .{ .icon = .{ .sprite_enum = .spiral, .tint = draw.Coloru.rgb(255, 235, 147).toColorf() } },

@@ -210,10 +210,6 @@ pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
 
 pub fn getTags(self: *const Spell) Spell.Tag.Array {
     const flamey_explodey: @This() = self.kind.flamey_explodey;
-    var line_dmg_buf: [3]u8 = undefined;
-    var aoe_dmg_buf: [3]u8 = undefined;
-    const dmg_str = std.fmt.bufPrint(&line_dmg_buf, "{d:.0}", .{flamey_explodey.ball_hit_effect.damage}) catch "";
-    const aoe_dmg_str = std.fmt.bufPrint(&aoe_dmg_buf, "{d:.0}", .{flamey_explodey.explode_hit_effect.damage}) catch "";
     return Spell.Tag.makeArray(&.{
         &.{
             .{ .icon = .{ .sprite_enum = .target } },
@@ -221,11 +217,11 @@ pub fn getTags(self: *const Spell) Spell.Tag.Array {
         },
         &.{
             .{ .icon = .{ .sprite_enum = .fire } },
-            .{ .label = Spell.Tag.Label.initTrunc(dmg_str) },
+            .{ .label = Spell.Tag.fmtLabel("{d:.0}", .{flamey_explodey.ball_hit_effect.damage}) },
         },
         &.{
             .{ .icon = .{ .sprite_enum = .aoe_fire } },
-            .{ .label = Spell.Tag.Label.initTrunc(aoe_dmg_str) },
+            .{ .label = Spell.Tag.fmtLabel("{d:.0}", .{flamey_explodey.explode_hit_effect.damage}) },
         },
     });
 }

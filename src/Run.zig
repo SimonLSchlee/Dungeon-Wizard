@@ -512,7 +512,7 @@ pub fn rewardSpellChoiceUI(self: *Run, idx: usize) Error!void {
     const title_center = v2f(modal_center_x, curr_row_y + 40);
     self.imm_ui.commands.appendAssumeCapacity(.{ .label = .{
         .pos = title_center,
-        .text = ImmUI.Command.LabelString.initTrunc("Choose a spell"),
+        .text = ImmUI.initLabel("Choose a spell"),
         .opt = .{
             .size = 40,
             .color = .white,
@@ -597,7 +597,7 @@ pub fn rewardUpdate(self: *Run) Error!void {
     const title_center = v2f(modal_center_x, curr_row_y + 40);
     self.imm_ui.commands.appendAssumeCapacity(.{ .label = .{
         .pos = title_center,
-        .text = ImmUI.Command.LabelString.initTrunc("Found some stuff"),
+        .text = ImmUI.initLabel("Found some stuff"),
         .opt = .{
             .size = 40,
             .color = .white,
@@ -640,7 +640,7 @@ pub fn rewardUpdate(self: *Run) Error!void {
                 } });
                 self.imm_ui.commands.appendAssumeCapacity(.{ .label = .{
                     .pos = row_text_pos,
-                    .text = ImmUI.Command.LabelString.initTrunc("Spell"),
+                    .text = ImmUI.initLabel("Spell"),
                     .opt = .{
                         .color = .white,
                     },
@@ -653,7 +653,7 @@ pub fn rewardUpdate(self: *Run) Error!void {
                 try item.unqRenderIcon(&self.imm_ui.commands, .{ .pos = row_icon_pos, .dims = row_rect_dims });
                 self.imm_ui.commands.appendAssumeCapacity(.{ .label = .{
                     .pos = row_text_pos,
-                    .text = ImmUI.Command.LabelString.initTrunc(item.getName()),
+                    .text = ImmUI.initLabel(item.getName()),
                     .opt = .{
                         .color = .white,
                     },
@@ -677,7 +677,7 @@ pub fn rewardUpdate(self: *Run) Error!void {
                 const gold_str = try u.bufPrintLocal("{}", .{gold_amount});
                 self.imm_ui.commands.appendAssumeCapacity(.{ .label = .{
                     .pos = row_text_pos,
-                    .text = ImmUI.Command.LabelString.initTrunc(gold_str),
+                    .text = ImmUI.initLabel(gold_str),
                     .opt = .{
                         .color = .white,
                     },
@@ -815,7 +815,7 @@ fn makeDeadMenu() DeadMenu {
             .size = 30,
         },
     };
-    modal.title = @TypeOf(modal.title).init("Your HP reached 0") catch unreachable;
+    modal.title = @TypeOf(modal.title).fromSlice("Your HP reached 0") catch unreachable;
     modal.title_rel_pos = v2f(modal_dims.x * 0.5, modal.padding.y + 15);
 
     const button_dims = v2f(230, 100);
@@ -829,15 +829,15 @@ fn makeDeadMenu() DeadMenu {
     };
     var new_run_btn = btn_proto;
     new_run_btn.clickable_rect.rect = btn_rects.buffer[0];
-    new_run_btn.text = @TypeOf(btn_proto.text).init("New Run") catch unreachable;
+    new_run_btn.text = @TypeOf(btn_proto.text).fromSlice("New Run") catch unreachable;
     var quit_btn = btn_proto;
     quit_btn.clickable_rect.rect = btn_rects.buffer[1];
-    quit_btn.text = @TypeOf(btn_proto.text).init("Quit") catch unreachable;
+    quit_btn.text = @TypeOf(btn_proto.text).fromSlice("Quit") catch unreachable;
 
     var retry_btn = btn_proto;
     retry_btn.poly_opt.fill_color = Colorf.blue;
     retry_btn.clickable_rect.rect = btn_rects.buffer[2];
-    retry_btn.text = @TypeOf(btn_proto.text).init("Retry Room\n(debug only)") catch unreachable;
+    retry_btn.text = @TypeOf(btn_proto.text).fromSlice("Retry Room\n(debug only)") catch unreachable;
 
     return DeadMenu{
         .modal = modal,
@@ -860,7 +860,7 @@ fn makeGamePauseUI() GamePauseUI {
         .text_opt = .{ .center = true, .color = .black, .size = 30 },
         .text_rel_pos = button_dims.scale(0.5),
     };
-    deck_button.text = @TypeOf(deck_button.text).init("Deck") catch unreachable;
+    deck_button.text = @TypeOf(deck_button.text).fromSlice("Deck") catch unreachable;
 
     var pause_menu_button = menuUI.Button{
         .clickable_rect = .{ .rect = .{
@@ -871,7 +871,7 @@ fn makeGamePauseUI() GamePauseUI {
         .text_opt = .{ .center = true, .color = .black, .size = 30 },
         .text_rel_pos = button_dims.scale(0.5),
     };
-    pause_menu_button.text = @TypeOf(pause_menu_button.text).init("Menu") catch unreachable;
+    pause_menu_button.text = @TypeOf(pause_menu_button.text).fromSlice("Menu") catch unreachable;
 
     return .{
         .deck_button = deck_button,

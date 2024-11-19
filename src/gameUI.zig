@@ -127,7 +127,7 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, 
             .pause => {
                 cmd_buf.appendAssumeCapacity(.{ .label = .{
                     .pos = rect.pos.add(v2f(2, 24)),
-                    .text = ImmUI.Command.LabelString.initTrunc(if (room.paused) "paused" else "not paused"),
+                    .text = ImmUI.initLabel(if (room.paused) "paused" else "not paused"),
                     .opt = .{
                         .color = .white,
                         .size = 10 * ui_scaling,
@@ -184,7 +184,7 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, 
     } }) catch @panic("Fail to append label cmd");
     cmd_buf.append(.{ .label = .{
         .pos = key_rect_pos.add(v2f(2, 2).scale(ui_scaling)),
-        .text = ImmUI.Command.LabelString.initTrunc(key_str),
+        .text = ImmUI.initLabel(key_str),
         .opt = key_text_opt,
     } }) catch @panic("Fail to append label cmd");
 
@@ -279,7 +279,7 @@ pub const Slots = struct {
             var slot = Slot{
                 .idx = i,
                 .key = spell_idx_to_key[i],
-                .key_str = Slot.KeyStr.initTrunc(&spell_idx_to_key_str[i]),
+                .key_str = Slot.KeyStr.fromSlice(&spell_idx_to_key_str[i]) catch unreachable,
                 .cooldown_timer = utl.TickCounter.init(90),
             };
             if (room.drawSpell()) |spell| {
@@ -292,7 +292,7 @@ pub const Slots = struct {
             var slot = Slot{
                 .idx = i,
                 .key = item_idx_to_key[i],
-                .key_str = Slot.KeyStr.initTrunc(&item_idx_to_key_str[i]),
+                .key_str = Slot.KeyStr.fromSlice(&item_idx_to_key_str[i]) catch unreachable,
             };
             if (maybe_item) |item| {
                 slot.kind = .{ .action = .{ .item = item } };
@@ -304,14 +304,14 @@ pub const Slots = struct {
             ret.discard_slot = .{
                 .idx = 0,
                 .key = discard_key,
-                .key_str = Slot.KeyStr.initTrunc("[D]"),
+                .key_str = Slot.KeyStr.fromSlice("[D]") catch unreachable,
                 .kind = .{ .action = .discard },
             };
         }
 
         ret.pause_slot = .{
             .idx = 0,
-            .key_str = Slot.KeyStr.initTrunc("[SPC]"),
+            .key_str = Slot.KeyStr.fromSlice("[SPC]") catch unreachable,
             .key = .space,
             .kind = .pause,
         };

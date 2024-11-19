@@ -137,7 +137,7 @@ pub fn menuButton(cmd_buf: *ImmUI.CmdBuf, pos: V2f, str: []const u8, dims: V2f) 
     cmd_buf.append(.{
         .label = .{
             .pos = pos.add(dims.scale(0.5)),
-            .text = ImmUI.Command.LabelString.initTrunc(str),
+            .text = ImmUI.initLabel(str),
             .opt = .{
                 .center = true,
                 .color = .black,
@@ -185,7 +185,7 @@ fn menuUpdate(self: *App) Error!void {
     self.menu_ui.commands.append(.{
         .label = .{
             .pos = title_center,
-            .text = ImmUI.Command.LabelString.initTrunc(title_text),
+            .text = ImmUI.initLabel(title_text),
             .opt = title_opt,
         },
     }) catch unreachable;

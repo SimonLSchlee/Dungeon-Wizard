@@ -88,31 +88,6 @@ pub inline fn clampf(x: f32, lo: f32, hi: f32) f32 {
     return clamp(f32, x, lo, hi);
 }
 
-pub fn initBoundedArray(BoundedArrayType: type, items: []const @TypeOf((BoundedArrayType{}).buffer[0])) BoundedArrayType {
-    var ret: BoundedArrayType = .{};
-    for (items) |item| {
-        ret.append(item) catch break;
-    }
-    return ret;
-}
-
-pub fn unionTagEql(a: anytype, b: @TypeOf(a)) bool {
-    const T = @TypeOf(a);
-    switch (@typeInfo(T)) {
-        .@"union" => |info| {
-            if (info.tag_type) |UnionTag| {
-                const tag_a: UnionTag = a;
-                const tag_b: UnionTag = b;
-                return tag_a == tag_b;
-            }
-        },
-        else => {
-            @compileError("Can only compare unions");
-        },
-    }
-    return false;
-}
-
 pub inline fn lerpf(a: f32, b: f32, t: f32) f32 {
     return (1 - t) * a + b * t;
 }
@@ -283,35 +258,5 @@ pub const TickCounter = struct {
 };
 
 pub fn BoundedString(max_len: usize) type {
-    const Error = error{
-        NoSpaceLeft,
-    };
-    return struct {
-        buf: [max_len]u8 = .{0} ** max_len,
-        len: usize = 0,
-
-        pub fn init(str: []const u8) !@This() {
-            var ret = @This(){};
-            if (str.len > max_len) {
-                return Error.NoSpaceLeft;
-            }
-            std.mem.copyForwards(u8, &ret.buf, str);
-            ret.len = str.len;
-            return ret;
-        }
-        pub fn initTrunc(str: []const u8) @This() {
-            var ret = @This(){};
-            const len = @min(str.len, ret.buf.len);
-            const str_trunc = str[0..len];
-            std.mem.copyForwards(u8, &ret.buf, str_trunc);
-            ret.len = str.len;
-            return ret;
-        }
-        pub fn slice(self: *@This()) []u8 {
-            return self.buf[0..self.len];
-        }
-        pub fn constSlice(self: *const @This()) []const u8 {
-            return self.buf[0..self.len];
-        }
-    };
+    return std.BoundedArray(u8, max_len);
 }
