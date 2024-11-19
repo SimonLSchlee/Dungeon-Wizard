@@ -496,6 +496,14 @@ pub fn update(self: *Room) Error!void {
                 player.pos,
                 player.vision_range + player.coll_radius,
             );
+            if (false) { // test triangle in fog map
+                const points = [_]V2f{
+                    player.pos.add(v2f(200, 200)),
+                    player.pos.add(v2f(-200, 200)),
+                    player.pos.add(v2f(0, -300)),
+                };
+                try self.fog.addVisiblePoly(self.tilemap.getRoomRect(), &points);
+            }
         }
     }
 
@@ -595,6 +603,17 @@ pub fn render(self: *const Room, native_render_texture: Platform.RenderTexture2D
     if (debug.show_tilemap_grid) {
         self.tilemap.debugDraw(self.camera);
     }
+    // show LOS raycast
+    if (false) {
+        if (self.getConstPlayer()) |player| {
+            const mouse_pos = plat.getMousePosWorld(self.camera);
+            plat.linef(player.pos, mouse_pos, 2, .red);
+            if (self.tilemap.raycastLOS(player.pos, mouse_pos)) |tile_coord| {
+                const rect = TileMap.tileCoordToRect(tile_coord);
+                plat.rectf(rect.pos, rect.dims, .{ .fill_color = Colorf.red.fade(0.4) });
+            }
+        }
+    }
     plat.endCamera2D();
 
     if (fog_enabled) {
@@ -602,7 +621,9 @@ pub fn render(self: *const Room, native_render_texture: Platform.RenderTexture2D
             .flip_y = true,
         };
         plat.setBlend(.multiply);
+        //plat.setShader(App.get().data.shaders.get(.fog_blur));
         plat.texturef(.{}, self.fog.render_tex.texture, fog_texture_opt);
+        //plat.setDefaultShader();
         plat.setBlend(.render_tex_alpha);
     }
 
