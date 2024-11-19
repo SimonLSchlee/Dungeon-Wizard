@@ -21,23 +21,53 @@ const Thing = @import("Thing.zig");
 const Room = @import("Room.zig");
 const TileMap = @import("TileMap.zig");
 
-const AttackType = union(enum) {
-    melee: struct {
-        lunge_accel: ?Thing.AccelParams = null,
-        hit_to_side_force: f32 = 0,
-    },
-    projectile: EnemyProjectile,
-};
-
-const EnemyProjectile = enum {
+pub const Projectile = enum {
     arrow,
 
-    pub fn prototype(self: EnemyProjectile) Thing {
+    pub fn prototype(self: Projectile) Thing {
         switch (self) {
             .arrow => return gobbowArrow(),
         }
         unreachable;
     }
+};
+
+pub const MeleeAttack = struct {
+    hitbox: Thing.HitBox,
+    LOS_thiccness: f32 = 10,
+    lunge_accel: ?Thing.AccelParams = null,
+    hit_to_side_force: f32 = 0,
+    range: f32 = 40,
+};
+
+pub const ProjectileAttack = struct {
+    projectile: Projectile,
+    range: f32 = 100,
+    LOS_thiccness: f32 = 10,
+};
+
+pub const Action = struct {
+    pub const Array = std.BoundedArray(Action, 8);
+    pub const Kind = enum {
+        melee_attack,
+        projectile_attack,
+    };
+    pub const KindData = union(Kind) {
+        melee_attack: MeleeAttack,
+        projectile_attack: ProjectileAttack,
+    };
+    pub const Params = struct {
+        thing: ?Thing.Id = null,
+        pos: V2f = .{}, // there has to be a position. (it may not matter though.)
+    };
+    pub const Doing = struct {
+        idx: usize,
+        params: Params,
+        can_turn: bool = true,
+    };
+    kind: KindData,
+    priority: f32 = 0, // higher means...higher... priority
+    cooldown: utl.TickCounter = utl.TickCounter.initStopped(60),
 };
 
 fn gobbowArrow() Thing {
@@ -104,212 +134,285 @@ pub fn getNearestOpposingThing(self: *Thing, room: *Room) ?*Thing {
     return closest;
 }
 
+pub const AIState = enum {
+    idle,
+    pursue,
+    action,
+};
+
+pub fn canDoAction(self: *const Thing, room: *const Room, action: *const Action, params: Action.Params) bool {
+    switch (action.kind) {
+        inline else => |atk| {
+            const target: *const Thing = if (params.thing) |id| if (room.getConstThingById(id)) |t| t else return false else return false;
+            const dist = target.pos.dist(self.pos);
+            const range = @max(dist - self.coll_radius - target.coll_radius, 0);
+            if (range <= atk.range and room.tilemap.isLOSBetweenThicc(self.pos, target.pos, atk.LOS_thiccness)) {
+                return true;
+            }
+        },
+    }
+    return false;
+}
+
+pub fn startAction(self: *Thing, room: *Room, doing: *Action.Doing, action: *Action) Error!bool {
+    const maybe_target_thing: ?*const Thing =
+        if (doing.params.thing) |target_id|
+        if (room.getConstThingById(target_id)) |t| t else null
+    else
+        null;
+    // make sure we always have a pos in the params, if we have a Thing
+    if (maybe_target_thing) |t| {
+        doing.params.pos = t.pos;
+    }
+    // TODO other stuff - maybe set pos to self.pos by default? idk
+    // face what we're doing
+    self.dir = doing.params.pos.sub(self.pos).normalizedChecked() orelse self.dir;
+
+    return try continueAction(self, room, doing, action);
+}
+
+// return true if done
+pub fn continueAction(self: *Thing, room: *Room, doing: *Action.Doing, action: *Action) Error!bool {
+    const maybe_target_thing: ?*const Thing =
+        if (doing.params.thing) |target_id|
+        if (room.getConstThingById(target_id)) |t| t else null
+    else
+        null;
+
+    switch (action.kind) {
+        .melee_attack => |melee| {
+            self.updateVel(.{}, .{});
+            const events = self.animator.?.play(.attack, .{ .loop = true });
+            if (events.contains(.commit)) {
+                doing.can_turn = false;
+            }
+            // predict hit
+            if (doing.can_turn) {
+                if (maybe_target_thing) |target| {
+                    if (self.animator.?.getTicksUntilEvent(.hit)) |ticks_til_hit_event| {
+                        if (target.hurtbox) |hurtbox| {
+                            const dist = target.pos.dist(self.pos);
+                            const range = @max(dist - hurtbox.radius, 0);
+                            var ticks_til_hit = utl.as(f32, ticks_til_hit_event);
+                            if (melee.lunge_accel) |accel| {
+                                ticks_til_hit += range / accel.max_speed;
+                            }
+                            const target_pos = target.pos.add(target.vel.scale(ticks_til_hit));
+                            self.dir = target_pos.sub(self.pos).normalizedChecked() orelse self.dir;
+                        }
+                    }
+                }
+            }
+            // end and hit are mutually exclusive
+            if (events.contains(.end)) {
+                // deactivate hitbox
+                if (self.hitbox) |*hitbox| {
+                    hitbox.active = false;
+                }
+                if (melee.lunge_accel) |accel_params| {
+                    self.coll_mask.insert(.creature);
+                    self.coll_layer.insert(.creature);
+                    self.updateVel(.{}, .{ .friction = accel_params.max_speed });
+                }
+                action.cooldown.restart();
+                return true;
+            }
+
+            if (events.contains(.hit)) {
+                self.renderer.creature.draw_color = Colorf.red;
+                self.hitbox = melee.hitbox;
+                const hitbox = &self.hitbox.?;
+                //std.debug.print("hit targetu\n", .{});
+                hitbox.mask = Thing.Faction.opposing_masks.get(self.faction);
+                const dir_ang = self.dir.toAngleRadians();
+                hitbox.rel_pos = V2f.fromAngleRadians(dir_ang).scale(hitbox.rel_pos.length());
+                if (hitbox.sweep_to_rel_pos) |*sw| {
+                    sw.* = V2f.fromAngleRadians(dir_ang).scale(sw.length());
+                }
+                hitbox.active = true;
+                if (maybe_target_thing) |target_thing| {
+                    if (melee.hit_to_side_force > 0) {
+                        const d = if (self.dir.cross(target_thing.pos.sub(self.pos)) > 0) self.dir.rotRadians(-utl.pi / 3) else self.dir.rotRadians(utl.pi / 3);
+                        hitbox.effect.force = .{ .fixed = d.scale(melee.hit_to_side_force) };
+                    }
+                }
+                // play sound
+                if (App.get().data.sounds.get(.thwack)) |s| {
+                    App.getPlat().playSound(s);
+                }
+
+                if (melee.lunge_accel) |accel_params| {
+                    self.coll_mask.remove(.creature);
+                    self.coll_layer.remove(.creature);
+                    self.updateVel(self.dir, accel_params);
+                }
+            }
+        },
+        .projectile_attack => |atk| {
+            self.updateVel(.{}, .{});
+            const events = self.animator.?.play(.attack, .{ .loop = true });
+            if (events.contains(.commit)) {
+                doing.can_turn = false;
+            }
+            // face/track target
+            var projectile = atk.projectile.prototype();
+            if (doing.can_turn) {
+                // default to original target pos
+                self.dir = doing.params.pos.sub(self.pos).normalizedChecked() orelse self.dir;
+                if (maybe_target_thing) |target| {
+                    if (self.animator.?.getTicksUntilEvent(.hit)) |ticks_til_hit_event| {
+                        if (target.hurtbox) |hurtbox| { // TODO hurtbox pos?
+                            const dist = target.pos.dist(self.pos);
+                            const range = @max(dist - hurtbox.radius, 0);
+                            var ticks_til_hit = utl.as(f32, ticks_til_hit_event);
+                            ticks_til_hit += range / projectile.accel_params.max_speed;
+                            const predicted_target_pos = target.pos.add(target.vel.scale(ticks_til_hit));
+                            // make sure we can actually still get past nearby walls with this new angle!
+                            if (room.tilemap.isLOSBetweenThicc(self.pos, predicted_target_pos, atk.LOS_thiccness)) {
+                                self.dir = predicted_target_pos.sub(self.pos).normalizedChecked() orelse self.dir;
+                            } else if (room.tilemap.isLOSBetweenThicc(self.pos, target.pos, atk.LOS_thiccness)) {
+                                // otherwise just face target directly
+                                self.dir = target.pos.sub(self.pos).normalizedChecked() orelse self.dir;
+                            }
+                        }
+                    }
+                }
+            }
+            if (events.contains(.end)) {
+                //std.debug.print("attack end\n", .{});
+                action.cooldown.restart();
+                return true;
+            }
+
+            if (events.contains(.hit)) {
+                self.renderer.creature.draw_color = Colorf.red;
+                projectile.dir = self.dir;
+                projectile.hitbox.?.mask = Thing.Faction.opposing_masks.get(self.faction);
+                switch (atk.projectile) {
+                    .arrow => {
+                        projectile.hitbox.?.rel_pos = self.dir.scale(28);
+                        _ = try room.queueSpawnThing(&projectile, self.pos);
+                    },
+                }
+            }
+        },
+    }
+    return false;
+}
+
 pub const AIController = struct {
-    state: enum {
-        idle,
-        pursue,
-        attack,
-    } = .idle,
-    ticks_in_state: i64 = 0,
-    target: ?Thing.Id = null,
-    attack_range: f32 = 40,
-    attack_cooldown: utl.TickCounter = utl.TickCounter.initStopped(60),
-    can_turn_during_attack: bool = true,
-    attack_type: AttackType = .{ .melee = .{} },
-    LOS_thiccness: f32 = 10,
+    state: AIState = .idle,
+    actions: Action.Array = .{},
+    doing: ?Action.Doing = null,
 
     pub fn update(self: *Thing, room: *Room) Error!void {
         assert(self.spawn_state == .spawned);
-        const nearest_target = getNearestOpposingThing(self, room);
         const ai = &self.controller.enemy;
 
-        // always go for the nearest targeet
-        if (nearest_target) |t| {
-            ai.target = t.id;
-        } else {
-            ai.target = null;
+        // tick action cooldowns
+        for (ai.actions.slice()) |*a| {
+            _ = a.cooldown.tick(false);
+        }
+
+        // if we're already doing an action, continue
+        if (ai.doing) |*doing| {
+            if (try continueAction(self, room, doing, &ai.actions.buffer[doing.idx])) {
+                ai.doing = null;
+            }
+            return;
+        }
+
+        // otherwise, decide what we'd like to do
+
+        // look at the world, record things for later
+        const nearest_enemy: ?*Thing = getNearestOpposingThing(self, room);
+        var next_available_best_atk: ?Action = null;
+        var next_attack_range: f32 = 0;
+        for (ai.actions.constSlice()) |a| {
+            switch (a.kind) {
+                // TODO not just attacks
+                inline else => |atk| {
+                    const is_better: bool = if (next_available_best_atk) |b| blk: {
+                        const a_ticks = a.cooldown.ticksLeft();
+                        const b_ticks = b.cooldown.ticksLeft();
+                        if (a_ticks == b_ticks) {
+                            break :blk a.priority > b.priority;
+                        }
+                        break :blk a_ticks < b_ticks;
+                    } else true;
+
+                    if (is_better) {
+                        next_available_best_atk = a;
+                        next_attack_range = atk.range;
+                    }
+                },
+            }
         }
 
         self.renderer.creature.draw_color = Colorf.yellow;
-        _ = ai.attack_cooldown.tick(false);
-        ai.state = state: switch (ai.state) {
-            .idle => {
-                if (ai.target) |_| {
-                    ai.ticks_in_state = 0;
-                    continue :state .pursue;
-                }
-                self.updateVel(.{}, .{});
-                _ = self.animator.?.play(.idle, .{ .loop = true });
-                break :state .idle;
-            },
-            .pursue => {
-                const target = blk: {
-                    if (ai.target) |t_id| {
-                        if (room.getThingById(t_id)) |t| {
-                            break :blk t;
-                        }
-                    }
-                    ai.target = null;
-                    ai.ticks_in_state = 0;
-                    continue :state .idle;
-                };
-                const dist = target.pos.dist(self.pos);
-                const range = @max(dist - self.coll_radius - target.coll_radius, 0);
-                if (range <= ai.attack_range and room.tilemap.isLOSBetweenThicc(self.pos, target.pos, ai.LOS_thiccness)) {
-                    // in range, but have to wait for cooldown before starting attack
-                    if (ai.attack_cooldown.running) {
-                        self.updateVel(.{}, .{});
-                        if (dist > 0.001) {
-                            self.dir = target.pos.sub(self.pos).normalized();
-                        }
-                        _ = self.animator.?.play(.idle, .{ .loop = true });
-                    } else {
-                        ai.ticks_in_state = 0;
-                        continue :state .attack;
-                    }
-                } else if (self.accel_params.max_speed > 0.0001) {
-                    _ = self.animator.?.play(.move, .{ .loop = true });
-                    const dist_til_in_range = range - ai.attack_range;
-                    var target_pos = target.pos;
-                    // predictive movement if close enough
-                    if (range < 80) {
-                        const time_til_reach = dist_til_in_range / self.accel_params.max_speed;
-                        target_pos = target.pos.add(target.vel.scale(time_til_reach));
-                    }
-                    try self.findPath(room, target_pos);
-                    const p = self.followPathGetNextPoint(10);
-                    self.updateVel(p.sub(self.pos).normalizedOrZero(), self.accel_params);
-                    if (!self.vel.isAlmostZero()) {
-                        self.dir = self.vel.normalized();
-                    }
-                } else {
-                    continue :state .idle;
-                }
-                break :state .pursue;
-            },
-            .attack => {
-                if (ai.ticks_in_state == 0) {
-                    ai.can_turn_during_attack = true;
-                }
-                // if target no longer exists, go idle
-                const target = blk: {
-                    if (ai.target) |t_id| {
-                        if (room.getThingById(t_id)) |t| {
-                            break :blk t;
-                        }
-                    }
-                    ai.target = null;
-                    ai.ticks_in_state = 0;
-                    continue :state .idle;
-                };
-                const dist = target.pos.dist(self.pos);
-                const range = @max(dist - self.coll_radius - target.coll_radius, 0);
-                switch (ai.attack_type) {
-                    .melee => |m| {
-                        self.updateVel(.{}, .{});
-                        const events = self.animator.?.play(.attack, .{ .loop = true });
-                        // predict hit
-                        if (ai.can_turn_during_attack) {
-                            if (self.animator.?.getTicksUntilEvent(.hit)) |ticks_til_hit_event| {
-                                var ticks_til_hit = utl.as(f32, ticks_til_hit_event);
-                                if (m.lunge_accel) |accel| {
-                                    ticks_til_hit += range / accel.max_speed;
-                                }
-                                const target_pos = target.pos.add(target.vel.scale(ticks_til_hit));
-                                self.dir = target_pos.sub(self.pos).normalizedChecked() orelse self.dir;
-                            } else {
-                                self.dir = target.pos.sub(self.pos).normalizedChecked() orelse self.dir;
-                            }
-                        }
-                        if (events.contains(.end)) {
-                            // deactivate hitbox
-                            if (self.hitbox) |*hitbox| {
-                                hitbox.active = false;
-                            }
-                            if (m.lunge_accel) |accel_params| {
-                                self.coll_mask.insert(.creature);
-                                self.coll_layer.insert(.creature);
-                                self.updateVel(.{}, .{ .friction = accel_params.max_speed });
-                            }
-                            ai.attack_cooldown.restart();
-                            // must re-enter attack via pursue (once cooldown expires)
-                            ai.ticks_in_state = 0;
-                            continue :state .pursue;
-                        }
-                        if (events.contains(.commit)) {
-                            ai.can_turn_during_attack = false;
-                        }
-                        if (events.contains(.hit)) {
-                            self.renderer.creature.draw_color = Colorf.red;
-                            if (self.hitbox) |*hitbox| {
-                                //std.debug.print("hit targetu\n", .{});
-                                hitbox.mask = Thing.Faction.opposing_masks.get(self.faction);
-                                const dir_ang = self.dir.toAngleRadians();
-                                hitbox.rel_pos = V2f.fromAngleRadians(dir_ang).scale(hitbox.rel_pos.length());
-                                if (hitbox.sweep_to_rel_pos) |*sw| {
-                                    sw.* = V2f.fromAngleRadians(dir_ang).scale(sw.length());
-                                }
-                                hitbox.active = true;
-                                if (m.hit_to_side_force > 0) {
-                                    const d = if (self.dir.cross(target.pos.sub(self.pos)) > 0) self.dir.rotRadians(-utl.pi / 3) else self.dir.rotRadians(utl.pi / 3);
-                                    hitbox.effect.force = .{ .fixed = d.scale(m.hit_to_side_force) };
-                                }
-                                // play sound
-                                if (App.get().data.sounds.get(.thwack)) |s| {
-                                    App.getPlat().playSound(s);
-                                }
-                            }
-                            if (m.lunge_accel) |accel_params| {
-                                self.coll_mask.remove(.creature);
-                                self.coll_layer.remove(.creature);
-                                self.updateVel(self.dir, accel_params);
-                            }
-                        }
-                    },
-                    .projectile => |proj_name| {
-                        self.updateVel(.{}, .{});
-                        const events = self.animator.?.play(.attack, .{ .loop = true });
-                        // face/track target
-                        var projectile = proj_name.prototype();
-                        if (ai.can_turn_during_attack) {
-                            if (self.animator.?.getTicksUntilEvent(.hit)) |ticks_til_hit_event| {
-                                var ticks_til_hit = utl.as(f32, ticks_til_hit_event);
-                                ticks_til_hit += range / projectile.accel_params.max_speed;
-                                const target_pos = target.pos.add(target.vel.scale(ticks_til_hit));
-                                self.dir = target_pos.sub(self.pos).normalizedChecked() orelse self.dir;
-                            } else {
-                                self.dir = target.pos.sub(self.pos).normalizedChecked() orelse self.dir;
-                            }
-                        }
-                        if (events.contains(.end)) {
-                            //std.debug.print("attack end\n", .{});
-                            ai.attack_cooldown.restart();
-                            // must re-enter attack via pursue (once cooldown expires)
-                            ai.ticks_in_state = 0;
-                            continue :state .pursue;
-                        }
-                        if (events.contains(.commit)) {
-                            ai.can_turn_during_attack = false;
-                        }
-                        if (events.contains(.hit)) {
-                            self.renderer.creature.draw_color = Colorf.red;
-                            switch (proj_name) {
-                                .arrow => {
-                                    projectile.dir = self.dir;
-                                    projectile.hitbox.?.mask = Thing.Faction.opposing_masks.get(self.faction);
-                                    projectile.hitbox.?.rel_pos = self.dir.scale(28);
-                                    _ = try room.queueSpawnThing(&projectile, self.pos);
-                                },
-                            }
-                        }
-                    },
-                }
-                break :state .attack;
-            },
-        };
-        ai.ticks_in_state += 1;
+        var desired_action_doing: ?Action.Doing = null;
+        var best_priority: f32 = -std.math.inf(f32);
+        // tick action cooldowns and get the best one (not on cooldown, highest prio)
+        for (ai.actions.slice(), 0..) |*a, i| {
+            if (a.cooldown.running) continue;
+            const params = switch (a.kind) {
+                inline else => if (nearest_enemy) |e| .{ .thing = e.id } else continue,
+            };
+            if (!canDoAction(self, room, a, params)) {
+                continue;
+            }
 
-        self.moveAndCollide(room);
+            const is_better: bool = if (desired_action_doing) |_| a.priority > best_priority else true;
+            if (is_better) {
+                best_priority = a.priority;
+                desired_action_doing = .{
+                    .idx = i,
+                    .params = params,
+                };
+            }
+        }
+
+        // if we have an available action we can and want to do, start it!
+        if (desired_action_doing) |doing| {
+            ai.doing = doing;
+            ai.state = .action;
+            if (try startAction(self, room, &ai.doing.?, &ai.actions.buffer[doing.idx])) {
+                ai.doing = null;
+            }
+            return;
+        }
+
+        // otherwise, move toward closest enemy, or idle
+        ai.state = .idle;
+        if (self.accel_params.max_speed > 0.0001) {
+            if (nearest_enemy) |target| {
+                if (next_available_best_atk) |*next_atk| {
+                    if (!canDoAction(self, room, next_atk, .{ .thing = target.id })) {
+                        ai.state = .pursue;
+                        const dist = target.pos.dist(self.pos);
+                        const range = @max(dist - target.hurtbox.?.radius, 0);
+                        _ = self.animator.?.play(.move, .{ .loop = true });
+                        const dist_til_in_range = range - next_attack_range;
+                        var target_pos = target.pos;
+                        // predictive movement if close enough
+                        if (range < 80) {
+                            const time_til_reach = dist_til_in_range / self.accel_params.max_speed;
+                            target_pos = target.pos.add(target.vel.scale(time_til_reach));
+                        }
+                        try self.findPath(room, target_pos);
+                        const p = self.followPathGetNextPoint(10);
+                        self.updateVel(p.sub(self.pos).normalizedOrZero(), self.accel_params);
+                        if (!self.vel.isAlmostZero()) {
+                            self.dir = self.vel.normalized();
+                        }
+                    }
+                }
+            }
+        }
+        if (ai.state == .idle) {
+            self.updateVel(.{}, .{});
+            _ = self.animator.?.play(.idle, .{ .loop = true });
+        }
     }
 };
 
@@ -349,6 +452,7 @@ pub fn getHidingPlaces(room: *const Room, fleer_pos: V2f, flee_from_pos: V2f, mi
     }
     return places;
 }
+const player = @import("player.zig");
 
 pub const AcolyteAIController = struct {
     wander_dir: V2f = .{},
@@ -464,8 +568,6 @@ pub const AcolyteAIController = struct {
             },
         };
         ai.ticks_in_state += 1;
-
-        self.moveAndCollide(room);
     }
 };
 
@@ -476,17 +578,21 @@ pub fn slime() Thing {
     c.accel_params = .{
         .max_speed = 0.7,
     };
-    c.controller = .{ .enemy = .{
-        .attack_cooldown = utl.TickCounter.initStopped(90),
-        .attack_range = 45,
-    } };
-    c.hitbox = .{
-        .mask = Thing.Faction.opposing_masks.get(.enemy),
-        .radius = 10,
-        .rel_pos = V2f.right.scale(20),
-        .sweep_to_rel_pos = V2f.right.scale(50),
-        .effect = .{ .damage = 6 },
-    };
+    c.controller = .{ .enemy = .{} };
+    c.controller.enemy.actions.appendAssumeCapacity(.{
+        .kind = .{
+            .melee_attack = .{
+                .hitbox = .{
+                    .radius = 10,
+                    .rel_pos = V2f.right.scale(20),
+                    .sweep_to_rel_pos = V2f.right.scale(50),
+                    .effect = .{ .damage = 6 },
+                },
+                .range = 45,
+            },
+        },
+        .cooldown = utl.TickCounter.initStopped(90),
+    });
     c.enemy_difficulty = 0.75;
     return c;
 }
@@ -496,16 +602,20 @@ pub fn bat() Thing {
     c.accel_params = .{
         .max_speed = 1.1,
     };
-    c.controller = .{ .enemy = .{
-        .attack_cooldown = utl.TickCounter.initStopped(60),
-        .attack_range = 30,
-    } };
-    c.hitbox = .{
-        .mask = Thing.Faction.opposing_masks.get(.enemy),
-        .radius = 10,
-        .rel_pos = V2f.right.scale(30),
-        .effect = .{ .damage = 3 },
-    };
+    c.controller = .{ .enemy = .{} };
+    c.controller.enemy.actions.appendAssumeCapacity(.{
+        .kind = .{
+            .melee_attack = .{
+                .hitbox = .{
+                    .radius = 10,
+                    .rel_pos = V2f.right.scale(30),
+                    .effect = .{ .damage = 3 },
+                },
+                .range = 30,
+            },
+        },
+        .cooldown = utl.TickCounter.initStopped(70),
+    });
     c.enemy_difficulty = 0.25;
     return c;
 }
@@ -515,29 +625,37 @@ pub fn troll() Thing {
     ret.accel_params = .{
         .max_speed = 0.7,
     };
-    ret.controller = .{ .enemy = .{
-        .attack_cooldown = utl.TickCounter.initStopped(90),
-        .LOS_thiccness = ret.coll_radius * 2,
-        .attack_range = 55,
-    } };
-    ret.hitbox = .{
-        .mask = Thing.Faction.opposing_masks.get(.enemy),
-        .radius = 15,
-        .rel_pos = V2f.right.scale(20),
-        .sweep_to_rel_pos = V2f.right.scale(50),
-        .effect = .{ .damage = 12 },
-    };
+    ret.controller = .{ .enemy = .{} };
+    ret.controller.enemy.actions.appendAssumeCapacity(.{
+        .kind = .{
+            .melee_attack = .{
+                .hitbox = .{
+                    .radius = 15,
+                    .rel_pos = V2f.right.scale(20),
+                    .sweep_to_rel_pos = V2f.right.scale(50),
+                    .effect = .{ .damage = 12 },
+                },
+                .range = 55,
+                .LOS_thiccness = 30,
+            },
+        },
+        .cooldown = utl.TickCounter.initStopped(90),
+    });
     ret.enemy_difficulty = 2.5;
+
     return ret;
 }
 
 pub fn gobbow() Thing {
     var ret = Thing.creatureProto(.gobbow, .gobbow, .enemy, 18, .medium, 12);
-    ret.controller = .{ .enemy = .{
-        .attack_range = 270,
-        .attack_cooldown = utl.TickCounter.initStopped(60),
-        .attack_type = .{ .projectile = .arrow },
-    } };
+    ret.controller = .{ .enemy = .{} };
+    ret.controller.enemy.actions.appendAssumeCapacity(.{
+        .kind = .{ .projectile_attack = .{
+            .projectile = .arrow,
+            .range = 270,
+        } },
+        .cooldown = utl.TickCounter.initStopped(60),
+    });
     ret.enemy_difficulty = 1.5;
     return ret;
 }
@@ -548,28 +666,30 @@ pub fn sharpboi() Thing {
     ret.accel_params = .{
         .max_speed = 0.9,
     };
-    ret.controller = .{ .enemy = .{
-        .attack_range = 110,
-        .attack_cooldown = utl.TickCounter.initStopped(140),
-        .attack_type = .{ .melee = .{
-            .lunge_accel = .{
-                .accel = 5,
-                .max_speed = 5,
-                .friction = 0,
+    ret.controller = .{ .enemy = .{} };
+    ret.controller.enemy.actions.appendAssumeCapacity(.{
+        .kind = .{
+            .melee_attack = .{
+                .lunge_accel = .{
+                    .accel = 5,
+                    .max_speed = 5,
+                    .friction = 0,
+                },
+                .hitbox = .{
+                    .mask = Thing.Faction.opposing_masks.get(.enemy),
+                    .radius = 15,
+                    .rel_pos = V2f.right.scale(40),
+                    .effect = .{ .damage = 8 },
+                    .deactivate_on_update = false,
+                    .deactivate_on_hit = true,
+                },
+                .hit_to_side_force = 2.5,
+                .range = 110,
+                .LOS_thiccness = 30,
             },
-            .hit_to_side_force = 2.5,
-        } },
-        .LOS_thiccness = ret.coll_radius * 2,
-    } };
-
-    ret.hitbox = .{
-        .mask = Thing.Faction.opposing_masks.get(.enemy),
-        .radius = 15,
-        .rel_pos = V2f.right.scale(40),
-        .effect = .{ .damage = 8 },
-        .deactivate_on_update = false,
-        .deactivate_on_hit = true,
-    };
+        },
+        .cooldown = utl.TickCounter.initStopped(140),
+    });
     ret.enemy_difficulty = 2.5;
     return ret;
 }

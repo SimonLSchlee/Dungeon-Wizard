@@ -78,8 +78,6 @@ pub const Projectile = struct {
 
         if (self.last_coll != null or !self.hitbox.?.active) {
             self.deferFree(room);
-        } else {
-            self.moveAndCollide(room);
         }
     }
 };

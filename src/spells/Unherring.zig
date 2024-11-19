@@ -97,12 +97,11 @@ pub const Projectile = struct {
                 if (self.vel.normalizedChecked()) |n| {
                     self.dir = n;
                 }
-                self.moveAndCollide(room);
             },
             .end => {
+                self.vel = .{};
                 self.renderer.vfx.draw_normal = false;
                 self.renderer.vfx.draw_over = true;
-                self.updateVel(.{}, .{});
                 if (animator.play(.end, .{}).contains(.end)) {
                     self.deferFree(room);
                 }

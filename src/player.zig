@@ -374,7 +374,5 @@ pub const Controller = struct {
             };
             controller.ticks_in_state += 1;
         }
-
-        self.moveAndCollide(room);
     }
 };

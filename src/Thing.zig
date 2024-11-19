@@ -605,7 +605,6 @@ pub const ProjectileController = struct {
             }
         }
         self.updateVel(self.dir, self.accel_params);
-        self.moveAndCollide(room);
         if (self.last_coll) |_| {
             self.deferFree(room);
             return;
@@ -838,10 +837,9 @@ pub const CreatureRenderer = struct {
 };
 
 pub const DefaultController = struct {
-    pub fn update(self: *Thing, room: *Room) Error!void {
+    pub fn update(self: *Thing, _: *Room) Error!void {
         assert(self.spawn_state == .spawned);
         self.updateVel(.{}, self.accel_params);
-        self.moveAndCollide(room);
     }
 };
 
@@ -874,6 +872,10 @@ pub fn update(self: *Thing, room: *Room) Error!void {
             self.deferFree(room);
         }
         return;
+    }
+    self.moveAndCollide(room);
+    if (self.statuses.get(.promptitude).stacks > 0) {
+        self.moveAndCollide(room);
     }
     if (self.hitbox) |*hitbox| {
         hitbox.update(self, room);

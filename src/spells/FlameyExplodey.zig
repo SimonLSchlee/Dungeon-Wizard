@@ -135,11 +135,11 @@ pub const Projectile = struct {
                 try spawnFiresInRadius(room, self.pos, flamey_explodey.explode_radius + 20, 20);
             }
         } else {
+            self.vel = .{};
             if (projectile.explode_counter.tick(false)) {
                 self.deferFree(room);
             }
         }
-        self.moveAndCollide(room);
     }
 };
 

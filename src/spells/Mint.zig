@@ -84,7 +84,6 @@ pub const Projectile = struct {
                 self.deferFree(room);
             }
         }
-        self.moveAndCollide(room);
     }
 };
 

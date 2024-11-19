@@ -276,6 +276,10 @@ pub const TickCounter = struct {
     pub fn remapTo0_1(self: *const TickCounter) f32 {
         return remapClampf(0, as(f32, self.num_ticks), 0, 1, as(f32, self.curr_tick));
     }
+
+    pub fn ticksLeft(self: *const TickCounter) i64 {
+        return self.num_ticks - self.curr_tick;
+    }
 };
 
 pub fn BoundedString(max_len: usize) type {
