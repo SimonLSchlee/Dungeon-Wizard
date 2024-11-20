@@ -137,28 +137,45 @@ pub const Input = struct {
         }
     }
 
+    fn actionHasTargeting(action: Action.KindData) bool {
+        switch (action) {
+            inline else => |a| return std.meta.hasMethod(@TypeOf(a), "renderTargeting"),
+        }
+    }
+
     pub fn render(self: *const Thing, room: *const Room) Error!void {
         const plat = getPlat();
         const input = &self.player_input.?;
         const ui_slots = &room.ui_slots;
         const controller = &self.controller.player;
 
-        const targeting: ?struct { action: Action.KindData, params: ?Spell.Params } = blk: {
+        var params: ?Spell.Params = null;
+        const action_with_targeting: ?Action.KindData = blk: {
             if (ui_slots.getSelectedActionSlot()) |slot| {
-                break :blk .{ .action = slot.kind.?.action, .params = null };
-            } else {
-                const maybe_buffered: ?Action.Buffered = if (controller.action_buffered) |b| b else if (controller.action_casting) |a| a else null;
-                if (maybe_buffered) |buffered| {
-                    break :blk .{ .action = buffered.action, .params = buffered.params };
+                const action = slot.kind.?.action;
+                if (actionHasTargeting(action)) {
+                    break :blk action;
+                }
+            }
+            if (controller.action_buffered) |b| {
+                if (actionHasTargeting(b.action)) {
+                    params = b.params;
+                    break :blk b.action;
+                }
+            }
+            if (controller.action_casting) |b| {
+                if (actionHasTargeting(b.action)) {
+                    params = b.params;
+                    break :blk b.action;
                 }
             }
             break :blk null;
         };
-        if (targeting) |t| {
-            switch (t.action) {
-                inline else => |action| {
-                    if (std.meta.hasMethod(@TypeOf(action), "renderTargeting")) {
-                        try action.renderTargeting(room, self, t.params);
+        if (action_with_targeting) |action| {
+            switch (action) {
+                inline else => |a| {
+                    if (std.meta.hasMethod(@TypeOf(a), "renderTargeting")) {
+                        try a.renderTargeting(room, self, params);
                     }
                 },
             }
