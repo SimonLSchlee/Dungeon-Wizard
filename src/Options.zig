@@ -161,13 +161,9 @@ pub fn render(self: *Options, render_texture: Platform.RenderTexture2D) Error!vo
     const origin = self.ui.rect.pos;
 
     for (self.ui.elements.slice()) |el| {
-        //plat.rectf(origin.add(el.rect.pos), el.rect.dims, .{
-        //    .fill_color = null,
-        //    .outline_color = Colorf.rgb(0.8, 0.8, 0.8),
-        //});
         plat.rectf(origin.add(el.value_rect.pos), el.value_rect.dims, .{
             .fill_color = null,
-            .outline_color = Colorf.rgb(0.8, 0.8, 0.0),
+            .outline = .{ .color = Colorf.rgb(0.8, 0.8, 0.0) },
         });
         switch (el.kind) {
             .dropdown => |dropdown| {

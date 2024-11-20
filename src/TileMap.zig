@@ -521,7 +521,7 @@ pub fn debugDrawPath(_: *const TileMap, camera: draw.Camera2D, path: []const V2i
     for (0..path.len - 1) |i| {
         const p0 = tileCoordToCenterPos(path[i]);
         const p1 = tileCoordToCenterPos(path[i + 1]);
-        plat.linef(p0, p1, line_thickness, Colorf.green);
+        plat.linef(p0, p1, .{ .thickness = line_thickness, .color = Colorf.green });
     }
 }
 
@@ -541,11 +541,11 @@ pub fn debugDrawGrid(_: *const TileMap, camera: draw.Camera2D) void {
 
     for (0..grid_cols) |col| {
         const x: f32 = grid_topleft.x + utl.as(f32, col) * tile_sz;
-        plat.linef(v2f(x, grid_topleft.y), v2f(x, grid_botright.y), line_thickness, Colorf.green.fade(0.5));
+        plat.linef(v2f(x, grid_topleft.y), v2f(x, grid_botright.y), .{ .thickness = line_thickness, .color = Colorf.green.fade(0.5) });
     }
     for (0..grid_rows) |row| {
         const y: f32 = grid_topleft.y + utl.as(f32, row) * tile_sz;
-        plat.linef(v2f(grid_topleft.x, y), v2f(grid_botright.x, y), line_thickness, Colorf.green.fade(0.5));
+        plat.linef(v2f(grid_topleft.x, y), v2f(grid_botright.x, y), .{ .thickness = line_thickness, .color = Colorf.green.fade(0.5) });
     }
 }
 

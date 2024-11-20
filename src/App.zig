@@ -128,8 +128,7 @@ pub fn menuButton(cmd_buf: *ImmUI.CmdBuf, pos: V2f, str: []const u8, dims: V2f) 
             .dims = dims,
             .opt = .{
                 .fill_color = .orange,
-                .outline_color = if (hovered) .red else null,
-                .outline_thickness = 5,
+                .outline = if (hovered) .{ .color = .red, .thickness = 5 } else null,
             },
         },
     }) catch @panic("Fail to append rect cmd");

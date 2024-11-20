@@ -552,10 +552,11 @@ pub fn render(self: *const Room, native_render_texture: Platform.RenderTexture2D
     plat.clear(.black);
     plat.setBlend(.render_tex_alpha);
 
-    plat.startCamera2D(self.camera);
-
+    plat.startCamera2D(self.camera, .{ .round_to_pixel = true });
     try self.tilemap.renderUnderObjects();
+    plat.endCamera2D();
 
+    plat.startCamera2D(self.camera, .{});
     // exit
     for (self.init_params.exits.constSlice()) |exit| {
         try exit.render(self);
@@ -607,10 +608,14 @@ pub fn render(self: *const Room, native_render_texture: Platform.RenderTexture2D
         for (thing_arr.constSlice()) |thing| {
             try thing.render(self);
         }
+        plat.endCamera2D();
+        plat.startCamera2D(self.camera, .{ .round_to_pixel = true });
         try self.tilemap.renderOverObjects(self.camera, thing_arr.constSlice());
         for (thing_arr.constSlice()) |thing| {
             try thing.renderOver(self);
         }
+        plat.endCamera2D();
+        plat.startCamera2D(self.camera, .{});
         for (self.init_params.exits.constSlice()) |exit| {
             try exit.renderOver(self);
         }
@@ -623,7 +628,7 @@ pub fn render(self: *const Room, native_render_texture: Platform.RenderTexture2D
     if (false) {
         if (self.getConstPlayer()) |player| {
             const mouse_pos = plat.getMousePosWorld(self.camera);
-            plat.linef(player.pos, mouse_pos, 2, .red);
+            plat.linef(player.pos, mouse_pos, .{ .thickness = 2, .color = .red });
             if (self.tilemap.raycastLOS(player.pos, mouse_pos)) |tile_coord| {
                 const rect = TileMap.tileCoordToRect(tile_coord);
                 plat.rectf(rect.pos, rect.dims, .{ .fill_color = Colorf.red.fade(0.4) });

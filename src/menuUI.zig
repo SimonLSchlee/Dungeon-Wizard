@@ -132,8 +132,7 @@ pub const Button = struct {
         if (self.isHovered()) {
             var selected_poly_opt = self.poly_opt;
             selected_poly_opt.fill_color = null;
-            selected_poly_opt.outline_thickness = 3;
-            selected_poly_opt.outline_color = Colorf.red;
+            selected_poly_opt.outline = .{ .color = Colorf.red, .thickness = 3 };
             plat.rectf(rect.pos.sub(v2f(5, 5)), rect.dims.add(v2f(10, 10)), selected_poly_opt);
         }
         try plat.textf(rect.pos.add(self.text_rel_pos), "{s}", .{self.text.constSlice()}, self.text_opt);

@@ -189,3 +189,15 @@ pub fn remapLength(self: Self, orig_from: f32, orig_to: f32, target_from: f32, t
 pub fn remapLengthTo0_1(self: Self, orig_from: f32, orig_to: f32) Self {
     return remapLength(self, orig_from, orig_to, 0, 1);
 }
+
+pub fn round(self: Self) Self {
+    return v2f(@round(self.x), @round(self.y));
+}
+
+pub fn floor(self: Self) Self {
+    return v2f(@floor(self.x), @floor(self.y));
+}
+
+pub fn ceil(self: Self) Self {
+    return v2f(@ceil(self.x), @ceil(self.y));
+}

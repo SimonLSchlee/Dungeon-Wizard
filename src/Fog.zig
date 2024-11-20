@@ -171,7 +171,7 @@ pub fn renderToTexture(self: *const Fog, camera: draw.Camera2D) Error!void {
     plat.startRenderToTexture(self.render_tex);
     plat.clear(Colorf.blank);
     plat.setBlend(.render_tex_alpha);
-    plat.startCamera2D(camera);
+    plat.startCamera2D(camera, .{});
 
     // TODO this works like the tilemap grid drawing for now, needs changing for blurring etc
     const inv_zoom = 1 / camera.zoom;

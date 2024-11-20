@@ -174,11 +174,19 @@ pub const TextOpt = struct {
     } = null,
 };
 
+pub const LineOpt = struct {
+    thickness: f32 = 1,
+    color: Colorf = Colorf.black,
+    smoothing: Smoothing = .none, // overridden if part of PolyOpt
+    round_to_pixel: bool = false, // overridden if part of PolyOpt
+};
+
 pub const PolyOpt = struct {
     fill_color: ?Colorf = Colorf.black,
-    outline_thickness: f32 = 1,
-    outline_color: ?Colorf = null,
+    outline: ?LineOpt = null,
     edge_radius: f32 = 0, // rectangles only
+    smoothing: Smoothing = .none,
+    round_to_pixel: bool = false,
 };
 
 pub const TextureOrigin = union(enum) {
@@ -208,4 +216,8 @@ pub const Camera2D = struct {
     offset: V2f = .{},
     rot_rads: f32 = 0,
     zoom: f32 = 1,
+};
+
+pub const CameraOpt = struct {
+    round_to_pixel: bool = false,
 };

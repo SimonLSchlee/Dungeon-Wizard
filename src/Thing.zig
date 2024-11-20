@@ -507,7 +507,7 @@ pub const SpawnerRenderer = struct {
     pub fn renderUnder(self: *const Thing, _: *const Room) Error!void {
         const renderer = &self.renderer.spawner;
         const plat = App.getPlat();
-        plat.circlef(self.pos, renderer.base_circle_radius, .{ .fill_color = renderer.base_circle_color });
+        plat.circlef(self.pos, renderer.base_circle_radius, .{ .fill_color = renderer.base_circle_color, .smoothing = .bilinear });
     }
 
     pub fn render(self: *const Thing, _: *const Room) Error!void {
@@ -636,7 +636,7 @@ pub const ShapeRenderer = struct {
             },
             .arrow => |s| {
                 const color: Colorf = if (renderer.poly_opt.fill_color) |c| c else .white;
-                plat.arrowf(self.pos, self.pos.add(self.dir.scale(s.length)), s.thickness, color);
+                plat.arrowf(self.pos, self.pos.add(self.dir.scale(s.length)), .{ .thickness = s.thickness, .color = color });
             },
             else => @panic("unimplemented"),
         }
@@ -673,11 +673,11 @@ pub const CreatureRenderer = struct {
         if (self.isAliveCreature()) {
             plat.circlef(self.pos, renderer.draw_radius, .{
                 .fill_color = null,
-                .outline_color = renderer.draw_color,
+                .outline = .{ .color = renderer.draw_color },
             });
             const arrow_start = self.pos.add(self.dir.scale(renderer.draw_radius));
             const arrow_end = self.pos.add(self.dir.scale(renderer.draw_radius + 5));
-            plat.arrowf(arrow_start, arrow_end, 5, renderer.draw_color);
+            plat.arrowf(arrow_start, arrow_end, .{ .thickness = 5, .color = renderer.draw_color });
         }
     }
 
@@ -723,7 +723,7 @@ pub const CreatureRenderer = struct {
             const shield_center = self.pos.sub(v2f(0, r));
             const popt = draw.PolyOpt{
                 .fill_color = null,
-                .outline_color = StatusEffect.proto_array.get(.protected).color,
+                .outline = .{ .color = StatusEffect.proto_array.get(.protected).color },
             };
             for (0..utl.as(usize, protected.stacks)) |i| {
                 plat.circlef(shield_center, r * 2 + 2 + utl.as(f32, i) * 2, popt);
@@ -757,7 +757,11 @@ pub const CreatureRenderer = struct {
                         const line_x = curr_width * (i / hp.curr);
                         const top = hp_topleft.add(v2f(line_x, 0));
                         const bot = hp_topleft.add(v2f(line_x, hp_height));
-                        plat.linef(top, bot, 1, Colorf.black.fade(0.5));
+                        plat.linef(top, bot, .{
+                            .thickness = 1,
+                            .color = Colorf.black.fade(0.5),
+                            .round_to_pixel = true,
+                        });
                         i += line_hp_inc;
                     }
                 }
@@ -773,7 +777,11 @@ pub const CreatureRenderer = struct {
                     var curr_pos = shields_topleft;
                     for (hp.shields.constSlice()) |shield| {
                         const shield_width = hp_width * shield.curr / total_shield_amount;
-                        plat.rectf(curr_pos, v2f(shield_width, shields_height), .{ .fill_color = shield_color });
+                        plat.rectf(curr_pos, v2f(shield_width, shields_height), .{
+                            .fill_color = shield_color,
+                            .smoothing = .bilinear,
+                            .round_to_pixel = true,
+                        });
                         curr_pos.x += shield_width;
                     }
                     { // lines
@@ -784,7 +792,12 @@ pub const CreatureRenderer = struct {
                             const line_x = curr_shield_width * (i / curr_shield_amount);
                             const top = shields_topleft.add(v2f(line_x, 0));
                             const bot = shields_topleft.add(v2f(line_x, shields_height));
-                            plat.linef(top, bot, 1, Colorf.black.fade(0.5));
+                            plat.linef(top, bot, .{
+                                .thickness = 1,
+                                .color = Colorf.black.fade(0.5),
+                                .smoothing = .bilinear,
+                                .round_to_pixel = true,
+                            });
                             i += line_shield_inc;
                         }
                     }
@@ -802,7 +815,7 @@ pub const CreatureRenderer = struct {
                     for (0..utl.as(usize, mana.curr)) |_| {
                         plat.circlef(curr_pos, mana_radius, .{
                             .fill_color = Colorf.rgb(0, 0.5, 1),
-                            .outline_color = .black,
+                            .outline = .{ .color = .black },
                         });
                         curr_pos.x += mana_spacing + mana_diam;
                     }
@@ -914,7 +927,7 @@ pub fn renderOver(self: *const Thing, room: *const Room) Error!void {
 
     const plat = App.getPlat();
     if (debug.show_thing_collisions) {
-        plat.circlef(self.pos, self.coll_radius, .{ .outline_color = .red, .fill_color = null });
+        plat.circlef(self.pos, self.coll_radius, .{ .outline = .{ .color = .red }, .fill_color = null });
         if (self.last_coll) |coll| {
             plat.arrowf(coll.pos, coll.pos.add(coll.normal.scale(self.coll_radius * 0.75)), 3, Colorf.red);
         }
@@ -922,7 +935,7 @@ pub fn renderOver(self: *const Thing, room: *const Room) Error!void {
     if (debug.show_thing_coords_searched) {
         if (self.path.len > 0) {
             for (self.dbg.coords_searched.constSlice()) |coord| {
-                plat.circlef(TileMap.tileCoordToCenterPos(coord), 10, .{ .outline_color = Colorf.white, .fill_color = null });
+                plat.circlef(TileMap.tileCoordToCenterPos(coord), 10, .{ .outline = .{ .color = Colorf.white }, .fill_color = null });
             }
         }
     }
@@ -936,7 +949,7 @@ pub fn renderOver(self: *const Thing, room: *const Room) Error!void {
                 const dir_f = self_to_pos.dot(to_enemy_n.neg());
                 const f = h.flee_from_dist + dir_f; // - h.fleer_dist;
                 try plat.textf(h.pos, "{d:.2}", .{f}, .{ .center = true, .color = .white, .size = 14 });
-                //plat.circlef(h.pos, 10, .{ .outline_color = Colorf.white, .fill_color = null });
+                //plat.circlef(h.pos, 10, .{ .outline = .{ .color = Colorf.white }, .fill_color = null });
             }
         }
     }
@@ -954,7 +967,7 @@ pub fn renderOver(self: *const Thing, room: *const Room) Error!void {
                 plat.circlef(pos, hitbox.radius, .{ .fill_color = color });
                 if (hitbox.sweep_to_rel_pos) |rel_end| {
                     const end_pos = self.pos.add(rel_end);
-                    plat.linef(pos, end_pos, hitbox.radius * 2, color);
+                    plat.linef(pos, end_pos, .{ .thickness = hitbox.radius * 2, .color = color });
                     plat.circlef(end_pos, hitbox.radius, .{ .fill_color = color });
                 }
             }
@@ -1132,7 +1145,7 @@ pub fn debugDrawPath(self: *const Thing, room: *const Room) Error!void {
     const line_thickness = inv_zoom;
     for (0..self.path.len - 1) |i| {
         plat.arrowf(self.path.buffer[i], self.path.buffer[i + 1], line_thickness, Colorf.green);
-        //p.linef(self.path.buffer[i], self.path.buffer[i + 1], line_thickness, Colorf.green);
+        //p.linef(self.path.buffer[i], self.path.buffer[i + 1], .{ .thickness = line_thickness, .color = Colorf.green });
     }
 }
 

@@ -528,8 +528,7 @@ pub fn rewardSpellChoiceUI(self: *Run, idx: usize) Error!void {
         .dims = modal_dims,
         .opt = .{
             .fill_color = Colorf.rgba(0.1, 0.1, 0.1, 0.8),
-            .outline_color = Colorf.rgba(0.1, 0.1, 0.2, 0.8),
-            .outline_thickness = 4,
+            .outline = .{ .color = Colorf.rgba(0.1, 0.1, 0.2, 0.8), .thickness = 4 },
         },
     } });
 
@@ -613,8 +612,10 @@ pub fn rewardUpdate(self: *Run) Error!void {
         .dims = modal_dims,
         .opt = .{
             .fill_color = Colorf.rgba(0.1, 0.1, 0.1, 0.8),
-            .outline_color = Colorf.rgba(0.1, 0.1, 0.2, 0.8),
-            .outline_thickness = 4,
+            .outline = .{
+                .color = Colorf.rgba(0.1, 0.1, 0.2, 0.8),
+                .thickness = 4,
+            },
         },
     } });
 
@@ -834,8 +835,10 @@ fn makeDeadMenu() DeadMenu {
         .padding = v2f(30, 30),
         .poly_opt = .{
             .fill_color = Colorf.rgba(0.1, 0.1, 0.1, 0.8),
-            .outline_color = Colorf.rgba(0.1, 0.1, 0.2, 0.8),
-            .outline_thickness = 4,
+            .outline = .{
+                .color = Colorf.rgba(0.1, 0.1, 0.2, 0.8),
+                .thickness = 4,
+            },
         },
         .text_opt = .{
             .center = true,

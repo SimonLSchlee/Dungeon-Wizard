@@ -180,7 +180,14 @@ pub const Input = struct {
                 p.* = p.add(move_pos);
                 p.y += y_off;
             }
-            plat.circlef(move_pos, 10, .{ .outline_color = Colorf.green.fade(0.6 * (1 - release_f)), .fill_color = null });
+            plat.circlef(
+                move_pos,
+                10,
+                .{
+                    .outline = .{ .color = Colorf.green.fade(0.6 * (1 - release_f)) },
+                    .fill_color = null,
+                },
+            );
             plat.trianglef(points, .{ .fill_color = Colorf.green.fade(1 - release_f) });
         }
     }

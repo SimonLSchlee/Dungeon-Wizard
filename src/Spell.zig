@@ -257,7 +257,14 @@ pub const TargetingData = struct {
 
         if (params == null) {
             if (targeting_data.show_max_range_ring and targeting_data.max_range < 99999) {
-                plat.circlef(caster.pos, targeting_data.max_range + caster.coll_radius, .{ .outline_color = targeting_data.color.fade(0.5), .fill_color = null });
+                plat.circlef(
+                    caster.pos,
+                    targeting_data.max_range + caster.coll_radius,
+                    .{
+                        .outline = .{ .color = targeting_data.color.fade(0.5) },
+                        .fill_color = null,
+                    },
+                );
             }
         }
 
@@ -283,7 +290,7 @@ pub const TargetingData = struct {
                     }
                     const ray_radius = ray.thickness * 0.5;
                     plat.circlef(cast_orig, ray_radius, .{ .fill_color = targeting_data.color });
-                    plat.linef(cast_orig, target_circle_pos, ray.thickness, targeting_data.color);
+                    plat.linef(cast_orig, target_circle_pos, .{ .thickness = ray.thickness, .color = targeting_data.color });
                     plat.circlef(target_circle_pos, ray_radius, .{ .fill_color = targeting_data.color });
                     //if (coll) |c| {
                     //    plat.circlef(c.pos, 3, .{ .fill_color = .red });
@@ -356,8 +363,10 @@ pub const TargetingData = struct {
                                 const rect = TileMap.tileCoordToRect(tile_coord);
                                 plat.rectf(rect.pos, rect.dims, .{
                                     .fill_color = null,
-                                    .outline_color = Colorf.red.fade(0.6),
-                                    .outline_thickness = 3,
+                                    .outline = .{
+                                        .color = Colorf.red.fade(0.6),
+                                        .thickness = 3,
+                                    },
                                 });
                             }
                         }
@@ -366,7 +375,7 @@ pub const TargetingData = struct {
                         }
                         if (targeting_data.ray_to_mouse) |ray| {
                             const ray_radius = ray.thickness * 0.5;
-                            plat.linef(caster.pos, thing.pos, ray.thickness, targeting_color);
+                            plat.linef(caster.pos, thing.pos, .{ .thickness = ray.thickness, .color = targeting_color });
                             plat.circlef(thing.pos, ray_radius, .{ .fill_color = targeting_color });
                         }
                         if (targeting_data.radius_at_target) |r| {

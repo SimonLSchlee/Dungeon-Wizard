@@ -468,17 +468,34 @@ pub fn measureText(self: *Platform, text: []const u8, opt: draw.TextOpt) Error!V
     return zVec(sz);
 }
 
-pub fn linef(_: *Platform, start: V2f, end: V2f, thickness: f32, color: Colorf) void {
-    r.DrawLineEx(cVec(start), cVec(end), thickness, cColorf(color));
+pub fn linef(_: *Platform, start: V2f, end: V2f, opt: draw.LineOpt) void {
+    var start_r = start;
+    var end_r = end;
+    if (opt.round_to_pixel) {
+        start_r = start.round();
+        end_r = end.round();
+    }
+    r.DrawLineEx(cVec(start_r), cVec(end_r), opt.thickness, cColorf(opt.color));
 }
 
 pub fn rectf(_: *Platform, topleft: V2f, dims: V2f, opt: draw.PolyOpt) void {
+    var topleft_r = topleft;
+    var dims_r = dims;
+    if (opt.round_to_pixel) {
+        topleft_r = topleft_r.round();
+        dims_r = dims_r.round();
+    }
     const rec: r.Rectangle = .{
-        .x = topleft.x,
-        .y = topleft.y,
-        .width = dims.x,
-        .height = dims.y,
+        .x = topleft_r.x,
+        .y = topleft_r.y,
+        .width = dims_r.x,
+        .height = dims_r.y,
     };
+    switch (opt.smoothing) {
+        .bilinear => r.rlEnableSmoothLines(),
+        .none => r.rlDisableSmoothLines(),
+    }
+
     if (opt.fill_color) |color| {
         if (opt.edge_radius > 0) {
             r.DrawRectangleRounded(rec, opt.edge_radius, 10, cColorf(color));
@@ -486,57 +503,89 @@ pub fn rectf(_: *Platform, topleft: V2f, dims: V2f, opt: draw.PolyOpt) void {
             r.DrawRectangleRec(rec, cColorf(color));
         }
     }
-    if (opt.outline_color) |color| {
+    if (opt.outline) |outline| {
         if (opt.edge_radius > 0) {
-            r.DrawRectangleRoundedLinesEx(rec, opt.edge_radius, 10, opt.outline_thickness, cColorf(color));
+            r.DrawRectangleRoundedLinesEx(rec, opt.edge_radius, 10, outline.thickness, cColorf(outline.color));
         } else {
-            r.DrawRectangleLinesEx(rec, opt.outline_thickness, cColorf(color));
+            r.DrawRectangleLinesEx(rec, outline.thickness, cColorf(outline.color));
         }
     }
 }
 
 pub fn circlef(_: *Platform, center: V2f, radius: f32, opt: draw.PolyOpt) void {
-    if (opt.fill_color) |color| {
-        r.DrawCircleV(cVec(center), radius, cColorf(color));
+    var center_r = center;
+    const radius_r = radius;
+    if (opt.round_to_pixel) {
+        center_r = center_r.round();
+        //radius_r = @round(radius);
     }
-    if (opt.outline_color) |color| {
-        r.DrawCircleLinesV(cVec(center), radius, cColorf(color));
+
+    switch (opt.smoothing) {
+        .bilinear => r.rlEnableSmoothLines(),
+        .none => r.rlDisableSmoothLines(),
+    }
+
+    if (opt.fill_color) |color| {
+        r.DrawCircleV(cVec(center_r), radius_r, cColorf(color));
+    }
+    if (opt.outline) |outline| {
+        r.DrawCircleLinesV(cVec(center_r), radius_r, cColorf(outline.color));
     }
 }
 
 pub fn sectorf(_: *Platform, center: V2f, radius: f32, start_ang_rads: f32, end_ang_rads: f32, opt: draw.PolyOpt) void {
-    const p = cVec(center);
+    var center_r = center;
+    var radius_r = radius;
     const segs = 20;
     const start_deg = u.radiansToDegrees(start_ang_rads);
     const end_deg = u.radiansToDegrees(end_ang_rads);
-    if (opt.fill_color) |color| {
-        r.DrawCircleSector(p, radius, start_deg, end_deg, segs, cColorf(color));
+
+    switch (opt.smoothing) {
+        .bilinear => r.rlEnableSmoothLines(),
+        .none => r.rlDisableSmoothLines(),
     }
-    if (opt.outline_color) |color| {
-        r.DrawCircleSectorLines(p, radius, start_deg, end_deg, segs, cColorf(color));
+
+    if (opt.round_to_pixel) {
+        center_r = center_r.round();
+        radius_r = @round(radius_r);
+    }
+    if (opt.fill_color) |color| {
+        r.DrawCircleSector(cVec(center_r), radius_r, start_deg, end_deg, segs, cColorf(color));
+    }
+    if (opt.outline) |outline| {
+        r.DrawCircleSectorLines(cVec(center_r), radius_r, start_deg, end_deg, segs, cColorf(outline.color));
     }
 }
-
-//pub fn polyf(_: *Platform, points: []V2f, opt: draw.PolyOpt) void {
-//    r.drawPol
-//    r.DrawPoly(center: Vector2, sides: c_int, radius: f32, rotation: f32, color: Colorf)
-//    return self._drawRectf(self, points, opt);
-//}
 
 pub fn trianglef(_: *Platform, points: [3]V2f, opt: draw.PolyOpt) void {
-    if (opt.fill_color) |color| {
-        r.DrawTriangle(cVec(points[0]), cVec(points[1]), cVec(points[2]), cColorf(color));
+    var points_r = points;
+    if (opt.round_to_pixel) {
+        for (&points_r) |*p| {
+            p.* = p.round();
+        }
     }
-    if (opt.outline_color) |color| {
-        r.DrawTriangleLines(cVec(points[0]), cVec(points[1]), cVec(points[2]), cColorf(color));
+    switch (opt.smoothing) {
+        .bilinear => r.rlEnableSmoothLines(),
+        .none => r.rlDisableSmoothLines(),
+    }
+    if (opt.fill_color) |color| {
+        r.DrawTriangle(cVec(points_r[0]), cVec(points_r[1]), cVec(points_r[2]), cColorf(color));
+    }
+    if (opt.outline) |outline| {
+        r.DrawTriangleLines(cVec(points_r[0]), cVec(points_r[1]), cVec(points_r[2]), cColorf(outline.color));
     }
 }
 
-pub fn arrowf(self: *Platform, base: V2f, point: V2f, thickness: f32, color: Colorf) void {
-    assert(thickness >= 0.001);
+pub fn arrowf(self: *Platform, base: V2f, point: V2f, opt: draw.LineOpt) void {
+    assert(opt.thickness >= 0.001);
 
-    const tri_height = thickness * 2.3;
-    const tri_width = thickness * 2.5;
+    switch (opt.smoothing) {
+        .bilinear => r.rlEnableSmoothLines(),
+        .none => r.rlDisableSmoothLines(),
+    }
+
+    const tri_height = opt.thickness * 2.3;
+    const tri_width = opt.thickness * 2.5;
     const tri_width_2 = tri_width * 0.5;
     const v = point.sub(base);
     var total_len = v.length();
@@ -548,13 +597,16 @@ pub fn arrowf(self: *Platform, base: V2f, point: V2f, thickness: f32, color: Col
     const line_len = @max(total_len - tri_height, 0);
     const line_v = dir.scale(line_len);
     const line_end = base.add(line_v);
-    self.linef(base, line_end, thickness, color);
+    self.linef(base, line_end, opt);
 
     const tri_end = line_end.add(dir.scale(tri_height));
     const tri_edge_v = dir.scale(tri_width_2);
     const left_v = V2f{ .x = tri_edge_v.y, .y = -tri_edge_v.x };
     const right_v = V2f{ .x = -tri_edge_v.y, .y = tri_edge_v.x };
-    self.trianglef(.{ line_end.add(left_v), line_end.add(right_v), tri_end }, .{ .fill_color = color });
+    self.trianglef(
+        .{ line_end.add(left_v), line_end.add(right_v), tri_end },
+        .{ .fill_color = opt.color, .round_to_pixel = opt.round_to_pixel },
+    );
 }
 
 pub fn loadFont(self: *Platform, path: []const u8) Error!Font {
@@ -710,9 +762,14 @@ fn cCam(cam: draw.Camera2D) r.Camera2D {
     };
 }
 
-pub fn startCamera2D(self: *Platform, cam: draw.Camera2D) void {
+pub fn startCamera2D(self: *Platform, cam: draw.Camera2D, opt: draw.CameraOpt) void {
     _ = self;
-    r.BeginMode2D(cCam(cam));
+    var cam_r = cam;
+    if (opt.round_to_pixel) {
+        cam_r.pos = cam.pos.round();
+        cam_r.offset = cam.offset.round();
+    }
+    r.BeginMode2D(cCam(cam_r));
 }
 
 pub fn endCamera2D(_: *Platform) void {

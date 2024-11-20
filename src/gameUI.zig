@@ -114,8 +114,10 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, 
                     .dims = rect.dims.add(v2f(0.5, 1)),
                     .opt = .{
                         .fill_color = null,
-                        .outline_color = border_color,
-                        .outline_thickness = 4,
+                        .outline = .{
+                            .color = border_color,
+                            .thickness = 4,
+                        },
                         .edge_radius = 0.12,
                     },
                 } });
@@ -642,7 +644,7 @@ pub const ExitDoor = struct {
             const t = @sin(f);
             var opt = draw.PolyOpt{
                 .fill_color = open_color_1.lerp(open_color_2, t),
-                .outline_color = rim_color,
+                .outline = .{ .color = rim_color },
             };
             if (mouse_pos.dist(self.pos) <= select_radius) {
                 opt.fill_color = open_hover_color;
@@ -651,7 +653,7 @@ pub const ExitDoor = struct {
         } else {
             const opt = draw.PolyOpt{
                 .fill_color = closed_color,
-                .outline_color = rim_color,
+                .outline = .{ .color = rim_color },
             };
             plat.circlef(self.pos.add(v2f(0, 2)), radius - 1, opt);
         }
@@ -671,7 +673,7 @@ pub const ExitDoor = struct {
                 const range = 20;
                 const base = self.pos.sub(v2f(0, 100 + range * t));
                 const end = base.add(v2f(0, 70));
-                plat.arrowf(base, end, 15, color);
+                plat.arrowf(base, end, .{ .thickness = 15, .color = color });
             }
         }
     }
