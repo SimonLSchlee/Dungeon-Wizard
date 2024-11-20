@@ -97,20 +97,18 @@ pub const Decision = union(enum) {
 };
 
 pub const AIAggro = struct {
-    attack_action_idx: usize = 0,
-
-    pub fn decide(ai: *AIAggro, self: *Thing, room: *Room) Decision {
+    pub fn decide(_: *AIAggro, self: *Thing, room: *Room) Decision {
         const controller = &self.controller.ai_actor;
         const nearest_enemy: ?*Thing = getNearestOpposingThing(self, room);
         if (nearest_enemy) |target| {
-            const action = &controller.actions.buffer[ai.attack_action_idx];
+            const action = &controller.actions.getPtr(.melee_attack_1).*.?;
             const params = Action.Params{ .target_kind = .thing, .thing = target.id };
             if (inAttackRange(self, room, action, params)) {
                 if (action.cooldown.running) {
                     return .idle;
                 } else {
                     return .{ .action = .{
-                        .idx = ai.attack_action_idx,
+                        .slot = .melee_attack_1,
                         .params = params,
                     } };
                 }
@@ -136,10 +134,10 @@ pub const AITroll = struct {
         const controller = &self.controller.ai_actor;
         if (self.hp) |*hp| {
             if (hp.curr < hp.max * 0.5) {
-                const action = &controller.actions.buffer[1];
+                const action = &controller.actions.getPtr(.ability_1).*.?;
                 if (!action.cooldown.running) {
                     return .{ .action = .{
-                        .idx = 1,
+                        .slot = .ability_1,
                         .params = .{
                             .target_kind = .self,
                             .thing = self.id,
@@ -153,12 +151,10 @@ pub const AITroll = struct {
 };
 
 pub const AIAcolyte = struct {
-    cast_action_idx: usize = 0,
-
-    pub fn decide(ai: *AIAcolyte, self: *Thing, room: *Room) Decision {
+    pub fn decide(_: *AIAcolyte, self: *Thing, room: *Room) Decision {
         const controller = &self.controller.ai_actor;
         const nearest_enemy: ?*Thing = getNearestOpposingThing(self, room);
-        const action = &controller.actions.buffer[ai.cast_action_idx];
+        const action = &controller.actions.getPtr(.spell_cast_1).*.?;
 
         if (nearest_enemy) |target| {
             if (!controller.flee_cooldown.running) {
@@ -177,7 +173,7 @@ pub const AIAcolyte = struct {
                 const spawn_pos = self.pos.add(dir.scale(self.coll_radius * 2));
                 const params = Action.Params{ .target_kind = .pos, .pos = spawn_pos };
                 return .{ .action = .{
-                    .idx = ai.cast_action_idx,
+                    .slot = .spell_cast_1,
                     .params = params,
                 } };
             }
@@ -198,7 +194,7 @@ pub const ActorController = struct {
         troll: AITroll,
     };
 
-    actions: Action.Array = .{},
+    actions: Action.Slot.Array = Action.Slot.Array.initFill(null),
     ai: KindData = .{ .aggro = .{} },
     decision: Decision = .idle,
     flee_range: f32 = 250,
@@ -212,8 +208,10 @@ pub const ActorController = struct {
         const controller = &self.controller.ai_actor;
 
         // tick action cooldowns
-        for (controller.actions.slice()) |*a| {
-            _ = a.cooldown.tick(false);
+        for (&controller.actions.values) |*action| {
+            if (action.*) |*a| {
+                _ = a.cooldown.tick(false);
+            }
         }
         _ = controller.flee_cooldown.tick(false);
 
@@ -232,7 +230,7 @@ pub const ActorController = struct {
                 controller.decision = ai.decide(self, room);
                 if (std.meta.activeTag(controller.decision) == .action) {
                     const doing = &controller.decision.action;
-                    try controller.actions.buffer[doing.idx].begin(self, room, doing);
+                    try controller.actions.getPtr(doing.slot).*.?.begin(self, room, doing);
                 }
             },
         };
@@ -243,7 +241,7 @@ pub const ActorController = struct {
                 _ = self.animator.?.play(.idle, .{ .loop = true });
             },
             .action => |*doing| {
-                const action = &controller.actions.buffer[doing.idx];
+                const action = &controller.actions.getPtr(doing.slot).*.?;
                 if (try action.update(self, room, doing)) {
                     action.cooldown.restart();
                     controller.decision = .idle;

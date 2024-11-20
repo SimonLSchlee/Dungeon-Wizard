@@ -109,7 +109,17 @@ pub const ActionTypes = [_]type{
 pub const Kind = utl.EnumFromTypes(&ActionTypes, "enum_name");
 pub const KindData = utl.TaggedUnionFromTypes(&ActionTypes, "enum_name", Kind);
 
-pub const Array = std.BoundedArray(Action, 8);
+pub const Slot = enum {
+    pub const Array = std.EnumArray(Slot, ?Action);
+    melee_attack_1,
+    projectile_attack_1,
+    spell_cast_1,
+    spell_cast_2,
+    spell_cast_3,
+    spell_cast_4,
+    spell_cast_5,
+    ability_1,
+};
 
 pub const TargetKind = enum {
     self,
@@ -140,7 +150,7 @@ pub const Params = struct {
 };
 
 pub const Doing = struct {
-    idx: usize,
+    slot: Action.Slot,
     params: Params,
     can_turn: bool = true,
 };

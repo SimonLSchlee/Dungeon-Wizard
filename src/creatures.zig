@@ -68,7 +68,7 @@ pub fn implingProto() Thing {
     ret.accel_params = .{
         .max_speed = 1.0,
     };
-    ret.controller.ai_actor.actions.appendAssumeCapacity(.{
+    ret.controller.ai_actor.actions.getPtr(.melee_attack_1).* = (.{
         .kind = .{
             .melee_attack = .{
                 .hitbox = .{
@@ -91,7 +91,7 @@ pub fn slimeProto() Thing {
     c.accel_params = .{
         .max_speed = 0.7,
     };
-    c.controller.ai_actor.actions.appendAssumeCapacity(.{
+    c.controller.ai_actor.actions.getPtr(.melee_attack_1).* = (.{
         .kind = .{
             .melee_attack = .{
                 .hitbox = .{
@@ -110,11 +110,11 @@ pub fn slimeProto() Thing {
 }
 
 pub fn batProto() Thing {
-    var c = creatureProto(.bat, .bat, .enemy, .{ .aggro = .{} }, 5, .smol, 17);
-    c.accel_params = .{
+    var ret = creatureProto(.bat, .bat, .enemy, .{ .aggro = .{} }, 5, .smol, 17);
+    ret.accel_params = .{
         .max_speed = 1.1,
     };
-    c.controller.ai_actor.actions.appendAssumeCapacity(.{
+    ret.controller.ai_actor.actions.getPtr(.melee_attack_1).* = (.{
         .kind = .{
             .melee_attack = .{
                 .hitbox = .{
@@ -127,8 +127,8 @@ pub fn batProto() Thing {
         },
         .cooldown = utl.TickCounter.initStopped(70),
     });
-    c.enemy_difficulty = 0.25;
-    return c;
+    ret.enemy_difficulty = 0.25;
+    return ret;
 }
 
 pub fn trollProto() Thing {
@@ -136,7 +136,7 @@ pub fn trollProto() Thing {
     ret.accel_params = .{
         .max_speed = 0.7,
     };
-    ret.controller.ai_actor.actions.appendAssumeCapacity(.{
+    ret.controller.ai_actor.actions.getPtr(.melee_attack_1).* = (.{
         .kind = .{
             .melee_attack = .{
                 .hitbox = .{
@@ -151,7 +151,7 @@ pub fn trollProto() Thing {
         },
         .cooldown = utl.TickCounter.initStopped(90),
     });
-    ret.controller.ai_actor.actions.appendAssumeCapacity(.{
+    ret.controller.ai_actor.actions.getPtr(.ability_1).* = (.{
         .kind = .{
             .regen_hp = .{
                 .amount_per_sec = 5,
@@ -167,7 +167,7 @@ pub fn trollProto() Thing {
 
 pub fn gobbowProto() Thing {
     var ret = creatureProto(.gobbow, .gobbow, .enemy, .{ .aggro = .{} }, 18, .medium, 12);
-    ret.controller.ai_actor.actions.appendAssumeCapacity(.{
+    ret.controller.ai_actor.actions.getPtr(.projectile_attack_1).* = (.{
         .kind = .{ .projectile_attack = .{
             .projectile = .arrow,
             .range = 270,
@@ -184,7 +184,7 @@ pub fn sharpboiProto() Thing {
     ret.accel_params = .{
         .max_speed = 0.9,
     };
-    ret.controller.ai_actor.actions.appendAssumeCapacity(.{
+    ret.controller.ai_actor.actions.getPtr(.melee_attack_1).* = (.{
         .kind = .{
             .melee_attack = .{
                 .lunge_accel = .{
@@ -218,7 +218,7 @@ pub fn acolyteProto() Thing {
         .friction = 0.09,
         .max_speed = 1.25,
     };
-    ret.controller.ai_actor.actions.appendAssumeCapacity(.{
+    ret.controller.ai_actor.actions.getPtr(.spell_cast_1).* = (.{
         .kind = .{ .spell_cast = .{
             .spell = Spell.getProto(.summon_bat),
         } },
