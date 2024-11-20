@@ -132,7 +132,7 @@ pub fn batProto() Thing {
 }
 
 pub fn trollProto() Thing {
-    var ret = creatureProto(.troll, .troll, .enemy, .{ .aggro = .{} }, 40, .big, 20);
+    var ret = creatureProto(.troll, .troll, .enemy, .{ .troll = .{} }, 40, .big, 20);
     ret.accel_params = .{
         .max_speed = 0.7,
     };
@@ -150,6 +150,15 @@ pub fn trollProto() Thing {
             },
         },
         .cooldown = utl.TickCounter.initStopped(90),
+    });
+    ret.controller.ai_actor.actions.appendAssumeCapacity(.{
+        .kind = .{
+            .regen_hp = .{
+                .amount_per_sec = 5,
+                .max_regen = 25,
+            },
+        },
+        .cooldown = utl.TickCounter.initStopped(core.secsToTicks(5)),
     });
     ret.enemy_difficulty = 2.5;
 

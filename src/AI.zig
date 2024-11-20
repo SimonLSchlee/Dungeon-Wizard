@@ -129,6 +129,29 @@ pub const AIAggro = struct {
     }
 };
 
+pub const AITroll = struct {
+    ai_aggro: AIAggro = .{},
+
+    pub fn decide(ai: *AITroll, self: *Thing, room: *Room) Decision {
+        const controller = &self.controller.ai_actor;
+        if (self.hp) |*hp| {
+            if (hp.curr < hp.max * 0.5) {
+                const action = &controller.actions.buffer[1];
+                if (!action.cooldown.running) {
+                    return .{ .action = .{
+                        .idx = 1,
+                        .params = .{
+                            .target_kind = .self,
+                            .thing = self.id,
+                        },
+                    } };
+                }
+            }
+        }
+        return ai.ai_aggro.decide(self, room);
+    }
+};
+
 pub const AIAcolyte = struct {
     cast_action_idx: usize = 0,
 
@@ -167,10 +190,12 @@ pub const ActorController = struct {
     pub const Kind = enum {
         aggro,
         acolyte,
+        troll,
     };
     pub const KindData = union(Kind) {
         aggro: AIAggro,
         acolyte: AIAcolyte,
+        troll: AITroll,
     };
 
     actions: Action.Array = .{},
@@ -218,7 +243,9 @@ pub const ActorController = struct {
                 _ = self.animator.?.play(.idle, .{ .loop = true });
             },
             .action => |*doing| {
-                if (try controller.actions.buffer[doing.idx].update(self, room, doing)) {
+                const action = &controller.actions.buffer[doing.idx];
+                if (try action.update(self, room, doing)) {
+                    action.cooldown.restart();
                     controller.decision = .idle;
                 }
             },

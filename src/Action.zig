@@ -25,6 +25,10 @@ const gameUI = @import("gameUI.zig");
 const sprites = @import("sprites.zig");
 const Action = @This();
 
+// Loosely defined, an Action is a behavior that occurs over a predictable timespan
+// E.g. Shooting an arrow, casting a spell, dashing...
+// Walking to player is NOT a predictable timespan, too many variables. so not an Action.
+
 pub const Projectile = enum {
     arrow,
 
@@ -66,6 +70,7 @@ fn gobbowArrow() Thing {
 }
 
 pub const MeleeAttack = struct {
+    pub const enum_name = "melee_attack";
     hitbox: Thing.HitBox,
     LOS_thiccness: f32 = 10,
     lunge_accel: ?Thing.AccelParams = null,
@@ -74,32 +79,37 @@ pub const MeleeAttack = struct {
 };
 
 pub const ProjectileAttack = struct {
+    pub const enum_name = "projectile_attack";
     projectile: Projectile,
     range: f32 = 100,
     LOS_thiccness: f32 = 10,
 };
 
 pub const SpellCast = struct {
+    pub const enum_name = "spell_cast";
     spell: Spell,
     cast_vfx: ?Thing.Id = null,
 };
 
-// Loosely defined, an Action is a behavior that occurs over a predictable timespan
-// E.g. Shooting an arrow, casting a spell, dashing...
-// Walking to player is NOT a predictable timespan, too many variables. so not an Action.
+pub const RegenHp = struct {
+    pub const enum_name = "regen_hp";
+    amount_per_sec: f32 = 1,
+    max_regen: f32 = 10,
+    amount_regened: f32 = 0,
+    timer: utl.TickCounter = utl.TickCounter.init(60),
+};
+
+pub const ActionTypes = [_]type{
+    MeleeAttack,
+    ProjectileAttack,
+    SpellCast,
+    RegenHp,
+};
+
+pub const Kind = utl.EnumFromTypes(&ActionTypes, "enum_name");
+pub const KindData = utl.TaggedUnionFromTypes(&ActionTypes, "enum_name", Kind);
 
 pub const Array = std.BoundedArray(Action, 8);
-pub const Kind = enum {
-    melee_attack,
-    projectile_attack,
-    spell_cast,
-};
-
-pub const KindData = union(Kind) {
-    melee_attack: MeleeAttack,
-    projectile_attack: ProjectileAttack,
-    spell_cast: SpellCast,
-};
 
 pub const TargetKind = enum {
     self,
@@ -161,6 +171,10 @@ pub fn begin(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) E
         .spell_cast => |*sp| {
             _ = sp;
         },
+        .regen_hp => |*r| {
+            r.amount_regened = 0;
+            r.timer.restart();
+        },
     }
     action.curr_tick = 0;
 }
@@ -208,7 +222,6 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                     self.coll_layer.insert(.creature);
                     self.updateVel(.{}, .{ .friction = accel_params.max_speed });
                 }
-                action.cooldown.restart();
                 return true;
             }
 
@@ -274,7 +287,6 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
             }
             if (events.contains(.end)) {
                 //std.debug.print("attack end\n", .{});
-                action.cooldown.restart();
                 return true;
             }
 
@@ -307,11 +319,24 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
             }
             if (action.curr_tick == 60) {
                 try spc.spell.cast(self, room, doing.params);
-                action.cooldown.restart();
                 return true;
             }
             self.updateVel(.{}, .{});
             _ = self.animator.?.play(.cast, .{ .loop = true });
+        },
+        .regen_hp => |*r| {
+            if (r.timer.tick(true)) {
+                if (self.hp) |*hp| {
+                    hp.heal(r.amount_per_sec);
+                }
+                r.amount_regened += r.amount_per_sec;
+                if (r.amount_regened >= r.max_regen) {
+                    return true;
+                }
+            }
+            self.updateVel(.{}, .{});
+            // TODO another anim? vfx?
+            _ = self.animator.?.play(.idle, .{ .loop = true });
         },
     }
     action.curr_tick += 1;
