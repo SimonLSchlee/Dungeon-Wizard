@@ -73,7 +73,7 @@ pub fn implingProto() Thing {
                 .hitbox = .{
                     .mask = Thing.Faction.opposing_masks.get(.ally),
                     .radius = 20,
-                    .rel_pos = V2f.right.scale(30),
+                    .rel_pos = V2f.right.scale(20),
                     .effect = .{ .damage = 6 },
                 },
                 .range = 30,
@@ -94,12 +94,12 @@ pub fn slimeProto() Thing {
         .kind = .{
             .melee_attack = .{
                 .hitbox = .{
-                    .radius = 10,
-                    .rel_pos = V2f.right.scale(20),
-                    .sweep_to_rel_pos = V2f.right.scale(50),
+                    .radius = 20,
+                    .rel_pos = V2f.right.scale(10),
+                    .sweep_to_rel_pos = V2f.right.scale(40),
                     .effect = .{ .damage = 6 },
                 },
-                .range = 45,
+                .range = 40,
             },
         },
         .cooldown = utl.TickCounter.initStopped(90),
@@ -117,11 +117,11 @@ pub fn batProto() Thing {
         .kind = .{
             .melee_attack = .{
                 .hitbox = .{
-                    .radius = 10,
-                    .rel_pos = V2f.right.scale(30),
+                    .radius = 20,
+                    .rel_pos = V2f.right.scale(20),
                     .effect = .{ .damage = 3 },
                 },
-                .range = 30,
+                .range = 25,
             },
         },
         .cooldown = utl.TickCounter.initStopped(70),
@@ -139,12 +139,12 @@ pub fn trollProto() Thing {
         .kind = .{
             .melee_attack = .{
                 .hitbox = .{
-                    .radius = 15,
+                    .radius = 20,
                     .rel_pos = V2f.right.scale(20),
                     .sweep_to_rel_pos = V2f.right.scale(50),
                     .effect = .{ .damage = 12 },
                 },
-                .range = 55,
+                .range = 50,
                 .LOS_thiccness = 30,
             },
         },

@@ -136,9 +136,7 @@ pub fn getNearestOpposingThing(self: *Thing, room: *Room) ?*Thing {
     return closest;
 }
 
-pub fn canDoAction(self: *const Thing, room: *const Room, action: *const Action, params: Action.Params) bool {
-    if (action.cooldown.running) return false;
-
+pub fn inAttackRange(self: *const Thing, room: *const Room, action: *const Action, params: Action.Params) bool {
     switch (action.kind) {
         inline else => |atk| {
             const target: *const Thing = if (params.thing) |id| if (room.getConstThingById(id)) |t| t else return false else return false;
@@ -317,11 +315,15 @@ pub const AIAggro = struct {
         if (nearest_enemy) |target| {
             const action = &controller.actions.buffer[ai.attack_action_idx];
             const params = Action.Params{ .thing = target.id };
-            if (canDoAction(self, room, action, params)) {
-                return .{ .action = .{
-                    .idx = ai.attack_action_idx,
-                    .params = params,
-                } };
+            if (inAttackRange(self, room, action, params)) {
+                if (action.cooldown.running) {
+                    return .idle;
+                } else {
+                    return .{ .action = .{
+                        .idx = ai.attack_action_idx,
+                        .params = params,
+                    } };
+                }
             }
             const range = switch (action.kind) {
                 .projectile_attack => |r| r.range,
