@@ -174,6 +174,7 @@ mislay_pile: Spell.SpellArray = .{},
 fog: Fog = undefined,
 curr_tick: i64 = 0,
 paused: bool = false,
+advance_one_frame: bool = false, // if true, pause on next frame
 waves: WavesArray = .{},
 first_wave_timer: u.TickCounter = undefined,
 curr_wave: i32 = 0,
@@ -264,6 +265,11 @@ pub fn reset(self: *Room) Error!void {
     }
 
     self.ui_slots = gameUI.Slots.init(self, self.init_params.slots_params);
+}
+
+pub fn clone(self: *const Room, out: *Room) Error!void {
+    out.* = self.*;
+    out.fog = try self.fog.clone();
 }
 
 pub fn reloadFromTileMap(self: *Room, tilemap: TileMap) Error!void {
@@ -404,6 +410,11 @@ pub fn update(self: *Room) Error!void {
     self.ui_clicked = false;
     self.moused_over_thing = null;
 
+    if (self.advance_one_frame) {
+        self.paused = true;
+        self.advance_one_frame = false;
+    }
+
     if (debug.enable_debug_controls) {
         if (plat.input_buffer.keyIsJustPressed(.backtick)) {
             self.edit_mode = !self.edit_mode;
@@ -415,13 +426,18 @@ pub fn update(self: *Room) Error!void {
                 thing.deferFree(self);
             }
         }
-    }
-
-    if (self.edit_mode) {
-        if (plat.input_buffer.mouseBtnIsJustPressed(.left)) {
-            const pos = plat.getMousePosWorld(self.camera);
-            //std.debug.print("spawn sheep at {d:0.2}, {d:0.2}\n", .{ pos.x, pos.y });
-            _ = try self.queueSpawnCreatureByKind(.troll, pos);
+        if (self.paused) {
+            if (plat.input_buffer.keyIsJustPressed(.period)) {
+                self.paused = false;
+                self.advance_one_frame = true;
+            }
+        }
+        if (self.edit_mode) {
+            if (plat.input_buffer.mouseBtnIsJustPressed(.left)) {
+                const pos = plat.getMousePosWorld(self.camera);
+                //std.debug.print("spawn sheep at {d:0.2}, {d:0.2}\n", .{ pos.x, pos.y });
+                _ = try self.queueSpawnCreatureByKind(.troll, pos);
+            }
         }
     }
     for (self.spawn_queue.constSlice()) |id| {

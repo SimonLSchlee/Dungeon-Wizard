@@ -127,6 +127,11 @@ pub const Place = union(PlaceKind) {
 
 gold: i32 = 0,
 room: Room = undefined,
+// debug room history states
+room_buf: []Room = undefined,
+room_buf_tail: usize = undefined,
+room_buf_head: usize = 0,
+
 room_exists: bool = false,
 reward_ui: ?Reward.UI = null,
 shop: ?Shop = null,
@@ -159,9 +164,11 @@ imm_ui: struct {
 } = .{},
 
 pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
+    const plat = getPlat();
     const app = App.get();
 
     run.* = .{
+        .room_buf = try plat.heap.alloc(Room, 60),
         .rng = std.Random.DefaultPrng.init(seed),
         .seed = seed,
         .deck = makeStarterDeck(false),
@@ -170,6 +177,8 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
         .player_thing = player.modePrototype(mode),
         .mode = mode,
     };
+    run.room_buf_head = 0;
+    run.room_buf_tail = run.room_buf.len - 1;
 
     // TODO elsewhererre?
     run.slots_init_params.discard_button = mode == ._mana_mandy;
@@ -268,6 +277,7 @@ pub fn deinit(self: *Run) void {
     if (self.room_exists) {
         self.room.deinit();
     }
+    getPlat().heap.free(self.room_buf);
 }
 
 pub fn reset(self: *Run) Error!void {
@@ -439,12 +449,30 @@ pub fn gameUpdate(self: *Run) Error!void {
                 }
             }
         }
+        if (plat.input_buffer.keyIsJustPressed(.comma)) {
+            const prev = (self.room_buf_head + self.room_buf.len - 1) % self.room_buf.len;
+            // head is directly after tail; buffer is empty
+            if (prev != self.room_buf_tail) {
+                self.room.deinit();
+                self.room = self.room_buf[prev];
+                self.room_buf_head = prev;
+            }
+            self.room.paused = true;
+        }
     }
     if (!room.edit_mode) {
         //if (plat.input_buffer.keyIsJustPressed(.escape)) {
         //    room.paused = true;
         //    self.screen = .pause_menu;
         //}
+    }
+    if (!room.paused) {
+        // buffer full, move forward tail to overwrite last entry
+        if (self.room_buf_head == self.room_buf_tail) {
+            self.room_buf_tail = (self.room_buf_tail + 1) % self.room_buf.len;
+        }
+        try room.clone(&self.room_buf[self.room_buf_head]);
+        self.room_buf_head = (self.room_buf_head + 1) % self.room_buf.len;
     }
     try room.update();
     switch (room.progress_state) {

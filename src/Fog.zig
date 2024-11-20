@@ -61,6 +61,14 @@ pub fn deinit(self: *Fog) void {
     plat.destroyRenderTexture(self.render_tex);
 }
 
+pub fn clone(self: *const Fog) Error!Fog {
+    const plat = getPlat();
+    var ret = self.*;
+    ret.visited = try self.visited.clone();
+    ret.render_tex = plat.createRenderTexture("fog", core.native_dims);
+    return ret;
+}
+
 pub fn posToTileCoord(pos: V2f, tile_sz_f: f32) V2i {
     return .{
         .x = utl.as(i32, @floor(pos.x / tile_sz_f)),
