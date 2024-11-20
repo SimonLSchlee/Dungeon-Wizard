@@ -24,8 +24,6 @@ const data = @import("data.zig");
 const Thing = @import("Thing.zig");
 const sprites = @import("sprites.zig");
 
-const player = @import("player.zig");
-const enemies = @import("enemies.zig");
 const Spell = @import("Spell.zig");
 
 const ComptimeProto = struct {
@@ -204,12 +202,12 @@ pub fn update(status: *StatusEffect, thing: *Thing, room: *Room) Error!void {
             switch (status.kind) {
                 .blackmailed => {
                     assert(thing.isCreature());
-                    const proto = App.get().data.creatures.get(thing.creature_kind.?);
+                    const proto = App.get().data.creature_protos.get(thing.creature_kind.?);
                     thing.faction = proto.faction;
                 },
                 .trailblaze => {
                     assert(thing.isCreature());
-                    const proto = App.get().data.creatures.get(thing.creature_kind.?);
+                    const proto = App.get().data.creature_protos.get(thing.creature_kind.?);
                     thing.accel_params = proto.accel_params;
                 },
                 else => {},

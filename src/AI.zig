@@ -46,6 +46,9 @@ pub const ProjectileAttack = struct {
     LOS_thiccness: f32 = 10,
 };
 
+// Loosely defined, an Action is a behavior that occurs over a predictable timespan
+// E.g. Shooting an arrow, casting a spell, dashing...
+// Walking to player is NOT a predictable timespan, too many variables. so not an Action.
 pub const Action = struct {
     pub const Array = std.BoundedArray(Action, 8);
     pub const Kind = enum {
@@ -66,7 +69,6 @@ pub const Action = struct {
         can_turn: bool = true,
     };
     kind: KindData,
-    priority: f32 = 0, // higher means...higher... priority
     cooldown: utl.TickCounter = utl.TickCounter.initStopped(60),
 };
 
@@ -134,13 +136,9 @@ pub fn getNearestOpposingThing(self: *Thing, room: *Room) ?*Thing {
     return closest;
 }
 
-pub const AIState = enum {
-    idle,
-    pursue,
-    action,
-};
-
 pub fn canDoAction(self: *const Thing, room: *const Room, action: *const Action, params: Action.Params) bool {
+    if (action.cooldown.running) return false;
+
     switch (action.kind) {
         inline else => |atk| {
             const target: *const Thing = if (params.thing) |id| if (room.getConstThingById(id)) |t| t else return false else return false;
@@ -154,7 +152,8 @@ pub fn canDoAction(self: *const Thing, room: *const Room, action: *const Action,
     return false;
 }
 
-pub fn startAction(self: *Thing, room: *Room, doing: *Action.Doing, action: *Action) Error!bool {
+pub fn startAction(self: *Thing, room: *Room, doing: *Action.Doing, action: *Action) Error!void {
+    _ = action;
     const maybe_target_thing: ?*const Thing =
         if (doing.params.thing) |target_id|
         if (room.getConstThingById(target_id)) |t| t else null
@@ -167,8 +166,6 @@ pub fn startAction(self: *Thing, room: *Room, doing: *Action.Doing, action: *Act
     // TODO other stuff - maybe set pos to self.pos by default? idk
     // face what we're doing
     self.dir = doing.params.pos.sub(self.pos).normalizedChecked() orelse self.dir;
-
-    return try continueAction(self, room, doing, action);
 }
 
 // return true if done
@@ -300,118 +297,111 @@ pub fn continueAction(self: *Thing, room: *Room, doing: *Action.Doing, action: *
     return false;
 }
 
-pub const AIController = struct {
-    state: AIState = .idle,
+// TODO these could be thought of as 'behaviors' and be more specific - e.g. 'pursue' instead of 'move'
+pub const Decision = union(enum) {
+    idle,
+    pursue_to_attack: struct {
+        target_id: Thing.Id, // for sanity check
+        attack_range: f32,
+    },
+    flee,
+    action: Action.Doing,
+};
+
+pub const AIAggro = struct {
+    attack_action_idx: usize = 0,
+
+    pub fn decide(ai: *AIAggro, self: *Thing, room: *Room) Decision {
+        const controller = &self.controller.ai_actor;
+        const nearest_enemy: ?*Thing = getNearestOpposingThing(self, room);
+        if (nearest_enemy) |target| {
+            const action = &controller.actions.buffer[ai.attack_action_idx];
+            const params = Action.Params{ .thing = target.id };
+            if (canDoAction(self, room, action, params)) {
+                return .{ .action = .{
+                    .idx = ai.attack_action_idx,
+                    .params = params,
+                } };
+            }
+            const range = switch (action.kind) {
+                .projectile_attack => |r| r.range,
+                .melee_attack => |m| m.range,
+            };
+            return .{ .pursue_to_attack = .{
+                .target_id = target.id,
+                .attack_range = range,
+            } };
+        }
+        return .idle;
+    }
+};
+
+pub const ActorController = struct {
+    pub const Kind = enum {
+        aggro,
+    };
+    pub const KindData = union(Kind) {
+        aggro: AIAggro,
+    };
+
     actions: Action.Array = .{},
-    doing: ?Action.Doing = null,
+    ai: KindData = .{ .aggro = .{} },
+    decision: Decision = .idle,
 
     pub fn update(self: *Thing, room: *Room) Error!void {
         assert(self.spawn_state == .spawned);
-        const ai = &self.controller.enemy;
+        const controller = &self.controller.ai_actor;
 
         // tick action cooldowns
-        for (ai.actions.slice()) |*a| {
+        for (controller.actions.slice()) |*a| {
             _ = a.cooldown.tick(false);
         }
 
-        // if we're already doing an action, continue
-        if (ai.doing) |*doing| {
-            if (try continueAction(self, room, doing, &ai.actions.buffer[doing.idx])) {
-                ai.doing = null;
-            }
-            return;
-        }
-
-        // otherwise, decide what we'd like to do
-
-        // look at the world, record things for later
-        const nearest_enemy: ?*Thing = getNearestOpposingThing(self, room);
-        var next_available_best_atk: ?Action = null;
-        var next_attack_range: f32 = 0;
-        for (ai.actions.constSlice()) |a| {
-            switch (a.kind) {
-                // TODO not just attacks
-                inline else => |atk| {
-                    const is_better: bool = if (next_available_best_atk) |b| blk: {
-                        const a_ticks = a.cooldown.ticksLeft();
-                        const b_ticks = b.cooldown.ticksLeft();
-                        if (a_ticks == b_ticks) {
-                            break :blk a.priority > b.priority;
-                        }
-                        break :blk a_ticks < b_ticks;
-                    } else true;
-
-                    if (is_better) {
-                        next_available_best_atk = a;
-                        next_attack_range = atk.range;
-                    }
-                },
-            }
-        }
-
-        self.renderer.creature.draw_color = Colorf.yellow;
-        var desired_action_doing: ?Action.Doing = null;
-        var best_priority: f32 = -std.math.inf(f32);
-        // tick action cooldowns and get the best one (not on cooldown, highest prio)
-        for (ai.actions.slice(), 0..) |*a, i| {
-            if (a.cooldown.running) continue;
-            const params = switch (a.kind) {
-                inline else => if (nearest_enemy) |e| .{ .thing = e.id } else continue,
-            };
-            if (!canDoAction(self, room, a, params)) {
-                continue;
-            }
-
-            const is_better: bool = if (desired_action_doing) |_| a.priority > best_priority else true;
-            if (is_better) {
-                best_priority = a.priority;
-                desired_action_doing = .{
-                    .idx = i,
-                    .params = params,
-                };
-            }
-        }
-
-        // if we have an available action we can and want to do, start it!
-        if (desired_action_doing) |doing| {
-            ai.doing = doing;
-            ai.state = .action;
-            if (try startAction(self, room, &ai.doing.?, &ai.actions.buffer[doing.idx])) {
-                ai.doing = null;
-            }
-            return;
-        }
-
-        // otherwise, move toward closest enemy, or idle
-        ai.state = .idle;
-        if (self.accel_params.max_speed > 0.0001) {
-            if (nearest_enemy) |target| {
-                if (next_available_best_atk) |*next_atk| {
-                    if (!canDoAction(self, room, next_atk, .{ .thing = target.id })) {
-                        ai.state = .pursue;
-                        const dist = target.pos.dist(self.pos);
-                        const range = @max(dist - target.hurtbox.?.radius, 0);
-                        _ = self.animator.?.play(.move, .{ .loop = true });
-                        const dist_til_in_range = range - next_attack_range;
-                        var target_pos = target.pos;
-                        // predictive movement if close enough
-                        if (range < 80) {
-                            const time_til_reach = dist_til_in_range / self.accel_params.max_speed;
-                            target_pos = target.pos.add(target.vel.scale(time_til_reach));
-                        }
-                        try self.findPath(room, target_pos);
-                        const p = self.followPathGetNextPoint(10);
-                        self.updateVel(p.sub(self.pos).normalizedOrZero(), self.accel_params);
-                        if (!self.vel.isAlmostZero()) {
-                            self.dir = self.vel.normalized();
-                        }
-                    }
+        // decide what to do, if not doing an action (actions are committed to until done)
+        if (std.meta.activeTag(controller.decision) != .action) switch (controller.ai) {
+            inline else => |*ai| {
+                controller.decision = ai.decide(self, room);
+                if (std.meta.activeTag(controller.decision) == .action) {
+                    const doing = &controller.decision.action;
+                    try startAction(self, room, doing, &controller.actions.buffer[doing.idx]);
                 }
-            }
-        }
-        if (ai.state == .idle) {
-            self.updateVel(.{}, .{});
-            _ = self.animator.?.play(.idle, .{ .loop = true });
+            },
+        };
+
+        switch (controller.decision) {
+            .idle => {
+                self.updateVel(.{}, .{});
+                _ = self.animator.?.play(.idle, .{ .loop = true });
+            },
+            .action => |*doing| {
+                if (try continueAction(self, room, doing, &controller.actions.buffer[doing.idx])) {
+                    controller.decision = .idle;
+                }
+            },
+            .pursue_to_attack => |s| {
+                const _target = room.getThingById(s.target_id);
+                assert(_target != null);
+                const target = _target.?;
+                const dist = target.pos.dist(self.pos);
+                const range = @max(dist - target.hurtbox.?.radius, 0);
+                _ = self.animator.?.play(.move, .{ .loop = true });
+                const dist_til_in_range = range - s.attack_range;
+                var target_pos = target.pos;
+                // predictive movement if close enough
+                if (range < 80) {
+                    const time_til_reach = dist_til_in_range / self.accel_params.max_speed;
+                    target_pos = target.pos.add(target.vel.scale(time_til_reach));
+                }
+                try self.findPath(room, target_pos);
+                const p = self.followPathGetNextPoint(10);
+                self.updateVel(p.sub(self.pos).normalizedOrZero(), self.accel_params);
+                if (!self.vel.isAlmostZero()) {
+                    self.dir = self.vel.normalized();
+                }
+            },
+            .flee => {
+                // TODO
+            },
         }
     }
 };
@@ -452,7 +442,6 @@ pub fn getHidingPlaces(room: *const Room, fleer_pos: V2f, flee_from_pos: V2f, mi
     }
     return places;
 }
-const player = @import("player.zig");
 
 pub const AcolyteAIController = struct {
     wander_dir: V2f = .{},
@@ -570,144 +559,3 @@ pub const AcolyteAIController = struct {
         ai.ticks_in_state += 1;
     }
 };
-
-const sprites = @import("sprites.zig");
-
-pub fn slime() Thing {
-    var c = Thing.creatureProto(.slime, .slime, .enemy, 14, .big, 13);
-    c.accel_params = .{
-        .max_speed = 0.7,
-    };
-    c.controller = .{ .enemy = .{} };
-    c.controller.enemy.actions.appendAssumeCapacity(.{
-        .kind = .{
-            .melee_attack = .{
-                .hitbox = .{
-                    .radius = 10,
-                    .rel_pos = V2f.right.scale(20),
-                    .sweep_to_rel_pos = V2f.right.scale(50),
-                    .effect = .{ .damage = 6 },
-                },
-                .range = 45,
-            },
-        },
-        .cooldown = utl.TickCounter.initStopped(90),
-    });
-    c.enemy_difficulty = 0.75;
-    return c;
-}
-
-pub fn bat() Thing {
-    var c = Thing.creatureProto(.bat, .bat, .enemy, 5, .smol, 17);
-    c.accel_params = .{
-        .max_speed = 1.1,
-    };
-    c.controller = .{ .enemy = .{} };
-    c.controller.enemy.actions.appendAssumeCapacity(.{
-        .kind = .{
-            .melee_attack = .{
-                .hitbox = .{
-                    .radius = 10,
-                    .rel_pos = V2f.right.scale(30),
-                    .effect = .{ .damage = 3 },
-                },
-                .range = 30,
-            },
-        },
-        .cooldown = utl.TickCounter.initStopped(70),
-    });
-    c.enemy_difficulty = 0.25;
-    return c;
-}
-
-pub fn troll() Thing {
-    var ret = Thing.creatureProto(.troll, .troll, .enemy, 40, .big, 20);
-    ret.accel_params = .{
-        .max_speed = 0.7,
-    };
-    ret.controller = .{ .enemy = .{} };
-    ret.controller.enemy.actions.appendAssumeCapacity(.{
-        .kind = .{
-            .melee_attack = .{
-                .hitbox = .{
-                    .radius = 15,
-                    .rel_pos = V2f.right.scale(20),
-                    .sweep_to_rel_pos = V2f.right.scale(50),
-                    .effect = .{ .damage = 12 },
-                },
-                .range = 55,
-                .LOS_thiccness = 30,
-            },
-        },
-        .cooldown = utl.TickCounter.initStopped(90),
-    });
-    ret.enemy_difficulty = 2.5;
-
-    return ret;
-}
-
-pub fn gobbow() Thing {
-    var ret = Thing.creatureProto(.gobbow, .gobbow, .enemy, 18, .medium, 12);
-    ret.controller = .{ .enemy = .{} };
-    ret.controller.enemy.actions.appendAssumeCapacity(.{
-        .kind = .{ .projectile_attack = .{
-            .projectile = .arrow,
-            .range = 270,
-        } },
-        .cooldown = utl.TickCounter.initStopped(60),
-    });
-    ret.enemy_difficulty = 1.5;
-    return ret;
-}
-
-pub fn sharpboi() Thing {
-    var ret = Thing.creatureProto(.sharpboi, .sharpboi, .enemy, 25, .medium, 18);
-
-    ret.accel_params = .{
-        .max_speed = 0.9,
-    };
-    ret.controller = .{ .enemy = .{} };
-    ret.controller.enemy.actions.appendAssumeCapacity(.{
-        .kind = .{
-            .melee_attack = .{
-                .lunge_accel = .{
-                    .accel = 5,
-                    .max_speed = 5,
-                    .friction = 0,
-                },
-                .hitbox = .{
-                    .mask = Thing.Faction.opposing_masks.get(.enemy),
-                    .radius = 15,
-                    .rel_pos = V2f.right.scale(40),
-                    .effect = .{ .damage = 8 },
-                    .deactivate_on_update = false,
-                    .deactivate_on_hit = true,
-                },
-                .hit_to_side_force = 2.5,
-                .range = 110,
-                .LOS_thiccness = 30,
-            },
-        },
-        .cooldown = utl.TickCounter.initStopped(140),
-    });
-    ret.enemy_difficulty = 2.5;
-    return ret;
-}
-
-pub fn acolyte() Thing {
-    var ret = Thing.creatureProto(.acolyte, .acolyte, .enemy, 25, .medium, 12);
-    ret.accel_params = .{
-        .accel = 0.3,
-        .friction = 0.09,
-        .max_speed = 1.25,
-    };
-    ret.controller = .{ .acolyte_enemy = .{} };
-    ret.enemy_difficulty = 3;
-    return ret;
-}
-
-pub fn dummy() Thing {
-    var ret = Thing.creatureProto(.dummy, .dummy, .enemy, 25, .medium, 20);
-    ret.enemy_difficulty = 0;
-    return ret;
-}

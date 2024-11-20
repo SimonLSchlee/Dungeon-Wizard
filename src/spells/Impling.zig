@@ -52,31 +52,6 @@ pub const proto = Spell.makeProto(
     },
 );
 
-pub fn implingProto() Error!Thing {
-    var ret = Thing.creatureProto(.impling, .impling, .ally, 25, .medium, 13);
-
-    ret.accel_params = .{
-        .max_speed = 1.0,
-    };
-    ret.controller = .{ .enemy = .{} };
-    ret.controller.enemy.actions.appendAssumeCapacity(.{
-        .kind = .{
-            .melee_attack = .{
-                .hitbox = .{
-                    .mask = Thing.Faction.opposing_masks.get(.ally),
-                    .radius = 20,
-                    .rel_pos = V2f.right.scale(30),
-                    .effect = .{ .damage = 6 },
-                },
-                .range = 30,
-                .LOS_thiccness = 40,
-            },
-        },
-        .cooldown = utl.TickCounter.initStopped(60),
-    });
-    return ret;
-}
-
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
     assert(std.meta.activeTag(params.target) == Spell.TargetKind.pos);
     _ = caster;
@@ -103,7 +78,7 @@ pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
         \\{s}
         \\
     ;
-    const summonProto = App.get().data.creatures.getPtr(.impling);
+    const summonProto = App.get().data.creature_protos.getPtr(.impling);
     const hp: i32 = utl.as(i32, summonProto.hp.?.max);
     const damage: i32 = utl.as(i32, summonProto.hitbox.?.effect.damage);
     return std.fmt.bufPrint(buf, fmt, .{ hp, damage, description });

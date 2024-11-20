@@ -27,22 +27,8 @@ const Player = @This();
 
 pub const enum_name = "player";
 
-pub fn basePrototype() Thing {
-    var ret = Thing.creatureProto(.player, .wizard, .player, 40, .medium, 15);
-    ret.accel_params = .{
-        .accel = 0.15,
-        .friction = 0.09,
-        .max_speed = 1.2,
-    };
-    ret.vision_range = 300;
-    ret.player_input = Input{};
-    ret.controller = .{ .player = .{} };
-
-    return ret;
-}
-
 pub fn modePrototype(mode: Run.Mode) Thing {
-    var base = basePrototype();
+    var base = App.get().data.creature_protos.get(.player);
     switch (mode) {
         ._4_slot_frank => {},
         ._mana_mandy => {

@@ -25,11 +25,12 @@ const pool = @import("pool.zig");
 const sprites = @import("sprites.zig");
 
 const player = @import("player.zig");
-const enemies = @import("enemies.zig");
+const creatures = @import("creatures.zig");
 const Spell = @import("Spell.zig");
 const Item = @import("Item.zig");
 pub const StatusEffect = @import("StatusEffect.zig");
 pub const Collision = @import("Collision.zig");
+const AI = @import("AI.zig");
 
 pub const Kind = enum {
     creature,
@@ -39,17 +40,7 @@ pub const Kind = enum {
     vfx,
 };
 
-pub const CreatureKind = enum {
-    player,
-    dummy,
-    troll,
-    gobbow,
-    sharpboi,
-    impling,
-    bat,
-    acolyte,
-    slime,
-};
+pub const CreatureKind = creatures.Kind;
 
 pub const SizeCategory = enum {
     none,
@@ -120,8 +111,8 @@ player_input: ?player.Input = null,
 controller: union(enum) {
     default: DefaultController,
     player: player.Controller,
-    enemy: enemies.AIController,
-    acolyte_enemy: enemies.AcolyteAIController,
+    ai_actor: AI.ActorController,
+    acolyte_enemy: AI.AcolyteAIController,
     spell: Spell.Controller,
     item: Item.Controller,
     projectile: ProjectileController,
@@ -559,7 +550,7 @@ pub const SpawnerController = struct {
             .fade_in_creature => {
                 self.renderer.spawner.sprite_tint = Colorf.black.fade(0).lerp(Colorf.white, spawner.timer.remapTo0_1());
                 if (spawner.timer.tick(true)) {
-                    var proto = App.get().data.creatures.get(spawner.creature_kind);
+                    var proto = App.get().data.creature_protos.get(spawner.creature_kind);
                     proto.faction = self.faction;
                     _ = try room.queueSpawnThing(&proto, self.pos);
                     spawner.state = .fade_out_circle;
@@ -576,7 +567,7 @@ pub const SpawnerController = struct {
     }
 
     pub fn prototype(creature_kind: CreatureKind) Thing {
-        const proto: Thing = App.get().data.creatures.get(creature_kind);
+        const proto: Thing = App.get().data.creature_protos.get(creature_kind);
         return .{
             .kind = .spawner,
             .controller = .{
@@ -1176,7 +1167,7 @@ pub fn getApproxVisibleCircle(self: *const Thing) struct { pos: V2f, radius: f32
         .spawner => |s| {
             // TODO very hack for spawners - this leaves no frame gap where visible circle is different to spawning creature's
             if (s.state != .fade_out_circle or s.timer.curr_tick == 0) {
-                var proto = App.get().data.creatures.get(s.creature_kind);
+                var proto = App.get().data.creature_protos.get(s.creature_kind);
                 proto.pos = self.pos;
                 return proto.getApproxVisibleCircle();
             }
@@ -1195,30 +1186,4 @@ pub fn getApproxVisibleCircle(self: *const Thing) struct { pos: V2f, radius: f32
         ret.radius = @max(h.radius, self.coll_radius);
     }
     return ret;
-}
-
-pub fn creatureProto(creature_kind: CreatureKind, sprite_kind: sprites.CreatureAnim.Kind, faction: Thing.Faction, hp: f32, size_cat: Thing.SizeCategory, select_height_px: f32) Thing {
-    return Thing{
-        .kind = .creature,
-        .creature_kind = creature_kind,
-        .spawn_state = .instance,
-        .vision_range = 160,
-        .coll_radius = Thing.SizeCategory.coll_radii.get(size_cat),
-        .coll_mask = Thing.Collision.Mask.initMany(&.{ .creature, .tile }),
-        .coll_layer = Thing.Collision.Mask.initMany(&.{.creature}),
-        .renderer = .{ .creature = .{
-            .draw_color = .yellow,
-            .draw_radius = Thing.SizeCategory.draw_radii.get(size_cat),
-        } },
-        .animator = .{ .kind = .{ .creature = .{ .kind = sprite_kind } } },
-        .hurtbox = .{
-            .radius = Thing.SizeCategory.hurtbox_radii.get(size_cat),
-        },
-        .selectable = .{
-            .height = select_height_px * core.pixel_art_scaling,
-            .radius = Thing.SizeCategory.select_radii.get(size_cat),
-        },
-        .hp = Thing.HP.init(hp),
-        .faction = faction,
-    };
 }

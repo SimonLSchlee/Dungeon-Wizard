@@ -74,7 +74,7 @@ fn makeWaves(tilemap: TileMap, rng: std.Random, params: WavesParams) WavesArray 
         .first => {
             if (tilemap.wave_spawns.len > 0) {
                 var wave = Wave{};
-                wave.spawns.append(.{ .pos = tilemap.wave_spawns.get(0), .proto = data.creatures.get(.dummy) }) catch unreachable;
+                wave.spawns.append(.{ .pos = tilemap.wave_spawns.get(0), .proto = data.creature_protos.get(.dummy) }) catch unreachable;
                 ret.append(wave) catch unreachable;
                 return ret;
             }
@@ -107,7 +107,7 @@ fn makeWaves(tilemap: TileMap, rng: std.Random, params: WavesParams) WavesArray 
         for (0..params.max_kinds_per_wave) |_| {
             const idx = rng.weightedIndex(f32, &params.enemy_probabilities.values);
             const kind: Thing.CreatureKind = @enumFromInt(idx);
-            enemy_protos.append(data.creatures.get(kind)) catch unreachable;
+            enemy_protos.append(data.creature_protos.get(kind)) catch unreachable;
             std.debug.print("  possible enemy: {any} : probability: {d:.2}\n", .{ kind, params.enemy_probabilities.get(kind) });
         }
 
@@ -292,7 +292,7 @@ pub fn queueSpawnThing(self: *Room, proto: *const Thing, pos: V2f) Error!?pool.I
 
 pub fn queueSpawnCreatureByKind(self: *Room, kind: Thing.CreatureKind, pos: V2f) Error!?pool.Id {
     const app = App.get();
-    const proto = app.data.creatures.getPtr(kind);
+    const proto = app.data.creature_protos.getPtr(kind);
     return self.queueSpawnThing(proto, pos);
 }
 

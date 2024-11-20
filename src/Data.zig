@@ -23,7 +23,7 @@ const Item = @import("Item.zig");
 const PackedRoom = @import("PackedRoom.zig");
 const player = @import("player.zig");
 const TileMap = @import("TileMap.zig");
-pub const enemies = @import("enemies.zig");
+const creatures = @import("creatures.zig");
 const Data = @This();
 
 pub const TileSet = struct {
@@ -295,7 +295,7 @@ pub fn FileWalkerIterator(assets_rel_dir: []const u8, file_suffix: []const u8) t
 
 tilesets: std.ArrayList(TileSet),
 tilemaps: std.ArrayList(TileMap),
-creatures: std.EnumArray(Thing.CreatureKind, Thing),
+creature_protos: std.EnumArray(Thing.CreatureKind, Thing),
 creature_sprite_sheets: AllCreatureSpriteSheetArrays,
 creature_anims: AllCreatureAnimArrays,
 vfx_sprite_sheets: std.ArrayList(SpriteSheet),
@@ -941,19 +941,10 @@ pub fn loadFonts(self: *Data) Error!void {
 pub fn reload(self: *Data) Error!void {
     self.loadSpriteSheets() catch |err| std.debug.print("WARNING: failed to load all sprites: {any}\n", .{err});
     self.loadSounds() catch |err| std.debug.print("WARNING: failed to load all sounds: {any}\n", .{err});
-    self.creatures = @TypeOf(self.creatures).init(
-        .{
-            .player = player.basePrototype(),
-            .dummy = enemies.dummy(),
-            .bat = enemies.bat(),
-            .troll = enemies.troll(),
-            .gobbow = enemies.gobbow(),
-            .sharpboi = enemies.sharpboi(),
-            .acolyte = enemies.acolyte(),
-            .slime = enemies.slime(),
-            .impling = try @import("spells/Impling.zig").implingProto(),
-        },
-    );
+    inline for (@typeInfo(creatures.Kind).@"enum".fields) |f| {
+        const kind: creatures.Kind = @enumFromInt(f.value);
+        self.creature_protos.getPtr(kind).* = creatures.proto_fns.get(kind)();
+    }
     self.loadTileSets() catch |err| std.debug.print("WARNING: failed to load all tilesets: {any}\n", .{err});
     self.loadTileMaps() catch |err| std.debug.print("WARNING: failed to load all tilemaps: {any}\n", .{err});
     inline for (std.meta.fields(RoomKind)) |f| {
