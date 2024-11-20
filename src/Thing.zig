@@ -862,6 +862,8 @@ pub fn update(self: *Thing, room: *Room) Error!void {
             self.deferFree(room);
         }
         return;
+    } else {
+        self.updateVel(.{}, .{});
     }
     self.moveAndCollide(room);
     if (self.statuses.get(.promptitude).stacks > 0) {
