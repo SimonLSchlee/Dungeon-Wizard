@@ -32,9 +32,6 @@ pub const title = "Impling";
 pub const enum_name = "impling";
 pub const Controllers = [_]type{};
 
-const base_radius = 7;
-const base_range = 200;
-
 pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
     .{
@@ -53,11 +50,10 @@ pub const proto = Spell.makeProto(
 );
 
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
-    assert(std.meta.activeTag(params.target) == Spell.TargetKind.pos);
-    _ = caster;
+    params.validate(.pos, caster);
     const impling = self.kind.impling;
     _ = impling;
-    const target_pos = params.target.pos;
+    const target_pos = params.pos;
     const spawner = Thing.SpawnerController.prototype(.impling);
     _ = try room.queueSpawnThing(&spawner, target_pos);
 }

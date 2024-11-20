@@ -48,7 +48,7 @@ pub const proto = Spell.makeProto(
 num_stacks: i32 = 7,
 
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
-    assert(params.target == .self);
+    params.validate(.self, caster);
     const promptitude: @This() = self.kind.promptitude;
     caster.statuses.getPtr(.promptitude).addStacks(caster, promptitude.num_stacks);
 

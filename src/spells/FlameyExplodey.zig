@@ -117,7 +117,7 @@ pub const Projectile = struct {
         const spell = spell_controller.spell;
         const flamey_explodey = spell.kind.flamey_explodey;
         const params = spell_controller.params;
-        const target_pos = params.target.pos;
+        const target_pos = params.pos;
         const projectile: *@This() = &spell_controller.controller.flamey_explodey_projectile;
 
         if (!projectile.exploded) {
@@ -144,9 +144,9 @@ pub const Projectile = struct {
 };
 
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
-    assert(std.meta.activeTag(params.target) == Spell.TargetKind.pos);
+    params.validate(.pos, caster);
     const flamey_explodey = self.kind.flamey_explodey;
-    const target_pos = params.target.pos;
+    const target_pos = params.pos;
     const target_dir = if (target_pos.sub(caster.pos).normalizedChecked()) |d| d else V2f.right;
 
     const ball = Thing{

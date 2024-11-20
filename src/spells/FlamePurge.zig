@@ -78,7 +78,7 @@ pub const Projectile = struct {
 };
 
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
-    assert(std.meta.activeTag(params.target) == Spell.TargetKind.self);
+    params.validate(.self, caster);
     const flame_purge: @This() = self.kind.flame_purge;
     // purrgeu
     const caster_lit_status = caster.statuses.getPtr(.lit);

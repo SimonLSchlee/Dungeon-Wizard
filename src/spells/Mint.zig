@@ -73,7 +73,7 @@ pub const Projectile = struct {
         const mint = spell.kind.mint;
         _ = mint;
         const params = spell_controller.params;
-        const target_pos = params.target.pos;
+        const target_pos = params.pos;
         const projectile: *@This() = &spell_controller.controller.mint_projectile;
         _ = projectile;
 
@@ -88,9 +88,9 @@ pub const Projectile = struct {
 };
 
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
-    assert(std.meta.activeTag(params.target) == Spell.TargetKind.pos);
+    params.validate(.pos, caster);
     const mint = self.kind.mint;
-    const target_pos = params.target.pos;
+    const target_pos = params.pos;
     const target_dir = if (target_pos.sub(caster.pos).normalizedChecked()) |d| d else V2f.right;
     var run = App.get().run;
     if (run.gold <= 0) {

@@ -49,7 +49,8 @@ shield_amount: f32 = 15,
 duration_secs: f32 = 5,
 
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
-    assert(params.target == .self);
+    params.validate(.self, caster);
+
     const blank_mind: @This() = self.kind.blank_mind;
     if (caster.hp) |*hp| {
         hp.addShield(blank_mind.shield_amount, core.secsToTicks(blank_mind.duration_secs));

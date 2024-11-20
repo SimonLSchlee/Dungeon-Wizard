@@ -51,9 +51,9 @@ pub const proto = Spell.makeProto(
 num_stacks: i32 = 7,
 
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
-    assert(std.meta.activeTag(params.target) == Spell.TargetKind.thing);
+    params.validate(.thing, caster);
 
-    const _target = room.getThingById(params.target.thing);
+    const _target = room.getThingById(params.thing.?);
     if (_target == null) {
         // fizzle
         return;

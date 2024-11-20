@@ -80,7 +80,7 @@ pub const Projectile = struct {
         const zap_dash = spell.kind.zap_dash;
         _ = zap_dash;
         const params = spell_controller.params;
-        const target_pos = params.target.pos;
+        const target_pos = params.pos;
         _ = target_pos;
         const projectile: *@This() = &spell_controller.controller.zap_dash_projectile;
         if (projectile.fade_timer.tick(false)) {
@@ -91,9 +91,9 @@ pub const Projectile = struct {
 };
 
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
-    assert(std.meta.activeTag(params.target) == Spell.TargetKind.pos);
+    params.validate(.pos, caster);
     const zap_dash = self.kind.zap_dash;
-    const param_target_pos = params.target.pos;
+    const param_target_pos = params.pos;
     const target_dir = if (param_target_pos.sub(caster.pos).normalizedChecked()) |d| d else V2f.right;
     const orig_target_pos = caster.pos.add(target_dir.scale(zap_dash.range));
     const target_pos = self.targeting_data.getRayEnd(room, caster, self.targeting_data.ray_to_mouse.?, orig_target_pos);

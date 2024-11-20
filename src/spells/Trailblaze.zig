@@ -49,11 +49,13 @@ pub fn fireProto() Thing {
     return Thing{
         .kind = .projectile,
         .spawn_state = .instance,
-        .controller = .{ .spell = .{
-            .params = .{ .target = .self },
-            .spell = proto,
-            .controller = .{ .trailblaze_projectile = .{} },
-        } },
+        .controller = .{
+            .spell = .{
+                .params = .{ .target_kind = .self }, // TODO this isn't valid but doesnt matter
+                .spell = proto,
+                .controller = .{ .trailblaze_projectile = .{} },
+            },
+        },
         .renderer = .{ .vfx = .{} },
         .animator = .{
             .kind = .{
@@ -118,7 +120,7 @@ pub const Projectile = struct {
 };
 
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
-    assert(params.target == .self);
+    params.validate(.self, caster);
     _ = room;
     const trailblaze: @This() = self.kind.trailblaze;
     const status = caster.statuses.getPtr(.trailblaze);

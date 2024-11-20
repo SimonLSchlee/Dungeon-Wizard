@@ -130,9 +130,9 @@ pub const Projectile = struct {
 };
 
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
-    assert(std.meta.activeTag(params.target) == Spell.TargetKind.pos);
+    params.validate(.pos, caster);
     const frost_vom = self.kind.frost_vom;
-    const target_pos = params.target.pos;
+    const target_pos = params.pos;
     const target_dir = if (target_pos.sub(caster.pos).normalizedChecked()) |d| d else V2f.right;
     const start_rads = target_dir.toAngleRadians() - frost_vom.arc_rads * 0.5;
     const end_rads = start_rads + frost_vom.arc_rads;

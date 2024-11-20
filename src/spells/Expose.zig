@@ -97,9 +97,9 @@ pub const Projectile = struct {
 };
 
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
-    assert(std.meta.activeTag(params.target) == Spell.TargetKind.pos);
+    params.validate(.pos, caster);
     const expose = self.kind.expose;
-    const target_pos = params.target.pos;
+    const target_pos = params.pos;
     const hit_circle = Thing{
         .kind = .projectile,
         .accel_params = .{

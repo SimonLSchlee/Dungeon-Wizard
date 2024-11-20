@@ -26,6 +26,7 @@ const Collision = @import("Collision.zig");
 const menuUI = @import("menuUI.zig");
 const sprites = @import("sprites.zig");
 const ImmUI = @import("ImmUI.zig");
+const Action = @import("Action.zig");
 
 const Spell = @This();
 
@@ -44,22 +45,26 @@ pub const card_title_center_offset = v2f(36, 56);
 
 var desc_buf: [2048]u8 = undefined;
 
-pub const SpellTypes = [_]type{
-    @import("spells/Unherring.zig"),
-    @import("spells/Protec.zig"),
-    @import("spells/FrostVom.zig"),
-    @import("spells/Blackmail.zig"),
-    @import("spells/Mint.zig"),
-    @import("spells/Impling.zig"),
-    @import("spells/Promptitude.zig"),
-    @import("spells/FlameyExplodey.zig"),
-    @import("spells/Expose.zig"),
-    @import("spells/ZapDash.zig"),
-    @import("spells/FlareDart.zig"),
-    @import("spells/Trailblaze.zig"),
-    @import("spells/FlamePurge.zig"),
-    @import("spells/BlankMind.zig"),
-    @import("spells/ShieldFu.zig"),
+pub const SpellTypes = blk: {
+    const player_spells = [_]type{
+        @import("spells/Unherring.zig"),
+        @import("spells/Protec.zig"),
+        @import("spells/FrostVom.zig"),
+        @import("spells/Blackmail.zig"),
+        @import("spells/Mint.zig"),
+        @import("spells/Impling.zig"),
+        @import("spells/Promptitude.zig"),
+        @import("spells/FlameyExplodey.zig"),
+        @import("spells/Expose.zig"),
+        @import("spells/ZapDash.zig"),
+        @import("spells/FlareDart.zig"),
+        @import("spells/Trailblaze.zig"),
+        @import("spells/FlamePurge.zig"),
+        @import("spells/BlankMind.zig"),
+        @import("spells/ShieldFu.zig"),
+    };
+    const nonplayer_spells = @import("spells/nonplayer.zig").spells;
+    break :blk player_spells ++ nonplayer_spells; //[player_spells.len + nonplayer_spells.len]
 };
 
 pub const Kind = utl.EnumFromTypes(&SpellTypes, "enum_name");
@@ -80,15 +85,6 @@ const spell_names = blk: {
         const kind: Kind = @enumFromInt(f.value);
         const T = GetKindType(kind);
         ret.set(kind, T.title);
-    }
-    break :blk ret;
-};
-const spell_descriptions = blk: {
-    var ret: std.EnumArray(Kind, []const u8) = undefined;
-    for (std.meta.fields(Kind)) |f| {
-        const kind: Kind = @enumFromInt(f.value);
-        const T = GetKindType(kind);
-        ret.set(kind, T.description);
     }
     break :blk ret;
 };
@@ -134,21 +130,8 @@ pub const Rarity = enum {
     brilliant,
 };
 
-pub const TargetKind = enum {
-    self,
-    thing,
-    pos,
-};
-
-pub const Params = struct {
-    face_dir: ?V2f = null,
-    cast_orig: ?V2f = null,
-    target: union(TargetKind) {
-        self,
-        thing: Thing.Id,
-        pos: V2f,
-    },
-};
+pub const TargetKind = Action.TargetKind;
+pub const Params = Action.Params;
 
 pub const TargetingData = struct {
     pub const Ray = struct {
@@ -156,7 +139,7 @@ pub const TargetingData = struct {
         thickness: f32 = 1,
         cast_orig_dist: f32 = 0,
     };
-    kind: TargetKind = .self,
+    kind: Action.TargetKind = .self,
     color: Colorf = .cyan,
     fixed_range: bool = false,
     max_range: f32 = std.math.inf(f32),
@@ -229,13 +212,14 @@ pub const TargetingData = struct {
                 const capped_vec = target_dir.scale(capped_dist);
                 var target_pos = caster.pos.add(capped_vec);
                 var ret = Params{
-                    .target = .{ .pos = target_pos },
+                    .target_kind = .pos,
+                    .pos = target_pos,
                     .face_dir = target_pos.sub(caster.pos).normalizedChecked() orelse caster.dir,
                 };
                 if (targeting_data.ray_to_mouse) |ray| {
                     const cast_orig = caster.pos.add(target_dir.scale(ray.cast_orig_dist));
                     if (target_pos.sub(cast_orig).dot(target_dir) < 0) {
-                        ret.target.pos = cast_orig;
+                        ret.pos = cast_orig;
                     }
                     ret.cast_orig = cast_orig;
                 }
@@ -243,7 +227,8 @@ pub const TargetingData = struct {
             },
             .self => {
                 return .{
-                    .target = .self,
+                    .target_kind = .self,
+                    .thing = caster.id,
                 };
             },
             .thing => {
@@ -256,8 +241,9 @@ pub const TargetingData = struct {
                     if (targeting_data.requires_los_to_thing and !room.tilemap.isLOSBetween(caster.pos, thing.pos)) return null;
                     if (targeting_data.target_faction_mask.contains(thing.faction)) {
                         return .{
-                            .target = .{ .thing = thing.id },
+                            .target_kind = .thing,
                             .face_dir = thing.pos.sub(caster.pos).normalizedChecked() orelse caster.dir,
+                            .thing = thing.id,
                         };
                     }
                 }
@@ -277,7 +263,7 @@ pub const TargetingData = struct {
 
         switch (targeting_data.kind) {
             .pos => {
-                const mouse_pos = if (params) |p| p.target.pos else plat.getMousePosWorld(room.camera);
+                const mouse_pos = if (params) |p| p.pos else plat.getMousePosWorld(room.camera);
                 const caster_to_mouse = mouse_pos.sub(caster.pos);
                 const target_dir = if (caster_to_mouse.normalizedChecked()) |d| d else V2f.right;
                 const max_radius = targeting_data.max_range + caster.coll_radius;
@@ -332,7 +318,7 @@ pub const TargetingData = struct {
             },
             .thing => {
                 const maybe_targeted_thing = if (params) |p|
-                    room.getConstThingById(p.target.thing)
+                    room.getConstThingById(p.thing.?)
                 else
                     @constCast(room).getMousedOverThing(targeting_data.target_faction_mask);
 
@@ -405,16 +391,20 @@ pub const Controller = struct {
     const ControllerTypes = blk: {
         var num = 0;
         for (SpellTypes) |M| {
-            for (M.Controllers) |_| {
-                num += 1;
+            if (@hasDecl(M, "Controllers")) {
+                for (M.Controllers) |_| {
+                    num += 1;
+                }
             }
         }
         var Types: [num]type = undefined;
         var i = 0;
         for (SpellTypes) |M| {
-            for (M.Controllers) |C| {
-                Types[i] = C;
-                i += 1;
+            if (@hasDecl(M, "Controllers")) {
+                for (M.Controllers) |C| {
+                    Types[i] = C;
+                    i += 1;
+                }
             }
         }
         break :blk Types;
@@ -679,7 +669,7 @@ pub fn getDescription(self: *const Spell) Error![]const u8 {
             if (std.meta.hasMethod(K, "getDescription")) {
                 break :blk try K.getDescription(self, buf[len..]);
             } else {
-                break :blk try std.fmt.bufPrint(buf, "{s}", .{spell_descriptions.get(std.meta.activeTag(self.kind))});
+                break :blk "";
             }
         },
     };

@@ -60,7 +60,7 @@ pub const PotionHP = struct {
     hp_restored_percent: f32 = 30,
 
     pub fn use(self: *const Item, user: *Thing, _: *Room, params: Params) Error!void {
-        assert(std.meta.activeTag(params.target) == Item.TargetKind.self);
+        params.validate(.self, user);
         const pot_hp = self.kind.pot_hp;
         if (user.hp) |*hp| {
             hp.heal(hp.max * (pot_hp.hp_restored_percent * 0.01));
@@ -101,7 +101,7 @@ pub const PotionInvis = struct {
     invis_stacks: i32 = 7,
 
     pub fn use(self: *const Item, user: *Thing, _: *Room, params: Params) Error!void {
-        assert(std.meta.activeTag(params.target) == Item.TargetKind.self);
+        params.validate(.self, user);
         user.statuses.getPtr(.unseeable).stacks = self.kind.pot_invis.invis_stacks;
     }
 };
@@ -133,7 +133,7 @@ pub const PotionThorns = struct {
     thorny_stacks: i32 = 5,
 
     pub fn use(self: *const Item, user: *Thing, _: *Room, params: Params) Error!void {
-        assert(std.meta.activeTag(params.target) == Item.TargetKind.self);
+        params.validate(.self, user);
         user.statuses.getPtr(.prickly).stacks = self.kind.pot_thorns.thorny_stacks;
     }
 };

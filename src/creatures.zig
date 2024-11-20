@@ -24,6 +24,7 @@ const TileMap = @import("TileMap.zig");
 const AI = @import("AI.zig");
 const player = @import("player.zig");
 const sprites = @import("sprites.zig");
+const Spell = @import("Spell.zig");
 
 pub const Kind = enum {
     player,
@@ -202,13 +203,18 @@ pub fn sharpboiProto() Thing {
 }
 
 pub fn acolyteProto() Thing {
-    var ret = creatureProto(.acolyte, .acolyte, .enemy, null, 25, .medium, 12);
+    var ret = creatureProto(.acolyte, .acolyte, .enemy, .{ .acolyte = .{} }, 25, .medium, 12);
     ret.accel_params = .{
         .accel = 0.3,
         .friction = 0.09,
         .max_speed = 1.25,
     };
-    ret.controller = .{ .acolyte_enemy = .{} };
+    ret.controller.ai_actor.actions.appendAssumeCapacity(.{
+        .kind = .{ .spell_cast = .{
+            .spell = Spell.getProto(.summon_bat),
+        } },
+        .cooldown = utl.TickCounter.initStopped(5 * core.fups_per_sec),
+    });
     ret.enemy_difficulty = 3;
     return ret;
 }

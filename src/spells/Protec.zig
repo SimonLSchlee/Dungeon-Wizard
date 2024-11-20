@@ -47,7 +47,7 @@ num_stacks: i32 = 1,
 max_stacks: i32 = 5,
 
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
-    assert(params.target == .self);
+    params.validate(.self, caster);
     const protec: @This() = self.kind.protec;
     caster.statuses.getPtr(.protected).addStacks(caster, protec.num_stacks);
 

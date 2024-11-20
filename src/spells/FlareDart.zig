@@ -71,7 +71,7 @@ pub const Projectile = struct {
         const flare_dart = spell.kind.flare_dart;
         _ = flare_dart;
         const params = spell_controller.params;
-        const target_pos = params.target.pos;
+        const target_pos = params.pos;
         _ = target_pos;
         const projectile: *@This() = &spell_controller.controller.flare_dart_projectile;
         _ = projectile;
@@ -83,9 +83,9 @@ pub const Projectile = struct {
 };
 
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
-    assert(std.meta.activeTag(params.target) == Spell.TargetKind.pos);
+    params.validate(.pos, caster);
     const flare_dart: @This() = self.kind.flare_dart;
-    const target_pos = params.target.pos;
+    const target_pos = params.pos;
     const target_dir = if (target_pos.sub(caster.pos).normalizedChecked()) |d| d else V2f.right;
 
     const ball = Thing{

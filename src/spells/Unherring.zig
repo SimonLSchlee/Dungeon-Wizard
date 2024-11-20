@@ -68,7 +68,7 @@ pub const Projectile = struct {
         const unherring = spell.kind.unherring;
         const params = spell_controller.params;
         const projectile: *Projectile = &spell_controller.controller.unherring_projectile;
-        const target_id = params.target.thing;
+        const target_id = params.thing.?;
         const _target = room.getThingById(target_id);
         const animator = &self.animator.?;
 
@@ -114,9 +114,9 @@ pub const Projectile = struct {
 };
 
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
-    assert(std.meta.activeTag(params.target) == Spell.TargetKind.thing);
+    params.validate(.thing, caster);
 
-    const _target = room.getThingById(params.target.thing);
+    const _target = room.getThingById(params.thing.?);
     if (_target == null) {
         // fizzle
         return;

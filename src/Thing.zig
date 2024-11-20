@@ -112,7 +112,6 @@ controller: union(enum) {
     default: DefaultController,
     player: player.Controller,
     ai_actor: AI.ActorController,
-    acolyte_enemy: AI.AcolyteAIController,
     spell: Spell.Controller,
     item: Item.Controller,
     projectile: ProjectileController,
