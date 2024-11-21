@@ -344,7 +344,11 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
         .regen_hp => |*r| {
             if (r.timer.tick(true)) {
                 if (self.hp) |*hp| {
-                    hp.heal(r.amount_per_sec);
+                    var adjusted_amount = r.amount_per_sec;
+                    if (self.statuses.get(.lit).stacks > 0) {
+                        adjusted_amount *= 0.5;
+                    }
+                    hp.heal(adjusted_amount);
                 }
                 r.amount_regened += r.amount_per_sec;
                 if (r.amount_regened >= r.max_regen) {
