@@ -31,6 +31,7 @@ const ImmUI = @import("ImmUI.zig");
 // unq == update and queue (render)
 // Handle all updating and rendering of a generic action Slot, returning a CastMethod if it was activated
 pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, room: *Room) Error!?Options.CastMethod {
+    const data = App.get().data;
     const plat = getPlat();
     const ui_scaling: f32 = 2;
 
@@ -127,20 +128,26 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, 
         // card/icon
         switch (kind_data) {
             .pause => {
-                cmd_buf.appendAssumeCapacity(.{ .label = .{
-                    .pos = rect.pos.add(v2f(2, 24)),
-                    .text = ImmUI.initLabel(if (room.paused) "paused" else "not paused"),
-                    .opt = .{
-                        .color = .white,
-                        .size = 10 * ui_scaling,
-                    },
-                } });
+                //var tint =
+                const tint: Colorf = if (room.paused) .white else .gray;
+                const sprite_name = if (room.paused) Data.MiscIcon.hourglass_down else Data.MiscIcon.hourglass_up;
+                const info = sprites.RenderIconInfo{ .frame = data.misc_icons.getRenderFrame(sprite_name).? };
+                try info.unqRenderTint(cmd_buf, rect, tint);
+                if (false) {
+                    cmd_buf.appendAssumeCapacity(.{ .label = .{
+                        .pos = rect.pos.add(v2f(2, 24)),
+                        .text = ImmUI.initLabel(if (room.paused) "paused" else "not paused"),
+                        .opt = .{
+                            .color = .white,
+                            .size = 10 * ui_scaling,
+                        },
+                    } });
+                }
             },
             .action => |a| switch (a) {
                 .discard => {
-                    const data = App.get().data;
                     const info = sprites.RenderIconInfo{ .frame = data.misc_icons.getRenderFrame(.discard).? };
-                    try info.unqRenderTint(cmd_buf, rect, Colorf.rgb(0.7, 0, 0));
+                    try info.unqRenderTint(cmd_buf, rect, Colorf.rgb(0.7, 0.1, 0.1));
                 },
                 .spell => |*spell| {
                     // TODO maybe?
@@ -167,7 +174,6 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, 
     }
 
     // hotkey
-    const data = App.get().data;
     const font = data.fonts.get(.pixeloid);
     const key_text_opt = draw.TextOpt{
         .color = key_color,
@@ -177,7 +183,13 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, 
     };
     const key_str = slot.key_str.constSlice();
     const str_sz = try plat.measureText(key_str, key_text_opt);
-    const key_rect_pos = rect.pos.add(V2f.splat(-str_sz.y * 0.25).scale(ui_scaling));
+    const key_rect_pos = if (slot_enabled) switch (slot.kind.?) {
+        .pause => rect.pos.add(v2f(-str_sz.y * 0.25, -str_sz.y * 0.75).scale(ui_scaling)),
+        .action => |a| switch (a) {
+            .spell, .item => rect.pos.add(V2f.splat(-str_sz.y * 0.25).scale(ui_scaling)),
+            .discard => rect.pos.add(v2f(-str_sz.y * 0.25, -str_sz.y * 0.75).scale(ui_scaling)),
+        },
+    } else rect.pos.add(V2f.splat(-str_sz.y * 0.25).scale(ui_scaling));
     cmd_buf.append(.{ .rect = .{
         .pos = key_rect_pos,
         .dims = str_sz.add(V2f.splat(4).scale(ui_scaling)),
@@ -370,7 +382,7 @@ pub const Slots = struct {
             };
             if (self.discard_slot) |*slot| {
                 slot.rect = .{
-                    .pos = pause_topleft.add(v2f(0, -20 - btn_dims.y)),
+                    .pos = pause_topleft.add(v2f(0, -40 - btn_dims.y)),
                     .dims = btn_dims,
                 };
             }
@@ -584,6 +596,9 @@ pub const Slots = struct {
             if (slot.is_long_hovered) {
                 try menuUI.renderToolTip("Discard hand", "", slot.rect.pos.add(v2f(slot.rect.dims.x, 0)));
             }
+        }
+        if (self.pause_slot.is_long_hovered) {
+            try menuUI.renderToolTip("Pause", "", self.pause_slot.rect.pos.add(v2f(self.pause_slot.rect.dims.x, 0)));
         }
         try self.renderToolTips(self.spells.constSlice());
         try self.renderToolTips(self.items.constSlice());

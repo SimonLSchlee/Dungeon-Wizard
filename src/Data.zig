@@ -197,6 +197,8 @@ fn EnumSpriteSheet(EnumType: type) type {
 
 pub const MiscIcon = enum {
     discard,
+    hourglass_up,
+    hourglass_down,
 };
 
 pub const TileMapIdxBuf = std.BoundedArray(usize, 16);
@@ -632,7 +634,7 @@ pub fn loadSpriteSheets(self: *Data) Error!void {
     try self.loadCreatureSpriteSheets();
     try self.loadVFXSpriteSheets();
     self.item_icons = try @TypeOf(self.item_icons).init(try loadSpriteSheetFromJsonPath("images/ui", "item_icons.json"));
-    self.misc_icons = try @TypeOf(self.misc_icons).init(try loadSpriteSheetFromJsonPath("images/ui", "misc_icons.json"));
+    self.misc_icons = try @TypeOf(self.misc_icons).init(try loadSpriteSheetFromJsonPath("images/ui", "misc-icons.json"));
     self.spell_icons = try @TypeOf(self.spell_icons).init(try loadSpriteSheetFromJsonPath("images/ui", "spell-icons.json"));
     self.spell_tags_icons = try @TypeOf(self.spell_tags_icons).initCropped(try loadSpriteSheetFromJsonPath("images/ui", "spell-tags-icons.json"), .magenta);
     self.card_sprites = try @TypeOf(self.card_sprites).init(try loadSpriteSheetFromJsonPath("images/ui", "card.json"));
