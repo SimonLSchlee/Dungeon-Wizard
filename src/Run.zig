@@ -363,8 +363,10 @@ pub fn makeRewards(self: *Run, difficulty: f32) void {
         }
     }
     { // gold
-        const gold = u.as(i32, @floor(difficulty)) + self.rng.random().uintAtMost(u8, 5);
-        reward_ui.rewards.appendAssumeCapacity(.{ .gold = gold });
+        const gold = u.as(i32, @ceil(difficulty)) + self.rng.random().uintAtMost(u8, 5);
+        if (gold > 0) { // should be above 0 but ya never know
+            reward_ui.rewards.appendAssumeCapacity(.{ .gold = gold });
+        }
     }
 
     self.reward_ui = reward_ui;
