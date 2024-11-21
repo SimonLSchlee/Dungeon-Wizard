@@ -213,7 +213,7 @@ pub fn sharpboiProto() Thing {
                 },
                 .hit_to_side_force = 2.5,
                 .range = 110,
-                .LOS_thiccness = 30,
+                .LOS_thiccness = ret.coll_radius * 0.5,
             },
         },
         .cooldown = utl.TickCounter.initStopped(140),
