@@ -22,7 +22,6 @@ const Spell = @import("Spell.zig");
 const Thing = @import("Thing.zig");
 const Data = @import("Data.zig");
 const Run = @import("Run.zig");
-const PackedRoom = @import("PackedRoom.zig");
 const menuUI = @import("menuUI.zig");
 const gameUI = @import("gameUI.zig");
 const Item = @import("Item.zig");

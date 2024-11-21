@@ -20,7 +20,6 @@ const Room = @import("Room.zig");
 const sprites = @import("sprites.zig");
 const Spell = @import("Spell.zig");
 const Item = @import("Item.zig");
-const PackedRoom = @import("PackedRoom.zig");
 const player = @import("player.zig");
 const TileMap = @import("TileMap.zig");
 const creatures = @import("creatures.zig");
@@ -200,7 +199,6 @@ pub const MiscIcon = enum {
     discard,
 };
 
-pub const PackedRoomBuf = std.BoundedArray(PackedRoom, 16);
 pub const TileMapIdxBuf = std.BoundedArray(usize, 16);
 
 pub const SFX = enum {
