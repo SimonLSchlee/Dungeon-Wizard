@@ -196,9 +196,13 @@ fn EnumSpriteSheet(EnumType: type) type {
 }
 
 pub const MiscIcon = enum {
+    pub const dims = Item.icon_dims;
+
     discard,
     hourglass_up,
     hourglass_down,
+    cards,
+    gold_stacks,
 };
 
 pub const TileMapIdxBuf = std.BoundedArray(usize, 16);

@@ -37,6 +37,8 @@ const Item = @This();
 pub const Pool = pool.BoundedPool(Item, 32);
 pub const Id = pool.Id;
 
+pub const icon_dims = v2f(24, 24);
+
 pub const PotionHP = struct {
     pub const title = "Hp Potion";
     pub const description =
@@ -330,8 +332,8 @@ pub inline fn renderTargeting(self: *const Item, room: *const Room, caster: *con
     return self.targeting_data.render(room, caster, params);
 }
 
-pub inline fn unqRenderIcon(self: *const Item, cmd_buf: *ImmUI.CmdBuf, rect: geom.Rectf) Error!void {
-    return try self.getRenderIconInfo().unqRender(cmd_buf, rect);
+pub inline fn unqRenderIcon(self: *const Item, cmd_buf: *ImmUI.CmdBuf, pos: V2f, scaling: f32) Error!void {
+    return try self.getRenderIconInfo().unqRender(cmd_buf, pos, scaling);
 }
 
 pub fn getRenderIconInfo(self: *const Item) sprites.RenderIconInfo {

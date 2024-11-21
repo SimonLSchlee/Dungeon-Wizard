@@ -198,7 +198,7 @@ pub fn update(self: *Shop, run: *const Run) Error!?Product {
                 spell.unqRenderCard(&self.imm_ui.commands, hovered_rect.pos, null, ui_scaling);
             },
             .item => |item| {
-                try item.unqRenderIcon(&self.imm_ui.commands, hovered_rect);
+                try item.unqRenderIcon(&self.imm_ui.commands, hovered_rect.pos, ui_scaling);
             },
         }
         const price_pos = hovered_rect.pos.add(hovered_rect.dims).sub(v2f(50, 40));

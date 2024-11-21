@@ -128,26 +128,14 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, 
         // card/icon
         switch (kind_data) {
             .pause => {
-                //var tint =
-                const tint: Colorf = if (room.paused) .white else .gray;
                 const sprite_name = if (room.paused) Data.MiscIcon.hourglass_down else Data.MiscIcon.hourglass_up;
                 const info = sprites.RenderIconInfo{ .frame = data.misc_icons.getRenderFrame(sprite_name).? };
-                try info.unqRenderTint(cmd_buf, rect, tint);
-                if (false) {
-                    cmd_buf.appendAssumeCapacity(.{ .label = .{
-                        .pos = rect.pos.add(v2f(2, 24)),
-                        .text = ImmUI.initLabel(if (room.paused) "paused" else "not paused"),
-                        .opt = .{
-                            .color = .white,
-                            .size = 10 * ui_scaling,
-                        },
-                    } });
-                }
+                try info.unqRender(cmd_buf, rect.pos, ui_scaling);
             },
             .action => |a| switch (a) {
                 .discard => {
                     const info = sprites.RenderIconInfo{ .frame = data.misc_icons.getRenderFrame(.discard).? };
-                    try info.unqRenderTint(cmd_buf, rect, Colorf.rgb(0.7, 0.1, 0.1));
+                    try info.unqRender(cmd_buf, rect.pos, ui_scaling);
                 },
                 .spell => |*spell| {
                     // TODO maybe?
@@ -155,7 +143,7 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, 
                     spell.unqRenderCard(cmd_buf, rect.pos, caster, ui_scaling);
                 },
                 .item => |*item| {
-                    try item.unqRenderIcon(cmd_buf, rect);
+                    try item.unqRenderIcon(cmd_buf, rect.pos, ui_scaling);
                 },
             },
         }

@@ -745,7 +745,7 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caste
             } };
         }
     };
-    rii.unqRender(cmd_buf, .{ .pos = art_topleft, .dims = card_art_dims.scale(scaling) }) catch @panic("failed renderino");
+    rii.unqRender(cmd_buf, art_topleft, scaling) catch @panic("failed renderino");
     if (data.card_sprites.getRenderFrame(CardSpriteEnum.fromRarity(self.rarity))) |rf| {
         cmd_buf.appendAssumeCapacity(.{ .texture = .{
             .pos = pos,

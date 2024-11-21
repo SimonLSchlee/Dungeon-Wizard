@@ -28,6 +28,7 @@ const Shop = @import("Shop.zig");
 const Item = @import("Item.zig");
 const player = @import("player.zig");
 const ImmUI = @import("ImmUI.zig");
+const sprites = @import("sprites.zig");
 
 pub const Mode = enum {
     _4_slot_frank,
@@ -519,6 +520,7 @@ pub fn pauseMenuUpdate(self: *Run) Error!void {
 
 pub fn rewardSpellChoiceUI(self: *Run, idx: usize) Error!void {
     const plat = getPlat();
+    const ui_scaling: f32 = 3;
 
     // modal background
     const modal_dims = v2f(core.native_dims_f.x * 0.6, core.native_dims_f.y * 0.6);
@@ -551,8 +553,7 @@ pub fn rewardSpellChoiceUI(self: *Run, idx: usize) Error!void {
     // spells
     const spell_choices = self.reward_ui.?.rewards.get(idx).spell_choice;
     assert(spell_choices.len > 0);
-    const spell_scaling: f32 = 3;
-    const spell_dims = Spell.card_dims.scale(spell_scaling);
+    const spell_dims = Spell.card_dims.scale(ui_scaling);
     var spell_rects = std.BoundedArray(geom.Rectf, Reward.max_spells){};
     spell_rects.resize(spell_choices.len) catch unreachable;
     gameUI.layoutRectsFixedSize(
@@ -571,7 +572,7 @@ pub fn rewardSpellChoiceUI(self: *Run, idx: usize) Error!void {
         if (hovered) {
             rect.pos.y -= 4;
         }
-        _ = spell.unqRenderCard(&self.imm_ui.commands, rect.pos, null, spell_scaling);
+        _ = spell.unqRenderCard(&self.imm_ui.commands, rect.pos, null, ui_scaling);
         if (clicked) {
             const product = Shop.Product{ .kind = .{ .spell = spell } };
             if (self.canPickupProduct(&product)) {
@@ -595,7 +596,9 @@ pub fn rewardSpellChoiceUI(self: *Run, idx: usize) Error!void {
 }
 
 pub fn rewardUpdate(self: *Run) Error!void {
+    const data = App.get().data;
     const plat = getPlat();
+    const ui_scaling: f32 = 2;
     assert(self.reward_ui != null);
     const reward_ui = &self.reward_ui.?;
 
@@ -636,37 +639,35 @@ pub fn rewardUpdate(self: *Run) Error!void {
     curr_row_y += 80;
 
     // reward rows
-    const row_rect_dims = v2f(modal_dims.x - 20, 40);
+    const row_icon_dims = Item.icon_dims.scale(ui_scaling);
+    const row_rect_dims = v2f(modal_dims.x - 20, row_icon_dims.y + 20);
     const row_rect_x = modal_topleft.x + 20;
     const mouse_pos = plat.getMousePosScreen();
 
     var removed_idx: ?usize = null;
     for (reward_ui.rewards.constSlice(), 0..) |reward, i| {
+        var row_rect_color = Colorf.rgba(0.4, 0.4, 0.4, 0.7);
         var row_rect_pos = v2f(row_rect_x, curr_row_y);
         const hovered = geom.pointIsInRectf(mouse_pos, .{ .pos = row_rect_pos, .dims = row_rect_dims });
         const clicked = hovered and plat.input_buffer.mouseBtnIsJustPressed(.left);
         if (hovered) {
-            row_rect_pos.y -= 4;
+            //row_rect_pos.y -= 4;
+            row_rect_color = Colorf.rgba(0.6, 0.6, 0.6, 0.7);
         }
         self.imm_ui.commands.appendAssumeCapacity(.{ .rect = .{
             .pos = row_rect_pos,
             .dims = row_rect_dims,
             .opt = .{
-                .fill_color = Colorf.rgba(0.4, 0.4, 0.4, 0.7),
+                .fill_color = row_rect_color,
                 .edge_radius = 0.1,
             },
         } });
         const row_icon_pos = row_rect_pos.add(v2f(10, 10));
-        const row_text_pos = row_icon_pos.add(v2f(0, 30));
+        const row_text_pos = row_icon_pos.add(v2f(10 + row_icon_dims.x + 10, 10));
         switch (reward) {
             .spell_choice => {
-                self.imm_ui.commands.appendAssumeCapacity(.{ .rect = .{
-                    .pos = row_icon_pos,
-                    .dims = v2f(20, 20),
-                    .opt = .{
-                        .fill_color = .red,
-                    },
-                } });
+                const info = sprites.RenderIconInfo{ .frame = data.misc_icons.getRenderFrame(.cards).? };
+                try info.unqRender(&self.imm_ui.commands, row_icon_pos, ui_scaling);
                 self.imm_ui.commands.appendAssumeCapacity(.{ .label = .{
                     .pos = row_text_pos,
                     .text = ImmUI.initLabel("Spell"),
@@ -679,7 +680,7 @@ pub fn rewardUpdate(self: *Run) Error!void {
                 }
             },
             .item => |item| {
-                try item.unqRenderIcon(&self.imm_ui.commands, .{ .pos = row_icon_pos, .dims = row_rect_dims });
+                try item.unqRenderIcon(&self.imm_ui.commands, row_icon_pos, ui_scaling);
                 self.imm_ui.commands.appendAssumeCapacity(.{ .label = .{
                     .pos = row_text_pos,
                     .text = ImmUI.initLabel(item.getName()),
@@ -696,13 +697,8 @@ pub fn rewardUpdate(self: *Run) Error!void {
                 }
             },
             .gold => |gold_amount| {
-                self.imm_ui.commands.appendAssumeCapacity(.{ .rect = .{
-                    .pos = row_icon_pos,
-                    .dims = v2f(20, 20),
-                    .opt = .{
-                        .fill_color = .yellow,
-                    },
-                } });
+                const info = sprites.RenderIconInfo{ .frame = data.misc_icons.getRenderFrame(.gold_stacks).? };
+                try info.unqRender(&self.imm_ui.commands, row_icon_pos, ui_scaling);
                 const gold_str = try u.bufPrintLocal("{}", .{gold_amount});
                 self.imm_ui.commands.appendAssumeCapacity(.{ .label = .{
                     .pos = row_text_pos,
