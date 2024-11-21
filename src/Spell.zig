@@ -706,14 +706,6 @@ pub inline fn renderTargeting(self: *const Spell, room: *const Room, caster: *co
     return self.targeting_data.render(room, caster, params);
 }
 
-pub inline fn renderIcon(self: *const Spell, rect: geom.Rectf) Error!void {
-    return try self.getRenderIconInfo().render(rect);
-}
-
-pub inline fn unqRenderIcon(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, rect: geom.Rectf) Error!void {
-    return try self.getRenderIconInfo().unqRender(cmd_buf, rect);
-}
-
 pub fn getName(self: *const Spell) []const u8 {
     const kind = std.meta.activeTag(self.kind);
     return spell_names.get(kind);
@@ -743,7 +735,7 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caste
     const art_topleft = pos.add(card_art_topleft_offset.scale(scaling));
     const rii: sprites.RenderIconInfo = blk: {
         const kind = std.meta.activeTag(self.kind);
-        if (data.spell_icons_2.getRenderFrame(kind)) |render_frame| {
+        if (data.spell_icons.getRenderFrame(kind)) |render_frame| {
             break :blk .{ .frame = render_frame };
         } else {
             const name = spell_names.get(kind);
@@ -898,20 +890,6 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caste
                 },
             } });
         }
-    }
-}
-
-pub fn getRenderIconInfo(self: *const Spell) sprites.RenderIconInfo {
-    const data = App.get().data;
-    const kind = std.meta.activeTag(self.kind);
-    if (data.spell_icons.getRenderFrame(kind)) |render_frame| {
-        return .{ .frame = render_frame };
-    } else {
-        const name = spell_names.get(kind);
-        return .{ .letter = .{
-            .str = [1]u8{std.ascii.toUpper(name[0])},
-            .color = self.color,
-        } };
     }
 }
 

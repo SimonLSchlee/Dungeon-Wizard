@@ -910,30 +910,6 @@ fn makeGamePauseUI() GamePauseUI {
     };
 }
 
-pub fn renderIconButton(self: *const Run, spell_or_item: anytype, crect: menuUI.ClickableRect) Error!?V2f {
-    var show_tooltip = false;
-    var hovered_crect = crect.rect;
-    if (crect.isHovered()) {
-        show_tooltip = true;
-        const new_dims = hovered_crect.dims.scale(1.1);
-        const new_pos = hovered_crect.pos.sub(new_dims.sub(hovered_crect.dims).scale(0.5));
-        hovered_crect.pos = new_pos;
-        hovered_crect.dims = new_dims;
-    }
-    getPlat().rectf(hovered_crect.pos, hovered_crect.dims, .{ .fill_color = Colorf.rgb(0.07, 0.05, 0.05) });
-    try spell_or_item.renderIcon(hovered_crect);
-
-    if (self.mode == ._mana_mandy) {
-        if (std.meta.hasMethod(@TypeOf(spell_or_item), "renderManaCost")) {
-            spell_or_item.renderManaCost(hovered_crect);
-        }
-    }
-    if (show_tooltip) {
-        return hovered_crect.pos.add(v2f(hovered_crect.dims.x, 0));
-    }
-    return null;
-}
-
 pub fn render(self: *Run, native_render_texture: Platform.RenderTexture2D) Error!void {
     const plat = getPlat();
 

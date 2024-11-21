@@ -145,9 +145,11 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, 
                 .spell => |*spell| {
                     // TODO maybe?
                     //const scaling = if (slot.is_long_hovered) ui_scaling + 1 else ui_scaling;
-                    _ = spell.unqRenderCard(cmd_buf, rect.pos, caster, ui_scaling);
+                    spell.unqRenderCard(cmd_buf, rect.pos, caster, ui_scaling);
                 },
-                inline else => |inner| try inner.unqRenderIcon(cmd_buf, rect),
+                .item => |*item| {
+                    try item.unqRenderIcon(cmd_buf, rect);
+                },
             },
         }
     }

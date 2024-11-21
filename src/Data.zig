@@ -303,7 +303,6 @@ vfx_anim_mappings: sprites.VFXAnim.IdxMapping,
 spell_icons: EnumSpriteSheet(Spell.Kind),
 item_icons: EnumSpriteSheet(Item.Kind),
 misc_icons: EnumSpriteSheet(MiscIcon),
-spell_icons_2: EnumSpriteSheet(Spell.Kind),
 spell_tags_icons: EnumSpriteSheet(Spell.Tag.SpriteEnum),
 card_sprites: EnumSpriteSheet(Spell.CardSpriteEnum),
 card_mana_cost: EnumSpriteSheet(Spell.ManaCost.SpriteEnum),
@@ -633,9 +632,8 @@ pub fn loadSpriteSheets(self: *Data) Error!void {
     try self.loadCreatureSpriteSheets();
     try self.loadVFXSpriteSheets();
     self.item_icons = try @TypeOf(self.item_icons).init(try loadSpriteSheetFromJsonPath("images/ui", "item_icons.json"));
-    self.spell_icons = try @TypeOf(self.spell_icons).init(try loadSpriteSheetFromJsonPath("images/ui", "spell_icons.json"));
     self.misc_icons = try @TypeOf(self.misc_icons).init(try loadSpriteSheetFromJsonPath("images/ui", "misc_icons.json"));
-    self.spell_icons_2 = try @TypeOf(self.spell_icons_2).init(try loadSpriteSheetFromJsonPath("images/ui", "spell-icons.json"));
+    self.spell_icons = try @TypeOf(self.spell_icons).init(try loadSpriteSheetFromJsonPath("images/ui", "spell-icons.json"));
     self.spell_tags_icons = try @TypeOf(self.spell_tags_icons).initCropped(try loadSpriteSheetFromJsonPath("images/ui", "spell-tags-icons.json"), .magenta);
     self.card_sprites = try @TypeOf(self.card_sprites).init(try loadSpriteSheetFromJsonPath("images/ui", "card.json"));
     self.card_mana_cost = try @TypeOf(self.card_mana_cost).init(try loadSpriteSheetFromJsonPath("images/ui", "card-mana-cost.json"));

@@ -330,10 +330,6 @@ pub inline fn renderTargeting(self: *const Item, room: *const Room, caster: *con
     return self.targeting_data.render(room, caster, params);
 }
 
-pub inline fn renderIcon(self: *const Item, rect: geom.Rectf) Error!void {
-    return try self.getRenderIconInfo().render(rect);
-}
-
 pub inline fn unqRenderIcon(self: *const Item, cmd_buf: *ImmUI.CmdBuf, rect: geom.Rectf) Error!void {
     return try self.getRenderIconInfo().unqRender(cmd_buf, rect);
 }
