@@ -255,8 +255,24 @@ pub const TickCounter = struct {
     pub fn ticksLeft(self: *const TickCounter) i64 {
         return self.num_ticks - self.curr_tick;
     }
+
+    pub fn stop(self: *TickCounter) void {
+        self.curr_tick = self.num_ticks;
+        self.running = false;
+    }
 };
 
 pub fn BoundedString(max_len: usize) type {
     return std.BoundedArray(u8, max_len);
+}
+
+pub fn enumToString(E: type, m: E) []const u8 {
+    const e_info = expectTypeInfo(E, .@"enum");
+    inline for (e_info.fields) |f| {
+        const k: E = @enumFromInt(f.value);
+        if (k == m) {
+            return f.name;
+        }
+    }
+    unreachable;
 }

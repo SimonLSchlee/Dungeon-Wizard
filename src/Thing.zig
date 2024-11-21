@@ -31,6 +31,7 @@ const Item = @import("Item.zig");
 pub const StatusEffect = @import("StatusEffect.zig");
 pub const Collision = @import("Collision.zig");
 const AI = @import("AI.zig");
+const Action = @import("Action.zig");
 
 pub const Kind = enum {
     creature,
@@ -113,7 +114,7 @@ controller: union(enum) {
     player: player.Controller,
     ai_actor: AI.ActorController,
     spell: Spell.Controller,
-    item: Item.Controller,
+    item: Item.Controller, // not pickup-able items, stuff/vfx that using an item may spawn or whatnot
     projectile: ProjectileController,
     spawner: SpawnerController,
     vfx: VFXController,
@@ -939,17 +940,38 @@ pub fn renderOver(self: *const Thing, room: *const Room) Error!void {
             }
         }
     }
+    if (debug.show_ai_decision) {
+        if (std.meta.activeTag(self.controller) == .ai_actor) {
+            const controller = self.controller.ai_actor;
+            const str = switch (controller.decision) {
+                .idle => "idle",
+                .pursue_to_attack => |p| blk: {
+                    if (room.getConstThingById(p.target_id)) |target| {
+                        plat.arrowf(self.pos, target.pos, .{ .color = .red, .thickness = 2 });
+                    }
+                    break :blk "pursue";
+                },
+                .flee => "flee",
+                .action => |doing| blk: {
+                    break :blk utl.bufPrintLocal("action: {s}", .{utl.enumToString(Action.Slot, doing.slot)}) catch "";
+                },
+            };
+            try plat.textf(self.pos, "{s}", .{str}, .{ .center = true, .color = .white, .size = 14 });
+        }
+    }
     if (debug.show_hiding_places) {
-        if (std.meta.activeTag(self.controller) == .acolyte_enemy) {
-            const ai = self.controller.acolyte_enemy;
-            for (ai.hiding_places.constSlice()) |h| {
-                const self_to_pos = h.pos.sub(self.pos).normalizedOrZero();
-                const len = @max(ai.to_enemy.length() - ai.flee_range, 0);
-                const to_enemy_n = ai.to_enemy.setLengthOrZero(len);
-                const dir_f = self_to_pos.dot(to_enemy_n.neg());
-                const f = h.flee_from_dist + dir_f; // - h.fleer_dist;
-                try plat.textf(h.pos, "{d:.2}", .{f}, .{ .center = true, .color = .white, .size = 14 });
-                //plat.circlef(h.pos, 10, .{ .outline = .{ .color = Colorf.white }, .fill_color = null });
+        if (std.meta.activeTag(self.controller) == .ai_actor) {
+            const controller = self.controller.ai_actor;
+            if (std.meta.activeTag(controller.decision) == .flee) {
+                for (controller.hiding_places.constSlice()) |h| {
+                    const self_to_pos = h.pos.sub(self.pos).normalizedOrZero();
+                    const len = @max(controller.to_enemy.length() - controller.flee_range, 0);
+                    const to_enemy_n = controller.to_enemy.setLengthOrZero(len);
+                    const dir_f = self_to_pos.dot(to_enemy_n.neg());
+                    const f = h.flee_from_dist + dir_f; // - h.fleer_dist;
+                    try plat.textf(h.pos, "{d:.2}", .{f}, .{ .center = true, .color = .white, .size = 14 });
+                    //plat.circlef(h.pos, 10, .{ .outline = .{ .color = Colorf.white }, .fill_color = null });
+                }
             }
         }
     }

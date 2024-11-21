@@ -234,7 +234,7 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
             place.room.waves_params.enemy_probabilities.getPtr(.gobbow).* = 1;
             place.room.waves_params.enemy_probabilities.getPtr(.troll).* = 1;
         }
-        if (i >= 4) {
+        if (i >= 3) {
             place.room.waves_params.enemy_probabilities.getPtr(.slime).* = 0;
             place.room.waves_params.enemy_probabilities.getPtr(.bat).* = 0;
             place.room.waves_params.enemy_probabilities.getPtr(.gobbow).* = 0.5;

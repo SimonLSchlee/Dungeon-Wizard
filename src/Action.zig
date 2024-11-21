@@ -72,10 +72,10 @@ fn gobbowArrow() Thing {
 pub const MeleeAttack = struct {
     pub const enum_name = "melee_attack";
     hitbox: Thing.HitBox,
-    LOS_thiccness: f32 = 10,
     lunge_accel: ?Thing.AccelParams = null,
     hit_to_side_force: f32 = 0,
     range: f32 = 40,
+    LOS_thiccness: f32 = 0,
 };
 
 pub const ProjectileAttack = struct {
@@ -111,14 +111,21 @@ pub const KindData = utl.TaggedUnionFromTypes(&ActionTypes, "enum_name", Kind);
 
 pub const Slot = enum {
     pub const Array = std.EnumArray(Slot, ?Action);
+
     melee_attack_1,
     projectile_attack_1,
-    spell_cast_1,
-    spell_cast_2,
-    spell_cast_3,
-    spell_cast_4,
-    spell_cast_5,
+    spell_cast_summon_1,
+    spell_cast_thing_attack_1,
+    spell_cast_aoe_attack_1,
+    spell_cast_thing_buff_1,
+    spell_cast_thing_debuff_1,
     ability_1,
+
+    pub const attacks = &[_]Slot{
+        .melee_attack_1,
+        .projectile_attack_1,
+        .spell_cast_thing_attack_1,
+    };
 };
 
 pub const TargetKind = enum {

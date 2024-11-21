@@ -78,7 +78,6 @@ pub fn implingProto() Thing {
                     .effect = .{ .damage = 6 },
                 },
                 .range = 30,
-                .LOS_thiccness = 40,
             },
         },
         .cooldown = utl.TickCounter.initStopped(60),
@@ -146,7 +145,6 @@ pub fn trollProto() Thing {
                     .effect = .{ .damage = 12 },
                 },
                 .range = 50,
-                .LOS_thiccness = 30,
             },
         },
         .cooldown = utl.TickCounter.initStopped(90),
@@ -166,11 +164,24 @@ pub fn trollProto() Thing {
 }
 
 pub fn gobbowProto() Thing {
-    var ret = creatureProto(.gobbow, .gobbow, .enemy, .{ .aggro = .{} }, 18, .medium, 12);
+    var ret = creatureProto(
+        .gobbow,
+        .gobbow,
+        .enemy,
+        .{ .ranged_flee = .{} },
+        18,
+        .medium,
+        12,
+    );
+    ret.accel_params = .{
+        .max_speed = 0.9,
+    };
+    ret.controller.ai_actor.flee_range = 230;
     ret.controller.ai_actor.actions.getPtr(.projectile_attack_1).* = (.{
         .kind = .{ .projectile_attack = .{
             .projectile = .arrow,
             .range = 270,
+            .LOS_thiccness = 10,
         } },
         .cooldown = utl.TickCounter.initStopped(60),
     });
@@ -218,7 +229,8 @@ pub fn acolyteProto() Thing {
         .friction = 0.09,
         .max_speed = 1.25,
     };
-    ret.controller.ai_actor.actions.getPtr(.spell_cast_1).* = (.{
+    ret.controller.ai_actor.flee_range = 250;
+    ret.controller.ai_actor.actions.getPtr(.spell_cast_summon_1).* = (.{
         .kind = .{ .spell_cast = .{
             .spell = Spell.getProto(.summon_bat),
         } },
