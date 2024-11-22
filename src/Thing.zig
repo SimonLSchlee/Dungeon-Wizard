@@ -1223,3 +1223,14 @@ pub fn getApproxVisibleCircle(self: *const Thing) struct { pos: V2f, radius: f32
     }
     return ret;
 }
+
+pub fn getRangeToHurtBox(self: *const Thing, pos: V2f) f32 {
+    if (self.hurtbox) |hurtbox| {
+        const hurtbox_pos = self.pos.add(hurtbox.rel_pos);
+        const dist = hurtbox_pos.dist(pos);
+        return @max(dist - hurtbox.radius, 0);
+    }
+    // default to coll_radius
+    const dist = self.pos.dist(pos);
+    return @max(dist - self.coll_radius, 0);
+}

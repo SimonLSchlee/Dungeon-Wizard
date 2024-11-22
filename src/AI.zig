@@ -62,8 +62,7 @@ pub fn inAttackRangeAndLOS(self: *const Thing, room: *const Room, action: *const
     const target: *const Thing = if (params.thing) |id| if (room.getConstThingById(id)) |t| t else return false else return false;
     if (target.hurtbox == null) return false;
 
-    const dist = target.pos.dist(self.pos);
-    const range = @max(dist - target.hurtbox.?.radius, 0);
+    const range = target.getRangeToHurtBox(self.pos);
     switch (action.kind) {
         .melee_attack => |melee| {
             const in_range = range <= melee.range;
@@ -352,8 +351,7 @@ pub const ActorController = struct {
                 const _target = room.getThingById(s.target_id);
                 assert(_target != null);
                 const target = _target.?;
-                const dist = target.pos.dist(self.pos);
-                const range = @max(dist - target.hurtbox.?.radius, 0);
+                const range = target.getRangeToHurtBox(self.pos);
                 _ = self.animator.?.play(.move, .{ .loop = true });
                 const dist_til_in_range = range - s.attack_range;
                 var target_pos = target.pos;
