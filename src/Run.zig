@@ -952,7 +952,7 @@ pub fn render(self: *Run, native_render_texture: Platform.RenderTexture2D) Error
         const gold_fill_color = Colorf.rgb(1, 0.9, 0);
         const topleft = plat.native_rect_cropped_offset.add(v2f(
             10,
-            plat.native_rect_cropped_dims.y - 30,
+            10,
         ));
         const rect_dims = v2f(20, 60);
         plat.rectf(topleft, rect_dims, .{ .fill_color = Colorf.black.fade(0.5) });
