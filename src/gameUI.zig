@@ -36,9 +36,10 @@ const item_slot_dims = v2f(48, 48);
 const item_slot_spacing: f32 = 8;
 const items_margin: f32 = 12;
 
-pub fn getItemsRects(rects: *std.BoundedArray(geom.Rectf, max_item_slots)) void {
+pub fn getItemsRects() std.BoundedArray(geom.Rectf, max_item_slots) {
     const plat = getPlat();
-    rects.clear();
+
+    var rects = std.BoundedArray(geom.Rectf, max_item_slots){};
     // items bottom left
     const max_items_rows: usize = 2;
     const max_items_per_row = max_item_slots / max_items_rows;
@@ -60,6 +61,8 @@ pub fn getItemsRects(rects: *std.BoundedArray(geom.Rectf, max_item_slots)) void 
             });
         }
     }
+
+    return rects;
 }
 
 // unq == update and queue (render)
@@ -229,6 +232,20 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, 
     return ret;
 }
 
+// Run slots (just items, and some additional data)
+pub const RunSlots = struct {
+    pub const ItemSlot = struct {
+        item: ?Item,
+        hover_timer: utl.TickCounter = utl.TickCounter.init(15),
+        is_long_hovered: bool = false,
+        rect: geom.Rectf = .{},
+    };
+    num_spell_slots: usize = 4, // populated from deck
+    items: std.BoundedArray(ItemSlot, max_item_slots) = .{},
+    discard_button: bool = false,
+};
+
+// game slots
 pub const Slots = struct {
     pub const SelectionKind = enum {
         selected,
@@ -259,11 +276,6 @@ pub const Slots = struct {
         is_long_hovered: bool = false,
         selection_kind: ?SelectionKind = null,
         rect: geom.Rectf = .{},
-    };
-    pub const InitParams = struct {
-        num_spell_slots: usize = 4, // populated from deck
-        items: std.BoundedArray(?Item, max_item_slots) = .{},
-        discard_button: bool = false,
     };
 
     pub const spell_idx_to_key = [max_spell_slots]core.Key{ .q, .w, .e, .r, .t, .y };
@@ -301,11 +313,11 @@ pub const Slots = struct {
         commands: ImmUI.CmdBuf = .{},
     } = .{},
 
-    pub fn init(room: *Room, params: InitParams) Slots {
-        assert(params.num_spell_slots < max_spell_slots);
+    pub fn init(room: *Room, run_slots: RunSlots) Slots {
+        assert(run_slots.num_spell_slots <= max_spell_slots);
 
         var ret = Slots{};
-        for (0..params.num_spell_slots) |i| {
+        for (0..run_slots.num_spell_slots) |i| {
             var slot = Slot{
                 .idx = i,
                 .key = spell_idx_to_key[i],
@@ -318,19 +330,19 @@ pub const Slots = struct {
             ret.spells.append(slot) catch unreachable;
         }
 
-        for (params.items.constSlice(), 0..) |maybe_item, i| {
+        for (run_slots.items.constSlice(), 0..) |item_slot, i| {
             var slot = Slot{
                 .idx = i,
                 .key = item_idx_to_key[i],
                 .key_str = Slot.KeyStr.fromSlice(&item_idx_to_key_str[i]) catch unreachable,
             };
-            if (maybe_item) |item| {
+            if (item_slot.item) |item| {
                 slot.kind = .{ .action = .{ .item = item } };
             }
             ret.items.append(slot) catch unreachable;
         }
 
-        if (params.discard_button) {
+        if (run_slots.discard_button) {
             ret.discard_slot = .{
                 .idx = 0,
                 .key = discard_key,
@@ -373,8 +385,7 @@ pub const Slots = struct {
             };
         }
         // items bottom left
-        var items_rects = std.BoundedArray(geom.Rectf, max_item_slots){};
-        getItemsRects(&items_rects);
+        const items_rects = getItemsRects();
         for (self.items.slice(), 0..) |*slot, i| {
             slot.rect = items_rects.get(i);
         }

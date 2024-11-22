@@ -39,7 +39,7 @@ pub const InitParams = struct {
     seed: u64,
     deck: Spell.SpellArray,
     exits: std.BoundedArray(gameUI.ExitDoor, 4),
-    slots_params: gameUI.Slots.InitParams,
+    run_slots: gameUI.RunSlots,
     mode: Run.Mode,
 };
 
@@ -241,7 +241,7 @@ pub fn reset(self: *Room) Error!void {
         }
     }
 
-    self.ui_slots = gameUI.Slots.init(self, self.init_params.slots_params);
+    self.ui_slots = gameUI.Slots.init(self, self.init_params.run_slots);
 }
 
 pub fn clone(self: *const Room, out: *Room) Error!void {

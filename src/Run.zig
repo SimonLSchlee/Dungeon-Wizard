@@ -153,7 +153,7 @@ curr_place_idx: usize = 0,
 player_thing: Thing = undefined,
 mode: Mode = undefined,
 deck: Spell.SpellArray = .{},
-slots_init_params: gameUI.Slots.InitParams = .{},
+slots: gameUI.RunSlots = .{},
 load_timer: u.TickCounter = u.TickCounter.init(20),
 load_state: enum {
     none,
@@ -183,13 +183,16 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
     run.room_buf_tail = run.room_buf.len - 1;
 
     // TODO elsewhererre?
-    run.slots_init_params.discard_button = mode == .mandy_3_mana;
-    run.slots_init_params.items = @TypeOf(run.slots_init_params.items).fromSlice(&.{
-        Item.getProto(.pot_hp),
-        null,
-        null,
-        null,
-    }) catch unreachable;
+    run.slots.discard_button = mode == .mandy_3_mana;
+    run.slots.items.clear();
+    run.slots.items.appendAssumeCapacity(.{
+        .item = Item.getProto(.pot_hp),
+    });
+    for (0..3) |_| {
+        run.slots.items.appendAssumeCapacity(.{
+            .item = null,
+        });
+    }
 
     // init places
     var places = Place.Array{};
@@ -315,7 +318,7 @@ pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
                 .seed = self.rng.random().int(u64),
                 .exits = exit_doors,
                 .player = self.player_thing,
-                .slots_params = self.slots_init_params,
+                .run_slots = self.slots,
                 .mode = self.mode,
             });
             self.room_exists = true;
@@ -385,8 +388,8 @@ pub fn canPickupProduct(self: *const Run, product: *const Shop.Product) bool {
             if (self.room_exists) {
                 if (self.room.ui_slots.getNextEmptyItemSlot() == null) return false;
             } else {
-                for (self.slots_init_params.items.constSlice()) |maybe_item| {
-                    if (maybe_item == null) break;
+                for (self.slots.items.constSlice()) |slot| {
+                    if (slot.item == null) break;
                 } else {
                     return false;
                 }
@@ -416,16 +419,14 @@ pub fn pickupProduct(self: *Run, product: *const Shop.Product) void {
                 } else {
                     unreachable;
                 }
-            } else {
-                for (self.slots_init_params.items.slice()) |*item_slot| {
-                    if (item_slot.* == null) {
-                        item_slot.* = item;
-
-                        break;
-                    }
-                } else {
-                    unreachable;
+            }
+            for (self.slots.items.slice()) |*item_slot| {
+                if (item_slot.item == null) {
+                    item_slot.item = item;
+                    break;
                 }
+            } else {
+                unreachable;
             }
         },
     }
@@ -481,6 +482,16 @@ pub fn gameUpdate(self: *Run) Error!void {
         self.room_buf_head = (self.room_buf_head + 1) % self.room_buf.len;
     }
     try room.update();
+
+    // keep run slots in sync with gameUI's
+    self.slots.items = .{};
+    for (room.ui_slots.items.constSlice()) |slot| {
+        const item: ?Item = if (slot.kind) |k| k.action.item else null;
+        self.slots.items.append(.{
+            .item = item,
+        }) catch unreachable;
+    }
+
     switch (room.progress_state) {
         .none => {},
         .lost => {
@@ -495,12 +506,6 @@ pub fn gameUpdate(self: *Run) Error!void {
         .exited => |exit_door| {
             _ = exit_door;
             self.player_thing.hp = room.getConstPlayer().?.hp.?;
-            // TODO make it betterrrs?
-            self.slots_init_params.items = .{};
-            for (room.ui_slots.items.constSlice()) |slot| {
-                const item: ?Item = if (slot.kind) |k| k.action.item else null;
-                self.slots_init_params.items.append(item) catch unreachable;
-            }
             self.loadNextPlace();
         },
     }
@@ -520,6 +525,34 @@ pub fn pauseMenuUpdate(self: *Run) Error!void {
     if (plat.input_buffer.keyIsJustPressed(.space)) {
         room.paused = false;
         self.screen = .game;
+    }
+}
+
+pub fn itemsUpdate(self: *Run) Error!void {
+    //const data = App.get().data;
+    const plat = getPlat();
+    const ui_scaling: f32 = 2;
+    const mouse_pos = plat.getMousePosScreen();
+
+    const items_rects = gameUI.getItemsRects();
+
+    for (self.slots.items.slice(), 0..) |slot, i| {
+        const rect = items_rects.get(i);
+        if (slot.item) |item| {
+            try item.unqRenderIcon(&self.imm_ui.commands, rect.pos, ui_scaling);
+        }
+    }
+    for (self.slots.items.slice(), 0..) |*slot, i| {
+        const rect = items_rects.get(i);
+        const hovered = geom.pointIsInRectf(mouse_pos, rect);
+        const clicked = hovered and (plat.input_buffer.mouseBtnIsJustPressed(.left) or plat.input_buffer.mouseBtnIsJustPressed(.left));
+        slot.is_long_hovered = (hovered and !slot.hover_timer.running);
+        if (slot.item) |item| {
+            if (clicked) {
+                _ = item;
+                // TODO discard/use menu
+            }
+        }
     }
 }
 
@@ -807,8 +840,14 @@ pub fn update(self: *Run) Error!void {
         .none => switch (self.screen) {
             .game => try self.gameUpdate(),
             .pause_menu => try self.pauseMenuUpdate(),
-            .reward => try self.rewardUpdate(),
-            .shop => try self.shopUpdate(),
+            .reward => {
+                try self.rewardUpdate();
+                try self.itemsUpdate();
+            },
+            .shop => {
+                try self.shopUpdate();
+                try self.itemsUpdate();
+            },
             .dead => try self.deadUpdate(),
         },
         .fade_in => if (self.load_timer.tick(true)) {
