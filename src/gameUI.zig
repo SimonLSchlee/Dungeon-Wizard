@@ -28,6 +28,40 @@ const player = @import("player.zig");
 const menuUI = @import("menuUI.zig");
 const ImmUI = @import("ImmUI.zig");
 
+pub const max_spell_slots = 6;
+const spell_slot_spacing: f32 = 16;
+
+pub const max_item_slots = 8;
+const item_slot_dims = v2f(48, 48);
+const item_slot_spacing: f32 = 8;
+const items_margin: f32 = 12;
+
+pub fn getItemsRects(rects: *std.BoundedArray(geom.Rectf, max_item_slots)) void {
+    const plat = getPlat();
+    rects.clear();
+    // items bottom left
+    const max_items_rows: usize = 2;
+    const max_items_per_row = max_item_slots / max_items_rows;
+    const max_items_dims = v2f(
+        utl.as(f32, max_items_per_row) * (item_slot_dims.x + item_slot_spacing) - item_slot_spacing,
+        utl.as(f32, max_items_rows) * (item_slot_dims.y + item_slot_spacing) - item_slot_spacing,
+    );
+    const items_topleft = plat.native_rect_cropped_offset.add(v2f(
+        items_margin,
+        plat.native_rect_cropped_dims.y - items_margin - max_items_dims.y,
+    ));
+    for (0..max_items_rows) |j| {
+        const y_off = (item_slot_dims.x + item_slot_spacing) * utl.as(f32, j);
+        for (0..max_items_per_row) |i| {
+            const x_off = (item_slot_dims.x + item_slot_spacing) * utl.as(f32, i);
+            rects.appendAssumeCapacity(.{
+                .pos = items_topleft.add(v2f(x_off, y_off)),
+                .dims = item_slot_dims,
+            });
+        }
+    }
+}
+
 // unq == update and queue (render)
 // Handle all updating and rendering of a generic action Slot, returning a CastMethod if it was activated
 pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, room: *Room) Error!?Options.CastMethod {
@@ -232,9 +266,6 @@ pub const Slots = struct {
         discard_button: bool = false,
     };
 
-    pub const max_spell_slots = 6;
-    pub const max_item_slots = 8;
-
     pub const spell_idx_to_key = [max_spell_slots]core.Key{ .q, .w, .e, .r, .t, .y };
     pub const spell_idx_to_key_str = blk: {
         var arr: [max_spell_slots][3]u8 = undefined;
@@ -254,11 +285,6 @@ pub const Slots = struct {
         break :blk arr;
     };
     pub const discard_key = core.Key.d;
-
-    const spell_slot_spacing: f32 = 16;
-
-    const item_slot_dims = v2f(48, 48);
-    const item_slot_spacing: f32 = 8;
 
     spells: std.BoundedArray(Slot, max_spell_slots) = .{},
     items: std.BoundedArray(Slot, max_item_slots) = .{},
@@ -326,7 +352,7 @@ pub const Slots = struct {
 
     pub fn reflowRects(self: *Slots) void {
         const plat = getPlat();
-        // TODO Options
+        // TODO Options?
         const ui_scaling: f32 = 2;
         const spell_slot_dims = Spell.card_dims.scale(ui_scaling);
         // spells must be centered on screen
@@ -346,19 +372,13 @@ pub const Slots = struct {
                 .dims = spell_slot_dims,
             };
         }
-        // items to the left
-        const items_dims = v2f(
-            (utl.as(f32, self.items.len)) * (item_slot_dims.x + item_slot_spacing) - item_slot_spacing,
-            item_slot_dims.y,
-        );
-        const items_topleft = spells_topleft.add(v2f(-items_dims.x - 10, spell_slot_dims.y - item_slot_dims.y));
+        // items bottom left
+        var items_rects = std.BoundedArray(geom.Rectf, max_item_slots){};
+        getItemsRects(&items_rects);
         for (self.items.slice(), 0..) |*slot, i| {
-            const x_off = (item_slot_dims.x + item_slot_spacing) * utl.as(f32, i);
-            slot.rect = .{
-                .pos = items_topleft.add(v2f(x_off, 0)),
-                .dims = item_slot_dims,
-            };
+            slot.rect = items_rects.get(i);
         }
+
         // discard and pause to the right
         {
             const spells_botright = spells_topleft.add(spells_dims);
