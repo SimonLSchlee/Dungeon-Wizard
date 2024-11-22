@@ -249,7 +249,7 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
         place.room.waves_params.difficulty = place.room.difficulty;
     }
     try places.insert(places.len / 2, .{ .shop = .{ .num = 0 } });
-    try places.insert(0, .{ .room = .{ .difficulty = 0, .kind = .first, .idx = 0, .waves_params = .{ .room_kind = .first, .first_wave_delay_ticks = 0 } } });
+    try places.insert(0, .{ .room = .{ .difficulty = 0, .kind = .first, .idx = 0, .waves_params = .{ .room_kind = .first, .first_wave_delay_secs = 0 } } });
     try places.append(.{ .shop = .{ .num = 1 } });
     try places.append(.{ .room = .{ .difficulty = 15, .kind = .boss, .idx = 0, .waves_params = .{ .room_kind = .boss } } });
     // TODO this better

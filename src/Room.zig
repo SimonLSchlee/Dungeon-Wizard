@@ -47,7 +47,8 @@ pub const WavesParams = struct {
     const max_max_kinds_per_wave = 4;
 
     difficulty: f32 = 0,
-    first_wave_delay_ticks: i64 = 5 * core.fups_per_sec,
+    first_wave_delay_secs: f32 = 4,
+    wave_secs_per_difficulty: f32 = 8,
     difficulty_error: f32 = 1,
     max_kinds_per_wave: usize = 2,
     min_waves: usize = 2,
@@ -177,7 +178,7 @@ curr_tick: i64 = 0,
 paused: bool = false,
 advance_one_frame: bool = false, // if true, pause on next frame
 waves: WavesArray = .{},
-first_wave_timer: u.TickCounter = undefined,
+wave_timer: u.TickCounter = undefined,
 curr_wave: i32 = 0,
 num_enemies_alive: i32 = 0,
 progress_state: union(enum) {
@@ -247,7 +248,7 @@ pub fn reset(self: *Room) Error!void {
     };
     self.curr_tick = 0;
     self.rng = std.Random.DefaultPrng.init(self.init_params.seed);
-    self.first_wave_timer = u.TickCounter.init(self.init_params.waves_params.first_wave_delay_ticks);
+    self.wave_timer = u.TickCounter.init(core.secsToTicks(self.init_params.waves_params.first_wave_delay_secs));
     self.curr_wave = 0;
     self.num_enemies_alive = 0;
     self.progress_state = .none;
@@ -359,6 +360,9 @@ pub fn mislaySpell(self: *Room, spell: Spell) void {
 pub fn spawnCurrWave(self: *Room) Error!void {
     assert(self.curr_wave < self.waves.len);
     const wave = self.waves.get(u.as(usize, self.curr_wave));
+    const wave_delay_secs = self.init_params.waves_params.wave_secs_per_difficulty * wave.total_difficulty;
+    std.debug.print("Spawning wave {}, next wave in {d:.1} secs\n", .{ self.curr_wave, wave_delay_secs });
+    self.wave_timer = u.TickCounter.init(core.secsToTicks(wave_delay_secs));
     for (wave.spawns.constSlice()) |spawn| {
         const spawner_proto = Thing.SpawnerController.prototype(spawn.proto.creature_kind.?);
         _ = try self.queueSpawnThing(&spawner_proto, spawn.pos);
@@ -461,12 +465,7 @@ pub fn update(self: *Room) Error!void {
     if (!self.edit_mode and !self.paused) {
         // waves spawning
         if (self.curr_wave < self.waves.len) {
-            // first wave spawns after fixed time
-            if (self.curr_wave == 0) {
-                if (self.first_wave_timer.tick(false)) {
-                    try self.spawnCurrWave();
-                }
-            } else if (self.num_enemies_alive == 0) {
+            if (self.wave_timer.tick(false) or (self.curr_wave > 0 and self.num_enemies_alive == 0)) {
                 try self.spawnCurrWave();
             }
         }
