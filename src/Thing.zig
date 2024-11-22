@@ -39,6 +39,7 @@ pub const Kind = enum {
     shield,
     spawner,
     vfx,
+    pickup,
 };
 
 pub const CreatureKind = creatures.Kind;
@@ -118,6 +119,7 @@ controller: union(enum) {
     projectile: ProjectileController,
     spawner: SpawnerController,
     vfx: VFXController,
+    mana_pickup: ManaPickupController,
 } = .default,
 renderer: union(enum) {
     none: void,
@@ -173,6 +175,7 @@ pub const HP = struct {
 
     curr: f32 = 10,
     max: f32 = 10,
+    total_damage_done: f32 = 0,
     shields: std.BoundedArray(Shield, 8) = .{},
 
     pub const faction_colors = std.EnumArray(Faction, Colorf).init(.{
@@ -234,7 +237,10 @@ pub const HP = struct {
         }
         if (damage_left <= 0) return;
         // shield are all popped
-        self.curr = utl.clampf(self.curr - damage_left, 0, self.max);
+        const final_damage_amount = @min(self.curr, damage_left);
+        assert(final_damage_amount > 0);
+        self.curr -= final_damage_amount;
+        self.total_damage_done += final_damage_amount;
     }
 };
 
@@ -339,7 +345,23 @@ pub const HurtBox = struct {
                 damage *= 1.3;
             }
             if (self.hp) |*hp| {
+                const pre_damage_done = hp.total_damage_done;
                 hp.doDamage(damage);
+                const post_damage_done = hp.total_damage_done;
+                if (room.init_params.mode == .crispin_picker and self.isEnemy()) {
+                    const total_manas = @max(@ceil(self.enemy_difficulty * 2), 1);
+                    const damage_per_mana = hp.max / total_manas;
+                    const post_manas = @floor(post_damage_done / damage_per_mana);
+                    const pre_manas = @floor(pre_damage_done / damage_per_mana);
+                    const num_manas = utl.as(usize, post_manas - pre_manas);
+                    var proto = ManaPickupController.prototype();
+                    for (0..num_manas) |_| {
+                        const rdir = V2f.fromAngleRadians(room.rng.random().float(f32) * utl.tau);
+                        const rdist = 20 + room.rng.random().float(f32) * 30;
+                        proto.vel = rdir.scale(2);
+                        _ = room.queueSpawnThing(&proto, self.pos.add(rdir.scale(rdist))) catch {};
+                    }
+                }
             }
         }
         force_blk: {
@@ -525,6 +547,44 @@ pub const SpawnerRenderer = struct {
             .tint = tint,
         };
         plat.texturef(self.pos, frame.texture, opt);
+    }
+};
+
+pub const ManaPickupController = struct {
+    pub fn update(self: *Thing, room: *Room) Error!void {
+        if (room.getPlayer()) |p| {
+            if (p.mana) |*mana| {
+                if (mana.curr < mana.max) {
+                    if (Collision.getCircleCircleCollision(self.pos, self.coll_radius, p.pos, p.renderer.creature.draw_radius)) |_| {
+                        mana.curr += 1;
+                        self.deferFree(room);
+                    }
+                }
+            }
+        }
+        self.updateVel(.{}, .{});
+    }
+    pub fn prototype() Thing {
+        const radius = 10;
+        const mana_inside_color = draw.Coloru.rgb(137, 109, 255).toColorf();
+        const mana_outline_color = draw.Coloru.rgb(42, 18, 107).toColorf();
+        return .{
+            .kind = .pickup,
+            .coll_radius = radius,
+            .coll_mask = Collision.Mask.initOne(.tile),
+            .controller = .{ .mana_pickup = .{} },
+            .renderer = .{
+                .shape = .{
+                    .kind = .{ .circle = .{ .radius = 10 } },
+                    .poly_opt = .{
+                        .fill_color = mana_inside_color,
+                        .outline = .{
+                            .color = mana_outline_color,
+                        },
+                    },
+                },
+            },
+        };
     }
 };
 

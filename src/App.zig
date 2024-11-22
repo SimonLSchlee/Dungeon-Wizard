@@ -194,18 +194,30 @@ fn menuUpdate(self: *App) Error!void {
         title_topleft.y + title_dims.y + title_padding.y,
     );
     var curr_btn_pos = btns_topleft;
-    if (menuButton(&self.menu_ui.commands, curr_btn_pos, "    New Run\n(4-Slot Frank)", btn_dims)) {
-        try self.startNewRun(._4_slot_frank);
+    if (false) {
+        if (menuButton(&self.menu_ui.commands, curr_btn_pos, "    New Run\n(Frank 4-slot)", btn_dims)) {
+            try self.startNewRun(.frank_4_slot);
+        }
+
+        curr_btn_pos.y += btn_dims.y + btn_spacing;
+    }
+    if (menuButton(&self.menu_ui.commands, curr_btn_pos, "      New Run\n(Mandy 3-mana)", btn_dims)) {
+        try self.startNewRun(.mandy_3_mana);
     }
     curr_btn_pos.y += btn_dims.y + btn_spacing;
-    if (menuButton(&self.menu_ui.commands, curr_btn_pos, "      New Run\n(Mana Mandy)", btn_dims)) {
-        try self.startNewRun(._mana_mandy);
+
+    if (menuButton(&self.menu_ui.commands, curr_btn_pos, "      New Run\n(Crispin\nCrystal-picker)", btn_dims)) {
+        try self.startNewRun(.crispin_picker);
     }
     curr_btn_pos.y += btn_dims.y + btn_spacing;
-    if (menuButton(&self.menu_ui.commands, curr_btn_pos, "Options", btn_dims)) {
-        self.options_open = true;
+
+    if (false) {
+        if (menuButton(&self.menu_ui.commands, curr_btn_pos, "Options", btn_dims)) {
+            self.options_open = true;
+        }
+        curr_btn_pos.y += btn_dims.y + btn_spacing;
     }
-    curr_btn_pos.y += btn_dims.y + btn_spacing;
+
     if (menuButton(&self.menu_ui.commands, curr_btn_pos, "Exit", btn_dims)) {
         plat.exit();
     }

@@ -31,8 +31,9 @@ const ImmUI = @import("ImmUI.zig");
 const sprites = @import("sprites.zig");
 
 pub const Mode = enum {
-    _4_slot_frank,
-    _mana_mandy,
+    frank_4_slot,
+    mandy_3_mana,
+    crispin_picker,
 };
 
 pub const Reward = union(enum) {
@@ -182,7 +183,7 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
     run.room_buf_tail = run.room_buf.len - 1;
 
     // TODO elsewhererre?
-    run.slots_init_params.discard_button = mode == ._mana_mandy;
+    run.slots_init_params.discard_button = mode == .mandy_3_mana;
     run.slots_init_params.items = @TypeOf(run.slots_init_params.items).fromSlice(&.{
         Item.getProto(.pot_hp),
         null,
@@ -314,6 +315,7 @@ pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
                 .exits = exit_doors,
                 .player = self.player_thing,
                 .slots_params = self.slots_init_params,
+                .mode = self.mode,
             });
             self.room_exists = true;
             // TODO hacky

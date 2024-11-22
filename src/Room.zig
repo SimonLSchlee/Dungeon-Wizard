@@ -40,6 +40,7 @@ pub const InitParams = struct {
     deck: Spell.SpellArray,
     exits: std.BoundedArray(gameUI.ExitDoor, 4),
     slots_params: gameUI.Slots.InitParams,
+    mode: Run.Mode,
 };
 
 pub const WavesParams = struct {

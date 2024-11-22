@@ -30,9 +30,16 @@ pub const enum_name = "player";
 pub fn modePrototype(mode: Run.Mode) Thing {
     var base = App.get().data.creature_protos.get(.player);
     switch (mode) {
-        ._4_slot_frank => {},
-        ._mana_mandy => {
+        .frank_4_slot => {},
+        .mandy_3_mana => {
             base.mana = .{ .max = 3, .curr = 3 };
+        },
+        .crispin_picker => {
+            base.mana = .{ .max = 5, .curr = 3 };
+            base.controller.player.mana_regen = .{
+                .timer = utl.TickCounter.init(core.secsToTicks(3)),
+                .max_threshold = 3,
+            };
         },
     }
     return base;
@@ -73,11 +80,12 @@ pub const Input = struct {
             ui_slots.updateTimerAndDrawSpell(room);
         }
 
-        // automatically discard when out of mana
-        // TODO when no cards are playable?
         if (self.mana) |*mana| {
-            if (mana.curr == 0 and controller.action_buffered == null) {
-                ui_slots.selectSlot(.action, .discard, .quick_release, 0);
+            if (room.init_params.mode == .mandy_3_mana) {
+                // automatically discard when out of mana
+                if (mana.curr == 0 and controller.action_buffered == null) {
+                    ui_slots.selectSlot(.action, .discard, .quick_release, 0);
+                }
             }
         }
 
@@ -223,10 +231,27 @@ pub const Controller = struct {
     cast_counter: utl.TickCounter = .{},
     cast_vfx: ?Thing.Id = null,
     ticks_in_state: i64 = 0,
+    mana_regen: ?struct {
+        timer: utl.TickCounter,
+        max_threshold: usize,
+    } = null,
 
     pub fn update(self: *Thing, room: *Room) Error!void {
         assert(self.spawn_state == .spawned);
         const controller = &self.controller.player;
+
+        if (controller.mana_regen) |*mrgn| {
+            if (self.mana) |*mana| {
+                if (mana.curr < mrgn.max_threshold) {
+                    if (!mrgn.timer.running) {
+                        mrgn.timer.restart();
+                    }
+                    if (mrgn.timer.tick(false)) {
+                        mana.curr += 1;
+                    }
+                }
+            }
+        }
 
         if (controller.action_buffered) |buffered| {
             if (controller.action_casting == null) {
@@ -245,12 +270,15 @@ pub const Controller = struct {
                                 assert(mana.curr >= cost);
                                 mana.curr -= cost;
                             }
-                            if (spell.draw_immediate) {
-                                room.ui_slots.setActionSlotCooldown(slot_idx, .spell, 0);
-                            } else {
-                                room.ui_slots.setActionSlotCooldown(slot_idx, .spell, null);
-                            }
+                        }
+                        // always 0 cooldown for draw_immediate
+                        if (spell.draw_immediate) {
+                            room.ui_slots.setActionSlotCooldown(slot_idx, .spell, 0);
+                        } else if (room.init_params.mode == .mandy_3_mana) {
+                            // mandy doesn't set cooldowns on the slots until full discard
+                            room.ui_slots.setActionSlotCooldown(slot_idx, .spell, null);
                         } else {
+                            // otherwise normal cooldown
                             room.ui_slots.setActionSlotCooldown(slot_idx, .spell, spell.getSlotCooldownTicks());
                         }
                         controller.cast_counter = utl.TickCounter.init(spell.cast_ticks);
@@ -331,25 +359,31 @@ pub const Controller = struct {
                             .spell => |spell| {
                                 try spell.cast(self, room, s.params.?);
                             },
-                            .discard => {
+                            .discard => { // discard all cards
                                 const ui_slots = &room.ui_slots;
-                                // TODO discard != mana?
-                                if (self.mana) |*mana| {
+                                // how long to wait if discarding...
+                                const discard_secs = if (self.mana) |*mana| blk: {
                                     const max_extra_mana_cooldown_secs: f32 = 1.33;
                                     const per_mana_secs = max_extra_mana_cooldown_secs / utl.as(f32, mana.max);
                                     const num_secs: f32 = 0.66 + per_mana_secs * utl.as(f32, mana.curr);
-                                    const num_ticks = core.secsToTicks(num_secs);
-                                    for (ui_slots.getSlotsByActionKindConst(.spell)) |*slot| {
-                                        if (slot.kind) |k| {
-                                            const spell = k.action.spell;
-                                            room.discardSpell(spell);
-                                        }
-                                        ui_slots.clearSlotByActionKind(slot.idx, .spell);
-                                        ui_slots.setActionSlotCooldown(slot.idx, .spell, num_ticks);
+                                    break :blk num_secs;
+                                } else 3;
+                                const num_ticks = core.secsToTicks(discard_secs);
+                                for (ui_slots.getSlotsByActionKindConst(.spell)) |*slot| {
+                                    if (slot.kind) |k| {
+                                        const spell = k.action.spell;
+                                        room.discardSpell(spell);
                                     }
-                                    ui_slots.setActionSlotCooldown(0, .discard, num_ticks);
-                                    ui_slots.unselectSlot();
-                                    mana.curr = mana.max;
+                                    ui_slots.clearSlotByActionKind(slot.idx, .spell);
+                                    ui_slots.setActionSlotCooldown(slot.idx, .spell, num_ticks);
+                                }
+                                ui_slots.setActionSlotCooldown(0, .discard, num_ticks);
+                                ui_slots.unselectSlot();
+                                // mana mandy gets all her mana back
+                                if (self.mana) |*mana| {
+                                    if (room.init_params.mode == .mandy_3_mana) {
+                                        mana.curr = mana.max;
+                                    }
                                 }
                             },
                         }
