@@ -221,7 +221,7 @@ pub const Input = struct {
 pub const Controller = struct {
     const State = enum {
         none,
-        cast,
+        action,
         walk,
     };
 
@@ -303,7 +303,7 @@ pub const Controller = struct {
                 .none => {
                     if (controller.action_casting != null) {
                         controller.ticks_in_state = 0;
-                        continue :state .cast;
+                        continue :state .action;
                     }
                     if (!input_dir.isZero()) {
                         controller.ticks_in_state = 0;
@@ -316,7 +316,7 @@ pub const Controller = struct {
                 .walk => {
                     if (controller.action_casting != null) {
                         controller.ticks_in_state = 0;
-                        continue :state .cast;
+                        continue :state .action;
                     }
                     if (input_dir.isZero()) {
                         controller.ticks_in_state = 0;
@@ -329,7 +329,7 @@ pub const Controller = struct {
                     _ = self.animator.?.play(.move, .{ .loop = true });
                     break :state .walk;
                 },
-                .cast => {
+                .action => {
                     assert(controller.action_casting != null);
 
                     const cast_loop_sound = App.get().data.sounds.get(.spell_casting).?;
@@ -413,7 +413,7 @@ pub const Controller = struct {
                     }
                     self.updateVel(.{}, self.accel_params);
                     _ = self.animator.?.play(.cast, .{ .loop = true });
-                    break :state .cast;
+                    break :state .action;
                 },
             };
             controller.ticks_in_state += 1;
