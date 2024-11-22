@@ -118,7 +118,8 @@ controller: union(enum) {
     item: Item.Controller, // not pickup-able items, stuff/vfx that using an item may spawn or whatnot
     projectile: ProjectileController,
     spawner: SpawnerController,
-    vfx: VFXController,
+    cast_vfx: CastVFXController,
+    text_vfx: TextVFXController,
     mana_pickup: ManaPickupController,
 } = .default,
 renderer: union(enum) {
@@ -220,8 +221,8 @@ pub const HP = struct {
             .timer = if (ticks) |t| utl.TickCounter.init(t) else null,
         }) catch unreachable;
     }
-    pub fn doDamage(self: *HP, amount: f32) void {
-        if (amount <= 0) return;
+    pub fn doDamage(self: *HP, amount: f32) f32 {
+        if (amount <= 0) return 0;
         var damage_left = amount;
         // damage hits the outermost shield, continuing inwards until it hits the actual current hp
         while (self.shields.len > 0 and damage_left > 0) {
@@ -229,18 +230,20 @@ pub const HP = struct {
             // this shield blocked all the remaining damage
             if (damage_left < last.curr) {
                 last.curr -= damage_left;
-                return;
+                return 0;
             }
             // too much damage - pop the shield and continue
             damage_left -= last.curr;
             _ = self.shields.pop();
         }
-        if (damage_left <= 0) return;
+        if (damage_left <= 0) return 0;
         // shield are all popped
         const final_damage_amount = @min(self.curr, damage_left);
         assert(final_damage_amount > 0);
         self.curr -= final_damage_amount;
         self.total_damage_done += final_damage_amount;
+
+        return final_damage_amount;
     }
 };
 
@@ -346,7 +349,11 @@ pub const HurtBox = struct {
             }
             if (self.hp) |*hp| {
                 const pre_damage_done = hp.total_damage_done;
-                hp.doDamage(damage);
+                const damage_done = hp.doDamage(damage);
+                const str = utl.bufPrintLocal("{d:.0}", .{damage_done}) catch "";
+                if (str.len > 0) {
+                    TextVFXController.spawn(self, str, .red, 1, room) catch {};
+                }
                 const post_damage_done = hp.total_damage_done;
                 if (room.init_params.mode == .crispin_picker and self.isEnemy()) {
                     const total_manas = @max(@ceil(self.enemy_difficulty * 2), 1);
@@ -412,14 +419,83 @@ pub const HurtBox = struct {
     }
 };
 
-// TODO more generic, rn just for casting anim
-pub const VFXController = struct {
+pub const TextVFXController = struct {
+    movement: enum {
+        float_up,
+        fall_down,
+    } = .float_up,
+    roffset: f32 = 0,
+    timer: utl.TickCounter = utl.TickCounter.init(core.secsToTicks(1)),
+    color: Colorf,
+    initial_pos: V2f,
+
+    pub fn update(self: *Thing, room: *Room) Error!void {
+        assert(self.spawn_state == .spawned);
+        const controller = &self.controller.text_vfx;
+
+        if (controller.timer.tick(false)) {
+            self.deferFree(room);
+        } else switch (controller.movement) {
+            .float_up => {
+                const f = controller.timer.remapTo0_1();
+                self.pos.y -= 2;
+                self.pos.x = controller.initial_pos.x + ((@sin((f + controller.roffset) * utl.pi * 2) * 2) - 1) * 3;
+                // fade doesn't look good with the borders...
+                //self.renderer.shape.kind.text.opt.color = controller.color.fade(f);
+                //self.renderer.shape.kind.text.opt.border.?.color = Colorf.black.fade(f);
+            },
+            .fall_down => {
+                self.vel.y += 1;
+                self.pos = self.pos.add(self.vel);
+            },
+        }
+    }
+
+    pub fn spawn(self: *Thing, str: []const u8, color: Colorf, scale: f32, room: *Room) Error!void {
+        const rfloat = room.rng.random().float(f32);
+        const rdir = V2f.fromAngleRadians(rfloat * utl.tau);
+        const center_pos = if (self.selectable) |s| self.pos.add(v2f(0, -s.height * 0.5)) else self.pos;
+        const radius = (if (self.selectable) |s| s.radius else self.coll_radius) * 0.75;
+        const rpos = center_pos.add(rdir.scale(radius));
+
+        var proto = Thing{
+            .kind = .vfx,
+            .controller = .{
+                .text_vfx = .{
+                    .initial_pos = rpos,
+                    .roffset = rfloat,
+                    .color = color,
+                },
+            },
+            .renderer = .{
+                .shape = .{
+                    .draw_over = true,
+                    .draw_normal = false,
+                    .kind = .{
+                        .text = .{
+                            // arrggh lol
+                            .text = ShapeRenderer.TextLabel.fromSlice(str[0..@min(str.len, (ShapeRenderer.TextLabel{}).buffer.len)]) catch unreachable,
+                        },
+                    },
+                    .poly_opt = .{},
+                },
+            },
+        };
+        proto.renderer.shape.kind.text.opt.color = color;
+        proto.renderer.shape.kind.text.opt.size *= utl.as(u32, scale + 1);
+        proto.renderer.shape.kind.text.opt.border.?.dist *= (scale + 1);
+
+        _ = try room.queueSpawnThing(&proto, rpos);
+    }
+};
+
+pub const CastVFXController = struct {
     parent: Thing.Id,
     anim_to_play: sprites.AnimName = .basic_loop,
 
     pub fn update(self: *Thing, room: *Room) Error!void {
         assert(self.spawn_state == .spawned);
-        const controller = &self.controller.vfx;
+        const controller = &self.controller.cast_vfx;
 
         if (room.getThingById(controller.parent)) |parent| {
             if (parent.isDeadCreature()) {
@@ -454,7 +530,7 @@ pub const VFXController = struct {
             .kind = .vfx,
             .pos = cast_pos,
             .controller = .{
-                .vfx = .{
+                .cast_vfx = .{
                     .parent = caster.id,
                 },
             },
@@ -664,6 +740,7 @@ pub const ProjectileController = struct {
 
 pub const ShapeRenderer = struct {
     pub const PointArray = std.BoundedArray(V2f, 32);
+    pub const TextLabel = utl.BoundedString(24);
 
     kind: union(enum) {
         circle: struct {
@@ -679,6 +756,19 @@ pub const ShapeRenderer = struct {
             length: f32,
         },
         poly: PointArray,
+        text: struct {
+            text: TextLabel,
+            font: Data.FontName = .pixeloid,
+            opt: draw.TextOpt = .{
+                .center = true,
+                .color = .white,
+                .size = 11,
+                .border = .{
+                    .dist = 1,
+                },
+                .smoothing = .none,
+            },
+        },
     },
     poly_opt: draw.PolyOpt,
     draw_under: bool = false,
@@ -697,6 +787,13 @@ pub const ShapeRenderer = struct {
             .arrow => |s| {
                 const color: Colorf = if (renderer.poly_opt.fill_color) |c| c else .white;
                 plat.arrowf(self.pos, self.pos.add(self.dir.scale(s.length)), .{ .thickness = s.thickness, .color = color });
+            },
+            .text => |s| {
+                const data = App.get().data;
+                const font = data.fonts.get(s.font);
+                var opt = s.opt;
+                opt.font = font;
+                plat.textf(self.pos, "{s}", .{s.text.constSlice()}, opt) catch {};
             },
             else => @panic("unimplemented"),
         }

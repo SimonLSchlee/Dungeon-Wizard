@@ -345,7 +345,7 @@ pub const Controller = struct {
                         }
                         switch (controller.action_casting.?.action) {
                             .spell => {
-                                const cast_proto = Thing.VFXController.castingProto(self);
+                                const cast_proto = Thing.CastVFXController.castingProto(self);
                                 if (try room.queueSpawnThing(&cast_proto, cast_proto.pos)) |id| {
                                     controller.cast_vfx = id;
                                 }
@@ -400,7 +400,7 @@ pub const Controller = struct {
                         getPlat().setSoundVolume(cast_loop_sound, vol * cast_loop_volume);
                         if (controller.cast_vfx) |id| {
                             if (room.getThingById(id)) |cast| {
-                                cast.controller.vfx.anim_to_play = .basic_cast;
+                                cast.controller.cast_vfx.anim_to_play = .basic_cast;
                             }
                         }
                         if (controller.cast_vfx != null) {

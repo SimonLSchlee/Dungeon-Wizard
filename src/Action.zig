@@ -321,7 +321,7 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
         },
         .spell_cast => |*spc| {
             if (action.curr_tick == 0) {
-                const cast_proto = Thing.VFXController.castingProto(self);
+                const cast_proto = Thing.CastVFXController.castingProto(self);
                 if (try room.queueSpawnThing(&cast_proto, cast_proto.pos)) |id| {
                     spc.cast_vfx = id;
                 }
@@ -329,7 +329,7 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
             if (action.curr_tick == 30) {
                 if (spc.cast_vfx) |id| {
                     if (room.getThingById(id)) |cast| {
-                        cast.controller.vfx.anim_to_play = .basic_cast;
+                        cast.controller.cast_vfx.anim_to_play = .basic_cast;
                     }
                 }
                 spc.cast_vfx = null;

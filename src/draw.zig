@@ -169,8 +169,8 @@ pub const TextOpt = struct {
     center: bool = false,
     smoothing: Smoothing = .bilinear,
     border: ?struct {
-        color: Colorf,
-        dist: f32,
+        color: Colorf = .black,
+        dist: f32 = 1,
     } = null,
 };
 
