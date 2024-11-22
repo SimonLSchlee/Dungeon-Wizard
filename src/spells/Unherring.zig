@@ -146,7 +146,14 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
                 .flip_x_to_dir = true,
             },
         },
-        .animator = .{ .kind = .{ .vfx = .{ .sheet_name = .herring } } },
+        .animator = .{
+            .kind = .{
+                .vfx = .{
+                    .sheet_name = .herring,
+                },
+            },
+            .curr_anim = .loop,
+        },
     };
     _ = try room.queueSpawnThing(&herring, caster.pos);
 }

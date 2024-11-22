@@ -63,7 +63,7 @@ pub fn fireProto() Thing {
                     .sheet_name = .trailblaze,
                 },
             },
-            .curr_anim = .loop, // TODO not setting this sometimes defaults to "none" anim when rendering, which is weird cos update should have run already
+            .curr_anim = .loop,
         },
         .hitbox = .{
             .mask = Thing.Faction.Mask.initFull(),
