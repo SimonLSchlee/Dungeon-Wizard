@@ -20,7 +20,7 @@ const App = @import("App.zig");
 const getPlat = App.getPlat;
 const Room = @import("Room.zig");
 const TileMap = @import("TileMap.zig");
-const data = @import("data.zig");
+const Data = @import("Data.zig");
 const pool = @import("pool.zig");
 const sprites = @import("sprites.zig");
 
@@ -354,13 +354,7 @@ pub const HurtBox = struct {
                     const post_manas = @floor(post_damage_done / damage_per_mana);
                     const pre_manas = @floor(pre_damage_done / damage_per_mana);
                     const num_manas = utl.as(usize, post_manas - pre_manas);
-                    var proto = ManaPickupController.prototype();
-                    for (0..num_manas) |_| {
-                        const rdir = V2f.fromAngleRadians(room.rng.random().float(f32) * utl.tau);
-                        const rdist = 20 + room.rng.random().float(f32) * 30;
-                        proto.vel = rdir.scale(2);
-                        _ = room.queueSpawnThing(&proto, self.pos.add(rdir.scale(rdist))) catch {};
-                    }
+                    ManaPickupController.spawnSome(num_manas, self.pos, room);
                 }
             }
         }
@@ -564,27 +558,32 @@ pub const ManaPickupController = struct {
         }
         self.updateVel(.{}, .{});
     }
-    pub fn prototype() Thing {
+    pub fn spawnSome(num: usize, pos: V2f, room: *Room) void {
         const radius = 10;
-        const mana_inside_color = draw.Coloru.rgb(137, 109, 255).toColorf();
-        const mana_outline_color = draw.Coloru.rgb(42, 18, 107).toColorf();
-        return .{
+        var proto = Thing{
             .kind = .pickup,
             .coll_radius = radius,
             .coll_mask = Collision.Mask.initOne(.tile),
             .controller = .{ .mana_pickup = .{} },
             .renderer = .{
-                .shape = .{
-                    .kind = .{ .circle = .{ .radius = 10 } },
-                    .poly_opt = .{
-                        .fill_color = mana_inside_color,
-                        .outline = .{
-                            .color = mana_outline_color,
-                        },
+                .vfx = .{},
+            },
+            .animator = .{
+                .kind = .{
+                    .vfx = .{
+                        .sheet_name = .pickup,
                     },
                 },
+                .curr_anim = .mana_crystal,
             },
         };
+        var rnd = room.rng.random();
+        for (0..num) |_| {
+            const rdir = V2f.fromAngleRadians(rnd.float(f32) * utl.tau);
+            const rdist = 20 + rnd.float(f32) * 30;
+            proto.vel = rdir.scale(1 + rnd.float(f32) * 2);
+            _ = room.queueSpawnThing(&proto, pos.add(rdir.scale(rdist))) catch {};
+        }
     }
 };
 

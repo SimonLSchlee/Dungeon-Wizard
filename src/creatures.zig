@@ -242,7 +242,7 @@ pub fn acolyteProto() Thing {
 
 pub fn dummyProto() Thing {
     var ret = creatureProto(.dummy, .dummy, .enemy, null, 25, .medium, 20);
-    ret.enemy_difficulty = 0;
+    ret.enemy_difficulty = 1.5;
     return ret;
 }
 
