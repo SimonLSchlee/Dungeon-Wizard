@@ -139,31 +139,6 @@ fn makeWaves(tilemap: TileMap, rng: std.Random, params: WavesParams) WavesArray 
     return ret;
 }
 
-// Room is basically the "World" state, of things that can change frame-to-frame in realtime while playing the 'main' game
-// that would include the UI state, graphics, etc...
-// save state - debugging
-// level in starting state - tilemap currently doing this
-//   - clone the prototype to 'reload' the Room
-//   -
-//   - could just use 'Room' - prototype 'Room' has all the stuff for a given level
-//     - serialize a Room - with an option to serialize the entire state, for debugging, or just the 'level' stuff for loading levels
-//     - move tilemap parsing code to Room
-//     -
-// edit mode:
-// - edit level starting state - can save, reload, etc
-//   - distinguish between 'spawns' and 'Things'
-// - edit current state for adhoc testing
-//   - e.g. adding 'Thing's or w/e
-// load/save states for debugging/testing
-// load/save levels, on load some state (player hp and stuff?) comes from higher level ("Run" or "Save" or something)
-//
-
-// fields to deep copy/reinit on clone()
-//  - render texture - just reinit?
-//  - is the same as the below; serialize entire state
-// fields to serialize if we want to save game state to disk, probably for debugging
-//  - ui, debug stuff, things, fog, spawn queue...everything except stuff we just reinit() (render_texture?)
-//  - more data, follow pointers and de/serialize those... etc
 camera: draw.Camera2D = .{},
 things: Thing.Pool = undefined,
 spawn_queue: ThingBoundedArray = .{},
