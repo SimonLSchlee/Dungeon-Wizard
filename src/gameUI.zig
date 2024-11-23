@@ -33,8 +33,8 @@ const spell_slot_spacing: f32 = 16;
 
 pub const max_item_slots = 8;
 const item_slot_dims = v2f(48, 48);
-const item_slot_spacing: f32 = 8;
-const items_margin: f32 = 12;
+const item_slot_spacing: V2f = v2f(8, 20);
+const items_margin: V2f = v2f(24, 16);
 
 pub fn getItemsRects() std.BoundedArray(geom.Rectf, max_item_slots) {
     const plat = getPlat();
@@ -44,17 +44,17 @@ pub fn getItemsRects() std.BoundedArray(geom.Rectf, max_item_slots) {
     const max_items_rows: usize = 2;
     const max_items_per_row = max_item_slots / max_items_rows;
     const max_items_dims = v2f(
-        utl.as(f32, max_items_per_row) * (item_slot_dims.x + item_slot_spacing) - item_slot_spacing,
-        utl.as(f32, max_items_rows) * (item_slot_dims.y + item_slot_spacing) - item_slot_spacing,
+        utl.as(f32, max_items_per_row) * (item_slot_dims.x + item_slot_spacing.x) - item_slot_spacing.x,
+        utl.as(f32, max_items_rows) * (item_slot_dims.y + item_slot_spacing.y) - item_slot_spacing.y,
     );
     const items_topleft = plat.native_rect_cropped_offset.add(v2f(
-        items_margin,
-        plat.native_rect_cropped_dims.y - items_margin - max_items_dims.y,
+        items_margin.x,
+        plat.native_rect_cropped_dims.y - items_margin.y - max_items_dims.y,
     ));
     for (0..max_items_rows) |j| {
-        const y_off = (item_slot_dims.x + item_slot_spacing) * utl.as(f32, j);
+        const y_off = (item_slot_dims.x + item_slot_spacing.y) * utl.as(f32, j);
         for (0..max_items_per_row) |i| {
-            const x_off = (item_slot_dims.x + item_slot_spacing) * utl.as(f32, i);
+            const x_off = (item_slot_dims.x + item_slot_spacing.x) * utl.as(f32, i);
             rects.appendAssumeCapacity(.{
                 .pos = items_topleft.add(v2f(x_off, y_off)),
                 .dims = item_slot_dims,
@@ -106,6 +106,7 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, 
         .dims = slot.rect.dims,
         .opt = .{
             .fill_color = bg_color,
+            .edge_radius = 0.2,
         },
     } }) catch @panic("Fail to append rect cmd");
 
@@ -121,7 +122,6 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, 
             if (hovered and clicked) {
                 ret = .left_click;
                 activated = true;
-                room.ui_clicked = true;
             } else if (plat.input_buffer.keyIsJustPressed(slot.key)) {
                 ret = App.get().options.cast_method;
                 activated = true;
@@ -149,6 +149,7 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, 
             if (slot.selection_kind != null) {
                 var border_rect = slot.rect;
                 var border_thickness: f32 = 4;
+                var border_edge_radius: f32 = 0.2;
                 switch (kind_data) {
                     .action => |a| switch (a) {
                         .spell => {
@@ -157,6 +158,7 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, 
                                 .dims = slot.rect.dims.sub(v2f(4, 4)),
                             };
                             border_thickness = 6;
+                            border_edge_radius = 0.12;
                         },
                         else => {},
                     },
@@ -171,7 +173,7 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, 
                             .color = border_color,
                             .thickness = border_thickness,
                         },
-                        .edge_radius = 0.12,
+                        .edge_radius = border_edge_radius,
                     },
                 } });
             }
@@ -223,15 +225,8 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, 
     };
     const key_str = slot.key_str.constSlice();
     const str_sz = try plat.measureText(key_str, key_text_opt);
-    const key_rect_pos = if (slot_enabled) switch (slot.kind.?) {
-        .pause => slot.rect.pos.add(v2f(-str_sz.y * 0.25, -str_sz.y * 0.75).scale(ui_scaling)),
-        .action => |a| switch (a) {
-            .spell, .item => slot.rect.pos.add(V2f.splat(-str_sz.y * 0.25).scale(ui_scaling)),
-            .discard => slot.rect.pos.add(v2f(-str_sz.y * 0.25, -str_sz.y * 0.75).scale(ui_scaling)),
-        },
-    } else slot.rect.pos.add(V2f.splat(-str_sz.y * 0.25).scale(ui_scaling));
     cmd_buf.append(.{ .rect = .{
-        .pos = key_rect_pos,
+        .pos = slot.key_rect_pos,
         .dims = str_sz.add(V2f.splat(4).scale(ui_scaling)),
         .opt = .{
             .fill_color = Colorf.black.fade(0.7),
@@ -239,7 +234,7 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, 
         },
     } }) catch @panic("Fail to append label cmd");
     cmd_buf.append(.{ .label = .{
-        .pos = key_rect_pos.add(v2f(2, 2).scale(ui_scaling)),
+        .pos = slot.key_rect_pos.add(v2f(2, 2).scale(ui_scaling)),
         .text = ImmUI.initLabel(key_str),
         .opt = key_text_opt,
     } }) catch @panic("Fail to append label cmd");
@@ -285,6 +280,7 @@ pub const Slots = struct {
         idx: usize,
         key: core.Key,
         key_str: KeyStr,
+        key_rect_pos: V2f = .{},
         kind: ?KindData = null,
         cooldown_timer: ?utl.TickCounter = null,
         hover_timer: utl.TickCounter = utl.TickCounter.init(15),
@@ -313,6 +309,7 @@ pub const Slots = struct {
     };
     pub const discard_key = core.Key.d;
 
+    ui_bg_rect: geom.Rectf = .{},
     spells: std.BoundedArray(Slot, max_spell_slots) = .{},
     items: std.BoundedArray(Slot, max_item_slots) = .{},
     select_state: ?struct {
@@ -398,11 +395,14 @@ pub const Slots = struct {
                 .pos = spells_topleft.add(v2f(x_off, 0)),
                 .dims = spell_slot_dims,
             };
+            slot.key_rect_pos = slot.rect.pos.sub(V2f.splat(6).scale(ui_scaling));
         }
+
         // items bottom left
         const items_rects = getItemsRects();
         for (self.items.slice(), 0..) |*slot, i| {
             slot.rect = items_rects.get(i);
+            slot.key_rect_pos = slot.rect.pos.sub(V2f.splat(8).scale(ui_scaling));
         }
 
         // discard and pause to the right
@@ -414,13 +414,27 @@ pub const Slots = struct {
                 .pos = pause_topleft,
                 .dims = btn_dims,
             };
+            self.pause_slot.key_rect_pos = self.pause_slot.rect.pos.sub(v2f(5, 17).scale(ui_scaling));
             if (self.discard_slot) |*slot| {
                 slot.rect = .{
                     .pos = pause_topleft.add(v2f(0, -40 - btn_dims.y)),
                     .dims = btn_dims,
                 };
+                slot.key_rect_pos = slot.rect.pos.sub(v2f(5, 17).scale(ui_scaling));
             }
         }
+        // background rect covers everything at bottom of screen
+        const bg_rect_pos = v2f(
+            plat.native_rect_cropped_offset.x,
+            @min(spells_topleft.y, items_rects.get(0).pos.y) - 16,
+        );
+        self.ui_bg_rect = .{
+            .pos = bg_rect_pos,
+            .dims = v2f(
+                plat.native_rect_cropped_dims.x,
+                plat.native_rect_cropped_offset.y + plat.native_rect_cropped_dims.y - bg_rect_pos.y,
+            ),
+        };
     }
 
     pub fn getSlotsByActionKind(self: *Slots, action_kind: player.Action.Kind) []Slot {
@@ -569,7 +583,22 @@ pub const Slots = struct {
     }
 
     pub fn update(self: *Slots, room: *Room, caster: *const Thing) Error!void {
+        const plat = getPlat();
         self.immui.commands.clear();
+        // big rect, check ui clicked
+        self.immui.commands.append(.{ .rect = .{
+            .pos = self.ui_bg_rect.pos,
+            .dims = self.ui_bg_rect.dims,
+            .opt = .{
+                .fill_color = Colorf.rgb(0.12, 0.1, 0.12),
+            },
+        } }) catch @panic("Fail to append rect cmd");
+        const mouse_pos = plat.getMousePosScreen();
+        const hovered = geom.pointIsInRectf(mouse_pos, self.ui_bg_rect);
+        const clicked = hovered and (plat.input_buffer.mouseBtnIsJustPressed(.left) or plat.input_buffer.mouseBtnIsJustPressed(.right));
+        room.ui_hovered = hovered;
+        room.ui_clicked = clicked;
+
         try self.unqActionSlots(room, caster, self.spells.slice(), .spell);
         try self.unqActionSlots(room, caster, self.items.slice(), .item);
         if (self.discard_slot) |*d| {

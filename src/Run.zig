@@ -533,11 +533,18 @@ pub fn itemsUpdate(self: *Run) Error!void {
     const plat = getPlat();
     const ui_scaling: f32 = 2;
     const mouse_pos = plat.getMousePosScreen();
-
+    const slot_bg_color = Colorf.rgb(0.07, 0.05, 0.05);
     const items_rects = gameUI.getItemsRects();
 
     for (self.slots.items.slice(), 0..) |slot, i| {
         const rect = items_rects.get(i);
+        self.imm_ui.commands.append(.{ .rect = .{
+            .pos = rect.pos,
+            .dims = rect.dims,
+            .opt = .{
+                .fill_color = slot_bg_color,
+            },
+        } }) catch @panic("Fail to append rect cmd");
         if (slot.item) |item| {
             try item.unqRenderIcon(&self.imm_ui.commands, rect.pos, ui_scaling);
         }
@@ -547,6 +554,7 @@ pub fn itemsUpdate(self: *Run) Error!void {
         const hovered = geom.pointIsInRectf(mouse_pos, rect);
         const clicked = hovered and (plat.input_buffer.mouseBtnIsJustPressed(.left) or plat.input_buffer.mouseBtnIsJustPressed(.left));
         slot.is_long_hovered = (hovered and !slot.hover_timer.running);
+
         if (slot.item) |item| {
             if (clicked) {
                 _ = item;
@@ -970,9 +978,7 @@ pub fn render(self: *Run, native_render_texture: Platform.RenderTexture2D) Error
             }
         },
         .pause_menu => {},
-        .reward => {
-            try ImmUI.render(&self.imm_ui.commands);
-        },
+        .reward => {},
         .shop => {
             assert(self.shop != null);
             const shop = &self.shop.?;
@@ -985,6 +991,7 @@ pub fn render(self: *Run, native_render_texture: Platform.RenderTexture2D) Error
             try self.dead_menu.retry_room_button.render();
         },
     }
+    try ImmUI.render(&self.imm_ui.commands);
     plat.startRenderToTexture(native_render_texture);
     plat.setBlend(.render_tex_alpha);
     { // gold

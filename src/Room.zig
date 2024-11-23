@@ -170,6 +170,7 @@ moused_over_thing: ?struct {
 } = null,
 edit_mode: bool = false,
 ui_clicked: bool = false,
+ui_hovered: bool = false,
 next_pool_id: u32 = 0, // i hate this, can we change it?
 highest_num_things: usize = 0,
 rng: std.Random.DefaultPrng = undefined,
@@ -388,6 +389,7 @@ pub fn getMousedOverThing(self: *Room, faction_mask: Thing.Faction.Mask) ?*Thing
 pub fn update(self: *Room) Error!void {
     const plat = getPlat();
     self.ui_clicked = false;
+    self.ui_hovered = false;
     self.moused_over_thing = null;
 
     if (self.advance_one_frame) {
