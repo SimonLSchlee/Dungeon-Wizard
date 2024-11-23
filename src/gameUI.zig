@@ -85,7 +85,7 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, 
         },
     };
     const bg_color = Colorf.rgb(0.07, 0.05, 0.05);
-    var rect = slot.rect;
+    var slot_contents_pos = slot.rect.pos;
     var border_color = Colorf.darkgray;
     var key_color = Colorf.gray;
 
@@ -99,11 +99,11 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, 
     // background rect
     if (can_activate_slot and hovered) {
         // TODO animate
-        rect.pos = slot.rect.pos.add(v2f(0, -5));
+        slot_contents_pos = slot.rect.pos.add(v2f(0, -5));
     }
     cmd_buf.append(.{ .rect = .{
-        .pos = rect.pos,
-        .dims = rect.dims,
+        .pos = slot.rect.pos,
+        .dims = slot.rect.dims,
         .opt = .{
             .fill_color = bg_color,
         },
@@ -147,14 +147,29 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, 
 
             // border
             if (slot.selection_kind != null) {
+                var border_rect = slot.rect;
+                var border_thickness: f32 = 4;
+                switch (kind_data) {
+                    .action => |a| switch (a) {
+                        .spell => {
+                            border_rect = .{
+                                .pos = slot_contents_pos.add(v2f(2, 2)),
+                                .dims = slot.rect.dims.sub(v2f(4, 4)),
+                            };
+                            border_thickness = 6;
+                        },
+                        else => {},
+                    },
+                    else => {},
+                }
                 cmd_buf.appendAssumeCapacity(.{ .rect = .{
-                    .pos = rect.pos.sub(v2f(0.25, 0.5)),
-                    .dims = rect.dims.add(v2f(0.5, 1)),
+                    .pos = border_rect.pos,
+                    .dims = border_rect.dims,
                     .opt = .{
                         .fill_color = null,
                         .outline = .{
                             .color = border_color,
-                            .thickness = 4,
+                            .thickness = border_thickness,
                         },
                         .edge_radius = 0.12,
                     },
@@ -167,20 +182,20 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, 
             .pause => {
                 const sprite_name = if (room.paused) Data.MiscIcon.hourglass_down else Data.MiscIcon.hourglass_up;
                 const info = sprites.RenderIconInfo{ .frame = data.misc_icons.getRenderFrame(sprite_name).? };
-                try info.unqRender(cmd_buf, rect.pos, ui_scaling);
+                try info.unqRender(cmd_buf, slot_contents_pos, ui_scaling);
             },
             .action => |a| switch (a) {
                 .discard => {
                     const info = sprites.RenderIconInfo{ .frame = data.misc_icons.getRenderFrame(.discard).? };
-                    try info.unqRender(cmd_buf, rect.pos, ui_scaling);
+                    try info.unqRender(cmd_buf, slot_contents_pos, ui_scaling);
                 },
                 .spell => |*spell| {
                     // TODO maybe?
                     //const scaling = if (slot.is_long_hovered) ui_scaling + 1 else ui_scaling;
-                    spell.unqRenderCard(cmd_buf, rect.pos, caster, ui_scaling);
+                    spell.unqRenderCard(cmd_buf, slot_contents_pos, caster, ui_scaling);
                 },
                 .item => |*item| {
-                    try item.unqRenderIcon(cmd_buf, rect.pos, ui_scaling);
+                    try item.unqRenderIcon(cmd_buf, slot_contents_pos, ui_scaling);
                 },
             },
         }
@@ -190,8 +205,8 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, 
         if (timer.running) {
             menuUI.unqSectorTimer(
                 cmd_buf,
-                rect.pos.add(rect.dims.scale(0.5)),
-                rect.dims.x * 0.5 * 0.7,
+                slot.rect.pos.add(slot.rect.dims.scale(0.5)),
+                slot.rect.dims.x * 0.5 * 0.7,
                 timer,
                 .{ .fill_color = .blue },
             );
@@ -209,12 +224,12 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, 
     const key_str = slot.key_str.constSlice();
     const str_sz = try plat.measureText(key_str, key_text_opt);
     const key_rect_pos = if (slot_enabled) switch (slot.kind.?) {
-        .pause => rect.pos.add(v2f(-str_sz.y * 0.25, -str_sz.y * 0.75).scale(ui_scaling)),
+        .pause => slot.rect.pos.add(v2f(-str_sz.y * 0.25, -str_sz.y * 0.75).scale(ui_scaling)),
         .action => |a| switch (a) {
-            .spell, .item => rect.pos.add(V2f.splat(-str_sz.y * 0.25).scale(ui_scaling)),
-            .discard => rect.pos.add(v2f(-str_sz.y * 0.25, -str_sz.y * 0.75).scale(ui_scaling)),
+            .spell, .item => slot.rect.pos.add(V2f.splat(-str_sz.y * 0.25).scale(ui_scaling)),
+            .discard => slot.rect.pos.add(v2f(-str_sz.y * 0.25, -str_sz.y * 0.75).scale(ui_scaling)),
         },
-    } else rect.pos.add(V2f.splat(-str_sz.y * 0.25).scale(ui_scaling));
+    } else slot.rect.pos.add(V2f.splat(-str_sz.y * 0.25).scale(ui_scaling));
     cmd_buf.append(.{ .rect = .{
         .pos = key_rect_pos,
         .dims = str_sz.add(V2f.splat(4).scale(ui_scaling)),
