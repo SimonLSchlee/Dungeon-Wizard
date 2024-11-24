@@ -356,7 +356,7 @@ pub const HurtBox = struct {
                 }
                 const post_damage_done = hp.total_damage_done;
                 if (room.init_params.mode == .crispin_picker and self.isEnemy()) {
-                    const total_manas = @max(@ceil(self.enemy_difficulty * 2), 1);
+                    const total_manas = @max(@ceil(self.enemy_difficulty * 2.5), 1);
                     const damage_per_mana = hp.max / total_manas;
                     const post_manas = @floor(post_damage_done / damage_per_mana);
                     const pre_manas = @floor(pre_damage_done / damage_per_mana);
@@ -621,18 +621,54 @@ pub const SpawnerRenderer = struct {
 };
 
 pub const ManaPickupController = struct {
+    state: enum {
+        loop,
+        collected,
+    } = .loop,
+    fading: bool = false,
+    timer: utl.TickCounter = utl.TickCounter.init(core.secsToTicks(8)),
+
     pub fn update(self: *Thing, room: *Room) Error!void {
-        if (room.getPlayer()) |p| {
-            if (p.mana) |*mana| {
-                if (mana.curr < mana.max) {
-                    if (Collision.getCircleCircleCollision(self.pos, self.coll_radius, p.pos, p.renderer.creature.draw_radius)) |_| {
-                        mana.curr += 1;
-                        self.deferFree(room);
-                    }
-                }
+        const controller = &self.controller.mana_pickup;
+        const animator = &self.animator.?;
+        const renderer = &self.renderer.vfx;
+        if (controller.timer.tick(false)) {
+            if (controller.fading) {
+                self.deferFree(room);
+                return;
+            } else {
+                controller.fading = true;
+                controller.timer = utl.TickCounter.init(core.secsToTicks(2));
             }
         }
-        self.updateVel(.{}, .{});
+        if (controller.fading) {
+            renderer.sprite_tint = Colorf.white.fade(1 - controller.timer.remapTo0_1());
+        }
+        switch (controller.state) {
+            .loop => if (room.getPlayer()) |p| {
+                _ = animator.play(.loop, .{ .loop = true });
+                if (p.mana) |*mana| {
+                    if (mana.curr < mana.max) {
+                        if (Collision.getCircleCircleCollision(self.pos, self.coll_radius, p.pos, p.renderer.creature.draw_radius)) |_| {
+                            mana.curr += 1;
+                            controller.state = .collected;
+                        }
+                    }
+                }
+            },
+            .collected => {
+                renderer.draw_normal = false;
+                renderer.draw_over = true;
+                if (animator.play(.end, .{}).contains(.end)) {
+                    self.deferFree(room);
+                }
+            },
+        }
+        if (self.last_coll) |c| {
+            const d = self.vel.sub(c.normal.scale(self.vel.dot(c.normal) * 2));
+            self.vel = d;
+        }
+        self.updateVel(.{}, .{ .friction = 0.01 });
     }
     pub fn spawnSome(num: usize, pos: V2f, room: *Room) void {
         const radius = 10;
@@ -647,17 +683,17 @@ pub const ManaPickupController = struct {
             .animator = .{
                 .kind = .{
                     .vfx = .{
-                        .sheet_name = .pickup,
+                        .sheet_name = .mana_pickup,
                     },
                 },
-                .curr_anim = .mana_crystal,
+                .curr_anim = .loop,
             },
         };
         var rnd = room.rng.random();
         for (0..num) |_| {
             const rdir = V2f.fromAngleRadians(rnd.float(f32) * utl.tau);
-            const rdist = 20 + rnd.float(f32) * 30;
-            proto.vel = rdir.scale(1 + rnd.float(f32) * 2);
+            const rdist = 10 + rnd.float(f32) * 30;
+            proto.vel = rdir.scale(0.5 + rnd.float(f32) * 1);
             _ = room.queueSpawnThing(&proto, pos.add(rdir.scale(rdist))) catch {};
         }
     }
