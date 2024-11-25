@@ -573,7 +573,7 @@ pub const Tag = struct {
         },
         label: Label,
     };
-    pub const PartArray = std.BoundedArray(Part, 6);
+    pub const PartArray = std.BoundedArray(Part, 8);
 
     parts: PartArray = .{},
 
