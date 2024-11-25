@@ -19,6 +19,7 @@ const Run = @import("Run.zig");
 const Data = @import("Data.zig");
 const Options = @import("Options.zig");
 const ImmUI = @import("ImmUI.zig");
+const menuUI = @import("menuUI.zig");
 
 var _app: ?*App = null;
 var _plat: ?*Platform = null;
@@ -117,38 +118,6 @@ pub fn deinit(self: *App) void {
     plat.heap.destroy(self);
 }
 
-pub fn menuButton(cmd_buf: *ImmUI.CmdBuf, pos: V2f, str: []const u8, dims: V2f) bool {
-    const plat = getPlat();
-    const mouse_pos = plat.getMousePosScreen();
-    const hovered = geom.pointIsInRectf(mouse_pos, .{ .pos = pos, .dims = dims });
-    const clicked = hovered and plat.input_buffer.mouseBtnIsJustPressed(.left);
-    cmd_buf.append(.{
-        .rect = .{
-            .pos = pos,
-            .dims = dims,
-            .opt = .{
-                .fill_color = .orange,
-                .outline = if (hovered) .{ .color = .red, .thickness = 5 } else null,
-            },
-        },
-    }) catch @panic("Fail to append rect cmd");
-    const font = App.get().data.fonts.get(.pixeloid);
-    cmd_buf.append(.{
-        .label = .{
-            .pos = pos.add(dims.scale(0.5)),
-            .text = ImmUI.initLabel(str),
-            .opt = .{
-                .center = true,
-                .color = .black,
-                .size = font.base_size * 2,
-                .font = font,
-                .smoothing = .none,
-            },
-        },
-    }) catch @panic("Fail to append text cmd");
-    return clicked;
-}
-
 fn menuUpdate(self: *App) Error!void {
     const plat = getPlat();
     const title_text = "Magic-Using Individual";
@@ -195,30 +164,30 @@ fn menuUpdate(self: *App) Error!void {
     );
     var curr_btn_pos = btns_topleft;
     if (false) {
-        if (menuButton(&self.menu_ui.commands, curr_btn_pos, "    New Run\n(Frank 4-slot)", btn_dims)) {
+        if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "    New Run\n(Frank 4-slot)", btn_dims)) {
             try self.startNewRun(.frank_4_slot);
         }
 
         curr_btn_pos.y += btn_dims.y + btn_spacing;
     }
-    if (menuButton(&self.menu_ui.commands, curr_btn_pos, "      New Run\n(Mandy 3-mana)", btn_dims)) {
+    if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "      New Run\n(Mandy 3-mana)", btn_dims)) {
         try self.startNewRun(.mandy_3_mana);
     }
     curr_btn_pos.y += btn_dims.y + btn_spacing;
 
-    if (menuButton(&self.menu_ui.commands, curr_btn_pos, "      New Run\n(Crispin\nCrystal-picker)", btn_dims)) {
+    if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "      New Run\n(Crispin\nCrystal-picker)", btn_dims)) {
         try self.startNewRun(.crispin_picker);
     }
     curr_btn_pos.y += btn_dims.y + btn_spacing;
 
     if (false) {
-        if (menuButton(&self.menu_ui.commands, curr_btn_pos, "Options", btn_dims)) {
+        if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "Options", btn_dims)) {
             self.options_open = true;
         }
         curr_btn_pos.y += btn_dims.y + btn_spacing;
     }
 
-    if (menuButton(&self.menu_ui.commands, curr_btn_pos, "Exit", btn_dims)) {
+    if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "Exit", btn_dims)) {
         plat.exit();
     }
 }

@@ -324,6 +324,26 @@ pub fn getDescription(self: *const Item) Error![]const u8 {
     return item_descriptions.get(std.meta.activeTag(self.kind));
 }
 
+const rarity_price_base = std.EnumArray(Rarity, i32).init(.{
+    .pedestrian = 8,
+    .interesting = 13,
+    .exceptional = 16,
+    .brilliant = 21,
+});
+
+const rarity_price_variance = std.EnumArray(Rarity, i32).init(.{
+    .pedestrian = 2,
+    .interesting = 3,
+    .exceptional = 4,
+    .brilliant = 3,
+});
+
+pub fn getShopPrice(self: *const Item, rng: std.Random) i32 {
+    const base = rarity_price_base.get(self.rarity);
+    const variance = rarity_price_variance.get(self.rarity);
+    return base - variance + rng.intRangeAtMost(i32, 0, variance * 2);
+}
+
 pub inline fn getTargetParams(self: *const Item, room: *Room, caster: *const Thing, mouse_pos: V2f) ?Params {
     return self.targeting_data.getParams(room, caster, mouse_pos);
 }

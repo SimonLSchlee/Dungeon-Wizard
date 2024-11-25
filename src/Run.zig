@@ -636,7 +636,7 @@ pub fn rewardSpellChoiceUI(self: *Run, idx: usize) Error!void {
         modal_topleft.x + (modal_dims.x - btn_dims.x) * 0.5,
         modal_topleft.y + modal_dims.y - 10 - btn_dims.y * 0.5,
     );
-    if (App.menuButton(&self.imm_ui.commands, btn_topleft, "Back", btn_dims)) {
+    if (menuUI.textButton(&self.imm_ui.commands, btn_topleft, "Back", btn_dims)) {
         self.reward_ui.?.selected_spell_choice_idx = null;
     }
 }
@@ -775,7 +775,7 @@ pub fn rewardUpdate(self: *Run) Error!void {
     if (reward_ui.rewards.len == 0) {
         skip_btn_text = "Continue";
     }
-    if (App.menuButton(&self.imm_ui.commands, skip_btn_topleft, skip_btn_text, skip_btn_dims)) {
+    if (menuUI.textButton(&self.imm_ui.commands, skip_btn_topleft, skip_btn_text, skip_btn_dims)) {
         self.screen = .game;
         assert(self.room_exists);
         self.room.took_reward = true;

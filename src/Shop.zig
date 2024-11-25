@@ -1,6 +1,6 @@
 const std = @import("std");
 const assert = std.debug.assert;
-const u = @import("util.zig");
+const utl = @import("util.zig");
 
 pub const Platform = @import("raylib.zig");
 const core = @import("core.zig");
@@ -28,6 +28,16 @@ const Item = @import("Item.zig");
 const ImmUI = @import("ImmUI.zig");
 const Shop = @This();
 
+const max_num_spells = 4;
+const num_spells = 4;
+const spells_spacing: f32 = 16;
+
+const max_num_items = 4;
+const num_items = 3;
+const items_spacing: f32 = 10;
+
+const slot_margin: f32 = 10;
+
 pub const SpellOrItem = union(enum) {
     spell: Spell,
     item: Item,
@@ -42,12 +52,14 @@ pub const Product = struct {
 
 const ProductSlot = struct {
     product: ?Product,
-    crect: menuUI.ClickableRect,
+    rect: geom.Rectf = .{},
+    hover_timer: utl.TickCounter = utl.TickCounter.init(15),
+    is_long_hovered: bool = false,
 };
 
 render_texture: Platform.RenderTexture2D,
-products: std.BoundedArray(ProductSlot, 12) = .{},
-proceed_button: menuUI.Button,
+spells: std.BoundedArray(ProductSlot, max_num_spells) = .{},
+items: std.BoundedArray(ProductSlot, max_num_items) = .{},
 rng: std.Random.DefaultPrng,
 state: enum {
     shopping,
@@ -60,93 +72,35 @@ imm_ui: struct {
 pub fn init(seed: u64) Error!Shop {
     const plat = App.getPlat();
 
-    const proceed_btn_dims = v2f(120, 70);
-    const proceed_btn_center = v2f(core.native_dims_f.x - proceed_btn_dims.x - 80, core.native_dims_f.y - proceed_btn_dims.y - 140);
-    var proceed_btn = menuUI.Button{
-        .clickable_rect = .{ .rect = .{
-            .pos = proceed_btn_center.sub(proceed_btn_dims.scale(0.5)),
-            .dims = proceed_btn_dims,
-        } },
-        .text_padding = v2f(10, 10),
-        .poly_opt = .{ .fill_color = .orange },
-        .text_opt = .{ .center = true, .color = .black, .size = 30 },
-        .text_rel_pos = proceed_btn_dims.scale(0.5),
-    };
-    proceed_btn.text = @TypeOf(proceed_btn.text).fromSlice("Proceed") catch unreachable;
-
     var ret = Shop{
         .render_texture = plat.createRenderTexture("shop", core.native_dims),
-        .proceed_button = proceed_btn,
         .rng = std.Random.DefaultPrng.init(seed),
     };
 
-    {
-        const max_num_spells = 4;
-        const num_spells = 4;
-        const spell_width: f32 = 150;
-        const spell_spacing = 25;
-        const spell_product_dims = v2f(spell_width, spell_width / 0.7);
-        const spells_center = v2f(core.native_dims_f.x * 0.5, 100 + spell_product_dims.y * 0.5);
-        const spells_bottom_y = spells_center.y + spell_product_dims.y * 0.5;
-        var spells = std.BoundedArray(Spell, max_num_spells){};
-        spells.resize(num_spells) catch unreachable;
-        const num_spells_generated = Spell.makeShopSpells(ret.rng.random(), spells.slice());
-        spells.resize(num_spells_generated) catch unreachable;
-        var spell_rects = std.BoundedArray(geom.Rectf, max_num_spells){};
-        spell_rects.resize(num_spells_generated) catch unreachable;
-        gameUI.layoutRectsFixedSize(
-            spells.len,
-            spell_product_dims,
-            spells_center,
-            .{
-                .direction = .horizontal,
-                .space_between = spell_spacing,
+    var spells = std.BoundedArray(Spell, max_num_spells){};
+    spells.resize(num_spells) catch unreachable;
+    const num_spells_generated = Spell.makeShopSpells(ret.rng.random(), spells.slice());
+    spells.resize(num_spells_generated) catch unreachable;
+    for (spells.constSlice()) |spell| {
+        ret.spells.appendAssumeCapacity(.{
+            .product = .{
+                .kind = .{ .spell = spell },
+                .price = .{ .gold = spell.getShopPrice(ret.rng.random()) },
             },
-            spell_rects.slice(),
-        );
-        for (spells.constSlice(), 0..) |spell, i| {
-            const rect = spell_rects.get(i);
-            ret.products.append(.{
-                .product = .{
-                    .kind = .{ .spell = spell },
-                    .price = .{ .gold = 10 },
-                },
-                .crect = .{ .rect = .{ .dims = rect.dims, .pos = rect.pos } },
-            }) catch unreachable;
-        }
+        });
+    }
 
-        const max_num_items = 4;
-        const num_items = 3;
-        const item_width: f32 = 150;
-        const item_spacing = 25;
-        const item_product_dims = v2f(item_width, item_width / 0.7);
-        const items_center = v2f(core.native_dims_f.x * 0.5, spells_bottom_y + 50 + item_product_dims.y * 0.5);
-        var items = std.BoundedArray(Item, max_num_items){};
-        items.resize(num_items) catch unreachable;
-        const num_items_generated = Item.makeShopItems(ret.rng.random(), items.slice());
-        items.resize(num_items_generated) catch unreachable;
-        var item_rects = std.BoundedArray(geom.Rectf, max_num_items){};
-        item_rects.resize(num_items_generated) catch unreachable;
-        gameUI.layoutRectsFixedSize(
-            items.len,
-            item_product_dims,
-            items_center,
-            .{
-                .direction = .horizontal,
-                .space_between = item_spacing,
+    var items = std.BoundedArray(Item, max_num_items){};
+    items.resize(num_items) catch unreachable;
+    const num_items_generated = Item.makeShopItems(ret.rng.random(), items.slice());
+    items.resize(num_items_generated) catch unreachable;
+    for (items.constSlice()) |item| {
+        ret.items.appendAssumeCapacity(.{
+            .product = .{
+                .kind = .{ .item = item },
+                .price = .{ .gold = item.getShopPrice(ret.rng.random()) },
             },
-            item_rects.slice(),
-        );
-        for (items.constSlice(), 0..) |item, i| {
-            const rect = item_rects.get(i);
-            ret.products.append(.{
-                .product = .{
-                    .kind = .{ .item = item },
-                    .price = .{ .gold = 20 },
-                },
-                .crect = .{ .rect = .{ .dims = rect.dims, .pos = rect.pos } },
-            }) catch unreachable;
-        }
+        });
     }
 
     return ret;
@@ -159,7 +113,7 @@ pub fn deinit(self: *Shop) void {
 
 pub fn reset(self: *Shop) Error!*Shop {
     self.deinit();
-    var rng = std.Random.DefaultPrng.init(u.as(u64, std.time.microTimestamp()));
+    var rng = std.Random.DefaultPrng.init(utl.as(u64, std.time.microTimestamp()));
     const seed = rng.random().int(u64);
     self.* = try init(seed);
     return self;
@@ -170,61 +124,167 @@ pub fn canBuy(run: *const Run, product: *const Product) bool {
     return run.gold >= price and run.canPickupProduct(product);
 }
 
-pub fn update(self: *Shop, run: *const Run) Error!?Product {
-    self.imm_ui.commands.clear();
-    var ret: ?Product = null;
+fn unqProductSlot(cmd_buf: *ImmUI.CmdBuf, slot: *ProductSlot, run: *const Run) Error!bool {
+    const data = App.get().data;
+    const plat = getPlat();
     const ui_scaling: f32 = 3;
+    var ret: bool = false;
 
-    for (self.products.slice()) |*slot| {
-        try self.imm_ui.commands.append(.{ .rect = .{
-            .pos = slot.crect.rect.pos,
-            .dims = slot.crect.rect.dims,
-            .opt = .{
-                .fill_color = Colorf.rgb(0.07, 0.05, 0.05),
-            },
-        } });
-        if (slot.product == null) continue;
-        const product: *Product = &slot.product.?;
-        var hovered_rect = slot.crect.rect;
-        if (slot.crect.isHovered()) {
-            const new_dims = hovered_rect.dims.scale(1.1);
-            const new_pos = hovered_rect.pos.sub(new_dims.sub(hovered_rect.dims).scale(0.5));
-            hovered_rect.pos = new_pos;
-            hovered_rect.dims = new_dims;
-        }
-        // renderr
+    const mouse_pos = plat.getMousePosScreen();
+    const hovered = geom.pointIsInRectf(mouse_pos, slot.rect);
+    const clicked = hovered and plat.input_buffer.mouseBtnIsJustPressed(.left);
+    // TODO anything else here?
+    const slot_enabled = slot.product != null;
+    const can_buy = slot_enabled and canBuy(run, &slot.product.?);
+    const bg_color = Colorf.rgb(0.17, 0.15, 0.15);
+    var slot_contents_pos = slot.rect.pos.add(V2f.splat(slot_margin));
+
+    if (hovered) {
+        _ = slot.hover_timer.tick(false);
+    } else {
+        slot.hover_timer.restart();
+    }
+    slot.is_long_hovered = (hovered and !slot.hover_timer.running);
+
+    // background rect
+    if (can_buy and hovered) {
+        // TODO animate
+        slot_contents_pos = slot_contents_pos.add(v2f(0, -5));
+    }
+    cmd_buf.append(.{ .rect = .{
+        .pos = slot.rect.pos,
+        .dims = slot.rect.dims,
+        .opt = .{
+            .fill_color = bg_color,
+            .edge_radius = 0.2,
+        },
+    } }) catch @panic("Fail to append rect cmd");
+
+    // slot contents
+    if (slot_enabled) {
+        const product = slot.product.?;
+
+        ret = can_buy and hovered and clicked;
         switch (product.kind) {
-            .spell => |spell| {
-                spell.unqRenderCard(&self.imm_ui.commands, hovered_rect.pos, null, ui_scaling);
+            .spell => |*spell| {
+                // TODO maybe?
+                //const scaling = if (slot.is_long_hovered) ui_scaling + 1 else ui_scaling;
+                spell.unqRenderCard(cmd_buf, slot_contents_pos, null, ui_scaling);
             },
-            .item => |item| {
-                try item.unqRenderIcon(&self.imm_ui.commands, hovered_rect.pos, ui_scaling);
+            .item => |*item| {
+                try item.unqRenderIcon(cmd_buf, slot_contents_pos, ui_scaling);
             },
         }
-        const price_pos = hovered_rect.pos.add(hovered_rect.dims).sub(v2f(50, 40));
-        const price_str = try u.bufPrintLocal("${}", .{product.price.gold});
-        try self.imm_ui.commands.append(.{ .label = .{
+        const price_font = data.fonts.get(.pixeloid);
+        const price_text_opt = draw.TextOpt{
+            .color = if (can_buy) .yellow else .red,
+            .size = price_font.base_size * utl.as(u32, ui_scaling),
+            .smoothing = .none,
+            .font = price_font,
+            .border = .{ .dist = ui_scaling },
+        };
+        const price_str = try utl.bufPrintLocal("${}", .{product.price.gold});
+        const price_str_dims = try plat.measureText(price_str, price_text_opt);
+        const price_pos = slot.rect.pos.add(slot.rect.dims).sub(price_str_dims.add(V2f.splat(slot_margin)));
+
+        try cmd_buf.append(.{ .label = .{
             .pos = price_pos,
             .text = ImmUI.initLabel(price_str),
-            .opt = .{
-                .center = true,
-                .color = .yellow,
-                .size = 30,
-            },
+            .opt = price_text_opt,
         } });
-        // buyy
-        if (slot.crect.isClicked()) {
-            if (canBuy(run, product)) {
-                ret = product.*;
-                slot.product = null;
-                break;
-            }
+    }
+
+    return ret;
+}
+
+pub fn update(self: *Shop, run: *const Run) Error!?Product {
+    const plat = getPlat();
+    const data = App.get().data;
+    const ui_scaling: f32 = 3;
+    var ret: ?Product = null;
+
+    self.imm_ui.commands.clear();
+
+    const title_center_pos = plat.native_rect_cropped_offset.add(v2f(
+        plat.native_rect_cropped_dims.x * 0.5,
+        60,
+    ));
+    try self.imm_ui.commands.append(.{ .label = .{
+        .pos = title_center_pos,
+        .text = ImmUI.initLabel("Shoppy Woppy"),
+        .opt = .{
+            .center = true,
+            .color = .white,
+            .size = 45,
+        },
+    } });
+
+    const price_font = data.fonts.get(.pixeloid);
+    const price_font_size = utl.as(f32, price_font.base_size) * ui_scaling;
+
+    // spells
+    const spell_dims = Spell.card_dims.scale(ui_scaling);
+    const spell_slot_dims = spell_dims.add(V2f.splat(slot_margin).scale(2)).add(v2f(0, price_font_size + slot_margin));
+    const spells_center = title_center_pos.add(v2f(0, 23 + 60 + spell_dims.y * 0.5));
+
+    var spell_rects = std.BoundedArray(geom.Rectf, max_num_spells){};
+    spell_rects.resize(self.spells.len) catch unreachable;
+    gameUI.layoutRectsFixedSize(
+        spell_rects.len,
+        spell_slot_dims,
+        spells_center,
+        .{ .direction = .horizontal, .space_between = spells_spacing },
+        spell_rects.slice(),
+    );
+    for (spell_rects.constSlice(), 0..) |rect, i| {
+        self.spells.buffer[i].rect = rect;
+    }
+
+    // items
+    const item_dims = Item.icon_dims.scale(ui_scaling);
+    const item_slot_dims = item_dims.add(V2f.splat(slot_margin).scale(2)).add(v2f(0, price_font_size + slot_margin));
+    const items_center = spells_center.add(v2f(0, spell_slot_dims.y * 0.5 + 40 + item_slot_dims.y * 0.5));
+
+    var item_rects = std.BoundedArray(geom.Rectf, max_num_spells){};
+    item_rects.resize(self.items.len) catch unreachable;
+    gameUI.layoutRectsFixedSize(
+        item_rects.len,
+        item_slot_dims,
+        items_center,
+        .{ .direction = .horizontal, .space_between = items_spacing },
+        item_rects.slice(),
+    );
+    for (item_rects.constSlice(), 0..) |rect, i| {
+        self.items.buffer[i].rect = rect;
+    }
+
+    for (self.spells.slice()) |*slot| {
+        if (try unqProductSlot(&self.imm_ui.commands, slot, run)) {
+            assert(canBuy(run, &slot.product.?));
+            ret = slot.product.?;
+            slot.product = null;
         }
     }
 
-    if (self.proceed_button.isClicked()) {
-        self.state = .done;
+    for (self.items.slice()) |*slot| {
+        if (try unqProductSlot(&self.imm_ui.commands, slot, run)) {
+            assert(canBuy(run, &slot.product.?));
+            ret = slot.product.?;
+            slot.product = null;
+        }
     }
+
+    // proceed btn
+    {
+        const proceed_btn_dims = v2f(170, 100);
+        const btn_center = items_center.add(v2f(0, item_slot_dims.y * 0.5 + 40 + proceed_btn_dims.y * 0.5));
+        const proceed_btn_pos = btn_center.sub(proceed_btn_dims.scale(0.5));
+
+        if (menuUI.textButton(&self.imm_ui.commands, proceed_btn_pos, "Proceed", proceed_btn_dims)) {
+            self.state = .done;
+        }
+    }
+
     return ret;
 }
 
@@ -237,8 +297,4 @@ pub fn render(self: *Shop, run: *Run, native_render_texture: Platform.RenderText
     plat.setBlend(.render_tex_alpha);
 
     try ImmUI.render(&self.imm_ui.commands);
-
-    try plat.textf(v2f(core.native_dims_f.x * 0.5, 50), "Shoppy woppy", .{}, .{ .center = true, .color = .white, .size = 45 });
-
-    try self.proceed_button.render();
 }

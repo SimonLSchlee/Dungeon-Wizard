@@ -173,3 +173,35 @@ pub fn unqSectorTimer(cmd_buf: *ImmUI.CmdBuf, pos: V2f, radius: f32, timer: *con
         },
     } }) catch @panic("Fail to append label cmd");
 }
+
+pub fn textButton(cmd_buf: *ImmUI.CmdBuf, pos: V2f, str: []const u8, dims: V2f) bool {
+    const plat = getPlat();
+    const mouse_pos = plat.getMousePosScreen();
+    const hovered = geom.pointIsInRectf(mouse_pos, .{ .pos = pos, .dims = dims });
+    const clicked = hovered and plat.input_buffer.mouseBtnIsJustPressed(.left);
+    cmd_buf.append(.{
+        .rect = .{
+            .pos = pos,
+            .dims = dims,
+            .opt = .{
+                .fill_color = .orange,
+                .outline = if (hovered) .{ .color = .red, .thickness = 5 } else null,
+            },
+        },
+    }) catch @panic("Fail to append rect cmd");
+    const font = App.get().data.fonts.get(.pixeloid);
+    cmd_buf.append(.{
+        .label = .{
+            .pos = pos.add(dims.scale(0.5)),
+            .text = ImmUI.initLabel(str),
+            .opt = .{
+                .center = true,
+                .color = .black,
+                .size = font.base_size * 2,
+                .font = font,
+                .smoothing = .none,
+            },
+        },
+    }) catch @panic("Fail to append text cmd");
+    return clicked;
+}

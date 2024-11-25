@@ -698,6 +698,26 @@ pub fn getTags(self: *const Spell) ?Tag.Array {
     return null;
 }
 
+const rarity_price_base = std.EnumArray(Rarity, i32).init(.{
+    .pedestrian = 7,
+    .interesting = 10,
+    .exceptional = 15,
+    .brilliant = 27,
+});
+
+const rarity_price_variance = std.EnumArray(Rarity, i32).init(.{
+    .pedestrian = 3,
+    .interesting = 5,
+    .exceptional = 5,
+    .brilliant = 5,
+});
+
+pub fn getShopPrice(self: *const Spell, rng: std.Random) i32 {
+    const base = rarity_price_base.get(self.rarity);
+    const variance = rarity_price_variance.get(self.rarity);
+    return base - variance + rng.intRangeAtMost(i32, 0, variance * 2);
+}
+
 pub inline fn getTargetParams(self: *const Spell, room: *Room, caster: *const Thing, mouse_pos: V2f) ?Params {
     return self.targeting_data.getParams(room, caster, mouse_pos);
 }
