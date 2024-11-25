@@ -70,26 +70,24 @@ pub fn BoundedPool(MemberType: type, size: usize) type {
         num_allocated: usize = 0,
         next_free: ?usize = null,
 
-        pub fn init(id: u32) Self {
-            var ret = Self{
+        pub fn init(self: *Self, id: u32) void {
+            self.* = .{
                 .id = id,
                 .next_free = 0,
             };
-            for (&ret.items, 0..) |*item, i| {
-                item.id.pool = ret.id;
+
+            for (&self.items, 0..) |*item, i| {
+                item.id.pool = self.id;
                 item.id.idx = u.as(u32, i);
                 item.id.gen = 0;
                 item.alloc_state = .{ .free = i + 1 };
             }
-            ret.items[ret.items.len - 1].alloc_state.free = null;
-
-            return ret;
+            self.items[self.items.len - 1].alloc_state.free = null;
         }
 
-        pub fn initWithGlobalId() Self {
-            const ret = init(global_pool_id);
+        pub fn initWithGlobalId(self: *Self) void {
+            self.init(global_pool_id);
             global_pool_id += 1;
-            return ret;
         }
 
         pub fn alloc(self: *Self) ?*MemberType {

@@ -325,10 +325,10 @@ pub const Slots = struct {
         commands: ImmUI.CmdBuf = .{},
     } = .{},
 
-    pub fn init(room: *Room, run_slots: RunSlots) Slots {
+    pub fn init(self: *Slots, room: *Room, run_slots: RunSlots) void {
         assert(run_slots.num_spell_slots <= max_spell_slots);
 
-        var ret = Slots{};
+        self.* = .{};
         for (0..run_slots.num_spell_slots) |i| {
             var slot = Slot{
                 .idx = i,
@@ -339,7 +339,7 @@ pub const Slots = struct {
             if (room.drawSpell()) |spell| {
                 slot.kind = .{ .action = .{ .spell = spell } };
             }
-            ret.spells.append(slot) catch unreachable;
+            self.spells.append(slot) catch unreachable;
         }
 
         for (run_slots.items.constSlice(), 0..) |item_slot, i| {
@@ -351,11 +351,11 @@ pub const Slots = struct {
             if (item_slot.item) |item| {
                 slot.kind = .{ .action = .{ .item = item } };
             }
-            ret.items.append(slot) catch unreachable;
+            self.items.append(slot) catch unreachable;
         }
 
         if (run_slots.discard_button) {
-            ret.discard_slot = .{
+            self.discard_slot = .{
                 .idx = 0,
                 .key = discard_key,
                 .key_str = Slot.KeyStr.fromSlice("[D]") catch unreachable,
@@ -363,15 +363,13 @@ pub const Slots = struct {
             };
         }
 
-        ret.pause_slot = .{
+        self.pause_slot = .{
             .idx = 0,
             .key_str = Slot.KeyStr.fromSlice("[SPC]") catch unreachable,
             .key = .space,
             .kind = .pause,
         };
-        ret.reflowRects();
-
-        return ret;
+        self.reflowRects();
     }
 
     pub fn reflowRects(self: *Slots) void {

@@ -44,7 +44,6 @@ pub const RenderTexture2D = struct {
 };
 
 stack_base: usize = 0,
-thing_stack_ptr: usize = 0,
 should_exit: bool = false,
 app_dll: ?std.DynLib = null,
 appInit: *const fn (*Platform) *anyopaque = undefined,
@@ -112,6 +111,10 @@ pub fn getStackPointer(_: *Platform) usize {
     return asm (""
         : [ret] "={sp}" (-> usize),
     );
+}
+
+pub fn printStackSize(self: *Platform) void {
+    std.debug.print("stack size: {x}\n", .{self.stack_base - self.getStackPointer()});
 }
 
 pub fn getAssetsPath(self: *Platform) Error![]const u8 {

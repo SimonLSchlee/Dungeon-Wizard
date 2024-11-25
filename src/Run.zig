@@ -311,18 +311,18 @@ pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
         .room => |r| {
             const room_indices = data.room_kind_tilemaps.get(r.kind);
             const room_idx = room_indices.get(r.idx);
-            const tilemap = data.tilemaps.items[room_idx];
-            const exit_doors = self.makeExitDoors(tilemap);
-            _ = try Room.init(&self.room, .{
+            const exit_doors = self.makeExitDoors(room_idx);
+            const params: Room.InitParams = .{
                 .deck = self.deck,
                 .waves_params = r.waves_params,
-                .tilemap = tilemap,
+                .tilemap_idx = u.as(u32, room_idx),
                 .seed = self.rng.random().int(u64),
                 .exits = exit_doors,
                 .player = self.player_thing,
                 .run_slots = self.slots,
                 .mode = self.mode,
-            });
+            };
+            try self.room.init(&params);
             self.room_exists = true;
             // TODO hacky
             // update once to clear fog
@@ -339,7 +339,9 @@ pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
 
 const TileMap = @import("TileMap.zig");
 
-pub fn makeExitDoors(_: *Run, tilemap: TileMap) std.BoundedArray(gameUI.ExitDoor, 4) {
+pub fn makeExitDoors(_: *Run, tilemap_idx: usize) std.BoundedArray(gameUI.ExitDoor, 4) {
+    const data = App.get().data;
+    const tilemap = &data.tilemaps.items[tilemap_idx];
     var ret = std.BoundedArray(gameUI.ExitDoor, 4){};
     for (tilemap.exits.constSlice()) |pos| {
         ret.append(.{ .pos = pos }) catch unreachable;
@@ -453,8 +455,8 @@ pub fn gameUpdate(self: *Run) Error!void {
                 const n: usize = if (num == 0) 9 else num - 1;
                 const test_rooms = app.data.room_kind_tilemaps.getPtr(.testu);
                 if (n < test_rooms.len) {
-                    const tilemap = app.data.tilemaps.items[test_rooms.get(n)];
-                    try room.reloadFromTileMap(tilemap);
+                    const tilemap_idx = u.as(u32, test_rooms.get(n));
+                    try room.reloadFromTileMap(tilemap_idx);
                 }
             }
         }

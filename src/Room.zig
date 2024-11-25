@@ -33,7 +33,7 @@ pub const max_things_in_room = 128;
 pub const ThingBoundedArray = std.BoundedArray(pool.Id, max_things_in_room);
 
 pub const InitParams = struct {
-    tilemap: TileMap,
+    tilemap_idx: u32,
     player: Thing,
     waves_params: WavesParams,
     seed: u64,
@@ -69,16 +69,16 @@ pub const Wave = struct {
 };
 pub const WavesArray = std.BoundedArray(Wave, 8);
 
-fn makeWaves(tilemap: TileMap, rng: std.Random, params: WavesParams) WavesArray {
+fn makeWaves(tilemap: *const TileMap, rng: std.Random, params: WavesParams, array: *WavesArray) void {
     const data = App.get().data;
-    var ret = WavesArray{};
+    array.clear();
     switch (params.room_kind) {
         .first => {
             if (tilemap.wave_spawns.len > 0) {
                 var wave = Wave{};
                 wave.spawns.append(.{ .pos = tilemap.wave_spawns.get(0), .proto = data.creature_protos.get(.dummy) }) catch unreachable;
-                ret.append(wave) catch unreachable;
-                return ret;
+                array.append(wave) catch unreachable;
+                return;
             }
         },
         .boss => {
@@ -131,12 +131,11 @@ fn makeWaves(tilemap: TileMap, rng: std.Random, params: WavesParams) WavesArray 
 
         std.debug.print("  = wave difficulty: {d:.2}\n", .{wave.total_difficulty});
         difficulty_left -= wave.total_difficulty;
-        ret.append(wave) catch unreachable;
+        array.append(wave) catch unreachable;
         if (difficulty_left < params.difficulty_error) break;
     }
 
     std.debug.print("#############\n\n", .{});
-    return ret;
 }
 
 camera: draw.Camera2D = .{},
@@ -185,17 +184,15 @@ rng: std.Random.DefaultPrng = undefined,
 tilemap: TileMap = .{},
 init_params: InitParams,
 
-pub fn init(room: *Room, params: InitParams) Error!*Room {
-    room.* = .{
+pub fn init(self: *Room, params: *const InitParams) Error!void {
+    self.* = .{
         .next_pool_id = 0,
         .fog = try Fog.init(),
-        .init_params = params,
+        .init_params = params.*,
     };
 
     // everything is done except spawning stuff
-    try room.reset();
-
-    return room;
+    try self.reset();
 }
 
 pub fn deinit(self: *Room) void {
@@ -204,7 +201,7 @@ pub fn deinit(self: *Room) void {
 }
 
 fn clearThings(self: *Room) void {
-    self.things = Thing.Pool.init(self.next_pool_id);
+    self.things.init(self.next_pool_id);
     self.next_pool_id += 1;
     self.spawn_queue.len = 0;
     self.free_queue.len = 0;
@@ -216,6 +213,7 @@ fn clearThings(self: *Room) void {
 }
 
 pub fn reset(self: *Room) Error!void {
+    const data = App.get().data;
     self.clearThings();
     self.fog.clearAll();
     self.camera = .{
@@ -230,10 +228,12 @@ pub fn reset(self: *Room) Error!void {
     self.progress_state = .none;
     self.paused = false;
     self.draw_pile = self.init_params.deck;
-    self.tilemap = self.init_params.tilemap;
-    self.waves = makeWaves(self.init_params.tilemap, self.rng.random(), self.init_params.waves_params);
+    const tilemap = &data.tilemaps.items[self.init_params.tilemap_idx];
+    self.tilemap = tilemap.*;
 
-    for (self.init_params.tilemap.creatures.constSlice()) |spawn| {
+    makeWaves(tilemap, self.rng.random(), self.init_params.waves_params, &self.waves);
+
+    for (tilemap.creatures.constSlice()) |spawn| {
         std.debug.print("Room init: spawning a {any}\n", .{spawn.kind});
         if (spawn.kind == .player) {
             self.player_id = try self.queueSpawnThing(&self.init_params.player, spawn.pos);
@@ -242,7 +242,7 @@ pub fn reset(self: *Room) Error!void {
         }
     }
 
-    self.ui_slots = gameUI.Slots.init(self, self.init_params.run_slots);
+    self.ui_slots.init(self, self.init_params.run_slots);
 }
 
 pub fn clone(self: *const Room, out: *Room) Error!void {
@@ -250,8 +250,8 @@ pub fn clone(self: *const Room, out: *Room) Error!void {
     out.fog = try self.fog.clone();
 }
 
-pub fn reloadFromTileMap(self: *Room, tilemap: TileMap) Error!void {
-    self.init_params.tilemap = tilemap;
+pub fn reloadFromTileMap(self: *Room, tilemap_idx: u32) Error!void {
+    self.init_params.tilemap_idx = tilemap_idx;
     try self.reset();
 }
 
