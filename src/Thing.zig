@@ -121,6 +121,7 @@ controller: union(enum) {
     cast_vfx: CastVFXController,
     text_vfx: TextVFXController,
     mana_pickup: ManaPickupController,
+    loop_vfx: LoopVFXController,
 } = .default,
 renderer: union(enum) {
     none: void,
@@ -416,6 +417,62 @@ pub const HurtBox = struct {
                 self.selectable = null;
             }
         }
+    }
+};
+
+pub const LoopVFXController = struct {
+    anim_to_loop: sprites.AnimName = .loop,
+    tint: Colorf = .white,
+    timer: utl.TickCounter = utl.TickCounter.init(core.secsToTicks(2)),
+    state: enum {
+        loop,
+        fade,
+    } = .loop,
+
+    pub fn update(self: *Thing, room: *Room) Error!void {
+        assert(self.spawn_state == .spawned);
+        const controller = &self.controller.loop_vfx;
+
+        _ = self.animator.?.play(controller.anim_to_loop, .{ .loop = true });
+
+        switch (controller.state) {
+            .loop => {
+                if (controller.timer.tick(false)) {
+                    controller.timer = utl.TickCounter.init(core.secsToTicks(1));
+                    controller.state = .fade;
+                }
+            },
+            .fade => {
+                self.renderer.vfx.sprite_tint = controller.tint.fade(1 - controller.timer.remapTo0_1());
+                if (controller.timer.tick(false)) {
+                    self.deferFree(room);
+                }
+            },
+        }
+    }
+    pub fn proto(spritesheet: sprites.VFXAnim.SheetName, anim: sprites.AnimName, lifetime_secs: f32, tint: Colorf, draw_over: bool) Thing {
+        return Thing{
+            .kind = .vfx,
+            .controller = .{ .loop_vfx = .{
+                .anim_to_loop = anim,
+                .timer = utl.TickCounter.init(core.secsToTicks(@max(lifetime_secs - 1, 0))),
+                .tint = tint,
+            } },
+            .renderer = .{
+                .vfx = .{
+                    .draw_normal = !draw_over,
+                    .draw_over = draw_over,
+                },
+            },
+            .animator = .{
+                .kind = .{
+                    .vfx = .{
+                        .sheet_name = spritesheet,
+                    },
+                },
+                .curr_anim = anim,
+            },
+        };
     }
 };
 
