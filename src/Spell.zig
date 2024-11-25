@@ -27,6 +27,7 @@ const menuUI = @import("menuUI.zig");
 const sprites = @import("sprites.zig");
 const ImmUI = @import("ImmUI.zig");
 const Action = @import("Action.zig");
+const Run = @import("Run.zig");
 
 const Spell = @This();
 
@@ -454,7 +455,8 @@ pub fn getSpellWeights(spells: []const Spell) WeightsArray {
     return ret;
 }
 
-pub fn generateRandom(rng: std.Random, mask: Obtainableness.Mask, allow_duplicates: bool, buf: []Spell) usize {
+pub fn generateRandom(rng: std.Random, mask: Obtainableness.Mask, mode: Run.Mode, allow_duplicates: bool, buf: []Spell) usize {
+    _ = mode;
     var num: usize = 0;
     var spell_pool = SpellArray{};
     for (all_spells) |spell| {
@@ -473,12 +475,12 @@ pub fn generateRandom(rng: std.Random, mask: Obtainableness.Mask, allow_duplicat
     return num;
 }
 
-pub fn makeRoomReward(rng: std.Random, buf: []Spell) usize {
-    return generateRandom(rng, Obtainableness.Mask.initOne(.room_reward), false, buf);
+pub fn makeRoomReward(rng: std.Random, mode: Run.Mode, buf: []Spell) usize {
+    return generateRandom(rng, Obtainableness.Mask.initOne(.room_reward), mode, false, buf);
 }
 
-pub fn makeShopSpells(rng: std.Random, buf: []Spell) usize {
-    return generateRandom(rng, Obtainableness.Mask.initOne(.shop), false, buf);
+pub fn makeShopSpells(rng: std.Random, mode: Run.Mode, buf: []Spell) usize {
+    return generateRandom(rng, Obtainableness.Mask.initOne(.shop), mode, false, buf);
 }
 
 pub const Obtainableness = enum {

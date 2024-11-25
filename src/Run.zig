@@ -31,6 +31,8 @@ const ImmUI = @import("ImmUI.zig");
 const sprites = @import("sprites.zig");
 
 pub const Mode = enum {
+    pub const Mask = std.EnumSet(Mode);
+
     frank_4_slot,
     mandy_3_mana,
     crispin_picker,
@@ -329,7 +331,7 @@ pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
         },
         .shop => |s| {
             _ = s.num;
-            self.shop = try Shop.init(self.rng.random().int(u64));
+            self.shop = try Shop.init(self.rng.random().int(u64), self);
             self.screen = .shop;
         },
     }
@@ -352,7 +354,7 @@ pub fn makeRewards(self: *Run, difficulty: f32) void {
     { // spells
         var reward: Reward = .{ .spell_choice = .{} };
         reward.spell_choice.resize(Reward.base_spells) catch unreachable;
-        const num_spells_generated = Spell.makeRoomReward(random, reward.spell_choice.slice());
+        const num_spells_generated = Spell.makeRoomReward(random, self.mode, reward.spell_choice.slice());
         reward.spell_choice.resize(num_spells_generated) catch unreachable;
         reward_ui.rewards.appendAssumeCapacity(reward);
     }
@@ -361,7 +363,7 @@ pub fn makeRewards(self: *Run, difficulty: f32) void {
         if (num_items > 0) {
             var items = std.BoundedArray(Item, Reward.max_items){};
             items.resize(num_items) catch unreachable;
-            const num_items_generated = Item.makeRoomReward(random, items.slice());
+            const num_items_generated = Item.makeRoomReward(random, self.mode, items.slice());
             items.resize(num_items_generated) catch unreachable;
             for (items.constSlice()) |item| {
                 reward_ui.rewards.appendAssumeCapacity(.{ .item = item });
@@ -789,7 +791,7 @@ pub fn shopUpdate(self: *Run) Error!void {
 
     if (debug.enable_debug_controls) {
         if (plat.input_buffer.keyIsJustPressed(.f4)) {
-            _ = try shop.reset();
+            _ = try shop.reset(self);
         }
         if (plat.input_buffer.keyIsJustPressed(.k)) {
             self.gold += 100;

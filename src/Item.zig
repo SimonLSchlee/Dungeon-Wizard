@@ -26,6 +26,7 @@ const Collision = @import("Collision.zig");
 const menuUI = @import("menuUI.zig");
 const sprites = @import("sprites.zig");
 const ImmUI = @import("ImmUI.zig");
+const Run = @import("Run.zig");
 const Spell = @import("Spell.zig");
 const Params = Spell.Params;
 const TargetKind = Spell.TargetKind;
@@ -140,10 +141,81 @@ pub const PotionThorns = struct {
     }
 };
 
+pub const PotionMana = struct {
+    pub const title = "Mana Potion";
+    pub const description =
+        \\Fill mana bar to maximum.
+    ;
+
+    pub const enum_name = "pot_mana";
+    pub const Controllers = [_]type{};
+
+    pub const proto = Item.makeProto(
+        std.meta.stringToEnum(Item.Kind, enum_name).?,
+        .{
+            .color = .green,
+            .obtainable_modes = Run.Mode.Mask.initMany(&.{ .mandy_3_mana, .crispin_picker }),
+            .targeting_data = .{
+                .kind = .self,
+            },
+        },
+    );
+
+    pub fn use(self: *const Item, user: *Thing, room: *Room, params: Params) Error!void {
+        params.validate(.self, user);
+        _ = self;
+        _ = room;
+        if (user.mana) |*mana| {
+            mana.curr = mana.max;
+        }
+    }
+
+    pub fn canUse(_: *const Item, _: *const Room, caster: *const Thing) bool {
+        if (caster.mana) |mana| {
+            return (mana.curr < mana.max);
+        }
+        return false;
+    }
+};
+
+pub const PotionImp = struct {
+    pub const title = "Bottled Imp";
+    pub const description =
+        \\Unbottle a friendly imp.
+    ;
+
+    pub const enum_name = "pot_imp";
+    pub const Controllers = [_]type{};
+
+    pub const proto = Item.makeProto(
+        std.meta.stringToEnum(Item.Kind, enum_name).?,
+        .{
+            .color = .green,
+            .rarity = .interesting,
+            .targeting_data = .{
+                .kind = .pos,
+                .target_mouse_pos = true,
+                .max_range = 150,
+                .show_max_range_ring = true,
+            },
+        },
+    );
+
+    pub fn use(self: *const Item, user: *Thing, room: *Room, params: Params) Error!void {
+        params.validate(.pos, user);
+        _ = self;
+        const target_pos = params.pos;
+        const spawner = Thing.SpawnerController.prototype(.impling);
+        _ = try room.queueSpawnThing(&spawner, target_pos);
+    }
+};
+
 pub const ItemTypes = [_]type{
     PotionHP,
     PotionInvis,
     PotionThorns,
+    PotionMana,
+    PotionImp,
 };
 
 pub const Kind = utl.EnumFromTypes(&ItemTypes, "enum_name");
@@ -258,11 +330,11 @@ pub fn getItemWeights(items: []const Item) WeightsArray {
     return ret;
 }
 
-pub fn generateRandom(rng: std.Random, mask: Obtainableness.Mask, allow_duplicates: bool, buf: []Item) usize {
+pub fn generateRandom(rng: std.Random, mask: Obtainableness.Mask, mode: Run.Mode, allow_duplicates: bool, buf: []Item) usize {
     var num: usize = 0;
     var item_pool = ItemArray{};
     for (all_items) |item| {
-        if (item.obtainableness.intersectWith(mask).count() > 0) {
+        if (item.obtainable_modes.contains(mode) and item.obtainableness.intersectWith(mask).count() > 0) {
             item_pool.append(item) catch unreachable;
         }
     }
@@ -277,17 +349,18 @@ pub fn generateRandom(rng: std.Random, mask: Obtainableness.Mask, allow_duplicat
     return num;
 }
 
-pub fn makeRoomReward(rng: std.Random, buf: []Item) usize {
-    return generateRandom(rng, Obtainableness.Mask.initOne(.room_reward), false, buf);
+pub fn makeRoomReward(rng: std.Random, mode: Run.Mode, buf: []Item) usize {
+    return generateRandom(rng, Obtainableness.Mask.initOne(.room_reward), mode, false, buf);
 }
 
-pub fn makeShopItems(rng: std.Random, buf: []Item) usize {
-    return generateRandom(rng, Obtainableness.Mask.initOne(.shop), false, buf);
+pub fn makeShopItems(rng: std.Random, mode: Run.Mode, buf: []Item) usize {
+    return generateRandom(rng, Obtainableness.Mask.initOne(.shop), mode, false, buf);
 }
 
 kind: KindData = undefined,
 rarity: Rarity = .pedestrian,
 obtainableness: Obtainableness.Mask = Obtainableness.Mask.initMany(&.{ .room_reward, .shop }),
+obtainable_modes: Run.Mode.Mask = Run.Mode.Mask.initFull(),
 color: Colorf = .black,
 targeting_data: TargetingData = .{},
 

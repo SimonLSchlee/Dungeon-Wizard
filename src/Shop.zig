@@ -69,7 +69,7 @@ imm_ui: struct {
     commands: ImmUI.CmdBuf = .{},
 } = .{},
 
-pub fn init(seed: u64) Error!Shop {
+pub fn init(seed: u64, run: *Run) Error!Shop {
     const plat = App.getPlat();
 
     var ret = Shop{
@@ -79,7 +79,7 @@ pub fn init(seed: u64) Error!Shop {
 
     var spells = std.BoundedArray(Spell, max_num_spells){};
     spells.resize(num_spells) catch unreachable;
-    const num_spells_generated = Spell.makeShopSpells(ret.rng.random(), spells.slice());
+    const num_spells_generated = Spell.makeShopSpells(ret.rng.random(), run.mode, spells.slice());
     spells.resize(num_spells_generated) catch unreachable;
     for (spells.constSlice()) |spell| {
         ret.spells.appendAssumeCapacity(.{
@@ -92,7 +92,7 @@ pub fn init(seed: u64) Error!Shop {
 
     var items = std.BoundedArray(Item, max_num_items){};
     items.resize(num_items) catch unreachable;
-    const num_items_generated = Item.makeShopItems(ret.rng.random(), items.slice());
+    const num_items_generated = Item.makeShopItems(ret.rng.random(), run.mode, items.slice());
     items.resize(num_items_generated) catch unreachable;
     for (items.constSlice()) |item| {
         ret.items.appendAssumeCapacity(.{
@@ -111,11 +111,11 @@ pub fn deinit(self: *Shop) void {
     plat.destroyRenderTexture(self.render_texture);
 }
 
-pub fn reset(self: *Shop) Error!*Shop {
+pub fn reset(self: *Shop, run: *Run) Error!*Shop {
     self.deinit();
     var rng = std.Random.DefaultPrng.init(utl.as(u64, std.time.microTimestamp()));
     const seed = rng.random().int(u64);
-    self.* = try init(seed);
+    self.* = try init(seed, run);
     return self;
 }
 
