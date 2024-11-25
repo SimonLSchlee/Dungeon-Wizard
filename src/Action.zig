@@ -348,7 +348,7 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                     if (self.statuses.get(.lit).stacks > 0) {
                         adjusted_amount *= 0.5;
                     }
-                    hp.heal(adjusted_amount);
+                    hp.heal(adjusted_amount, self, room);
                 }
                 r.amount_regened += r.amount_per_sec;
                 if (r.amount_regened >= r.max_regen) {
@@ -356,7 +356,6 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                 }
             }
             self.updateVel(.{}, .{});
-            // TODO another anim? vfx?
             _ = self.animator.?.play(.idle, .{ .loop = true });
         },
     }

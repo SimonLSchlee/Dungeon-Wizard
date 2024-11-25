@@ -61,11 +61,11 @@ pub const PotionHP = struct {
 
     hp_restored_percent: f32 = 30,
 
-    pub fn use(self: *const Item, user: *Thing, _: *Room, params: Params) Error!void {
+    pub fn use(self: *const Item, user: *Thing, room: *Room, params: Params) Error!void {
         params.validate(.self, user);
         const pot_hp = self.kind.pot_hp;
         if (user.hp) |*hp| {
-            hp.heal(hp.max * (pot_hp.hp_restored_percent * 0.01));
+            hp.heal(hp.max * (pot_hp.hp_restored_percent * 0.01), user, room);
         }
     }
 

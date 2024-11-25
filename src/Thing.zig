@@ -208,9 +208,25 @@ pub const HP = struct {
             i += 1;
         }
     }
-    pub fn heal(self: *HP, amount: f32) void {
-        self.curr = @min(self.curr + amount, self.max);
+    pub fn heal(hp: *HP, amount: f32, self: *Thing, room: *Room) void {
+        const amount_healed = @min(amount, hp.max - hp.curr);
+        hp.curr += amount_healed;
+        const proto = Thing.LoopVFXController.proto(
+            .swirlies,
+            .loop,
+            0.8,
+            .green,
+            true,
+        );
+        _ = room.queueSpawnThing(&proto, self.pos) catch {};
+        if (amount_healed > 0) {
+            const str = utl.bufPrintLocal("{d:.0}", .{amount_healed}) catch "";
+            if (str.len > 0) {
+                TextVFXController.spawn(self, str, .green, 1, room) catch {};
+            }
+        }
     }
+
     pub fn addShield(self: *HP, amount: f32, ticks: ?i64) void {
         if (self.shields.len >= self.shields.buffer.len) {
             _ = self.shields.orderedRemove(0);
@@ -222,8 +238,9 @@ pub const HP = struct {
             .timer = if (ticks) |t| utl.TickCounter.init(t) else null,
         }) catch unreachable;
     }
-    pub fn doDamage(self: *HP, amount: f32) f32 {
-        if (amount <= 0) return 0;
+
+    pub fn doDamage(self: *HP, amount: f32, thing: *Thing, room: *Room) void {
+        if (amount <= 0) return;
         var damage_left = amount;
         // damage hits the outermost shield, continuing inwards until it hits the actual current hp
         while (self.shields.len > 0 and damage_left > 0) {
@@ -231,20 +248,23 @@ pub const HP = struct {
             // this shield blocked all the remaining damage
             if (damage_left < last.curr) {
                 last.curr -= damage_left;
-                return 0;
+                return;
             }
             // too much damage - pop the shield and continue
             damage_left -= last.curr;
             _ = self.shields.pop();
         }
-        if (damage_left <= 0) return 0;
+        if (damage_left <= 0) return;
         // shield are all popped
         const final_damage_amount = @min(self.curr, damage_left);
+
+        const str = utl.bufPrintLocal("{d:.0}", .{final_damage_amount}) catch "";
+        if (str.len > 0) {
+            TextVFXController.spawn(thing, str, .red, 1, room) catch {};
+        }
         assert(final_damage_amount > 0);
         self.curr -= final_damage_amount;
         self.total_damage_done += final_damage_amount;
-
-        return final_damage_amount;
     }
 };
 
@@ -350,11 +370,7 @@ pub const HurtBox = struct {
             }
             if (self.hp) |*hp| {
                 const pre_damage_done = hp.total_damage_done;
-                const damage_done = hp.doDamage(damage);
-                const str = utl.bufPrintLocal("{d:.0}", .{damage_done}) catch "";
-                if (str.len > 0) {
-                    TextVFXController.spawn(self, str, .red, 1, room) catch {};
-                }
+                hp.doDamage(damage, self, room);
                 const post_damage_done = hp.total_damage_done;
                 if (room.init_params.mode == .crispin_picker and self.isEnemy()) {
                     const total_manas = @max(@ceil(self.enemy_difficulty * 2.5), 1);
