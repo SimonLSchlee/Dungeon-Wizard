@@ -64,6 +64,7 @@ pub const SpellTypes = blk: {
         @import("spells/BlankMind.zig"),
         @import("spells/ShieldFu.zig"),
         @import("spells/Ignite.zig"),
+        @import("spells/MassIgnite.zig"),
     };
     const nonplayer_spells = @import("spells/nonplayer.zig").spells;
     break :blk player_spells ++ nonplayer_spells; //[player_spells.len + nonplayer_spells.len]
