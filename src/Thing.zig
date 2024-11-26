@@ -744,7 +744,7 @@ pub const ManaPickupController = struct {
         self.updateVel(.{}, .{ .friction = 0.01 });
     }
     pub fn spawnSome(num: usize, pos: V2f, room: *Room) void {
-        const radius = 10;
+        const radius = 14;
         var proto = Thing{
             .kind = .pickup,
             .coll_radius = radius,
@@ -1017,7 +1017,7 @@ pub const CreatureRenderer = struct {
                 plat.rectf(hp_topleft, v2f(hp_width, hp_height), .{ .fill_color = Colorf.black });
                 plat.rectf(hp_topleft, v2f(curr_width, hp_height), .{ .fill_color = HP.faction_colors.get(self.faction) });
                 { // lines
-                    const line_hp_inc: f32 = 10;
+                    const line_hp_inc: f32 = if (hp.max < 100) 10 else 50;
                     var i: f32 = line_hp_inc;
                     while (i < hp.curr) {
                         const line_x = curr_width * (i / hp.curr);
@@ -1052,7 +1052,7 @@ pub const CreatureRenderer = struct {
                     }
                     { // lines
                         const curr_shield_width = utl.remapClampf(0, total_shield_amount, 0, hp_width, curr_shield_amount);
-                        const line_shield_inc: f32 = 10;
+                        const line_shield_inc: f32 = if (total_shield_amount < 100) 10 else 50;
                         var i: f32 = 0;
                         while (i <= curr_shield_amount) {
                             const line_x = curr_shield_width * (i / curr_shield_amount);

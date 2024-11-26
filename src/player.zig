@@ -243,10 +243,7 @@ pub const Controller = struct {
         if (controller.mana_regen) |*mrgn| {
             if (self.mana) |*mana| {
                 if (mana.curr < mrgn.max_threshold) {
-                    if (!mrgn.timer.running) {
-                        mrgn.timer.restart();
-                    }
-                    if (mrgn.timer.tick(false)) {
+                    if (mrgn.timer.tick(true)) {
                         mana.curr += 1;
                     }
                 }
