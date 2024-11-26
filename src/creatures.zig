@@ -109,7 +109,7 @@ pub fn slimeProto() Thing {
 }
 
 pub fn batProto() Thing {
-    var ret = creatureProto(.bat, .bat, .enemy, .{ .aggro = .{} }, 5, .smol, 17);
+    var ret = creatureProto(.bat, .bat, .enemy, .{ .aggro = .{} }, 4, .smol, 17);
     ret.accel_params = .{
         .max_speed = 1.1,
     };
@@ -158,7 +158,7 @@ pub fn trollProto() Thing {
         },
         .cooldown = utl.TickCounter.initStopped(core.secsToTicks(5)),
     });
-    ret.enemy_difficulty = 2.5;
+    ret.enemy_difficulty = 3;
 
     return ret;
 }
@@ -236,7 +236,7 @@ pub fn acolyteProto() Thing {
         } },
         .cooldown = utl.TickCounter.initStopped(5 * core.fups_per_sec),
     });
-    ret.enemy_difficulty = 3;
+    ret.enemy_difficulty = 2.5;
     return ret;
 }
 

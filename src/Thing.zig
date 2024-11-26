@@ -258,7 +258,7 @@ pub const HP = struct {
         // shield are all popped
         const final_damage_amount = @min(self.curr, damage_left);
 
-        const str = utl.bufPrintLocal("{d:.0}", .{final_damage_amount}) catch "";
+        const str = utl.bufPrintLocal("{d:.0}", .{@floor(final_damage_amount)}) catch "";
         if (str.len > 0) {
             TextVFXController.spawn(thing, str, .red, 1, room) catch {};
         }
