@@ -571,6 +571,7 @@ pub const Tag = struct {
         ice_ball,
         arrow_180_CC,
         arrows_opp,
+        mana_crystal,
     };
     pub const Part = union(enum) {
         icon: struct {

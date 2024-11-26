@@ -28,6 +28,8 @@ const player = @import("player.zig");
 const menuUI = @import("menuUI.zig");
 const ImmUI = @import("ImmUI.zig");
 
+const slot_bg_color = Colorf.rgb(0.07, 0.05, 0.05);
+
 pub const max_spell_slots = 6;
 const spell_slot_spacing: f32 = 16;
 
@@ -84,7 +86,7 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, 
             inline else => |k| !std.meta.hasMethod(@TypeOf(k), "canUse") or k.canUse(room, caster),
         },
     };
-    const bg_color = Colorf.rgb(0.07, 0.05, 0.05);
+    const bg_color = slot_bg_color;
     var slot_contents_pos = slot.rect.pos;
     var border_color = Colorf.darkgray;
     var key_color = Colorf.gray;
@@ -321,6 +323,8 @@ pub const Slots = struct {
     selected_method: Options.CastMethod = .left_click,
     discard_slot: ?Slot = null,
     pause_slot: Slot = undefined, // Slots are for player.Action's
+    mana_rect: geom.Rectf = .{},
+    hp_rect: geom.Rectf = .{},
     immui: struct {
         commands: ImmUI.CmdBuf = .{},
     } = .{},
@@ -402,6 +406,19 @@ pub const Slots = struct {
             slot.rect = items_rects.get(i);
             slot.key_rect_pos = slot.rect.pos.sub(V2f.splat(8).scale(ui_scaling));
         }
+
+        // hp and mana above
+        const hp_height: f32 = 45;
+        const hp_topleft = items_rects.get(0).pos.sub(v2f(0, hp_height + 30));
+        self.hp_rect = .{
+            .pos = hp_topleft,
+            .dims = v2f(165, hp_height),
+        };
+        const mana_topleft = hp_topleft.add(v2f(self.hp_rect.dims.x + 15, 0));
+        self.mana_rect = .{
+            .pos = mana_topleft,
+            .dims = v2f(100, hp_height),
+        };
 
         // discard and pause to the right
         {
@@ -611,6 +628,75 @@ pub const Slots = struct {
             self.pause_slot.selection_kind = .selected;
         } else {
             self.pause_slot.selection_kind = null;
+        }
+        {
+            const ui_scaling: f32 = 3;
+            const data = App.get().data;
+            const hp_mana_rect_opt = draw.PolyOpt{
+                .edge_radius = 0.2,
+                .fill_color = slot_bg_color,
+            };
+            const font = data.fonts.get(.pixeloid);
+            const hp_mana_text_opt = draw.TextOpt{
+                .font = font,
+                .size = font.base_size * utl.as(u32, ui_scaling),
+                .smoothing = .none,
+                .color = .white,
+            };
+            try self.immui.commands.append(.{ .rect = .{
+                .pos = self.hp_rect.pos,
+                .dims = self.hp_rect.dims,
+                .opt = hp_mana_rect_opt,
+            } });
+            if (caster.hp) |hp| {
+                const cropped_dims = data.spell_tags_icons.sprite_dims_cropped.?.get(.heart);
+                var curr_pos = self.hp_rect.pos.add(v2f(3, 4).scale(ui_scaling));
+                if (data.spell_tags_icons.getRenderFrame(.heart)) |rf| {
+                    try self.immui.commands.append(.{ .texture = .{
+                        .pos = curr_pos,
+                        .texture = rf.texture,
+                        .opt = .{
+                            .src_dims = cropped_dims,
+                            .src_pos = rf.pos.toV2f(),
+                            .uniform_scaling = ui_scaling,
+                            .tint = .red,
+                        },
+                    } });
+                }
+                curr_pos = curr_pos.add(v2f(cropped_dims.x + 1, -2).scale(ui_scaling));
+                try self.immui.commands.append(.{ .label = .{
+                    .pos = curr_pos,
+                    .text = ImmUI.initLabel(try utl.bufPrintLocal("{d:.0}/{d:.0}", .{ hp.curr, hp.max })),
+                    .opt = hp_mana_text_opt,
+                } });
+            }
+
+            try self.immui.commands.append(.{ .rect = .{
+                .pos = self.mana_rect.pos,
+                .dims = self.mana_rect.dims,
+                .opt = hp_mana_rect_opt,
+            } });
+            if (caster.mana) |mana| {
+                const cropped_dims = data.spell_tags_icons.sprite_dims_cropped.?.get(.mana_crystal);
+                var curr_pos = self.mana_rect.pos.add(v2f(3, 4).scale(ui_scaling));
+                if (data.spell_tags_icons.getRenderFrame(.mana_crystal)) |rf| {
+                    try self.immui.commands.append(.{ .texture = .{
+                        .pos = curr_pos,
+                        .texture = rf.texture,
+                        .opt = .{
+                            .src_dims = cropped_dims,
+                            .src_pos = rf.pos.toV2f(),
+                            .uniform_scaling = ui_scaling,
+                        },
+                    } });
+                }
+                curr_pos = curr_pos.add(v2f(cropped_dims.x + 1, -2).scale(ui_scaling));
+                try self.immui.commands.append(.{ .label = .{
+                    .pos = curr_pos,
+                    .text = ImmUI.initLabel(try utl.bufPrintLocal("{d:.0}/{d:.0}", .{ mana.curr, mana.max })),
+                    .opt = hp_mana_text_opt,
+                } });
+            }
         }
     }
 
