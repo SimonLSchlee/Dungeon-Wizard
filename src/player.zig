@@ -271,8 +271,10 @@ pub const Controller = struct {
                                 mana.curr -= cost;
                             }
                         }
-                        // always 0 cooldown for draw_immediate
-                        if (spell.draw_immediate) {
+                        if (self.statuses.get(.quickdraw).stacks > 0) {
+                            room.ui_slots.setActionSlotCooldown(slot_idx, .spell, 0);
+                            self.statuses.getPtr(.quickdraw).addStacks(self, -1);
+                        } else if (spell.draw_immediate) {
                             room.ui_slots.setActionSlotCooldown(slot_idx, .spell, 0);
                         } else if (room.init_params.mode == .mandy_3_mana) {
                             // mandy doesn't set cooldowns on the slots until full discard

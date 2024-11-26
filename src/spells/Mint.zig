@@ -41,6 +41,7 @@ pub const proto = Spell.makeProto(
     .{
         .cast_time = .fast,
         .rarity = .interesting,
+        .obtainableness = Spell.Obtainableness.Mask.initEmpty(), // TODO reenable?
         .color = StatusEffect.proto_array.get(.mint).color,
         .targeting_data = .{
             .kind = .pos,

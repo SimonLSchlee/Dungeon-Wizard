@@ -65,9 +65,11 @@ pub const SpellTypes = blk: {
         @import("spells/ShieldFu.zig"),
         @import("spells/Ignite.zig"),
         @import("spells/MassIgnite.zig"),
+        @import("spells/Hmmm.zig"),
+        @import("spells/Switcharoo.zig"),
     };
     const nonplayer_spells = @import("spells/nonplayer.zig").spells;
-    break :blk player_spells ++ nonplayer_spells; //[player_spells.len + nonplayer_spells.len]
+    break :blk player_spells ++ nonplayer_spells;
 };
 
 pub const Kind = utl.EnumFromTypes(&SpellTypes, "enum_name");
@@ -232,6 +234,7 @@ pub const TargetingData = struct {
                 return .{
                     .target_kind = .self,
                     .thing = caster.id,
+                    .pos = caster.pos,
                 };
             },
             .thing => {
@@ -247,6 +250,7 @@ pub const TargetingData = struct {
                             .target_kind = .thing,
                             .face_dir = thing.pos.sub(caster.pos).normalizedChecked() orelse caster.dir,
                             .thing = thing.id,
+                            .pos = thing.pos,
                         };
                     }
                 }
@@ -458,11 +462,10 @@ pub fn getSpellWeights(spells: []const Spell) WeightsArray {
 }
 
 pub fn generateRandom(rng: std.Random, mask: Obtainableness.Mask, mode: Run.Mode, allow_duplicates: bool, buf: []Spell) usize {
-    _ = mode;
     var num: usize = 0;
     var spell_pool = SpellArray{};
     for (all_spells) |spell| {
-        if (spell.obtainableness.intersectWith(mask).count() > 0) {
+        if (spell.obtainable_modes.contains(mode) and spell.obtainableness.intersectWith(mask).count() > 0) {
             spell_pool.append(spell) catch unreachable;
         }
     }
@@ -567,6 +570,7 @@ pub const Tag = struct {
         monster_with_sword,
         ice_ball,
         arrow_180_CC,
+        arrows_opp,
     };
     pub const Part = union(enum) {
         icon: struct {
@@ -609,6 +613,7 @@ pub const cast_time_to_secs = std.EnumArray(CastTime, f32).init(.{
 kind: KindData = undefined,
 rarity: Rarity = .pedestrian,
 obtainableness: Obtainableness.Mask = Obtainableness.Mask.initMany(&.{ .room_reward, .shop }),
+obtainable_modes: Run.Mode.Mask = Run.Mode.Mask.initFull(),
 color: Colorf = .black,
 targeting_data: TargetingData = .{},
 cast_time: CastTime,

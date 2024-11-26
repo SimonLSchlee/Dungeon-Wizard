@@ -22,78 +22,87 @@ const Thing = @import("../Thing.zig");
 const TileMap = @import("../TileMap.zig");
 const StatusEffect = @import("../StatusEffect.zig");
 
+const Collision = @import("../Collision.zig");
 const Spell = @import("../Spell.zig");
 const TargetKind = Spell.TargetKind;
 const TargetingData = Spell.TargetingData;
 const Params = Spell.Params;
 
-pub const title = "Blackmail";
+pub const title = "Switcharoo";
 
-pub const enum_name = "blackmail";
-pub const Controllers = [_]type{};
+pub const enum_name = "switcharoo";
+
+const base_range = 300;
 
 pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
     .{
-        .cast_time = .slow,
-        .mana_cost = Spell.ManaCost.num(2),
-        .obtainableness = Spell.Obtainableness.Mask.initEmpty(), // TODO reenable?
+        .cast_time = .fast,
+        .mana_cost = Spell.ManaCost.num(1),
         .rarity = .interesting,
-        .color = StatusEffect.proto_array.get(.blackmailed).color,
+        .color = StatusEffect.proto_array.get(.mint).color,
         .targeting_data = .{
             .kind = .thing,
-            .target_faction_mask = Thing.Faction.Mask.initOne(.enemy),
-            .max_range = 400,
+            .target_faction_mask = Thing.Faction.Mask.initMany(&.{ .ally, .bezerk, .enemy, .neutral }),
+            .max_range = base_range,
+            .ray_to_mouse = .{},
             .show_max_range_ring = true,
         },
     },
 );
 
-num_stacks: i32 = 7,
+hit_effect: Thing.HitEffect = .{
+    .damage = 5,
+},
 
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
     params.validate(.thing, caster);
+    const switcharoo = self.kind.switcharoo;
+    const target_pos = params.pos;
+    const caster_pos = caster.pos;
+    caster.pos = target_pos;
 
-    const _target = room.getThingById(params.thing.?);
-    if (_target == null) {
-        // fizzle
-        return;
+    if (room.getThingById(params.thing.?)) |target| {
+        target.pos = caster_pos;
+        if (target.hurtbox) |*hurtbox| {
+            hurtbox.hit(target, room, switcharoo.hit_effect, caster);
+        }
     }
-    const target = _target.?;
-    const blackmail = self.kind.blackmail;
-    target.faction = .ally;
-    target.statuses.getPtr(.blackmailed).setStacks(caster, blackmail.num_stacks);
 }
 
 pub const description =
-    \\Intimidate an enemy into becoming
-    \\your ally. For a while, at least.
+    \\Switch your position with another
+    \\creature. The creature takes
+    \\damage.
 ;
+
 pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
-    const blackmail: @This() = self.kind.blackmail;
+    const switcharoo: @This() = self.kind.switcharoo;
     const fmt =
-        \\Duration: {} secs
+        \\Damage: {}
         \\
         \\{s}
         \\
     ;
-    const dur_secs: i32 = blackmail.num_stacks * utl.as(i32, @divFloor(StatusEffect.proto_array.get(.blackmailed).cooldown.num_ticks, core.fups_per_sec));
-    return std.fmt.bufPrint(buf, fmt, .{ dur_secs, description });
+    const damage: i32 = utl.as(i32, switcharoo.hit_effect.damage);
+    return std.fmt.bufPrint(buf, fmt ++ "\n", .{ damage, description });
 }
 
 pub fn getTags(self: *const Spell) Spell.Tag.Array {
-    const blackmail: @This() = self.kind.blackmail;
-    _ = blackmail;
-    //const damage_str = utl.bufPrintLocal("{d:.0}", .{blackmail.hit_effect.damage}) catch "";
+    const switcharoo: @This() = self.kind.switcharoo;
     return Spell.Tag.makeArray(&.{
         &.{
             .{ .icon = .{ .sprite_enum = .target } },
             .{ .icon = .{ .sprite_enum = .skull } },
         },
         &.{
-            .{ .icon = .{ .sprite_enum = .ouchy_skull } },
-            .{ .icon = .{ .sprite_enum = .heart, .tint = Colorf.rgb(1, 0.4, 0.6) } },
             .{ .icon = .{ .sprite_enum = .wizard, .tint = .orange } },
+            .{ .icon = .{ .sprite_enum = .arrows_opp } },
+            .{ .icon = .{ .sprite_enum = .ouchy_skull } },
+        },
+        &.{
+            .{ .icon = .{ .sprite_enum = .magic } },
+            .{ .label = Spell.Tag.fmtLabel("{d:.0}", .{switcharoo.hit_effect.damage}) },
         },
     });
 }

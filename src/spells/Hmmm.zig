@@ -27,50 +27,63 @@ const TargetKind = Spell.TargetKind;
 const TargetingData = Spell.TargetingData;
 const Params = Spell.Params;
 
-pub const title = "Protec";
+pub const title = "Hmmm";
 
-pub const enum_name = "protec";
-pub const Controllers = [_]type{};
+pub const enum_name = "hmmm";
 
 pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
     .{
+        .rarity = .interesting,
         .cast_time = .fast,
-        .obtainableness = Spell.Obtainableness.Mask.initEmpty(), // TODO reenable?
         .color = StatusEffect.proto_array.get(.protected).color,
         .targeting_data = .{
             .kind = .self,
         },
+        .draw_immediate = true,
     },
 );
 
-num_stacks: i32 = 1,
-max_stacks: i32 = 5,
+stacks: i32 = 2,
 
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
     params.validate(.self, caster);
-    const protec: @This() = self.kind.protec;
-    caster.statuses.getPtr(.protected).addStacks(caster, protec.num_stacks);
-
+    const hmmm: @This() = self.kind.hmmm;
+    caster.statuses.getPtr(.quickdraw).addStacks(caster, hmmm.stacks);
     _ = room;
 }
 
 pub const description =
-    \\Conjure a personal shield
-    \\that renders you invulnerable
-    \\to the next hit.
+    \\The next 2 spells are drawn
+    \\instantly.
+    \\Draw next spell immediately.
 ;
 
 pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
-    const protec: @This() = self.kind.protec;
+    const hmmm: @This() = self.kind.hmmm;
+    _ = hmmm;
     const fmt =
-        \\Duration: {} secs
-        \\
         \\{s}
-        \\Stacks up to {} times.
         \\
     ;
-    const dur_secs: i32 = protec.num_stacks * utl.as(i32, @divFloor(StatusEffect.proto_array.get(.protected).cooldown.num_ticks, core.fups_per_sec));
-    const b = try std.fmt.bufPrint(buf, fmt, .{ dur_secs, description, protec.max_stacks });
+
+    const b = try std.fmt.bufPrint(buf, fmt, .{description});
     return b;
+}
+
+pub fn getTags(self: *const Spell) Spell.Tag.Array {
+    const hmmm: @This() = self.kind.hmmm;
+    _ = hmmm;
+    return Spell.Tag.makeArray(&.{
+        &.{
+            .{ .icon = .{ .sprite_enum = .target } },
+            .{ .icon = .{ .sprite_enum = .wizard, .tint = .orange } },
+        },
+        &.{
+            .{ .icon = .{ .sprite_enum = .fast_forward } },
+            .{ .icon = .{ .sprite_enum = .card } },
+            .{ .icon = .{ .sprite_enum = .card } },
+            .{ .icon = .{ .sprite_enum = .card } },
+        },
+    });
 }

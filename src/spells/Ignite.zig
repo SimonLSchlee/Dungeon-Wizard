@@ -115,13 +115,15 @@ pub fn getTags(self: *const Spell) Spell.Tag.Array {
             .{ .icon = .{ .sprite_enum = .fire } },
         },
         &.{
-            .{ .label = Spell.Tag.Label.fromSlice("?") catch unreachable },
-            .{ .icon = .{ .sprite_enum = .fire } },
-            .{ .icon = .{ .sprite_enum = .arrow_right } },
-            .{ .icon = .{ .sprite_enum = .spiral, .tint = draw.Coloru.rgb(255, 235, 147).toColorf() } },
-            .{ .icon = .{ .sprite_enum = .ouchy_skull } },
+            .{ .label = Spell.Tag.Label.fromSlice("Bonus:") catch unreachable },
+        },
+        &.{
             .{ .icon = .{ .sprite_enum = .fire } },
             .{ .label = Spell.Tag.fmtLabel("{d:.0}", .{ignite.bonus_hit_effect.damage}) },
+        },
+        &.{
+            .{ .icon = .{ .sprite_enum = .spiral, .tint = draw.Coloru.rgb(255, 235, 147).toColorf() } },
+            .{ .icon = .{ .sprite_enum = .ouchy_skull } },
         },
     });
 }

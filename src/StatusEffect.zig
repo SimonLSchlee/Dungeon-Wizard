@@ -108,6 +108,12 @@ const protos = [_]ComptimeProto{
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(1, 0.2, 0),
     },
+    .{
+        .enum_name = "quickdraw",
+        .cd = 0,
+        .cd_type = .no_cd,
+        .color = Colorf.rgb(0.7, 0.7, 0.5),
+    },
 };
 
 const Kind = blk: {
