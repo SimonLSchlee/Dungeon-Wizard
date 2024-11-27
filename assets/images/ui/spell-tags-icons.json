@@ -268,6 +268,87 @@
     "spriteSourceSize": { "x": 0, "y": 0, "w": 7, "h": 7 },
     "sourceSize": { "w": 7, "h": 7 },
     "duration": 100
+   },
+   {
+    "filename": "blood_splat  0",
+    "frame": { "x": 0, "y": 210, "w": 7, "h": 7 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 7, "h": 7 },
+    "sourceSize": { "w": 7, "h": 7 },
+    "duration": 100
+   },
+   {
+    "filename": "magic_eye  0",
+    "frame": { "x": 0, "y": 217, "w": 7, "h": 7 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 7, "h": 7 },
+    "sourceSize": { "w": 7, "h": 7 },
+    "duration": 100
+   },
+   {
+    "filename": "ouchy_heart  0",
+    "frame": { "x": 0, "y": 224, "w": 7, "h": 7 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 7, "h": 7 },
+    "sourceSize": { "w": 7, "h": 7 },
+    "duration": 100
+   },
+   {
+    "filename": "coin  0",
+    "frame": { "x": 0, "y": 231, "w": 7, "h": 7 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 7, "h": 7 },
+    "sourceSize": { "w": 7, "h": 7 },
+    "duration": 100
+   },
+   {
+    "filename": "wizard_inverse  0",
+    "frame": { "x": 0, "y": 238, "w": 7, "h": 7 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 7, "h": 7 },
+    "sourceSize": { "w": 7, "h": 7 },
+    "duration": 100
+   },
+   {
+    "filename": "spiky  0",
+    "frame": { "x": 0, "y": 245, "w": 7, "h": 7 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 7, "h": 7 },
+    "sourceSize": { "w": 7, "h": 7 },
+    "duration": 100
+   },
+   {
+    "filename": "burn  0",
+    "frame": { "x": 0, "y": 252, "w": 7, "h": 7 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 7, "h": 7 },
+    "sourceSize": { "w": 7, "h": 7 },
+    "duration": 100
+   },
+   {
+    "filename": "trailblaze  0",
+    "frame": { "x": 0, "y": 259, "w": 7, "h": 7 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 7, "h": 7 },
+    "sourceSize": { "w": 7, "h": 7 },
+    "duration": 100
+   },
+   {
+    "filename": "draw_card  0",
+    "frame": { "x": 0, "y": 266, "w": 7, "h": 7 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 7, "h": 7 },
+    "sourceSize": { "w": 7, "h": 7 },
+    "duration": 100
    }
  ],
  "meta": {
@@ -275,7 +356,7 @@
   "version": "1.3.6-arm64",
   "image": "spell-tags-icons.png",
   "format": "RGBA8888",
-  "size": { "w": 7, "h": 210 },
+  "size": { "w": 7, "h": 273 },
   "scale": "1",
   "frameTags": [
    { "name": "target", "from": 0, "to": 0, "direction": "forward", "color": "#000000ff" },
@@ -307,10 +388,20 @@
    { "name": "ice_ball", "from": 26, "to": 26, "direction": "forward", "color": "#000000ff" },
    { "name": "arrow_180_CC", "from": 27, "to": 27, "direction": "forward", "color": "#000000ff" },
    { "name": "arrows_opp", "from": 28, "to": 28, "direction": "forward", "color": "#000000ff" },
-   { "name": "mana_crystal", "from": 29, "to": 29, "direction": "forward", "color": "#000000ff" }
+   { "name": "mana_crystal", "from": 29, "to": 29, "direction": "forward", "color": "#000000ff" },
+   { "name": "blood_splat", "from": 30, "to": 30, "direction": "forward", "color": "#000000ff" },
+   { "name": "magic_eye", "from": 31, "to": 31, "direction": "forward", "color": "#000000ff" },
+   { "name": "ouchy_heart", "from": 32, "to": 32, "direction": "forward", "color": "#000000ff" },
+   { "name": "coin", "from": 33, "to": 33, "direction": "forward", "color": "#000000ff" },
+   { "name": "wizard_inverse", "from": 34, "to": 34, "direction": "forward", "color": "#000000ff" },
+   { "name": "spiky", "from": 35, "to": 35, "direction": "forward", "color": "#000000ff" },
+   { "name": "burn", "from": 36, "to": 36, "direction": "forward", "color": "#000000ff" },
+   { "name": "trailblaze", "from": 37, "to": 37, "direction": "forward", "color": "#000000ff" },
+   { "name": "draw_card", "from": 38, "to": 38, "direction": "forward", "color": "#000000ff" }
   ],
   "layers": [
    { "name": "icon", "opacity": 255, "blendMode": "normal" },
+   { "name": "Layer 3", "opacity": 255, "blendMode": "normal" },
    { "name": "mask", "opacity": 255, "blendMode": "normal" }
   ],
   "slices": [

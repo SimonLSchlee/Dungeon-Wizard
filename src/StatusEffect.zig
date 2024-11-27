@@ -94,7 +94,7 @@ const protos = [_]ComptimeProto{
         .cd = 4 * core.fups_per_sec,
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(1, 0.5, 0),
-        .max_stacks = 4,
+        .max_stacks = 3,
     },
     .{
         .enum_name = "moist",
@@ -116,7 +116,7 @@ const protos = [_]ComptimeProto{
     },
 };
 
-const Kind = blk: {
+pub const Kind = blk: {
     var fields: [protos.len]std.builtin.Type.EnumField = undefined;
     for (protos, 0..) |p, i| {
         fields[i] = .{
@@ -188,6 +188,15 @@ pub fn setStacks(self: *StatusEffect, thing: *Thing, num: i32) void {
 
 pub fn addStacks(self: *StatusEffect, thing: *Thing, num: i32) void {
     self.setStacks(thing, self.stacks + num);
+}
+
+pub fn getDurationSeconds(kind: Kind, stacks: i32) ?f32 {
+    const status = proto_array.get(kind);
+    return switch (status.cd_type) {
+        .remove_one_stack => utl.as(f32, stacks) * utl.as(f32, @divFloor(status.cooldown.num_ticks, core.fups_per_sec)),
+        .remove_all_stacks => core.fups_to_secsf(status.cooldown.num_ticks),
+        .no_cd => null,
+    };
 }
 
 pub fn update(status: *StatusEffect, thing: *Thing, room: *Room) Error!void {

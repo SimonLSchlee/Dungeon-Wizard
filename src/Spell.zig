@@ -28,6 +28,7 @@ const sprites = @import("sprites.zig");
 const ImmUI = @import("ImmUI.zig");
 const Action = @import("Action.zig");
 const Run = @import("Run.zig");
+const StatusEffect = @import("StatusEffect.zig");
 
 const Spell = @This();
 
@@ -541,6 +542,7 @@ pub const ManaCost = union(enum) {
 pub const Tag = struct {
     pub const Array = std.BoundedArray(Tag, 16);
     pub const Label = utl.BoundedString(8);
+    pub const Desc = utl.BoundedString(64);
     pub const SpriteEnum = enum {
         target,
         skull,
@@ -572,6 +574,15 @@ pub const Tag = struct {
         arrow_180_CC,
         arrows_opp,
         mana_crystal,
+        blood_splat,
+        magic_eye,
+        ouchy_heart,
+        coin,
+        wizard_inverse,
+        spiky,
+        burn,
+        trailblaze,
+        draw_card,
     };
     pub const Part = union(enum) {
         icon: struct {
@@ -582,7 +593,9 @@ pub const Tag = struct {
     };
     pub const PartArray = std.BoundedArray(Part, 8);
 
+    start_on_new_line: bool = false,
     parts: PartArray = .{},
+    desc: Desc = .{},
 
     pub fn makeArray(grouped_parts: []const []const Spell.Tag.Part) Spell.Tag.Array {
         var ret = Spell.Tag.Array{};
@@ -596,6 +609,159 @@ pub const Tag = struct {
     pub fn fmtLabel(comptime fmt: []const u8, args: anytype) Label {
         const str = utl.bufPrintLocal(fmt, args) catch "E:FMT";
         return Label.fromSlice(str) catch Label.fromSlice("E:OVRFLW") catch unreachable;
+    }
+    pub fn fmtDesc(comptime fmt: []const u8, args: anytype) Desc {
+        const str = utl.bufPrintLocal(fmt, args) catch "ERR:FMT";
+        return Desc.fromSlice(str) catch Desc.fromSlice("ERR:OVRFLW") catch unreachable;
+    }
+    pub fn makeTarget(kind: TargetKind) Tag {
+        var ret = Tag{
+            .start_on_new_line = true,
+            .parts = PartArray.fromSlice(&.{
+                .{ .icon = .{ .sprite_enum = .target } },
+            }) catch unreachable,
+        };
+        switch (kind) {
+            .self => {
+                ret.parts.appendAssumeCapacity(.{ .icon = .{ .sprite_enum = .wizard, .tint = .orange } });
+                ret.desc = fmtDesc("Target: self", .{});
+            },
+            .pos => {
+                ret.parts.appendAssumeCapacity(.{ .icon = .{ .sprite_enum = .mouse } });
+                ret.desc = fmtDesc("Target: point", .{});
+            },
+            .thing => {
+                ret.parts.appendAssumeCapacity(.{ .icon = .{ .sprite_enum = .skull } });
+                ret.desc = fmtDesc("Target: creature", .{});
+            },
+        }
+        return ret;
+    }
+    pub fn makeDamage(kind: Thing.HitEffect.DamageKind, amount: f32, aoe_hits_allies: bool) Tag {
+        const sprite: SpriteEnum = switch (kind) {
+            .magic => if (aoe_hits_allies) .aoe_magic else .magic,
+            .fire => if (aoe_hits_allies) .aoe_fire else .fire,
+            .ice => if (aoe_hits_allies) .aoe_ice else .icicle,
+            .lightning => if (aoe_hits_allies) .aoe_lightning else .lightning,
+            else => .blood_splat,
+        };
+        return Tag{
+            .parts = PartArray.fromSlice(&.{
+                .{ .icon = .{ .sprite_enum = sprite } },
+                .{ .label = fmtLabel("{d:.0}", .{@floor(amount)}) },
+            }) catch unreachable,
+            .desc = fmtDesc("Deals {d:.0} {s} damage{s}", .{
+                @floor(amount),
+                utl.enumToString(Thing.HitEffect.DamageKind, kind),
+                if (aoe_hits_allies) ". Careful! Damages ALL creatures in the area of effect" else "",
+            }),
+        };
+    }
+    pub fn sEnding(num: i32) []const u8 {
+        if (num > 0) {
+            return "s";
+        }
+        return "";
+    }
+    pub fn makeStatus(kind: StatusEffect.Kind, stacks: i32) Tag {
+        const dur_secs = if (StatusEffect.getDurationSeconds(kind, stacks)) |secs_f| utl.as(i32, @floor(secs_f)) else null;
+        return switch (kind) {
+            .protected => Tag{
+                .parts = PartArray.fromSlice(&.{
+                    .{ .icon = .{ .sprite_enum = .ouchy_skull, .tint = draw.Coloru.rgb(161, 133, 238).toColorf() } },
+                    .{ .label = Spell.Tag.fmtLabel("{} sec{s}", .{ dur_secs.?, sEnding(dur_secs.?) }) },
+                }) catch unreachable,
+                .desc = fmtDesc("Protected: The next enemy attack is blocked", .{}),
+            },
+            .frozen => Tag{
+                .parts = PartArray.fromSlice(&.{
+                    .{ .icon = .{ .sprite_enum = .ice_ball } },
+                    .{ .label = Spell.Tag.fmtLabel("{} sec{s}", .{ dur_secs.?, sEnding(dur_secs.?) }) },
+                }) catch unreachable,
+                .desc = fmtDesc("Frozen: Cannot move or act", .{}),
+            },
+            .blackmailed => Tag{
+                .parts = PartArray.fromSlice(&.{
+                    .{ .icon = .{ .sprite_enum = .ouchy_heart, .tint = Colorf.rgb(1, 0.4, 0.6) } },
+                    .{ .label = Spell.Tag.fmtLabel("{} sec{s}", .{ dur_secs.?, sEnding(dur_secs.?) }) },
+                }) catch unreachable,
+                .desc = fmtDesc("Blackmailed: Fights for the blackmailer", .{}),
+            },
+            .mint => Tag{
+                .parts = PartArray.fromSlice(&.{
+                    .{ .icon = .{ .sprite_enum = .coin } },
+                    .{ .label = Spell.Tag.fmtLabel("{} sec{s}", .{ dur_secs.?, sEnding(dur_secs.?) }) },
+                }) catch unreachable,
+                .desc = fmtDesc("Mint: On death, drops 1 gold per stack", .{}),
+            },
+            .promptitude => Tag{
+                .parts = PartArray.fromSlice(&.{
+                    .{ .icon = .{ .sprite_enum = .fast_forward } },
+                    .{ .label = Spell.Tag.fmtLabel("{} sec{s}", .{ dur_secs.?, sEnding(dur_secs.?) }) },
+                }) catch unreachable,
+                .desc = fmtDesc("Promptitude: Moves and acts at double speed", .{}),
+            },
+            .exposed => Tag{
+                .parts = PartArray.fromSlice(&.{
+                    .{ .icon = .{ .sprite_enum = .magic_eye } },
+                    .{ .label = Spell.Tag.fmtLabel("{} sec{s}", .{ dur_secs.?, sEnding(dur_secs.?) }) },
+                }) catch unreachable,
+                .desc = fmtDesc("Exposed: Takes 30% more damage from all sources", .{}),
+            },
+            .stunned => Tag{
+                .parts = PartArray.fromSlice(&.{
+                    .{ .icon = .{ .sprite_enum = .spiral, .tint = draw.Coloru.rgb(255, 235, 147).toColorf() } },
+                    .{ .label = Spell.Tag.fmtLabel("{} sec{s}", .{ dur_secs.?, sEnding(dur_secs.?) }) },
+                }) catch unreachable,
+                .desc = fmtDesc("Stunned: Cannot move or act", .{}),
+            },
+            .unseeable => Tag{
+                .parts = PartArray.fromSlice(&.{
+                    .{ .icon = .{ .sprite_enum = .wizard_inverse } },
+                    .{ .label = Spell.Tag.fmtLabel("{} sec{s}", .{ dur_secs.?, sEnding(dur_secs.?) }) },
+                }) catch unreachable,
+                .desc = fmtDesc("Unseeable: Ignored by enemies", .{}),
+            },
+            .prickly => Tag{
+                .parts = PartArray.fromSlice(&.{
+                    .{ .icon = .{ .sprite_enum = .spiky } },
+                    .{ .label = Spell.Tag.fmtLabel("{} stack{s}", .{ stacks, sEnding(stacks) }) },
+                }) catch unreachable,
+                .desc = fmtDesc("Prickly: Melee attackers take 1 damage per stack", .{}),
+            },
+            .lit => Tag{
+                .parts = PartArray.fromSlice(&.{
+                    .{ .icon = .{ .sprite_enum = .burn } },
+                    .{ .label = Spell.Tag.fmtLabel("{} stack{s}", .{ stacks, sEnding(stacks) }) },
+                }) catch unreachable,
+                .desc = fmtDesc("Aflame: Take {} damage per second.\nRemove 1 stack every {} seconds.\nMax {} stacks", .{
+                    stacks,
+                    utl.as(i32, @floor(core.fups_to_secsf(StatusEffect.proto_array.get(kind).cooldown.num_ticks))),
+                    StatusEffect.proto_array.get(kind).max_stacks,
+                }),
+            },
+            .moist => Tag{
+                .parts = PartArray.fromSlice(&.{
+                    .{ .icon = .{ .sprite_enum = .wizard_inverse } },
+                    .{ .label = Spell.Tag.fmtLabel("{} sec{s}", .{ dur_secs.?, sEnding(dur_secs.?) }) },
+                }) catch unreachable,
+                .desc = fmtDesc("Moist: Extinguishes \"Aflame\".\nImmune to \"Aflame\"", .{}),
+            },
+            .trailblaze => Tag{
+                .parts = PartArray.fromSlice(&.{
+                    .{ .icon = .{ .sprite_enum = .trailblaze } },
+                    .{ .label = Spell.Tag.fmtLabel("{} sec{s}", .{ dur_secs.?, sEnding(dur_secs.?) }) },
+                }) catch unreachable,
+                .desc = fmtDesc("Trailblazin': Moves faster.\nLeaves behind a trail of fire", .{}),
+            },
+            .quickdraw => Tag{
+                .parts = PartArray.fromSlice(&.{
+                    .{ .icon = .{ .sprite_enum = .draw_card } },
+                    .{ .label = Spell.Tag.fmtLabel("{} stack{s}", .{ stacks, sEnding(stacks) }) },
+                }) catch unreachable,
+                .desc = fmtDesc("Quickdraw: The next {} spells are drawn instantly", .{stacks}),
+            },
+        };
     }
 };
 
@@ -858,7 +1024,7 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caste
                     },
                 }
             }
-            if (curr_tag_topleft.x != tag_topleft.x and curr_tag_topleft.x + width_x > tag_topleft.x + card_tags_dims.x * scaling) {
+            if (curr_tag_topleft.x != tag_topleft.x and (tag.start_on_new_line or curr_tag_topleft.x + width_x > tag_topleft.x + card_tags_dims.x * scaling)) {
                 curr_tag_topleft.y += (9 + 1) * scaling; // TODO put somewhere
                 curr_tag_topleft.x = tag_topleft.x;
             }
