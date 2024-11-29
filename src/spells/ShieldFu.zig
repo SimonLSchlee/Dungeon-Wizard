@@ -78,10 +78,6 @@ pub fn getTags(self: *const Spell) Spell.Tag.Array {
     const shield_fu: @This() = self.kind.shield_fu;
     return Spell.Tag.makeArray(&.{
         &.{
-            .{ .icon = .{ .sprite_enum = .target } },
-            .{ .icon = .{ .sprite_enum = .wizard, .tint = .orange } },
-        },
-        &.{
             .{ .icon = .{ .sprite_enum = .shield_empty } },
             .{ .label = Spell.Tag.fmtLabel("{d:.0}", .{shield_fu.shield_amount}) },
         },

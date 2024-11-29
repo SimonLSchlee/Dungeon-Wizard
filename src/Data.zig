@@ -23,6 +23,7 @@ const Item = @import("Item.zig");
 const player = @import("player.zig");
 const TileMap = @import("TileMap.zig");
 const creatures = @import("creatures.zig");
+const icon_text = @import("icon_text.zig");
 const Data = @This();
 
 pub const TileSet = struct {
@@ -310,6 +311,7 @@ spell_icons: EnumSpriteSheet(Spell.Kind),
 item_icons: EnumSpriteSheet(Item.Kind),
 misc_icons: EnumSpriteSheet(MiscIcon),
 spell_tags_icons: EnumSpriteSheet(Spell.Tag.SpriteEnum),
+text_icons: EnumSpriteSheet(icon_text.Icon),
 card_sprites: EnumSpriteSheet(Spell.CardSpriteEnum),
 card_mana_cost: EnumSpriteSheet(Spell.ManaCost.SpriteEnum),
 sounds: std.EnumArray(SFX, ?Platform.Sound),
@@ -641,6 +643,7 @@ pub fn loadSpriteSheets(self: *Data) Error!void {
     self.misc_icons = try @TypeOf(self.misc_icons).init(try loadSpriteSheetFromJsonPath("images/ui", "misc-icons.json"));
     self.spell_icons = try @TypeOf(self.spell_icons).init(try loadSpriteSheetFromJsonPath("images/ui", "spell-icons.json"));
     self.spell_tags_icons = try @TypeOf(self.spell_tags_icons).initCropped(try loadSpriteSheetFromJsonPath("images/ui", "spell-tags-icons.json"), .magenta);
+    self.text_icons = try @TypeOf(self.text_icons).initCropped(try loadSpriteSheetFromJsonPath("images/ui", "small_text_icons.json"), .magenta);
     self.card_sprites = try @TypeOf(self.card_sprites).init(try loadSpriteSheetFromJsonPath("images/ui", "card.json"));
     self.card_mana_cost = try @TypeOf(self.card_mana_cost).init(try loadSpriteSheetFromJsonPath("images/ui", "card-mana-cost.json"));
 }

@@ -160,32 +160,17 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
 
 pub const description =
     \\This little fish never misses!
-    \\Just point and click. Does
-    \\fish-type damage, of course.
+    \\Just point and click.
 ;
 
-pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
-    const unherring: @This() = self.kind.unherring;
-    const fmt =
-        \\Damage: {}
-        \\
-        \\{s}
-        \\
-    ;
-    const damage: i32 = utl.as(i32, unherring.hit_effect.damage);
-    return std.fmt.bufPrint(buf, fmt, .{ damage, description });
+pub fn getFlavor(self: *const Spell) []const u8 {
+    _ = self;
+    return description;
 }
 
-pub fn getTags(self: *const Spell) Spell.Tag.Array {
+pub fn getNewTags(self: *const Spell) Error!Spell.NewTag.Array {
     const unherring: @This() = self.kind.unherring;
-    return Spell.Tag.makeArray(&.{
-        &.{
-            .{ .icon = .{ .sprite_enum = .target } },
-            .{ .icon = .{ .sprite_enum = .skull } },
-        },
-        &.{
-            .{ .icon = .{ .sprite_enum = .magic } },
-            .{ .label = Spell.Tag.fmtLabel("{d:.0}", .{unherring.hit_effect.damage}) },
-        },
-    });
+    return Spell.NewTag.Array.fromSlice(&.{
+        try Spell.NewTag.makeDamage(.magic, unherring.hit_effect.damage, false),
+    }) catch unreachable;
 }

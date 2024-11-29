@@ -188,7 +188,7 @@ pub fn getTags(self: *const Spell) Spell.Tag.Array {
             .{ .label = Spell.Tag.fmtLabel("{d:.0}", .{zap_dash.end_hit_effect.damage}) },
         },
         &.{
-            .{ .icon = .{ .sprite_enum = .spiral, .tint = draw.Coloru.rgb(255, 235, 147).toColorf() } },
+            .{ .icon = .{ .sprite_enum = .spiral_yellow } },
             .{ .icon = .{ .sprite_enum = .ouchy_skull } },
         },
     });

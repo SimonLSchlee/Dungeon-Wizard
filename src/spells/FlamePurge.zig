@@ -21,6 +21,7 @@ const Room = @import("../Room.zig");
 const Thing = @import("../Thing.zig");
 const TileMap = @import("../TileMap.zig");
 const StatusEffect = @import("../StatusEffect.zig");
+const icon_text = @import("../icon_text.zig");
 
 const Collision = @import("../Collision.zig");
 const Spell = @import("../Spell.zig");
@@ -50,10 +51,11 @@ pub const proto = Spell.makeProto(
 );
 
 explode_hit_effect: Thing.HitEffect = .{
-    .damage = 8,
+    .damage = 6,
     .status_stacks = StatusEffect.StacksArray.initDefault(0, .{ .lit = 1 }),
     .force = .{ .from_center = 4 },
 },
+bonus_damage_per_lit: f32 = 2,
 explode_radius: f32 = base_explode_radius,
 immune_stacks: i32 = 3,
 
@@ -86,7 +88,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     caster_lit_status.stacks = 0;
     var updated_hit_effect = flame_purge.explode_hit_effect;
     updated_hit_effect.status_stacks.getPtr(.lit).* += transferred_stacks;
-    updated_hit_effect.damage += utl.as(f32, transferred_stacks) * 2;
+    updated_hit_effect.damage += utl.as(f32, transferred_stacks) * flame_purge.bonus_damage_per_lit;
 
     const ball = Thing{
         .kind = .projectile,
@@ -119,41 +121,31 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
 
 pub const description =
     \\Fire explodes outwards from you,
-    \\setting alight surrounding enemies
-    \\and pushing them away.
-    \\If you are already on fire, your
-    \\'lit' stacks transfer onto all
-    \\affected by the blast.
+    \\knocking back surrounding enemies.
+    \\Transfer your lit stacks to enemies.
+    \\You are moistened by the experience.
 ;
 
-pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
-    const flame_purge: @This() = self.kind.flame_purge;
-    const fmt =
-        \\Lit stacks transferred: 1 + any more you have
-        \\Damage: {} + 2 per lit stack transferred
-        \\
-        \\{s}
-        \\Leaves  you 'moist' (immune to lit) for {d:.1}
-        \\seconds
-        \\
-    ;
-    return std.fmt.bufPrint(buf, fmt, .{ flame_purge.explode_hit_effect.damage, description, flame_purge.immune_stacks });
+pub fn getFlavor(self: *const Spell) []const u8 {
+    _ = self;
+    return description;
 }
 
-pub fn getTags(self: *const Spell) Spell.Tag.Array {
+pub fn getNewTags(self: *const Spell) Error!Spell.NewTag.Array {
+    var buf: [64]u8 = undefined;
     const flame_purge: @This() = self.kind.flame_purge;
-    return Spell.Tag.makeArray(&.{
-        &.{
-            .{ .icon = .{ .sprite_enum = .target } },
-            .{ .icon = .{ .sprite_enum = .wizard, .tint = .orange } },
+    return Spell.NewTag.Array.fromSlice(&.{
+        try Spell.NewTag.makeDamage(.fire, flame_purge.explode_hit_effect.damage, false),
+        try Spell.NewTag.makeStatus(.moist, flame_purge.immune_stacks),
+        .{
+            .card_label = try Spell.NewTag.CardLabel.fromSlice(
+                try std.fmt.bufPrint(&buf, "Bonus/{any}:", .{icon_text.Icon.burn}),
+            ),
+            .tooltip_label = try Spell.NewTag.TooltipLabel.fromSlice(
+                try std.fmt.bufPrint(&buf, "Bonus per {any}lit:", .{icon_text.Icon.burn}),
+            ),
         },
-        &.{
-            .{ .icon = .{ .sprite_enum = .water } },
-            .{ .icon = .{ .sprite_enum = .wizard, .tint = .orange } },
-        },
-        &.{
-            .{ .icon = .{ .sprite_enum = .aoe_fire } },
-            .{ .label = Spell.Tag.fmtLabel("{d:.0}", .{flame_purge.explode_hit_effect.damage}) },
-        },
-    });
+        try Spell.NewTag.makeStatus(.lit, 1),
+        try Spell.NewTag.makeDamage(.fire, flame_purge.bonus_damage_per_lit, false),
+    }) catch unreachable;
 }

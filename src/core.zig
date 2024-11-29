@@ -16,6 +16,8 @@ pub const Error = error{
     RecompileFail,
     FileSystemFail,
     ParseFail,
+    EncodingFail,
+    DecodingFail,
 };
 
 pub const Key = enum(u32) {

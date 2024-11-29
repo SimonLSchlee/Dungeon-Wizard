@@ -23,96 +23,126 @@ const TileMap = @import("TileMap.zig");
 const data = @import("data.zig");
 const Thing = @import("Thing.zig");
 const sprites = @import("sprites.zig");
-
+const icon_text = @import("icon_text.zig");
 const Spell = @import("Spell.zig");
+const ImmUI = @import("ImmUI.zig");
+const tooltip = @import("tooltip.zig");
 
-const ComptimeProto = struct {
+const Proto = struct {
     enum_name: [:0]const u8,
+    name: []const u8,
     cd: i64,
     cd_type: CdType,
     color: Colorf,
     max_stacks: i32 = 9999,
+    icon: icon_text.Icon,
 };
 
-const protos = [_]ComptimeProto{
+const protos = [_]Proto{
     .{
         .enum_name = "protected",
+        .name = "Protected",
         .cd = 10 * core.fups_per_sec,
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(0.7, 0.7, 0.4),
+        .icon = .ouchy_skull, // TODO
     },
     .{
         .enum_name = "frozen",
+        .name = "Frozen",
         .cd = 1 * core.fups_per_sec,
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(0.3, 0.4, 0.9),
+        .icon = .ice_ball,
     },
     .{
         .enum_name = "blackmailed",
+        .name = "Blackmailed",
         .cd = 1 * core.fups_per_sec,
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(0.6, 0, 0),
+        .icon = .ouchy_heart,
     },
     .{
         .enum_name = "mint",
+        .name = "Mint",
         .cd = 1 * core.fups_per_sec,
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(1.0, 0.9, 0),
+        .icon = .coin,
     },
     .{
         .enum_name = "promptitude",
+        .name = "Promptitude",
         .cd = 1 * core.fups_per_sec,
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(0.95, 0.9, 1.0),
+        .icon = .fast_forward,
     },
     .{
         .enum_name = "exposed",
+        .name = "Exposed",
         .cd = 1 * core.fups_per_sec,
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(0.15, 0.1, 0.2),
+        .icon = .magic_eye,
     },
     .{
         .enum_name = "stunned",
+        .name = "Stunned",
         .cd = 1 * core.fups_per_sec,
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(0.9, 0.8, 0.7),
+        .icon = .spiral_yellow,
     },
     .{
         .enum_name = "unseeable",
+        .name = "Unseeable",
         .cd = 1 * core.fups_per_sec,
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(0.26, 0.55, 0.7),
+        .icon = .wizard_inverse,
     },
     .{
         .enum_name = "prickly",
+        .name = "Prickly",
         .cd = 0,
         .cd_type = .no_cd,
         .color = Colorf.rgb(0.25, 0.55, 0.2),
+        .icon = .spiky,
     },
     .{
         .enum_name = "lit",
+        .name = "Lit",
         .cd = 4 * core.fups_per_sec,
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(1, 0.5, 0),
         .max_stacks = 3,
+        .icon = .burn,
     },
     .{
         .enum_name = "moist",
+        .name = "Moist",
         .cd = 1 * core.fups_per_sec,
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(0.5, 0.8, 1),
+        .icon = .water,
     },
     .{
         .enum_name = "trailblaze",
+        .name = "Trailblaze",
         .cd = 1 * core.fups_per_sec,
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(1, 0.2, 0),
+        .icon = .trailblaze,
     },
     .{
         .enum_name = "quickdraw",
+        .name = "Quickdraw",
         .cd = 0,
         .cd_type = .no_cd,
         .color = Colorf.rgb(0.7, 0.7, 0.5),
+        .icon = .draw_card,
     },
 };
 
@@ -141,7 +171,9 @@ pub const proto_array = blk: {
     for (protos, 0..) |p, i| {
         const kind: Kind = @enumFromInt(i);
         ret.set(kind, .{
+            .name = p.name,
             .kind = kind,
+            .icon = p.icon,
             .stacks = 0,
             .cooldown = utl.TickCounter.init(p.cd),
             .cd_type = p.cd_type,
@@ -158,6 +190,8 @@ pub const CdType = enum {
     remove_all_stacks,
 };
 
+name: []const u8, // TODO remove
+icon: icon_text.Icon,
 kind: Kind,
 stacks: i32 = 0,
 cooldown: utl.TickCounter = utl.TickCounter.init(core.fups_per_sec * 1),
@@ -260,4 +294,85 @@ pub fn update(status: *StatusEffect, thing: *Thing, room: *Room) Error!void {
         },
         else => {},
     }
+}
+
+pub fn fmtDesc(buf: []u8, kind: StatusEffect.Kind) Error![]u8 {
+    const status = proto_array.get(kind);
+    return switch (kind) {
+        .protected => try std.fmt.bufPrint(buf, "The next enemy attack is blocked", .{}),
+        .frozen => try std.fmt.bufPrint(buf, "Cannot move or act", .{}),
+        .exposed => try std.fmt.bufPrint(buf, "Takes 30% more damage from all sources", .{}),
+        else => try std.fmt.bufPrint(buf, "<Placeholder for status: {s}>", .{status.name}),
+    };
+}
+
+pub fn fmtLong(buf: []u8, kind: StatusEffect.Kind, stacks: i32) Error![]u8 {
+    const status = proto_array.get(kind);
+    return try icon_text.partsToUtf8(buf, &.{
+        .{ .icon = status.icon },
+        .{ .text = status.name },
+        .{ .text = ": " },
+        .{ .text = try _fmtStacksLong(kind, stacks) },
+    });
+}
+
+pub fn fmtShort(buf: []u8, kind: StatusEffect.Kind, stacks: i32) Error![]u8 {
+    const status = proto_array.get(kind);
+    return try icon_text.partsToUtf8(buf, &.{
+        .{ .icon = status.icon },
+        .{ .text = try _fmtStacksShort(kind, stacks) },
+    });
+}
+
+pub fn fmtName(buf: []u8, kind: StatusEffect.Kind) Error![]u8 {
+    const status = proto_array.get(kind);
+    return try icon_text.partsToUtf8(buf, &.{
+        .{ .icon = status.icon },
+        .{ .text = status.name },
+    });
+}
+
+pub fn getInfos(buf: []tooltip.Info, kind: StatusEffect.Kind) Error![]tooltip.Info {
+    assert(buf.len >= 1);
+    var idx: usize = 0;
+    buf[idx] = .{ .status = kind };
+    idx += 1;
+    switch (kind) {
+        .moist => {
+            assert(buf.len >= 2);
+            buf[idx] = .{ .status = .lit };
+            idx += 1;
+        },
+        else => {},
+    }
+    return buf[0..idx];
+}
+
+inline fn sEnding(num: i32) []const u8 {
+    if (num > 0) {
+        return "s";
+    }
+    return "";
+}
+
+fn _fmtStacksLong(kind: StatusEffect.Kind, stacks: i32) Error![]u8 {
+    const dur_secs = if (StatusEffect.getDurationSeconds(kind, stacks)) |secs_f| utl.as(i32, @floor(secs_f)) else null;
+    return switch (kind) {
+        .lit => try utl.bufPrintLocal("{} stack{s}", .{ stacks, sEnding(stacks) }),
+        else => if (dur_secs) |secs|
+            try utl.bufPrintLocal("{} sec{s}", .{ secs, sEnding(secs) })
+        else
+            try utl.bufPrintLocal("{} stack{s}", .{ stacks, sEnding(stacks) }),
+    };
+}
+
+fn _fmtStacksShort(kind: StatusEffect.Kind, stacks: i32) Error![]u8 {
+    const dur_secs = if (StatusEffect.getDurationSeconds(kind, stacks)) |secs_f| utl.as(i32, @floor(secs_f)) else null;
+    return switch (kind) {
+        .lit => try utl.bufPrintLocal("{}", .{stacks}),
+        else => if (dur_secs) |secs|
+            try utl.bufPrintLocal("{}sec{s}", .{ secs, sEnding(secs) })
+        else
+            try utl.bufPrintLocal("{}", .{stacks}),
+    };
 }

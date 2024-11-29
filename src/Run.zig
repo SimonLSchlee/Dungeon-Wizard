@@ -166,6 +166,9 @@ curr_tick: i64 = 0,
 imm_ui: struct {
     commands: ImmUI.CmdBuf = .{},
 } = .{},
+tooltip_ui: struct {
+    commands: ImmUI.CmdBuf = .{},
+} = .{},
 
 pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
     const plat = getPlat();

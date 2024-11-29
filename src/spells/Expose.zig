@@ -129,40 +129,19 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
 }
 
 pub const description =
-    \\Add "exposed" stacks to enemies in
-    \\a small area. Exposed enemies take
-    \\30% additional damage from all
-    \\sources.
+    \\Bathe enemies in an ouchy
+    \\spotlight.
 ;
-// TODO percentage could change? ^
 
-pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
-    const expose: @This() = self.kind.expose;
-    const fmt =
-        \\Damage: {}
-        \\Duration: {} secs
-        \\
-        \\{s}
-        \\
-    ;
-    const dur_secs: i32 = expose.hit_effect.status_stacks.get(.exposed) * utl.as(i32, @divFloor(StatusEffect.proto_array.get(.exposed).cooldown.num_ticks, core.fups_per_sec));
-    const damage: i32 = utl.as(i32, expose.hit_effect.damage);
-    return std.fmt.bufPrint(buf, fmt, .{ damage, dur_secs, description });
+pub fn getFlavor(self: *const Spell) []const u8 {
+    _ = self;
+    return description;
 }
 
-pub fn getTags(self: *const Spell) Spell.Tag.Array {
+pub fn getNewTags(self: *const Spell) Error!Spell.NewTag.Array {
     const expose: @This() = self.kind.expose;
-    return Spell.Tag.makeArray(&.{
-        &.{
-            .{ .icon = .{ .sprite_enum = .target } },
-            .{ .icon = .{ .sprite_enum = .mouse } },
-        },
-        &.{
-            .{ .icon = .{ .sprite_enum = .aoe_magic } },
-            .{ .label = Spell.Tag.fmtLabel("{d:.0}", .{expose.hit_effect.damage}) },
-        },
-        &.{
-            .{ .icon = .{ .sprite_enum = .ouchy_skull, .tint = draw.Coloru.rgb(161, 133, 238).toColorf() } },
-        },
-    });
+    return Spell.NewTag.Array.fromSlice(&.{
+        try Spell.NewTag.makeDamage(.magic, expose.hit_effect.damage, false),
+        try Spell.NewTag.makeStatus(.exposed, expose.hit_effect.status_stacks.get(.exposed)),
+    }) catch unreachable;
 }

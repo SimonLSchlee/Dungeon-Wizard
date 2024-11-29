@@ -90,6 +90,40 @@ pub fn BoundedPool(MemberType: type, size: usize) type {
             global_pool_id += 1;
         }
 
+        pub const Iterator = struct {
+            pool: *Self,
+            idx: usize = 0,
+            pub fn next(it: *Iterator) ?*MemberType {
+                while (it.idx < it.pool.items.len) {
+                    const ret = &it.pool.items[it.idx];
+                    it.idx += 1;
+                    if (ret.alloc_state != .free) {
+                        return ret;
+                    }
+                }
+                return null;
+            }
+        };
+        pub const ConstIterator = struct {
+            it: Iterator,
+            pub fn next(it: *ConstIterator) ?*const MemberType {
+                return it.next();
+            }
+        };
+
+        pub fn iterator(self: *Self) Iterator {
+            return .{
+                .pool = self,
+                .idx = 0,
+            };
+        }
+
+        pub fn constIterator(self: *const Self) ConstIterator {
+            return .{
+                .it = @constCast(self).iterator(),
+            };
+        }
+
         pub fn alloc(self: *Self) ?*MemberType {
             if (self.next_free) |next_free| {
                 var item = &self.items[next_free];

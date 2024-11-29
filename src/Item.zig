@@ -452,3 +452,10 @@ pub fn renderToolTip(self: *const Item, pos: V2f) Error!void {
     const desc = try self.getDescription();
     return menuUI.renderToolTip(self.getName(), desc, pos);
 }
+
+pub fn unqRenderToolTip(self: *const Item, cmd_buf: *ImmUI.CmdBuf, pos: V2f) Error!void {
+    const scaling: f32 = 3;
+    const name = self.getName();
+    const desc = try self.getDescription();
+    try Spell.unqRenderToolTipWithTags(cmd_buf, pos, name, desc, &.{}, scaling);
+}

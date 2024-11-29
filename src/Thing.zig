@@ -269,6 +269,14 @@ pub const HP = struct {
 };
 
 pub const HitEffect = struct {
+    pub const DamageKind = enum {
+        physical,
+        magic,
+        fire,
+        ice,
+        lightning,
+    };
+    damage_kind: DamageKind = .physical,
     damage: f32 = 1,
     status_stacks: StatusEffect.StacksArray = StatusEffect.StacksArray.initDefault(0, .{}),
     force: union(enum) {

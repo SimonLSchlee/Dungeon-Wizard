@@ -130,6 +130,14 @@ pub const Input = struct {
                         .params = params,
                         .slot_idx = utl.as(i32, slot.idx),
                     };
+                    switch (action) {
+                        .spell => |s| if (self.mana) |*mana| {
+                            if (s.mana_cost.getActualCost(self)) |cost| {
+                                assert(mana.curr >= cost);
+                            }
+                        },
+                        else => {},
+                    }
                     ui_slots.changeSelectedSlotToBuffered();
                 } else if (action == .discard) {
                     controller.action_buffered = Action.Buffered{

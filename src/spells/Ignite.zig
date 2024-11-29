@@ -106,7 +106,7 @@ pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
 
 pub fn getTags(self: *const Spell) Spell.Tag.Array {
     const ignite: @This() = self.kind.ignite;
-    return Spell.Tag.makeArray(&.{
+    var ret = Spell.Tag.makeArray(&.{
         &.{
             .{ .icon = .{ .sprite_enum = .target } },
             .{ .icon = .{ .sprite_enum = .skull } },
@@ -115,15 +115,20 @@ pub fn getTags(self: *const Spell) Spell.Tag.Array {
             .{ .icon = .{ .sprite_enum = .fire } },
         },
         &.{
-            .{ .label = Spell.Tag.Label.fromSlice("Bonus:") catch unreachable },
+            .{ .label = Spell.Tag.Label.fromSlice("Bonus /") catch unreachable },
+            .{ .icon = .{ .sprite_enum = .fire } },
+            .{ .label = Spell.Tag.Label.fromSlice(":") catch unreachable },
         },
         &.{
             .{ .icon = .{ .sprite_enum = .fire } },
             .{ .label = Spell.Tag.fmtLabel("{d:.0}", .{ignite.bonus_hit_effect.damage}) },
         },
         &.{
-            .{ .icon = .{ .sprite_enum = .spiral, .tint = draw.Coloru.rgb(255, 235, 147).toColorf() } },
+            .{ .icon = .{ .sprite_enum = .spiral_yellow } },
             .{ .icon = .{ .sprite_enum = .ouchy_skull } },
         },
     });
+    ret.buffer[2].start_on_new_line = true;
+    ret.buffer[3].start_on_new_line = true;
+    return ret;
 }

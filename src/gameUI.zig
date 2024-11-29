@@ -69,7 +69,7 @@ pub fn getItemsRects() std.BoundedArray(geom.Rectf, max_item_slots) {
 
 // unq == update and queue (render)
 // Handle all updating and rendering of a generic action Slot, returning a CastMethod if it was activated
-pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, room: *Room) Error!?Options.CastMethod {
+pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, room: *Room) Error!?Options.CastMethod {
     const data = App.get().data;
     const plat = getPlat();
     const ui_scaling: f32 = 2;
@@ -203,6 +203,40 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, 
                 },
             },
         }
+        // tooltip
+        if (slot.is_long_hovered) {
+            const tooltip_pos = slot.rect.pos.add(v2f(slot.rect.dims.x, 0));
+            switch (kind_data) {
+                .pause => {
+                    try Spell.unqRenderToolTipWithTags(
+                        tooltip_cmd_buf,
+                        tooltip_pos,
+                        "Pause",
+                        "",
+                        &.{},
+                        3,
+                    );
+                },
+                .action => |a| switch (a) {
+                    .discard => {
+                        try Spell.unqRenderToolTipWithTags(
+                            tooltip_cmd_buf,
+                            tooltip_pos,
+                            "Discard hand",
+                            "",
+                            &.{},
+                            3,
+                        );
+                    },
+                    .spell => |*spell| {
+                        try spell.unqRenderToolTip(tooltip_cmd_buf, tooltip_pos);
+                    },
+                    .item => |*item| {
+                        try item.unqRenderToolTip(tooltip_cmd_buf, tooltip_pos);
+                    },
+                },
+            }
+        }
     }
     if (slot.cooldown_timer) |*timer| {
         // NOTE rn the timers are ticked in updateTimerAndDrawSpell, that's fine...
@@ -326,6 +360,9 @@ pub const Slots = struct {
     mana_rect: geom.Rectf = .{},
     hp_rect: geom.Rectf = .{},
     immui: struct {
+        commands: ImmUI.CmdBuf = .{},
+    } = .{},
+    tooltip_immui: struct {
         commands: ImmUI.CmdBuf = .{},
     } = .{},
 
@@ -591,7 +628,7 @@ pub const Slots = struct {
 
     fn unqActionSlots(self: *Slots, room: *Room, caster: *const Thing, slots: []Slot, action_kind: player.Action.Kind) Error!void {
         for (slots, 0..) |*slot, i| {
-            if (try unqSlot(&self.immui.commands, slot, caster, room)) |cast_method| {
+            if (try unqSlot(&self.immui.commands, &self.tooltip_immui.commands, slot, caster, room)) |cast_method| {
                 self.selectSlot(.action, action_kind, cast_method, i);
             }
         }
@@ -599,6 +636,7 @@ pub const Slots = struct {
 
     pub fn update(self: *Slots, room: *Room, caster: *const Thing) Error!void {
         const plat = getPlat();
+        self.tooltip_immui.commands.clear();
         self.immui.commands.clear();
         // big rect, check ui clicked
         self.immui.commands.append(.{ .rect = .{
@@ -617,11 +655,11 @@ pub const Slots = struct {
         try self.unqActionSlots(room, caster, self.spells.slice(), .spell);
         try self.unqActionSlots(room, caster, self.items.slice(), .item);
         if (self.discard_slot) |*d| {
-            if (try unqSlot(&self.immui.commands, d, caster, room)) |_| {
+            if (try unqSlot(&self.immui.commands, &self.tooltip_immui.commands, d, caster, room)) |_| {
                 self.selectSlot(.action, .discard, .quick_release, 0);
             }
         }
-        if (try unqSlot(&self.immui.commands, &self.pause_slot, caster, room)) |_| {
+        if (try unqSlot(&self.immui.commands, &self.tooltip_immui.commands, &self.pause_slot, caster, room)) |_| {
             room.paused = !room.paused;
         }
         if (room.paused) {
@@ -712,26 +750,6 @@ pub const Slots = struct {
         }
     }
 
-    pub fn renderToolTips(self: *const Slots, slots: []const Slot) Error!void {
-        _ = self;
-        for (slots) |slot| {
-            const pos = slot.rect.pos.add(v2f(slot.rect.dims.x, 0));
-            if (!slot.hover_timer.running) {
-                if (slot.kind) |k| {
-                    switch (k) {
-                        .pause => {},
-                        .action => |a| switch (a) {
-                            .discard => {
-                                // TODO
-                            },
-                            inline else => |inner| try inner.renderToolTip(pos),
-                        },
-                    }
-                }
-            }
-        }
-    }
-
     pub fn render(self: *const Slots, room: *const Room) Error!void {
         const plat = App.getPlat();
 
@@ -750,17 +768,7 @@ pub const Slots = struct {
         }
 
         try ImmUI.render(&self.immui.commands);
-        // tooltips on top of everything
-        if (self.discard_slot) |slot| {
-            if (slot.is_long_hovered) {
-                try menuUI.renderToolTip("Discard hand", "", slot.rect.pos.add(v2f(slot.rect.dims.x, 0)));
-            }
-        }
-        if (self.pause_slot.is_long_hovered) {
-            try menuUI.renderToolTip("Pause", "", self.pause_slot.rect.pos.add(v2f(self.pause_slot.rect.dims.x, 0)));
-        }
-        try self.renderToolTips(self.spells.constSlice());
-        try self.renderToolTips(self.items.constSlice());
+        try ImmUI.render(&self.tooltip_immui.commands);
     }
 };
 

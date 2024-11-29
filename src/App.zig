@@ -32,6 +32,10 @@ pub fn getPlat() *Platform {
     return _plat orelse @panic("_plat not found");
 }
 
+pub fn getData() *Data {
+    return get().data;
+}
+
 _arena: std.heap.ArenaAllocator = undefined,
 arena: std.mem.Allocator = undefined,
 data: *Data = undefined,
