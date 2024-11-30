@@ -56,17 +56,18 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     _ = room;
 }
 
-pub fn getToolTip(self: *const Spell, tt: *Spell.ToolTip) Error!void {
+pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
     const shield_fu: @This() = self.kind.shield_fu;
     const fmt =
         \\Gain {any}{d:.0} shield for {d:.0} seconds.
     ;
-    const desc = try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{
-        StatusEffect.getIcon(.shield),
-        @floor(shield_fu.shield_amount),
-        @floor(shield_fu.duration_secs),
-    });
-    try tt.desc.resize(desc.len);
+    tt.desc = try Spell.Tooltip.Desc.fromSlice(
+        try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{
+            StatusEffect.getIcon(.shield),
+            @floor(shield_fu.shield_amount),
+            @floor(shield_fu.duration_secs),
+        }),
+    );
     tt.infos.appendAssumeCapacity(.{ .status = .shield });
 }
 

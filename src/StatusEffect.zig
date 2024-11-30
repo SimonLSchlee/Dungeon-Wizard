@@ -26,7 +26,7 @@ const sprites = @import("sprites.zig");
 const icon_text = @import("icon_text.zig");
 const Spell = @import("Spell.zig");
 const ImmUI = @import("ImmUI.zig");
-const tooltip = @import("tooltip.zig");
+const Tooltip = @import("Tooltip.zig");
 
 const Proto = struct {
     enum_name: [:0]const u8,
@@ -375,7 +375,7 @@ pub fn fmtName(buf: []u8, kind: StatusEffect.Kind) Error![]u8 {
     });
 }
 
-pub fn getInfos(buf: []tooltip.Info, kind: StatusEffect.Kind) Error![]tooltip.Info {
+pub fn getInfos(buf: []Tooltip.Info, kind: StatusEffect.Kind) Error![]Tooltip.Info {
     assert(buf.len >= 1);
     var idx: usize = 0;
     buf[idx] = .{ .status = kind };

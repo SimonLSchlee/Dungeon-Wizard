@@ -19,6 +19,7 @@ const App = @import("App.zig");
 const getPlat = App.getPlat;
 const sprites = @import("sprites.zig");
 const ImmUI = @import("ImmUI.zig");
+const icon_text = @import("icon_text.zig");
 
 // render text at the right size to fit into a rect, with padding
 pub fn textInRect(topleft: V2f, dims: V2f, rect_opt: draw.PolyOpt, text_padding: V2f, comptime fmt: []const u8, args: anytype, text_opt: draw.TextOpt) Error!void {

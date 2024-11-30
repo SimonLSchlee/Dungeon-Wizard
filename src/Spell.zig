@@ -30,7 +30,7 @@ const Action = @import("Action.zig");
 const Run = @import("Run.zig");
 const StatusEffect = @import("StatusEffect.zig");
 const icon_text = @import("icon_text.zig");
-const tooltip = @import("tooltip.zig");
+pub const Tooltip = @import("Tooltip.zig");
 
 const Spell = @This();
 
@@ -541,24 +541,20 @@ pub const ManaCost = union(enum) {
     }
 };
 
-pub const ToolTip = struct {
-    pub const Desc = utl.BoundedString(256);
-    pub const InfoArr = std.BoundedArray(tooltip.Info, 8);
-
-    infos: InfoArr = .{},
-    desc: Desc = .{},
-};
-
 pub const NewTag = struct {
     pub const Array = std.BoundedArray(NewTag, 8);
     pub const CardLabel = utl.BoundedString(16);
-    pub const TooltipLabel = utl.BoundedString(128);
-    pub const InfoArr = std.BoundedArray(tooltip.Info, 8);
 
     card_label: CardLabel = .{},
-    tooltip_label: TooltipLabel = .{},
-    info_tooltips: InfoArr = .{},
     start_on_new_line: bool = false,
+
+    pub fn fromFmt(comptime fmt: []const u8, args: anytype) NewTag {
+        return .{
+            .card_label = CardLabel.fromSlice(
+                std.fmt.bufPrint(desc_buf[0..16], fmt, args) catch "FMT ERR:TOO LONG",
+            ) catch unreachable,
+        };
+    }
 
     pub fn makeDamage(kind: Thing.Damage.Kind, amount: f32, aoe_hits_allies: bool) Error!NewTag {
         var ret = NewTag{};
@@ -572,8 +568,6 @@ pub const NewTag = struct {
             .fire => {
                 icon = if (aoe_hits_allies) .aoe_fire else .fire;
                 dmg_type_string = "Fire ";
-                ret.info_tooltips.appendAssumeCapacity(.{ .damage = .fire });
-                ret.info_tooltips.appendAssumeCapacity(.{ .status = .lit });
             },
             .ice => {
                 icon = if (aoe_hits_allies) .aoe_ice else .icicle;
@@ -592,28 +586,12 @@ pub const NewTag = struct {
                 .{ .text = try utl.bufPrintLocal("{d:.0}", .{@floor(amount)}) },
             }),
         );
-        ret.tooltip_label = try TooltipLabel.fromSlice(
-            try icon_text.partsToUtf8(&buf, &.{
-                .{ .icon = icon },
-                .{ .text = try utl.bufPrintLocal(
-                    "{d:.0} {s}Damage{s}",
-                    .{
-                        @floor(amount),
-                        dmg_type_string,
-                        if (aoe_hits_allies) "\nDamages ALL creatures in the area of effect" else "",
-                    },
-                ) },
-            }),
-        );
         return ret;
     }
     pub fn makeStatus(kind: StatusEffect.Kind, stacks: i32) Error!NewTag {
         var buf: [64]u8 = undefined;
         var ret = NewTag{};
         ret.card_label = try CardLabel.fromSlice(try StatusEffect.fmtShort(&buf, kind, stacks));
-        ret.tooltip_label = try TooltipLabel.fromSlice(try StatusEffect.fmtLong(&buf, kind, stacks));
-        const info_buf = try StatusEffect.getInfos(&ret.info_tooltips.buffer, kind);
-        try ret.info_tooltips.resize(info_buf.len);
         return ret;
     }
 };
@@ -925,12 +903,12 @@ pub fn getFlavor(self: *const Spell) []const u8 {
     return "";
 }
 
-pub fn getToolTip(self: *const Spell, info: *ToolTip) Error!void {
+pub fn getTooltip(self: *const Spell, info: *Tooltip) Error!void {
     switch (self.kind) {
         inline else => |k| {
             const K = @TypeOf(k);
-            if (std.meta.hasMethod(K, "getToolTip")) {
-                return try K.getToolTip(self, info);
+            if (std.meta.hasMethod(K, "getTooltip")) {
+                return try K.getTooltip(self, info);
             }
         },
     }
@@ -1234,297 +1212,10 @@ pub fn unqRenderTag(tag: *const Tag, cmd_buf: *ImmUI.CmdBuf, pos: V2f, bg_dims: 
     }
 }
 
-pub fn unqRenderToolTip(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f) Error!void {
-    const scaling: f32 = 3;
-    const kind = std.meta.activeTag(self.kind);
-    const name = spell_names.get(kind);
-    const flavor = self.getFlavor();
-    const tags = self.getTags();
-    if (tags.len > 0) {
-        try unqRenderToolTipWithTags(cmd_buf, pos, name, flavor, &tags, scaling);
-    }
-    var tt: ToolTip = .{};
-    try self.getToolTip(&tt);
+pub fn unqRenderTooltip(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, scaling: f32) Error!void {
+    var tt: Tooltip = .{};
+    try self.getTooltip(&tt);
     if (tt.desc.len > 0) {
-        try _unqRenderToolTip(cmd_buf, pos, &tt, 2);
-    }
-}
-
-pub fn unqRenderToolTipWithTags(cmd_buf: *ImmUI.CmdBuf, pos: V2f, title: []const u8, flavor: []const u8, tags: *const Tag.Array, scaling: f32) Error!void {
-    const plat = App.getPlat();
-    const data = App.get().data;
-
-    const title_font = data.fonts.get(.pixeloid);
-    const title_opt = draw.TextOpt{
-        .color = .white,
-        .size = title_font.base_size * utl.as(u32, scaling),
-        .font = title_font,
-        .smoothing = .none,
-    };
-    const title_dims = try plat.measureText(title, title_opt);
-    const flavor_opt = draw.TextOpt{
-        .color = .white,
-        .size = title_font.base_size * utl.as(u32, scaling),
-        .font = title_font,
-        .smoothing = .none,
-    };
-    const tag_desc_font = data.fonts.get(.seven_x_five);
-    const tag_desc_opt = draw.TextOpt{
-        .color = .white,
-        .size = tag_desc_font.base_size * utl.as(u32, scaling),
-        .font = tag_desc_font,
-        .smoothing = .none,
-    };
-    const flavor_dims = try plat.measureText(flavor, flavor_opt);
-    var tag_desc_dimses = std.BoundedArray(V2f, (Tag.Array{}).buffer.len){};
-    // measure le tags
-    var total_tags_dims = V2f{};
-    for (tags.constSlice()) |tag| {
-        // first measure
-        const tag_dims = measureTag(&tag);
-        const tag_dims_scaled = tag_dims.scale(scaling);
-        const tag_desc_dims = try plat.measureText(tag.desc.constSlice(), tag_desc_opt);
-        tag_desc_dimses.appendAssumeCapacity(tag_desc_dims);
-
-        total_tags_dims.y += tag_dims_scaled.y + tag_desc_dims.y + 2 * scaling;
-        total_tags_dims.x = @max(@max(total_tags_dims.x, tag_dims_scaled.x), tag_desc_dims.x);
-    }
-    const content_dims = v2f(
-        @max(@max(title_dims.x, flavor_dims.x), total_tags_dims.x),
-        title_dims.y + total_tags_dims.y + flavor_dims.y + 2 * scaling,
-    );
-    const modal_dims = content_dims.add(v2f(4, 4).scale(scaling));
-
-    var adjusted_pos = pos;
-    const bot_right = adjusted_pos.add(modal_dims);
-    const native_cropped_rect_bot_right = plat.native_rect_cropped_offset.add(plat.native_rect_cropped_dims);
-    if (bot_right.x > native_cropped_rect_bot_right.x) {
-        adjusted_pos.x -= (bot_right.x - native_cropped_rect_bot_right.x);
-    }
-    if (bot_right.y > native_cropped_rect_bot_right.y) {
-        adjusted_pos.y -= (bot_right.y - native_cropped_rect_bot_right.y);
-    }
-    adjusted_pos = adjusted_pos.floor();
-
-    try cmd_buf.append(.{ .rect = .{
-        .pos = adjusted_pos,
-        .dims = modal_dims,
-        .opt = .{
-            .fill_color = Colorf.black.fade(0.9),
-            .edge_radius = 0.2,
-        },
-    } });
-
-    var content_curr_pos = adjusted_pos.add(v2f(2, 2).scale(scaling));
-    try (cmd_buf.append(.{ .label = .{
-        .pos = content_curr_pos,
-        .text = ImmUI.initLabel(title),
-        .opt = title_opt,
-    } }));
-    content_curr_pos.y += title_dims.y + 1 * scaling;
-
-    for (tags.constSlice(), 0..) |*tag, i| {
-        unqRenderTag(tag, cmd_buf, content_curr_pos, null, scaling);
-        content_curr_pos.y += (Tag.height + 1) * scaling;
-        try (cmd_buf.append(.{ .label = .{
-            .pos = content_curr_pos,
-            .text = ImmUI.initLabel(tag.desc.constSlice()),
-            .opt = flavor_opt,
-        } }));
-        content_curr_pos.y += tag_desc_dimses.get(i).y + 1 * scaling;
-    }
-
-    try (cmd_buf.append(.{ .label = .{
-        .pos = content_curr_pos,
-        .text = ImmUI.initLabel(flavor),
-        .opt = flavor_opt,
-    } }));
-}
-
-pub fn unqRenderToolTipWithNewTags(cmd_buf: *ImmUI.CmdBuf, pos: V2f, title: []const u8, desc: []const u8, tags: *const NewTag.Array, scaling: f32) Error!void {
-    const plat = App.getPlat();
-    const data = App.get().data;
-    const padding = V2f.splat(10);
-    const section_spacing: f32 = 10;
-    const tag_line_spacing: f32 = 8;
-    const info_tooltip_spacing: f32 = 0;
-    const with_title = false;
-    var all_tag_infos = NewTag.InfoArr{};
-    for (tags.constSlice()) |tag| {
-        loop: for (tag.info_tooltips.constSlice()) |new_info| {
-            for (all_tag_infos.constSlice()) |info| {
-                if (info.eql(new_info)) {
-                    continue :loop;
-                }
-            }
-            try all_tag_infos.append(new_info);
-        }
-    }
-    const main_font = data.fonts.get(.pixeloid);
-    const desc_dims = icon_text.measureIconText(desc);
-    // measure le infos
-    var tag_dimses = std.BoundedArray(V2f, (NewTag.Array{}).buffer.len){};
-    var total_tags_dims = V2f{};
-    for (tags.constSlice()) |tag| {
-        const tag_dims = icon_text.measureIconText(tag.tooltip_label.constSlice());
-        const tag_dims_scaled = tag_dims.scale(scaling);
-        tag_dimses.appendAssumeCapacity(tag_dims_scaled);
-
-        total_tags_dims.y += tag_dims_scaled.y;
-        total_tags_dims.x = @max(total_tags_dims.x, tag_dims_scaled.x);
-    }
-    total_tags_dims.y += tag_line_spacing * @max(utl.as(f32, tag_dimses.len) - 1, 0);
-
-    var main_content_dims = v2f(
-        @max(desc_dims.x, total_tags_dims.x),
-        total_tags_dims.y + desc_dims.y + 2 * section_spacing,
-    );
-    const main_tooltip_dims = main_content_dims.add(padding.scale(2));
-
-    if (with_title) {
-        const title_opt = draw.TextOpt{
-            .color = .white,
-            .size = main_font.base_size * utl.as(u32, scaling + 1),
-            .font = main_font,
-            .smoothing = .none,
-        };
-        const title_dims = try plat.measureText(title, title_opt);
-        main_content_dims.x = @max(main_content_dims, title_dims.x);
-        main_content_dims.y += title_dims.y;
-    }
-
-    // measure le infos
-    var infos_dimses = std.BoundedArray(V2f, (NewTag.InfoArr{}).buffer.len){};
-    var total_infos_dims = V2f{};
-    for (all_tag_infos.constSlice()) |*info| {
-        const info_dims = tooltip.measureToolTipContent(info);
-        const info_dims_scaled = info_dims.scale(scaling);
-        infos_dimses.appendAssumeCapacity(info_dims_scaled);
-
-        total_infos_dims.y += info_dims_scaled.y + tooltip.tooltip_padding.y * 2;
-        total_infos_dims.x = @max(total_infos_dims.x, info_dims_scaled.x);
-    }
-    total_infos_dims.y += info_tooltip_spacing * @max(utl.as(f32, infos_dimses.len) - 1, 0);
-    total_infos_dims.x += tooltip.tooltip_padding.x * 2;
-
-    const entire_everything_dims = v2f(
-        @max(main_tooltip_dims.x, total_infos_dims.x),
-        main_tooltip_dims.y + if (infos_dimses.len > 0) info_tooltip_spacing + total_infos_dims.y else 0,
-    );
-
-    var adjusted_pos = pos;
-    const bot_right = adjusted_pos.add(entire_everything_dims);
-    const native_cropped_rect_bot_right = plat.native_rect_cropped_offset.add(plat.native_rect_cropped_dims);
-    if (bot_right.x > native_cropped_rect_bot_right.x) {
-        adjusted_pos.x -= (bot_right.x - native_cropped_rect_bot_right.x);
-    }
-    if (bot_right.y > native_cropped_rect_bot_right.y) {
-        adjusted_pos.y -= (bot_right.y - native_cropped_rect_bot_right.y);
-    }
-    adjusted_pos = adjusted_pos.floor();
-
-    // now drawawwwww
-    // main tooltip
-    try cmd_buf.append(.{ .rect = .{
-        .pos = adjusted_pos,
-        .dims = main_tooltip_dims,
-        .opt = .{
-            .fill_color = Colorf.black.fade(0.9),
-            .edge_radius = 0.2,
-        },
-    } });
-
-    var content_curr_pos = adjusted_pos.add(padding);
-    if (with_title) {
-        const title_opt = draw.TextOpt{
-            .color = .white,
-            .size = main_font.base_size * utl.as(u32, scaling + 1),
-            .font = main_font,
-            .smoothing = .none,
-        };
-        const title_dims = try plat.measureText(title, title_opt);
-        try (cmd_buf.append(.{ .label = .{
-            .pos = content_curr_pos,
-            .text = ImmUI.initLabel(title),
-            .opt = title_opt,
-        } }));
-        content_curr_pos.y += title_dims.y + section_spacing;
-    }
-
-    icon_text.unqRenderIconText(cmd_buf, desc, content_curr_pos, scaling, .white) catch {};
-    content_curr_pos.y += desc_dims.y + section_spacing;
-
-    for (tags.constSlice(), 0..) |*tag, i| {
-        icon_text.unqRenderIconText(cmd_buf, tag.tooltip_label.constSlice(), content_curr_pos, scaling, .white) catch {};
-        content_curr_pos.y += tag_dimses.get(i).y + tag_line_spacing;
-    }
-
-    var info_tooltip_pos = adjusted_pos.add(v2f(0, main_tooltip_dims.y + info_tooltip_spacing));
-    for (all_tag_infos.constSlice(), 0..) |*info, i| {
-        tooltip.unqRenderToolTip(info, cmd_buf, info_tooltip_pos, scaling) catch {};
-        info_tooltip_pos.y += infos_dimses.get(i).y + info_tooltip_spacing;
-    }
-}
-
-pub fn _unqRenderToolTip(cmd_buf: *ImmUI.CmdBuf, pos: V2f, tt: *const ToolTip, scaling: f32) Error!void {
-    const plat = App.getPlat();
-    //const data = App.get().data;
-    const padding = V2f.splat(10);
-    const info_tooltip_spacing: f32 = 0;
-
-    const desc_dims = icon_text.measureIconText(tt.desc.constSlice());
-
-    const main_content_dims = desc_dims.scale(scaling);
-    const main_tooltip_dims = main_content_dims.add(padding.scale(2));
-
-    // measure le infos
-    var infos_dimses = std.BoundedArray(V2f, (NewTag.InfoArr{}).buffer.len){};
-    var total_infos_dims = V2f{};
-    for (tt.infos.constSlice()) |*info| {
-        const info_dims = tooltip.measureToolTipContent(info);
-        const info_dims_scaled = info_dims.scale(scaling);
-        infos_dimses.appendAssumeCapacity(info_dims_scaled);
-
-        total_infos_dims.y += info_dims_scaled.y + tooltip.tooltip_padding.y * 2;
-        total_infos_dims.x = @max(total_infos_dims.x, info_dims_scaled.x);
-    }
-    total_infos_dims.y += info_tooltip_spacing * @max(utl.as(f32, infos_dimses.len) - 1, 0);
-    total_infos_dims.x += tooltip.tooltip_padding.x * 2;
-
-    const entire_everything_dims = v2f(
-        @max(main_tooltip_dims.x, total_infos_dims.x),
-        main_tooltip_dims.y + if (infos_dimses.len > 0) info_tooltip_spacing + total_infos_dims.y else 0,
-    );
-
-    var adjusted_pos = pos;
-    const bot_right = adjusted_pos.add(entire_everything_dims);
-    const native_cropped_rect_bot_right = plat.native_rect_cropped_offset.add(plat.native_rect_cropped_dims);
-    if (bot_right.x > native_cropped_rect_bot_right.x) {
-        adjusted_pos.x -= (bot_right.x - native_cropped_rect_bot_right.x);
-    }
-    if (bot_right.y > native_cropped_rect_bot_right.y) {
-        adjusted_pos.y -= (bot_right.y - native_cropped_rect_bot_right.y);
-    }
-    adjusted_pos = adjusted_pos.floor();
-
-    // now drawawwwww
-    // main tooltip
-    try cmd_buf.append(.{ .rect = .{
-        .pos = adjusted_pos,
-        .dims = main_tooltip_dims,
-        .opt = .{
-            .fill_color = Colorf.black.fade(0.9),
-            .edge_radius = 0.2,
-        },
-    } });
-
-    const content_curr_pos = adjusted_pos.add(padding);
-    icon_text.unqRenderIconText(cmd_buf, tt.desc.constSlice(), content_curr_pos, scaling, .white) catch {};
-    //content_curr_pos.y += desc_dims.y + section_spacing;
-
-    var info_tooltip_pos = adjusted_pos.add(v2f(0, main_tooltip_dims.y + info_tooltip_spacing));
-    for (tt.infos.constSlice(), 0..) |*info, i| {
-        tooltip.unqRenderToolTip(info, cmd_buf, info_tooltip_pos, scaling) catch {};
-        info_tooltip_pos.y += infos_dimses.get(i).y + info_tooltip_spacing;
+        try tt.unqRender(cmd_buf, pos, scaling);
     }
 }

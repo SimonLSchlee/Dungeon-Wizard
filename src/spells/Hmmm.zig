@@ -53,37 +53,23 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     _ = room;
 }
 
-pub const description =
-    \\The next 2 spells are drawn
-    \\instantly.
-    \\Draw next spell immediately.
-;
-
-pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
+pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
     const hmmm: @This() = self.kind.hmmm;
-    _ = hmmm;
     const fmt =
-        \\{s}
-        \\
+        \\Gain {} {any}quickdraw.
     ;
-
-    const b = try std.fmt.bufPrint(buf, fmt, .{description});
-    return b;
+    tt.desc = try Spell.Tooltip.Desc.fromSlice(
+        try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{
+            hmmm.stacks + 1,
+            StatusEffect.getIcon(.quickdraw),
+        }),
+    );
+    tt.infos.appendAssumeCapacity(.{ .status = .quickdraw });
 }
 
-pub fn getTags(self: *const Spell) Spell.Tag.Array {
+pub fn getNewTags(self: *const Spell) Error!Spell.NewTag.Array {
     const hmmm: @This() = self.kind.hmmm;
-    _ = hmmm;
-    return Spell.Tag.makeArray(&.{
-        &.{
-            .{ .icon = .{ .sprite_enum = .target } },
-            .{ .icon = .{ .sprite_enum = .wizard, .tint = .orange } },
-        },
-        &.{
-            .{ .icon = .{ .sprite_enum = .fast_forward } },
-            .{ .icon = .{ .sprite_enum = .card } },
-            .{ .icon = .{ .sprite_enum = .card } },
-            .{ .icon = .{ .sprite_enum = .card } },
-        },
-    });
+    return Spell.NewTag.Array.fromSlice(&.{
+        Spell.NewTag.fromFmt("{any}{}", .{ StatusEffect.getIcon(.quickdraw), hmmm.stacks + 1 }),
+    }) catch unreachable;
 }

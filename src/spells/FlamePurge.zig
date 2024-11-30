@@ -119,7 +119,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     caster.statuses.getPtr(.moist).addStacks(caster, flame_purge.immune_stacks);
 }
 
-pub fn getToolTip(self: *const Spell, tt: *Spell.ToolTip) Error!void {
+pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
     const flame_purge: @This() = self.kind.flame_purge;
     const hit_damage = Thing.Damage{
         .kind = .fire,
@@ -134,16 +134,17 @@ pub fn getToolTip(self: *const Spell, tt: *Spell.ToolTip) Error!void {
         \\surrounding enemies.
         \\Deal an additional {any} for each
         \\{any}lit stack you have.
-        \\Gain {any}moist for {} seconds.
+        \\Gain {any}moist for {d:.0} seconds.
     ;
-    const desc = try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{
-        hit_damage,
-        bonus_damage,
-        StatusEffect.getIcon(.lit),
-        StatusEffect.getIcon(.moist),
-        StatusEffect.getDurationSeconds(.moist, flame_purge.immune_stacks).?,
-    });
-    try tt.desc.resize(desc.len);
+    tt.desc = try Spell.Tooltip.Desc.fromSlice(
+        try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{
+            hit_damage,
+            bonus_damage,
+            StatusEffect.getIcon(.lit),
+            StatusEffect.getIcon(.moist),
+            @floor(StatusEffect.getDurationSeconds(.moist, flame_purge.immune_stacks).?),
+        }),
+    );
     tt.infos.appendAssumeCapacity(.{ .damage = .fire });
     tt.infos.appendAssumeCapacity(.{ .status = .lit });
     tt.infos.appendAssumeCapacity(.{ .status = .moist });
@@ -158,9 +159,6 @@ pub fn getNewTags(self: *const Spell) Error!Spell.NewTag.Array {
         .{
             .card_label = try Spell.NewTag.CardLabel.fromSlice(
                 try std.fmt.bufPrint(&buf, "Bonus/{any}:", .{icon_text.Icon.burn}),
-            ),
-            .tooltip_label = try Spell.NewTag.TooltipLabel.fromSlice(
-                try std.fmt.bufPrint(&buf, "Bonus per {any}lit:", .{icon_text.Icon.burn}),
             ),
         },
         try Spell.NewTag.makeStatus(.lit, 1),

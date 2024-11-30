@@ -178,6 +178,7 @@ pub fn utf8ToPartsIterator(buf: []const u8) Utf8ToPartsIterator {
 }
 
 pub fn measureIconText(buf: []const u8) V2f {
+    if (buf.len == 0) return .{};
     const plat = getPlat();
     const data = App.get().data;
     const icon_text_font = data.fonts.get(.seven_x_five);

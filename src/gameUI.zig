@@ -27,6 +27,7 @@ const Item = @import("Item.zig");
 const player = @import("player.zig");
 const menuUI = @import("menuUI.zig");
 const ImmUI = @import("ImmUI.zig");
+const Tooltip = @import("Tooltip.zig");
 
 const slot_bg_color = Colorf.rgb(0.07, 0.05, 0.05);
 
@@ -205,34 +206,27 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, slot: *Sl
         }
         // tooltip
         if (slot.is_long_hovered) {
+            const tooltip_scaling: f32 = 2;
             const tooltip_pos = slot.rect.pos.add(v2f(slot.rect.dims.x, 0));
             switch (kind_data) {
                 .pause => {
-                    try Spell.unqRenderToolTipWithTags(
-                        tooltip_cmd_buf,
-                        tooltip_pos,
-                        "Pause",
-                        "",
-                        &.{},
-                        3,
-                    );
+                    const tt = Tooltip{
+                        .title = Tooltip.Title.fromSlice("Pause") catch unreachable,
+                    };
+                    try tt.unqRender(tooltip_cmd_buf, tooltip_pos, tooltip_scaling);
                 },
                 .action => |a| switch (a) {
                     .discard => {
-                        try Spell.unqRenderToolTipWithTags(
-                            tooltip_cmd_buf,
-                            tooltip_pos,
-                            "Discard hand",
-                            "",
-                            &.{},
-                            3,
-                        );
+                        const tt = Tooltip{
+                            .title = Tooltip.Title.fromSlice("Discard hand") catch unreachable,
+                        };
+                        try tt.unqRender(tooltip_cmd_buf, tooltip_pos, tooltip_scaling);
                     },
                     .spell => |*spell| {
-                        try spell.unqRenderToolTip(tooltip_cmd_buf, tooltip_pos);
+                        try spell.unqRenderTooltip(tooltip_cmd_buf, tooltip_pos, tooltip_scaling);
                     },
                     .item => |*item| {
-                        try item.unqRenderToolTip(tooltip_cmd_buf, tooltip_pos);
+                        try item.unqRenderTooltip(tooltip_cmd_buf, tooltip_pos, tooltip_scaling);
                     },
                 },
             }

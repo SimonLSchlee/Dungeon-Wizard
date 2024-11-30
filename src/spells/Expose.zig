@@ -128,7 +128,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     _ = try room.queueSpawnThing(&hit_circle, target_pos);
 }
 
-pub fn getToolTip(self: *const Spell, tt: *Spell.ToolTip) Error!void {
+pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
     const expose: @This() = self.kind.expose;
     const hit_damage = Thing.Damage{
         .kind = .magic,
@@ -138,12 +138,13 @@ pub fn getToolTip(self: *const Spell, tt: *Spell.ToolTip) Error!void {
         \\Deal {any} damage and {any}expose
         \\enemies for {d:.0} seconds.
     ;
-    const desc = try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{
-        hit_damage,
-        StatusEffect.getIcon(.exposed),
-        StatusEffect.getDurationSeconds(.exposed, expose.hit_effect.status_stacks.get(.exposed)).?,
-    });
-    try tt.desc.resize(desc.len);
+    tt.desc = try Spell.Tooltip.Desc.fromSlice(
+        try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{
+            hit_damage,
+            StatusEffect.getIcon(.exposed),
+            StatusEffect.getDurationSeconds(.exposed, expose.hit_effect.status_stacks.get(.exposed)).?,
+        }),
+    );
     tt.infos.appendAssumeCapacity(.{ .status = .exposed });
 }
 

@@ -27,6 +27,7 @@ const menuUI = @import("menuUI.zig");
 const sprites = @import("sprites.zig");
 const ImmUI = @import("ImmUI.zig");
 const Run = @import("Run.zig");
+const Tooltip = @import("Tooltip.zig");
 const Spell = @import("Spell.zig");
 const Params = Spell.Params;
 const TargetKind = Spell.TargetKind;
@@ -448,14 +449,28 @@ pub fn getName(self: *const Item) []const u8 {
     return item_names.get(kind);
 }
 
-pub fn renderToolTip(self: *const Item, pos: V2f) Error!void {
-    const desc = try self.getDescription();
-    return menuUI.renderToolTip(self.getName(), desc, pos);
+pub fn getTooltip(self: *const Item, info: *Tooltip) Error!void {
+    switch (self.kind) {
+        inline else => |k| {
+            const K = @TypeOf(k);
+            if (std.meta.hasMethod(K, "getTooltip")) {
+                return try K.getTooltip(self, info);
+            } else {
+                if (@hasField(K, "title")) {
+                    info.title = try Tooltip.Title.fromSlice(K.title);
+                }
+                if (@hasField(K, "description")) {
+                    info.desc = try Tooltip.Desc.fromSlice(K.description);
+                }
+            }
+        },
+    }
 }
 
-pub fn unqRenderToolTip(self: *const Item, cmd_buf: *ImmUI.CmdBuf, pos: V2f) Error!void {
-    const scaling: f32 = 3;
-    const name = self.getName();
-    const desc = try self.getDescription();
-    try Spell.unqRenderToolTipWithTags(cmd_buf, pos, name, desc, &.{}, scaling);
+pub fn unqRenderTooltip(self: *const Item, cmd_buf: *ImmUI.CmdBuf, pos: V2f, scaling: f32) Error!void {
+    var tt: Tooltip = .{};
+    try self.getTooltip(&tt);
+    if (tt.desc.len > 0) {
+        try tt.unqRender(cmd_buf, pos, scaling);
+    }
 }

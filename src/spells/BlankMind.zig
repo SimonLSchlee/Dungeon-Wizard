@@ -58,23 +58,22 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     _ = room;
 }
 
-pub const description =
-    \\Shield self from damage.
-    \\Draw next spell immediately.
-;
-
-pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
+pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
     const blank_mind: @This() = self.kind.blank_mind;
     const fmt =
-        \\Shield amount: {}
-        \\Duration: {} secs
-        \\
-        \\{s}
-        \\
+        \\Gain {any}{d:.0} shield for {d:.0} seconds.
+        \\{any}Draw 1 spell (immediately).
     ;
-
-    const b = try std.fmt.bufPrint(buf, fmt, .{ blank_mind.shield_amount, blank_mind.duration_secs, description });
-    return b;
+    tt.desc = try Spell.Tooltip.Desc.fromSlice(
+        try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{
+            StatusEffect.getIcon(.shield),
+            @floor(blank_mind.shield_amount),
+            @floor(blank_mind.duration_secs),
+            StatusEffect.getIcon(.quickdraw),
+        }),
+    );
+    tt.infos.appendAssumeCapacity(.{ .status = .shield });
+    tt.infos.appendAssumeCapacity(.{ .status = .quickdraw });
 }
 
 pub fn getTags(self: *const Spell) Spell.Tag.Array {
