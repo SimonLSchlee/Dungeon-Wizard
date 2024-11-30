@@ -29,6 +29,7 @@ const Item = @import("Item.zig");
 const player = @import("player.zig");
 const ImmUI = @import("ImmUI.zig");
 const sprites = @import("sprites.zig");
+const Tooltip = @import("Tooltip.zig");
 
 pub const Mode = enum {
     pub const Mask = std.EnumSet(Mode);
@@ -60,6 +61,7 @@ pub const Reward = struct {
         item: Item,
         gold: i32,
     },
+    long_hover: menuUI.LongHover = .{},
 };
 
 pub const GamePauseUI = struct {
@@ -710,7 +712,7 @@ pub fn rewardUpdate(self: *Run) Error!void {
     const mouse_pos = plat.getMousePosScreen();
 
     var removed_idx: ?usize = null;
-    for (reward_ui.rewards.constSlice(), 0..) |reward, i| {
+    for (reward_ui.rewards.slice(), 0..) |*reward, i| {
         var row_rect_color = Colorf.rgba(0.4, 0.4, 0.4, 0.7);
         var row_rect_pos = v2f(row_rect_x, curr_row_y);
         const hovered = geom.pointIsInRectf(mouse_pos, .{ .pos = row_rect_pos, .dims = row_rect_dims });
@@ -743,6 +745,12 @@ pub fn rewardUpdate(self: *Run) Error!void {
                 if (clicked) {
                     reward_ui.selected_spell_choice_idx = i;
                 }
+                if (reward.long_hover.update(hovered)) {
+                    const tt = Tooltip{
+                        .title = Tooltip.Title.fromSlice("Choose a spell") catch unreachable,
+                    };
+                    try tt.unqRender(&self.tooltip_ui.commands, mouse_pos, ui_scaling);
+                }
             },
             .item => |item| {
                 try item.unqRenderIcon(&self.imm_ui.commands, row_icon_pos, ui_scaling);
@@ -760,6 +768,9 @@ pub fn rewardUpdate(self: *Run) Error!void {
                         removed_idx = i;
                     }
                 }
+                if (reward.long_hover.update(hovered)) {
+                    try item.unqRenderTooltip(&self.tooltip_ui.commands, mouse_pos, ui_scaling);
+                }
             },
             .gold => |gold_amount| {
                 const info = sprites.RenderIconInfo{ .frame = data.misc_icons.getRenderFrame(.gold_stacks).? };
@@ -775,6 +786,12 @@ pub fn rewardUpdate(self: *Run) Error!void {
                 if (clicked) {
                     self.gold += gold_amount;
                     removed_idx = i;
+                }
+                if (reward.long_hover.update(hovered)) {
+                    const tt = Tooltip{
+                        .title = Tooltip.Title.fromSlice("It's money...") catch unreachable,
+                    };
+                    try tt.unqRender(&self.tooltip_ui.commands, mouse_pos, ui_scaling);
                 }
             },
         }

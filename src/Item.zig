@@ -28,6 +28,7 @@ const sprites = @import("sprites.zig");
 const ImmUI = @import("ImmUI.zig");
 const Run = @import("Run.zig");
 const Tooltip = @import("Tooltip.zig");
+const StatusEffect = @import("StatusEffect.zig");
 const Spell = @import("Spell.zig");
 const Params = Spell.Params;
 const TargetKind = Spell.TargetKind;
@@ -81,13 +82,6 @@ pub const PotionHP = struct {
 
 pub const PotionInvis = struct {
     pub const title = "Unseeability Powder";
-    pub const description =
-        \\Makes you unseeable by enemies,
-        \\temporarily.
-        \\Some enemies won't be fooled.
-        \\You can cast spells and move as
-        \\normal while unseeable.
-    ;
 
     pub const enum_name = "pot_invis";
     pub const Controllers = [_]type{};
@@ -108,18 +102,26 @@ pub const PotionInvis = struct {
         params.validate(.self, user);
         user.statuses.getPtr(.unseeable).stacks = self.kind.pot_invis.invis_stacks;
     }
+
+    pub fn getTooltip(self: *const Item, tt: *Tooltip) Error!void {
+        const pot_invis: @This() = self.kind.pot_invis;
+        const fmt =
+            \\Makes you {any}unseeable for {d:.0}
+            \\seconds.
+        ;
+        tt.desc = try Tooltip.Desc.fromSlice(
+            try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{
+                StatusEffect.getIcon(.unseeable),
+                @floor(StatusEffect.getDurationSeconds(.unseeable, pot_invis.invis_stacks).?),
+            }),
+        );
+        tt.title = try Tooltip.Title.fromSlice(title);
+        tt.infos.appendAssumeCapacity(.{ .status = .unseeable });
+    }
 };
 
 pub const PotionThorns = struct {
     pub const title = "Prickly Potion";
-    pub const description =
-        \\Drink it (carefully!) to gain 5
-        \\prickly stacks. While prickly,
-        \\enemies who hit you with melee
-        \\attacks take damage according to
-        \\your stacks. Stacks don't expire
-        \\until you exit the room.
-    ;
 
     pub const enum_name = "pot_thorns";
     pub const Controllers = [_]type{};
@@ -139,6 +141,22 @@ pub const PotionThorns = struct {
     pub fn use(self: *const Item, user: *Thing, _: *Room, params: Params) Error!void {
         params.validate(.self, user);
         user.statuses.getPtr(.prickly).stacks = self.kind.pot_thorns.thorny_stacks;
+    }
+
+    pub fn getTooltip(self: *const Item, tt: *Tooltip) Error!void {
+        const pot_thorns: @This() = self.kind.pot_thorns;
+        const stacks = pot_thorns.thorny_stacks;
+        const fmt =
+            \\Gain {} {any}prickly stacks
+        ;
+        tt.desc = try Tooltip.Desc.fromSlice(
+            try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{
+                stacks,
+                StatusEffect.getIcon(.prickly),
+            }),
+        );
+        tt.title = try Tooltip.Title.fromSlice(title);
+        tt.infos.appendAssumeCapacity(.{ .status = .prickly });
     }
 };
 
@@ -456,10 +474,10 @@ pub fn getTooltip(self: *const Item, info: *Tooltip) Error!void {
             if (std.meta.hasMethod(K, "getTooltip")) {
                 return try K.getTooltip(self, info);
             } else {
-                if (@hasField(K, "title")) {
+                if (@hasDecl(K, "title")) {
                     info.title = try Tooltip.Title.fromSlice(K.title);
                 }
-                if (@hasField(K, "description")) {
+                if (@hasDecl(K, "description")) {
                     info.desc = try Tooltip.Desc.fromSlice(K.description);
                 }
             }
@@ -470,7 +488,7 @@ pub fn getTooltip(self: *const Item, info: *Tooltip) Error!void {
 pub fn unqRenderTooltip(self: *const Item, cmd_buf: *ImmUI.CmdBuf, pos: V2f, scaling: f32) Error!void {
     var tt: Tooltip = .{};
     try self.getTooltip(&tt);
-    if (tt.desc.len > 0) {
+    if (tt.desc.len > 0 or tt.title.len > 0) {
         try tt.unqRender(cmd_buf, pos, scaling);
     }
 }
