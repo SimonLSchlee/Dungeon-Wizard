@@ -276,9 +276,8 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, slot: *Sl
 pub const RunSlots = struct {
     pub const ItemSlot = struct {
         item: ?Item,
-        hover_timer: utl.TickCounter = utl.TickCounter.init(15),
-        is_long_hovered: bool = false,
         rect: geom.Rectf = .{},
+        long_hover: menuUI.LongHover = .{},
     };
     num_spell_slots: usize = 4, // populated from deck
     items: std.BoundedArray(ItemSlot, max_item_slots) = .{},

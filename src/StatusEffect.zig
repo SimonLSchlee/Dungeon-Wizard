@@ -150,7 +150,7 @@ const protos = [_]Proto{
         .cd = 0,
         .cd_type = .no_cd,
         .color = Colorf.rgb(0.8, 0.8, 0.7),
-        .icon = .shield_empty,
+        .icon = .shield,
     },
 };
 
@@ -244,7 +244,10 @@ pub fn getDurationSeconds(kind: Kind, stacks: i32) ?f32 {
 pub fn update(status: *StatusEffect, thing: *Thing, room: *Room) Error!void {
     switch (status.kind) {
         .shield => if (thing.hp) |hp| {
-            status.stacks = utl.as(i32, hp.shields.len);
+            status.stacks = 0;
+            for (hp.shields.constSlice()) |shield| {
+                status.stacks += utl.as(i32, @ceil(shield.curr));
+            }
         },
         else => {},
     }
@@ -344,7 +347,7 @@ pub fn fmtDesc(buf: []u8, kind: StatusEffect.Kind) Error![]u8 {
         ),
         .trailblaze => try std.fmt.bufPrint(buf, "Moves faster.\nLeaves behind a trail of fire", .{}),
         .quickdraw => try std.fmt.bufPrint(buf, "The next spell is drawn instantly", .{}),
-        .shield => try std.fmt.bufPrint(buf, "Block damage. Expires after a timer", .{}),
+        .shield => try std.fmt.bufPrint(buf, "Prevents damage for a duration", .{}),
         //else => try std.fmt.bufPrint(buf, "<Placeholder for status: {s}>", .{status.name}),
     };
 }

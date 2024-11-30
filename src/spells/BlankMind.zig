@@ -62,7 +62,7 @@ pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
     const blank_mind: @This() = self.kind.blank_mind;
     const fmt =
         \\Gain {any}{d:.0} shield for {d:.0} seconds.
-        \\{any}Draw 1 spell (immediately).
+        \\Gain 1 {any}quickdraw.
     ;
     tt.desc = try Spell.Tooltip.Desc.fromSlice(
         try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{
@@ -76,20 +76,10 @@ pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
     tt.infos.appendAssumeCapacity(.{ .status = .quickdraw });
 }
 
-pub fn getTags(self: *const Spell) Spell.Tag.Array {
+pub fn getNewTags(self: *const Spell) Error!Spell.NewTag.Array {
     const blank_mind: @This() = self.kind.blank_mind;
-    return Spell.Tag.makeArray(&.{
-        &.{
-            .{ .icon = .{ .sprite_enum = .target } },
-            .{ .icon = .{ .sprite_enum = .wizard, .tint = .orange } },
-        },
-        &.{
-            .{ .icon = .{ .sprite_enum = .shield_empty } },
-            .{ .label = Spell.Tag.fmtLabel("{d:.0}", .{blank_mind.shield_amount}) },
-        },
-        &.{
-            .{ .icon = .{ .sprite_enum = .arrow_180_CC } },
-            .{ .icon = .{ .sprite_enum = .card } },
-        },
-    });
+    return Spell.NewTag.Array.fromSlice(&.{
+        try Spell.NewTag.makeStatus(.shield, utl.as(i32, blank_mind.shield_amount)),
+        try Spell.NewTag.makeStatus(.quickdraw, 1),
+    }) catch unreachable;
 }

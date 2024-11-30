@@ -158,14 +158,20 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     _ = try room.queueSpawnThing(&herring, caster.pos);
 }
 
-pub const description =
-    \\This little fish never misses!
-    \\Just point and click.
-;
-
-pub fn getFlavor(self: *const Spell) []const u8 {
-    _ = self;
-    return description;
+pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
+    const unherring: @This() = self.kind.unherring;
+    const hit_damage = Thing.Damage{
+        .kind = .magic,
+        .amount = unherring.hit_effect.damage,
+    };
+    const fmt =
+        \\Deal {any} damage.
+    ;
+    tt.desc = try Spell.Tooltip.Desc.fromSlice(
+        try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{
+            hit_damage,
+        }),
+    );
 }
 
 pub fn getNewTags(self: *const Spell) Error!Spell.NewTag.Array {

@@ -38,7 +38,7 @@ pub const Mode = enum {
     crispin_picker,
 };
 
-pub const Reward = union(enum) {
+pub const Reward = struct {
     const max_rewards: usize = 8;
     const base_spells: usize = 3;
     const max_spells = 8;
@@ -49,11 +49,17 @@ pub const Reward = union(enum) {
         rewards: std.BoundedArray(Reward, max_rewards) = .{},
         selected_spell_choice_idx: ?usize = null,
     };
-    pub const SpellChoiceArray = std.BoundedArray(Spell, max_spells);
+    pub const SpellChoice = struct {
+        spell: Spell,
+        long_hover: menuUI.LongHover = .{},
+    };
+    pub const SpellChoiceArray = std.BoundedArray(SpellChoice, max_spells);
 
-    spell_choice: SpellChoiceArray,
-    item: Item,
-    gold: i32,
+    kind: union(enum) {
+        spell_choice: SpellChoiceArray,
+        item: Item,
+        gold: i32,
+    },
 };
 
 pub const GamePauseUI = struct {
@@ -357,10 +363,12 @@ pub fn makeRewards(self: *Run, difficulty: f32) void {
     var reward_ui = Reward.UI{};
 
     { // spells
-        var reward: Reward = .{ .spell_choice = .{} };
-        reward.spell_choice.resize(Reward.base_spells) catch unreachable;
-        const num_spells_generated = Spell.makeRoomReward(random, self.mode, reward.spell_choice.slice());
-        reward.spell_choice.resize(num_spells_generated) catch unreachable;
+        var reward: Reward = .{ .kind = .{ .spell_choice = .{} } };
+        var buf: [Reward.max_spells]Spell = undefined;
+        const spells = Spell.makeRoomReward(random, self.mode, buf[0..Reward.base_spells]);
+        for (spells) |spell| {
+            reward.kind.spell_choice.appendAssumeCapacity(.{ .spell = spell });
+        }
         reward_ui.rewards.appendAssumeCapacity(reward);
     }
     { // items
@@ -371,14 +379,14 @@ pub fn makeRewards(self: *Run, difficulty: f32) void {
             const num_items_generated = Item.makeRoomReward(random, self.mode, items.slice());
             items.resize(num_items_generated) catch unreachable;
             for (items.constSlice()) |item| {
-                reward_ui.rewards.appendAssumeCapacity(.{ .item = item });
+                reward_ui.rewards.appendAssumeCapacity(.{ .kind = .{ .item = item } });
             }
         }
     }
     { // gold
         const gold = u.as(i32, @ceil(difficulty)) + self.rng.random().uintAtMost(u8, 5);
         if (gold > 0) { // should be above 0 but ya never know
-            reward_ui.rewards.appendAssumeCapacity(.{ .gold = gold });
+            reward_ui.rewards.appendAssumeCapacity(.{ .kind = .{ .gold = gold } });
         }
     }
 
@@ -560,11 +568,12 @@ pub fn itemsUpdate(self: *Run) Error!void {
         const rect = items_rects.get(i);
         const hovered = geom.pointIsInRectf(mouse_pos, rect);
         const clicked = hovered and (plat.input_buffer.mouseBtnIsJustPressed(.left) or plat.input_buffer.mouseBtnIsJustPressed(.left));
-        slot.is_long_hovered = (hovered and !slot.hover_timer.running);
 
         if (slot.item) |item| {
+            if (slot.long_hover.update(hovered)) {
+                try item.unqRenderTooltip(&self.tooltip_ui.commands, rect.pos.add(v2f(rect.dims.x, 0)), ui_scaling);
+            }
             if (clicked) {
-                _ = item;
                 // TODO discard/use menu
             }
         }
@@ -604,7 +613,7 @@ pub fn rewardSpellChoiceUI(self: *Run, idx: usize) Error!void {
     curr_row_y += 80;
 
     // spells
-    const spell_choices = self.reward_ui.?.rewards.get(idx).spell_choice;
+    var spell_choices: *Reward.SpellChoiceArray = &self.reward_ui.?.rewards.buffer[idx].kind.spell_choice;
     assert(spell_choices.len > 0);
     const spell_dims = Spell.card_dims.scale(ui_scaling);
     var spell_rects = std.BoundedArray(geom.Rectf, Reward.max_spells){};
@@ -618,22 +627,26 @@ pub fn rewardSpellChoiceUI(self: *Run, idx: usize) Error!void {
     );
 
     const mouse_pos = plat.getMousePosScreen();
-    for (spell_choices.constSlice(), 0..) |spell, i| {
+    for (spell_choices.slice(), 0..) |*spell_choice, i| {
         var rect = spell_rects.get(i);
         const hovered = geom.pointIsInRectf(mouse_pos, rect);
         const clicked = hovered and plat.input_buffer.mouseBtnIsJustPressed(.left);
         if (hovered) {
             rect.pos.y -= 4;
         }
-        _ = spell.unqRenderCard(&self.imm_ui.commands, rect.pos, null, ui_scaling);
+        _ = spell_choice.spell.unqRenderCard(&self.imm_ui.commands, rect.pos, null, ui_scaling);
         if (clicked) {
-            const product = Shop.Product{ .kind = .{ .spell = spell } };
+            const product = Shop.Product{ .kind = .{ .spell = spell_choice.spell } };
             if (self.canPickupProduct(&product)) {
                 self.pickupProduct(&product);
                 _ = self.reward_ui.?.rewards.orderedRemove(idx);
                 self.reward_ui.?.selected_spell_choice_idx = null;
                 break;
             }
+        }
+        if (spell_choice.long_hover.update(hovered)) {
+            const tooltip_pos = rect.pos.add(v2f(rect.dims.x, 0));
+            try spell_choice.spell.unqRenderTooltip(&self.tooltip_ui.commands, tooltip_pos, ui_scaling);
         }
     }
 
@@ -717,7 +730,7 @@ pub fn rewardUpdate(self: *Run) Error!void {
         } });
         const row_icon_pos = row_rect_pos.add(v2f(10, 10));
         const row_text_pos = row_icon_pos.add(v2f(10 + row_icon_dims.x + 10, 10));
-        switch (reward) {
+        switch (reward.kind) {
             .spell_choice => {
                 const info = sprites.RenderIconInfo{ .frame = data.misc_icons.getRenderFrame(.cards).? };
                 try info.unqRender(&self.imm_ui.commands, row_icon_pos, ui_scaling);
@@ -831,6 +844,7 @@ pub fn deadUpdate(self: *Run) Error!void {
 pub fn update(self: *Run) Error!void {
     const plat = App.getPlat();
     self.imm_ui.commands.clear();
+    self.tooltip_ui.commands.clear();
 
     if (debug.enable_debug_controls) {
         if (plat.input_buffer.keyIsJustPressed(.f3)) {
@@ -999,6 +1013,7 @@ pub fn render(self: *Run, native_render_texture: Platform.RenderTexture2D) Error
         },
     }
     try ImmUI.render(&self.imm_ui.commands);
+    try ImmUI.render(&self.tooltip_ui.commands);
     plat.startRenderToTexture(native_render_texture);
     plat.setBlend(.render_tex_alpha);
     { // gold

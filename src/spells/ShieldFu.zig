@@ -71,12 +71,9 @@ pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
     tt.infos.appendAssumeCapacity(.{ .status = .shield });
 }
 
-pub fn getTags(self: *const Spell) Spell.Tag.Array {
+pub fn getNewTags(self: *const Spell) Error!Spell.NewTag.Array {
     const shield_fu: @This() = self.kind.shield_fu;
-    return Spell.Tag.makeArray(&.{
-        &.{
-            .{ .icon = .{ .sprite_enum = .shield_empty } },
-            .{ .label = Spell.Tag.fmtLabel("{d:.0}", .{shield_fu.shield_amount}) },
-        },
-    });
+    return Spell.NewTag.Array.fromSlice(&.{
+        try Spell.NewTag.makeStatus(.shield, utl.as(i32, shield_fu.shield_amount)),
+    }) catch unreachable;
 }

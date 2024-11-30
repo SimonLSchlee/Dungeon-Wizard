@@ -78,9 +78,8 @@ pub fn init(seed: u64, run: *Run) Error!Shop {
     };
 
     var spells = std.BoundedArray(Spell, max_num_spells){};
-    spells.resize(num_spells) catch unreachable;
-    const num_spells_generated = Spell.makeShopSpells(ret.rng.random(), run.mode, spells.slice());
-    spells.resize(num_spells_generated) catch unreachable;
+    const spells_generated = Spell.makeShopSpells(ret.rng.random(), run.mode, spells.slice());
+    spells.resize(spells_generated.len) catch unreachable;
     for (spells.constSlice()) |spell| {
         ret.spells.appendAssumeCapacity(.{
             .product = .{

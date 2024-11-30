@@ -59,11 +59,11 @@ pub const proto = Spell.makeProto(
 );
 
 explode_hit_effect: Thing.HitEffect = .{
-    .damage = 8,
+    .damage = 6,
     .status_stacks = StatusEffect.StacksArray.initDefault(0, .{ .lit = 1 }),
 },
 ball_hit_effect: Thing.HitEffect = .{
-    .damage = 6,
+    .damage = 4,
 },
 ball_radius: f32 = base_ball_radius,
 explode_radius: f32 = base_explode_radius,
@@ -184,44 +184,40 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     _ = try room.queueSpawnThing(&ball, params.cast_orig.?);
 }
 
-pub const description =
-    \\Conjure a ball of fire which flies
-    \\to the target point, and explodes,
-    \\damaging all creatures in the blast
-    \\and setting them alight.
-    \\It will also trigger on impact with
-    \\an enemy.
-    \\Careful!
-;
-
-pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
+pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
     const flamey_explodey: @This() = self.kind.flamey_explodey;
+    const ball_damage = flamey_explodey.ball_hit_effect.damage;
+    const explode_damage = flamey_explodey.explode_hit_effect.damage;
+    const hit_dmg = Thing.Damage{
+        .kind = .fire,
+        .amount = ball_damage,
+    };
+    const explode_dmg = Thing.Damage{
+        .kind = .fire,
+        .amount = explode_damage,
+    };
     const fmt =
-        \\Direct hit damage: {}
-        \\Explosion damage: {}
-        \\
-        \\{s}
-        \\
+        \\Projectile which deals {any}
+        \\damage on impact and explodes
+        \\for {any}, leaving flames
+        \\on the ground.
     ;
-    const ball_damage: i32 = utl.as(i32, flamey_explodey.ball_hit_effect.damage);
-    const explode_damage: i32 = utl.as(i32, flamey_explodey.explode_hit_effect.damage);
-    return std.fmt.bufPrint(buf, fmt, .{ ball_damage, explode_damage, description });
+    tt.desc = try Spell.Tooltip.Desc.fromSlice(
+        try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{
+            hit_dmg,
+            explode_dmg,
+        }),
+    );
+    tt.infos.appendAssumeCapacity(.{ .damage = .fire });
+    tt.infos.appendAssumeCapacity(.{ .status = .lit });
 }
 
-pub fn getTags(self: *const Spell) Spell.Tag.Array {
+pub fn getNewTags(self: *const Spell) Error!Spell.NewTag.Array {
     const flamey_explodey: @This() = self.kind.flamey_explodey;
-    return Spell.Tag.makeArray(&.{
-        &.{
-            .{ .icon = .{ .sprite_enum = .target } },
-            .{ .icon = .{ .sprite_enum = .mouse } },
-        },
-        &.{
-            .{ .icon = .{ .sprite_enum = .fire } },
-            .{ .label = Spell.Tag.fmtLabel("{d:.0}", .{flamey_explodey.ball_hit_effect.damage}) },
-        },
-        &.{
-            .{ .icon = .{ .sprite_enum = .aoe_fire } },
-            .{ .label = Spell.Tag.fmtLabel("{d:.0}", .{flamey_explodey.explode_hit_effect.damage}) },
-        },
-    });
+    const ball_damage = flamey_explodey.ball_hit_effect.damage;
+    const explode_damage = flamey_explodey.explode_hit_effect.damage;
+    return Spell.NewTag.Array.fromSlice(&.{
+        try Spell.NewTag.makeDamage(.fire, ball_damage, false),
+        try Spell.NewTag.makeDamage(.fire, explode_damage, true),
+    }) catch unreachable;
 }

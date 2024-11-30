@@ -65,6 +65,22 @@ pub fn renderToolTip(title: []const u8, body: []const u8, pos: V2f) Error!void {
     try plat.textf(text_pos, "{s}", .{body}, body_opt);
 }
 
+pub const LongHover = struct {
+    hover_timer: utl.TickCounter = utl.TickCounter.init(15),
+
+    pub fn is(self: *const LongHover, is_hovered: bool) bool {
+        return (is_hovered and !self.hover_timer.running);
+    }
+    pub fn update(self: *LongHover, is_hovered: bool) bool {
+        if (is_hovered) {
+            _ = self.hover_timer.tick(false);
+        } else {
+            self.hover_timer.restart();
+        }
+        return self.is(is_hovered);
+    }
+};
+
 pub const Modal = struct {
     rect: geom.Rectf = .{},
     poly_opt: draw.PolyOpt = .{},

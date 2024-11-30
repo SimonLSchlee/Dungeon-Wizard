@@ -65,6 +65,7 @@ pub const Icon = enum {
     burn,
     trailblaze,
     draw_card,
+    shield,
 
     pub fn format(self: Icon, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) Error!void {
         _ = fmt;
