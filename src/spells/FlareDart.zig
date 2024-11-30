@@ -123,36 +123,28 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     _ = try room.queueSpawnThing(&ball, caster.pos);
 }
 
-pub const description =
-    \\Fling a flaming flare!
-    \\Makes enemies "lit", dealing
-    \\additional damage. Each stack of
-    \\"lit" does 1 damage per second
-    \\for 4 seconds.
-;
-
-pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
+pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
     const flare_dart: @This() = self.kind.flare_dart;
+    const hit_dmg = Thing.Damage{
+        .kind = .fire,
+        .amount = flare_dart.hit_effect.damage,
+    };
     const fmt =
-        \\Damage: {}
-        \\
-        \\{s}
-        \\
+        \\Projectile which deals {any}
+        \\damage on impact.
     ;
-    const ball_damage: i32 = utl.as(i32, flare_dart.hit_effect.damage);
-    return std.fmt.bufPrint(buf, fmt, .{ ball_damage, description });
+    tt.desc = try Spell.Tooltip.Desc.fromSlice(
+        try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{
+            hit_dmg,
+        }),
+    );
+    tt.infos.appendAssumeCapacity(.{ .damage = .fire });
+    tt.infos.appendAssumeCapacity(.{ .status = .lit });
 }
 
-pub fn getTags(self: *const Spell) Spell.Tag.Array {
+pub fn getNewTags(self: *const Spell) Error!Spell.NewTag.Array {
     const flare_dart: @This() = self.kind.flare_dart;
-    return Spell.Tag.makeArray(&.{
-        &.{
-            .{ .icon = .{ .sprite_enum = .target } },
-            .{ .icon = .{ .sprite_enum = .mouse } },
-        },
-        &.{
-            .{ .icon = .{ .sprite_enum = .fire } },
-            .{ .label = Spell.Tag.fmtLabel("{d:.0}", .{flare_dart.hit_effect.damage}) },
-        },
-    });
+    return Spell.NewTag.Array.fromSlice(&.{
+        try Spell.NewTag.makeDamage(.fire, flare_dart.hit_effect.damage, false),
+    }) catch unreachable;
 }

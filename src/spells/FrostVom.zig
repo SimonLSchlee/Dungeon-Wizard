@@ -172,39 +172,31 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     _ = try room.queueSpawnThing(&vom, caster.pos);
 }
 
-pub const description =
-    \\"Hurl" a cone of ice which
-    \\freezes enemies.
-;
-
-pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
+pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
     const frost_vom: @This() = self.kind.frost_vom;
+    const hit_dmg = Thing.Damage{
+        .kind = .ice,
+        .amount = frost_vom.hit_effect.damage,
+    };
     const fmt =
-        \\Damage: {}
-        \\Freeze duration: {} secs
-        \\
-        \\{s}
-        \\
+        \\Deal {any} damage in a
+        \\cone, {any}freezing creatures
+        \\for {d:0.} seconds.
     ;
-    const dur_secs: i32 = frost_vom.hit_effect.status_stacks.get(.frozen) * utl.as(i32, @divFloor(StatusEffect.proto_array.get(.frozen).cooldown.num_ticks, core.fups_per_sec));
-    const damage: i32 = utl.as(i32, frost_vom.hit_effect.damage);
-    return std.fmt.bufPrint(buf, fmt, .{ damage, dur_secs, description });
+    tt.desc = try Spell.Tooltip.Desc.fromSlice(
+        try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{
+            hit_dmg,
+            StatusEffect.getIcon(.frozen),
+            StatusEffect.getDurationSeconds(.frozen, frost_vom.hit_effect.status_stacks.get(.frozen)).?,
+        }),
+    );
+    tt.infos.appendAssumeCapacity(.{ .status = .frozen });
 }
 
-pub fn getTags(self: *const Spell) Spell.Tag.Array {
+pub fn getNewTags(self: *const Spell) Error!Spell.NewTag.Array {
     const frost_vom: @This() = self.kind.frost_vom;
-    return Spell.Tag.makeArray(&.{
-        &.{
-            .{ .icon = .{ .sprite_enum = .target } },
-            .{ .icon = .{ .sprite_enum = .mouse } },
-        },
-        &.{
-            .{ .icon = .{ .sprite_enum = .aoe_ice } },
-            .{ .label = Spell.Tag.fmtLabel("{d:.0}", .{frost_vom.hit_effect.damage}) },
-        },
-        &.{
-            .{ .icon = .{ .sprite_enum = .ice_ball } },
-            .{ .icon = .{ .sprite_enum = .ouchy_skull } },
-        },
-    });
+    return Spell.NewTag.Array.fromSlice(&.{
+        try Spell.NewTag.makeDamage(.ice, frost_vom.hit_effect.damage, true),
+        try Spell.NewTag.makeStatus(.frozen, frost_vom.hit_effect.status_stacks.get(.frozen)),
+    }) catch unreachable;
 }

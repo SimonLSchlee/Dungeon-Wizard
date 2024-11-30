@@ -160,6 +160,7 @@ pub fn getNewTags(self: *const Spell) Error!Spell.NewTag.Array {
             .card_label = try Spell.NewTag.CardLabel.fromSlice(
                 try std.fmt.bufPrint(&buf, "Bonus/{any}:", .{icon_text.Icon.burn}),
             ),
+            .start_on_new_line = true,
         },
         try Spell.NewTag.makeStatus(.lit, 1),
         try Spell.NewTag.makeDamage(.fire, flame_purge.bonus_damage_per_lit, false),
