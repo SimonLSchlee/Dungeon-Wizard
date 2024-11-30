@@ -32,6 +32,7 @@ pub const StatusEffect = @import("StatusEffect.zig");
 pub const Collision = @import("Collision.zig");
 const AI = @import("AI.zig");
 const Action = @import("Action.zig");
+const icon_text = @import("icon_text.zig");
 
 pub const Kind = enum {
     creature,
@@ -268,15 +269,102 @@ pub const HP = struct {
     }
 };
 
-pub const HitEffect = struct {
-    pub const DamageKind = enum {
+pub const Damage = struct {
+    pub const Kind = enum {
         physical,
         magic,
         fire,
         ice,
         lightning,
+
+        pub inline fn getIcon(self: Damage.Kind, aoe: bool) icon_text.Icon {
+            return switch (self) {
+                .magic => if (aoe) .aoe_magic else .magic,
+                .fire => if (aoe) .aoe_fire else .fire,
+                .ice => if (aoe) .aoe_ice else .icicle,
+                .lightning => if (aoe) .aoe_lightning else .lightning,
+                else => .blood_splat,
+            };
+        }
+        pub inline fn getName(self: Damage.Kind) []const u8 {
+            return switch (self) {
+                .physical => "Physical",
+                .magic => "Magic",
+                .fire => "Fire",
+                .ice => "Ice",
+                .lightning => "Lightning",
+            };
+        }
+
+        pub fn fmtName(buf: []u8, kind: Damage.Kind, aoe: bool) Error![]u8 {
+            var icon: icon_text.Icon = .blood_splat;
+            var dmg_type_string: []const u8 = "";
+            switch (kind) {
+                .magic => {
+                    icon = if (aoe) .aoe_magic else .magic;
+                    dmg_type_string = "Magic ";
+                },
+                .fire => {
+                    icon = if (aoe) .aoe_fire else .fire;
+                    dmg_type_string = "Fire ";
+                },
+                .ice => {
+                    icon = if (aoe) .aoe_ice else .icicle;
+                    dmg_type_string = "Ice ";
+                },
+                .lightning => {
+                    icon = if (aoe) .aoe_lightning else .lightning;
+                    dmg_type_string = "Lightning ";
+                },
+                else => {},
+            }
+            return try std.fmt.bufPrint(buf, "{any}{s}", .{ icon, dmg_type_string });
+        }
+        pub fn fmtDesc(buf: []u8, kind: Damage.Kind) Error![]u8 {
+            return switch (kind) {
+                .magic => try std.fmt.bufPrint(buf, "It's maaaagic", .{}),
+                .fire => try std.fmt.bufPrint(buf, "Applies a stack of {any}lit", .{StatusEffect.proto_array.get(.lit).icon}),
+                .ice => try std.fmt.bufPrint(buf, "Cold", .{}),
+                .lightning => try std.fmt.bufPrint(buf, "Zappy. Applies {any}stun", .{StatusEffect.proto_array.get(.lit).icon}),
+                else => try std.fmt.bufPrint(buf, "It hurts", .{}),
+            };
+        }
+        pub const FmtOpts = packed struct(usize) {
+            aoe: bool = false,
+            name_string: bool = false,
+        };
+        pub fn format(self: Damage.Kind, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) Error!void {
+            _ = fmt;
+            var opts: Damage.Kind.FmtOpts = .{};
+            if (options.precision) |p| {
+                opts = @bitCast(p);
+            }
+            const icon = self.getIcon(opts.aoe);
+            if (opts.name_string) {
+                writer.print("{any}{s}", .{ icon, self.getName() }) catch return Error.EncodingFail;
+            } else {
+                writer.print("{any}", .{icon}) catch return Error.EncodingFail;
+            }
+        }
     };
-    damage_kind: DamageKind = .physical,
+    kind: Damage.Kind,
+    amount: f32,
+    pub const FmtOpts = packed struct(usize) {
+        aoe: bool = false,
+        _: @Type(.{ .int = .{ .bits = @bitSizeOf(usize) - 1, .signedness = .unsigned } }) = 0,
+    };
+    pub fn format(self: Damage, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) Error!void {
+        _ = fmt;
+        var opts: Damage.FmtOpts = .{};
+        if (options.precision) |p| {
+            opts = @bitCast(p);
+        }
+        writer.print("{any}{d:.0}", .{ self.kind.getIcon(opts.aoe), @floor(self.amount) }) catch return Error.EncodingFail;
+    }
+};
+
+pub const HitEffect = struct {
+    damage_kind: Damage.Kind = .physical,
     damage: f32 = 1,
     status_stacks: StatusEffect.StacksArray = StatusEffect.StacksArray.initDefault(0, .{}),
     force: union(enum) {

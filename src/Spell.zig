@@ -541,10 +541,18 @@ pub const ManaCost = union(enum) {
     }
 };
 
+pub const ToolTip = struct {
+    pub const Desc = utl.BoundedString(256);
+    pub const InfoArr = std.BoundedArray(tooltip.Info, 8);
+
+    infos: InfoArr = .{},
+    desc: Desc = .{},
+};
+
 pub const NewTag = struct {
     pub const Array = std.BoundedArray(NewTag, 8);
     pub const CardLabel = utl.BoundedString(16);
-    pub const TooltipLabel = utl.BoundedString(64);
+    pub const TooltipLabel = utl.BoundedString(128);
     pub const InfoArr = std.BoundedArray(tooltip.Info, 8);
 
     card_label: CardLabel = .{},
@@ -552,7 +560,7 @@ pub const NewTag = struct {
     info_tooltips: InfoArr = .{},
     start_on_new_line: bool = false,
 
-    pub fn makeDamage(kind: Thing.HitEffect.DamageKind, amount: f32, aoe_hits_allies: bool) Error!NewTag {
+    pub fn makeDamage(kind: Thing.Damage.Kind, amount: f32, aoe_hits_allies: bool) Error!NewTag {
         var ret = NewTag{};
         var icon: icon_text.Icon = .blood_splat;
         var dmg_type_string: []const u8 = "";
@@ -597,8 +605,6 @@ pub const NewTag = struct {
                 ) },
             }),
         );
-        // TODO info tooltips (fire..)
-        ret.info_tooltips = .{};
         return ret;
     }
     pub fn makeStatus(kind: StatusEffect.Kind, stacks: i32) Error!NewTag {
@@ -711,7 +717,7 @@ pub const Tag = struct {
         }
         return ret;
     }
-    pub fn makeDamage(kind: Thing.HitEffect.DamageKind, amount: f32, aoe_hits_allies: bool) Tag {
+    pub fn makeDamage(kind: Thing.Damage.Kind, amount: f32, aoe_hits_allies: bool) Tag {
         const sprite: SpriteEnum = switch (kind) {
             .magic => if (aoe_hits_allies) .aoe_magic else .magic,
             .fire => if (aoe_hits_allies) .aoe_fire else .fire,
@@ -726,7 +732,7 @@ pub const Tag = struct {
             }) catch unreachable,
             .desc = fmtDesc("Deals {d:.0} {s} damage{s}", .{
                 @floor(amount),
-                utl.enumToString(Thing.HitEffect.DamageKind, kind),
+                utl.enumToString(Thing.Damage.Kind, kind),
                 if (aoe_hits_allies) ". Careful! Damages ALL creatures in the area of effect" else "",
             }),
         };
@@ -917,6 +923,17 @@ pub fn getFlavor(self: *const Spell) []const u8 {
         },
     }
     return "";
+}
+
+pub fn getToolTip(self: *const Spell, info: *ToolTip) Error!void {
+    switch (self.kind) {
+        inline else => |k| {
+            const K = @TypeOf(k);
+            if (std.meta.hasMethod(K, "getToolTip")) {
+                return try K.getToolTip(self, info);
+            }
+        },
+    }
 }
 
 pub fn getTags(self: *const Spell) Tag.Array {
@@ -1226,9 +1243,10 @@ pub fn unqRenderToolTip(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f) Er
     if (tags.len > 0) {
         try unqRenderToolTipWithTags(cmd_buf, pos, name, flavor, &tags, scaling);
     }
-    const new_tags = try self.getNewTags();
-    if (new_tags.len > 0) {
-        try unqRenderToolTipWithNewTags(cmd_buf, pos, name, flavor, &new_tags, 2);
+    var tt: ToolTip = .{};
+    try self.getToolTip(&tt);
+    if (tt.desc.len > 0) {
+        try _unqRenderToolTip(cmd_buf, pos, &tt, 2);
     }
 }
 
@@ -1323,13 +1341,14 @@ pub fn unqRenderToolTipWithTags(cmd_buf: *ImmUI.CmdBuf, pos: V2f, title: []const
     } }));
 }
 
-pub fn unqRenderToolTipWithNewTags(cmd_buf: *ImmUI.CmdBuf, pos: V2f, title: []const u8, flavor: []const u8, tags: *const NewTag.Array, scaling: f32) Error!void {
+pub fn unqRenderToolTipWithNewTags(cmd_buf: *ImmUI.CmdBuf, pos: V2f, title: []const u8, desc: []const u8, tags: *const NewTag.Array, scaling: f32) Error!void {
     const plat = App.getPlat();
     const data = App.get().data;
     const padding = V2f.splat(10);
     const section_spacing: f32 = 10;
     const tag_line_spacing: f32 = 8;
     const info_tooltip_spacing: f32 = 0;
+    const with_title = false;
     var all_tag_infos = NewTag.InfoArr{};
     for (tags.constSlice()) |tag| {
         loop: for (tag.info_tooltips.constSlice()) |new_info| {
@@ -1341,22 +1360,8 @@ pub fn unqRenderToolTipWithNewTags(cmd_buf: *ImmUI.CmdBuf, pos: V2f, title: []co
             try all_tag_infos.append(new_info);
         }
     }
-
-    const title_font = data.fonts.get(.pixeloid);
-    const title_opt = draw.TextOpt{
-        .color = .white,
-        .size = title_font.base_size * utl.as(u32, scaling + 1),
-        .font = title_font,
-        .smoothing = .none,
-    };
-    const title_dims = try plat.measureText(title, title_opt);
-    const flavor_opt = draw.TextOpt{
-        .color = .white,
-        .size = title_font.base_size * utl.as(u32, scaling),
-        .font = title_font,
-        .smoothing = .none,
-    };
-    const flavor_dims = try plat.measureText(flavor, flavor_opt);
+    const main_font = data.fonts.get(.pixeloid);
+    const desc_dims = icon_text.measureIconText(desc);
     // measure le infos
     var tag_dimses = std.BoundedArray(V2f, (NewTag.Array{}).buffer.len){};
     var total_tags_dims = V2f{};
@@ -1370,11 +1375,23 @@ pub fn unqRenderToolTipWithNewTags(cmd_buf: *ImmUI.CmdBuf, pos: V2f, title: []co
     }
     total_tags_dims.y += tag_line_spacing * @max(utl.as(f32, tag_dimses.len) - 1, 0);
 
-    const main_content_dims = v2f(
-        @max(@max(title_dims.x, flavor_dims.x), total_tags_dims.x),
-        title_dims.y + total_tags_dims.y + flavor_dims.y + 2 * section_spacing,
+    var main_content_dims = v2f(
+        @max(desc_dims.x, total_tags_dims.x),
+        total_tags_dims.y + desc_dims.y + 2 * section_spacing,
     );
     const main_tooltip_dims = main_content_dims.add(padding.scale(2));
+
+    if (with_title) {
+        const title_opt = draw.TextOpt{
+            .color = .white,
+            .size = main_font.base_size * utl.as(u32, scaling + 1),
+            .font = main_font,
+            .smoothing = .none,
+        };
+        const title_dims = try plat.measureText(title, title_opt);
+        main_content_dims.x = @max(main_content_dims, title_dims.x);
+        main_content_dims.y += title_dims.y;
+    }
 
     // measure le infos
     var infos_dimses = std.BoundedArray(V2f, (NewTag.InfoArr{}).buffer.len){};
@@ -1418,19 +1435,24 @@ pub fn unqRenderToolTipWithNewTags(cmd_buf: *ImmUI.CmdBuf, pos: V2f, title: []co
     } });
 
     var content_curr_pos = adjusted_pos.add(padding);
-    try (cmd_buf.append(.{ .label = .{
-        .pos = content_curr_pos,
-        .text = ImmUI.initLabel(title),
-        .opt = title_opt,
-    } }));
-    content_curr_pos.y += title_dims.y + section_spacing;
+    if (with_title) {
+        const title_opt = draw.TextOpt{
+            .color = .white,
+            .size = main_font.base_size * utl.as(u32, scaling + 1),
+            .font = main_font,
+            .smoothing = .none,
+        };
+        const title_dims = try plat.measureText(title, title_opt);
+        try (cmd_buf.append(.{ .label = .{
+            .pos = content_curr_pos,
+            .text = ImmUI.initLabel(title),
+            .opt = title_opt,
+        } }));
+        content_curr_pos.y += title_dims.y + section_spacing;
+    }
 
-    try (cmd_buf.append(.{ .label = .{
-        .pos = content_curr_pos,
-        .text = ImmUI.initLabel(flavor),
-        .opt = flavor_opt,
-    } }));
-    content_curr_pos.y += flavor_dims.y + section_spacing;
+    icon_text.unqRenderIconText(cmd_buf, desc, content_curr_pos, scaling, .white) catch {};
+    content_curr_pos.y += desc_dims.y + section_spacing;
 
     for (tags.constSlice(), 0..) |*tag, i| {
         icon_text.unqRenderIconText(cmd_buf, tag.tooltip_label.constSlice(), content_curr_pos, scaling, .white) catch {};
@@ -1439,6 +1461,69 @@ pub fn unqRenderToolTipWithNewTags(cmd_buf: *ImmUI.CmdBuf, pos: V2f, title: []co
 
     var info_tooltip_pos = adjusted_pos.add(v2f(0, main_tooltip_dims.y + info_tooltip_spacing));
     for (all_tag_infos.constSlice(), 0..) |*info, i| {
+        tooltip.unqRenderToolTip(info, cmd_buf, info_tooltip_pos, scaling) catch {};
+        info_tooltip_pos.y += infos_dimses.get(i).y + info_tooltip_spacing;
+    }
+}
+
+pub fn _unqRenderToolTip(cmd_buf: *ImmUI.CmdBuf, pos: V2f, tt: *const ToolTip, scaling: f32) Error!void {
+    const plat = App.getPlat();
+    //const data = App.get().data;
+    const padding = V2f.splat(10);
+    const info_tooltip_spacing: f32 = 0;
+
+    const desc_dims = icon_text.measureIconText(tt.desc.constSlice());
+
+    const main_content_dims = desc_dims.scale(scaling);
+    const main_tooltip_dims = main_content_dims.add(padding.scale(2));
+
+    // measure le infos
+    var infos_dimses = std.BoundedArray(V2f, (NewTag.InfoArr{}).buffer.len){};
+    var total_infos_dims = V2f{};
+    for (tt.infos.constSlice()) |*info| {
+        const info_dims = tooltip.measureToolTipContent(info);
+        const info_dims_scaled = info_dims.scale(scaling);
+        infos_dimses.appendAssumeCapacity(info_dims_scaled);
+
+        total_infos_dims.y += info_dims_scaled.y + tooltip.tooltip_padding.y * 2;
+        total_infos_dims.x = @max(total_infos_dims.x, info_dims_scaled.x);
+    }
+    total_infos_dims.y += info_tooltip_spacing * @max(utl.as(f32, infos_dimses.len) - 1, 0);
+    total_infos_dims.x += tooltip.tooltip_padding.x * 2;
+
+    const entire_everything_dims = v2f(
+        @max(main_tooltip_dims.x, total_infos_dims.x),
+        main_tooltip_dims.y + if (infos_dimses.len > 0) info_tooltip_spacing + total_infos_dims.y else 0,
+    );
+
+    var adjusted_pos = pos;
+    const bot_right = adjusted_pos.add(entire_everything_dims);
+    const native_cropped_rect_bot_right = plat.native_rect_cropped_offset.add(plat.native_rect_cropped_dims);
+    if (bot_right.x > native_cropped_rect_bot_right.x) {
+        adjusted_pos.x -= (bot_right.x - native_cropped_rect_bot_right.x);
+    }
+    if (bot_right.y > native_cropped_rect_bot_right.y) {
+        adjusted_pos.y -= (bot_right.y - native_cropped_rect_bot_right.y);
+    }
+    adjusted_pos = adjusted_pos.floor();
+
+    // now drawawwwww
+    // main tooltip
+    try cmd_buf.append(.{ .rect = .{
+        .pos = adjusted_pos,
+        .dims = main_tooltip_dims,
+        .opt = .{
+            .fill_color = Colorf.black.fade(0.9),
+            .edge_radius = 0.2,
+        },
+    } });
+
+    const content_curr_pos = adjusted_pos.add(padding);
+    icon_text.unqRenderIconText(cmd_buf, tt.desc.constSlice(), content_curr_pos, scaling, .white) catch {};
+    //content_curr_pos.y += desc_dims.y + section_spacing;
+
+    var info_tooltip_pos = adjusted_pos.add(v2f(0, main_tooltip_dims.y + info_tooltip_spacing));
+    for (tt.infos.constSlice(), 0..) |*info, i| {
         tooltip.unqRenderToolTip(info, cmd_buf, info_tooltip_pos, scaling) catch {};
         info_tooltip_pos.y += infos_dimses.get(i).y + info_tooltip_spacing;
     }

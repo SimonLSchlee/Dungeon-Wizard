@@ -35,7 +35,7 @@ pub const InfoKind = enum {
 
 pub const Info = union(enum) {
     status: StatusEffect.Kind,
-    damage: Thing.HitEffect.DamageKind,
+    damage: Thing.Damage.Kind,
 
     pub fn eql(a: Info, b: Info) bool {
         if (std.meta.activeTag(a) != std.meta.activeTag(b)) return false;
@@ -50,7 +50,7 @@ pub const tooltip_padding = v2f(10, 10);
 pub const tooltip_section_spacing: f32 = 8;
 
 pub fn measureToolTipContent(info: *const Info) V2f {
-    var buf: [64]u8 = undefined;
+    var buf: [128]u8 = undefined;
     var title_dims = V2f{};
     var desc_dims = V2f{};
     switch (info.*) {
@@ -61,7 +61,10 @@ pub fn measureToolTipContent(info: *const Info) V2f {
             desc_dims = icon_text.measureIconText(desc);
         },
         .damage => |kind| {
-            _ = kind;
+            const title = Thing.Damage.Kind.fmtName(&buf, kind, false) catch "";
+            title_dims = icon_text.measureIconText(title);
+            const desc = Thing.Damage.Kind.fmtDesc(&buf, kind) catch "";
+            desc_dims = icon_text.measureIconText(desc);
         },
     }
     return v2f(
@@ -71,7 +74,7 @@ pub fn measureToolTipContent(info: *const Info) V2f {
 }
 
 pub fn unqRenderToolTip(info: *const Info, cmd_buf: *ImmUI.CmdBuf, pos: V2f, ui_scaling: f32) Error!void {
-    var buf: [64]u8 = undefined;
+    var buf: [128]u8 = undefined;
     const content_dims = measureToolTipContent(info).scale(ui_scaling);
     const rect_dims = content_dims.add(tooltip_padding.scale(2));
     const content_pos = pos.add(tooltip_padding);
@@ -95,7 +98,13 @@ pub fn unqRenderToolTip(info: *const Info, cmd_buf: *ImmUI.CmdBuf, pos: V2f, ui_
             try icon_text.unqRenderIconText(cmd_buf, desc, curr_pos, ui_scaling, .white);
         },
         .damage => |kind| {
-            _ = kind;
+            var curr_pos = content_pos;
+            const title = Thing.Damage.Kind.fmtName(&buf, kind, false) catch ""; // TODO aoe?
+            const title_dims = icon_text.measureIconText(title).scale(ui_scaling);
+            try icon_text.unqRenderIconText(cmd_buf, title, curr_pos, ui_scaling, .white);
+            curr_pos.y += title_dims.y + tooltip_section_spacing;
+            const desc = Thing.Damage.Kind.fmtDesc(&buf, kind) catch "";
+            try icon_text.unqRenderIconText(cmd_buf, desc, curr_pos, ui_scaling, .white);
         },
     }
 }

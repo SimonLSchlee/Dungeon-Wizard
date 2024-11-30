@@ -87,7 +87,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     const transferred_stacks: i32 = caster_lit_status.stacks;
     caster_lit_status.stacks = 0;
     var updated_hit_effect = flame_purge.explode_hit_effect;
-    updated_hit_effect.status_stacks.getPtr(.lit).* += transferred_stacks;
+    //updated_hit_effect.status_stacks.getPtr(.lit).* += transferred_stacks;
     updated_hit_effect.damage += utl.as(f32, transferred_stacks) * flame_purge.bonus_damage_per_lit;
 
     const ball = Thing{
@@ -119,16 +119,34 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     caster.statuses.getPtr(.moist).addStacks(caster, flame_purge.immune_stacks);
 }
 
-pub const description =
-    \\Fire explodes outwards from you,
-    \\knocking back surrounding enemies.
-    \\Transfer your lit stacks to enemies.
-    \\You are moistened by the experience.
-;
-
-pub fn getFlavor(self: *const Spell) []const u8 {
-    _ = self;
-    return description;
+pub fn getToolTip(self: *const Spell, tt: *Spell.ToolTip) Error!void {
+    const flame_purge: @This() = self.kind.flame_purge;
+    const hit_damage = Thing.Damage{
+        .kind = .fire,
+        .amount = flame_purge.explode_hit_effect.damage,
+    };
+    const bonus_damage = Thing.Damage{
+        .kind = .fire,
+        .amount = flame_purge.bonus_damage_per_lit,
+    };
+    const fmt =
+        \\Deal {any} damage and knock back
+        \\surrounding enemies.
+        \\Deal an additional {any} for each
+        \\{any}lit stack you have.
+        \\Gain {any}moist for {} seconds.
+    ;
+    const desc = try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{
+        hit_damage,
+        bonus_damage,
+        StatusEffect.getIcon(.lit),
+        StatusEffect.getIcon(.moist),
+        StatusEffect.getDurationSeconds(.moist, flame_purge.immune_stacks).?,
+    });
+    try tt.desc.resize(desc.len);
+    tt.infos.appendAssumeCapacity(.{ .damage = .fire });
+    tt.infos.appendAssumeCapacity(.{ .status = .lit });
+    tt.infos.appendAssumeCapacity(.{ .status = .moist });
 }
 
 pub fn getNewTags(self: *const Spell) Error!Spell.NewTag.Array {

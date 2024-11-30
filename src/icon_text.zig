@@ -187,6 +187,7 @@ pub fn measureIconText(buf: []const u8) V2f {
         .smoothing = .none,
     };
     const line_height = utl.as(f32, icon_text_font.base_size);
+    const line_spacing = 2;
     var it = utf8ToPartsIterator(buf);
     var dims = v2f(0, line_height);
     var curr_line_width: f32 = 0;
@@ -208,7 +209,7 @@ pub fn measureIconText(buf: []const u8) V2f {
                     // new line was found
                     if (line_it.index) |_| {
                         dims.x = @max(dims.x, curr_line_width);
-                        dims.y += line_height;
+                        dims.y += line_height + line_spacing;
                         curr_line_width = 0;
                     }
                 }
@@ -231,6 +232,7 @@ pub fn unqRenderIconText(cmd_buf: *ImmUI.CmdBuf, buf: []const u8, pos: V2f, scal
         .color = color,
     };
     const line_height = utl.as(f32, icon_text_font.base_size * utl.as(u32, @round(scaling)));
+    const line_spacing: f32 = 2 * scaling;
     var it = utf8ToPartsIterator(buf);
     var curr_pos: V2f = pos;
     var last_was_text: bool = false;
@@ -260,7 +262,7 @@ pub fn unqRenderIconText(cmd_buf: *ImmUI.CmdBuf, buf: []const u8, pos: V2f, scal
                 while (line_it.next()) |line| {
                     cmd_buf.appendAssumeCapacity(.{ .label = .{
                         .pos = curr_pos,
-                        .text = ImmUI.initLabel(text),
+                        .text = ImmUI.initLabel(line),
                         .opt = icon_text_opt,
                     } });
                     const line_sz = plat.measureText(line, icon_text_opt) catch V2f{};
@@ -268,7 +270,7 @@ pub fn unqRenderIconText(cmd_buf: *ImmUI.CmdBuf, buf: []const u8, pos: V2f, scal
                     // new line was found
                     if (line_it.index) |_| {
                         curr_pos.x = pos.x;
-                        curr_pos.y += line_height;
+                        curr_pos.y += line_height + line_spacing;
                     }
                 }
             },

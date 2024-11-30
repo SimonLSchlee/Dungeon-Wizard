@@ -296,13 +296,41 @@ pub fn update(status: *StatusEffect, thing: *Thing, room: *Room) Error!void {
     }
 }
 
+pub fn getIcon(kind: StatusEffect.Kind) icon_text.Icon {
+    return proto_array.get(kind).icon;
+}
+
 pub fn fmtDesc(buf: []u8, kind: StatusEffect.Kind) Error![]u8 {
     const status = proto_array.get(kind);
     return switch (kind) {
         .protected => try std.fmt.bufPrint(buf, "The next enemy attack is blocked", .{}),
         .frozen => try std.fmt.bufPrint(buf, "Cannot move or act", .{}),
-        .exposed => try std.fmt.bufPrint(buf, "Takes 30% more damage from all sources", .{}),
-        else => try std.fmt.bufPrint(buf, "<Placeholder for status: {s}>", .{status.name}),
+        .blackmailed => try std.fmt.bufPrint(buf, "Fights for the blackmailer", .{}),
+        .mint => try std.fmt.bufPrint(buf, "On death, drops 1 gold per stack", .{}),
+        .promptitude => try std.fmt.bufPrint(buf, "Moves and acts at double speed", .{}),
+        .exposed => try std.fmt.bufPrint(buf, "Takes 130% damage from all sources", .{}),
+        .stunned => try std.fmt.bufPrint(buf, "Cannot move or act", .{}),
+        .unseeable => try std.fmt.bufPrint(buf, "Ignored by enemies", .{}),
+        .prickly => try std.fmt.bufPrint(buf, "Melee attackers take 1 damage per stack", .{}),
+        .lit => try std.fmt.bufPrint(
+            buf,
+            "For each stack, take 1 damage per second.\nRemove 1 stack every {} seconds.\nMax {} stacks",
+            .{
+                utl.as(i32, @floor(core.fups_to_secsf(status.cooldown.num_ticks))),
+                status.max_stacks,
+            },
+        ),
+        .moist => try std.fmt.bufPrint(
+            buf,
+            "Remove all stacks of {any}lit.\nImmune to {any}lit until duration expires",
+            .{
+                icon_text.Icon.burn,
+                icon_text.Icon.burn,
+            },
+        ),
+        .trailblaze => try std.fmt.bufPrint(buf, "Moves faster.\nLeaves behind a trail of fire", .{}),
+        .quickdraw => try std.fmt.bufPrint(buf, "The next spell is drawn instantly", .{}),
+        //else => try std.fmt.bufPrint(buf, "<Placeholder for status: {s}>", .{status.name}),
     };
 }
 
