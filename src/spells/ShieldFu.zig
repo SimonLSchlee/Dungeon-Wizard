@@ -56,22 +56,18 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     _ = room;
 }
 
-pub const description =
-    \\Shield self from damage.
-;
-
-pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
+pub fn getToolTip(self: *const Spell, tt: *Spell.ToolTip) Error!void {
     const shield_fu: @This() = self.kind.shield_fu;
     const fmt =
-        \\Shield amount: {}
-        \\Duration: {} secs
-        \\
-        \\{s}
-        \\
+        \\Gain {any}{d:.0} shield for {d:.0} seconds.
     ;
-
-    const b = try std.fmt.bufPrint(buf, fmt, .{ shield_fu.shield_amount, shield_fu.duration_secs, description });
-    return b;
+    const desc = try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{
+        StatusEffect.getIcon(.shield),
+        @floor(shield_fu.shield_amount),
+        @floor(shield_fu.duration_secs),
+    });
+    try tt.desc.resize(desc.len);
+    tt.infos.appendAssumeCapacity(.{ .status = .shield });
 }
 
 pub fn getTags(self: *const Spell) Spell.Tag.Array {
