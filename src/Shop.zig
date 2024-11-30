@@ -53,8 +53,7 @@ pub const Product = struct {
 const ProductSlot = struct {
     product: ?Product,
     rect: geom.Rectf = .{},
-    hover_timer: utl.TickCounter = utl.TickCounter.init(15),
-    is_long_hovered: bool = false,
+    long_hover: menuUI.LongHover = .{},
 };
 
 render_texture: Platform.RenderTexture2D,
@@ -65,9 +64,6 @@ state: enum {
     shopping,
     done,
 } = .shopping,
-imm_ui: struct {
-    commands: ImmUI.CmdBuf = .{},
-} = .{},
 
 pub fn init(seed: u64, run: *Run) Error!Shop {
     const plat = App.getPlat();
@@ -77,10 +73,9 @@ pub fn init(seed: u64, run: *Run) Error!Shop {
         .rng = std.Random.DefaultPrng.init(seed),
     };
 
-    var spells = std.BoundedArray(Spell, max_num_spells){};
-    const spells_generated = Spell.makeShopSpells(ret.rng.random(), run.mode, spells.slice());
-    spells.resize(spells_generated.len) catch unreachable;
-    for (spells.constSlice()) |spell| {
+    var spells_buf: [max_num_spells]Spell = undefined;
+    const spells_generated = Spell.makeShopSpells(ret.rng.random(), run.mode, spells_buf[0..num_spells]);
+    for (spells_generated) |spell| {
         ret.spells.appendAssumeCapacity(.{
             .product = .{
                 .kind = .{ .spell = spell },
@@ -89,11 +84,9 @@ pub fn init(seed: u64, run: *Run) Error!Shop {
         });
     }
 
-    var items = std.BoundedArray(Item, max_num_items){};
-    items.resize(num_items) catch unreachable;
-    const num_items_generated = Item.makeShopItems(ret.rng.random(), run.mode, items.slice());
-    items.resize(num_items_generated) catch unreachable;
-    for (items.constSlice()) |item| {
+    var items_buf: [max_num_items]Item = undefined;
+    const items_generated = Item.makeShopItems(ret.rng.random(), run.mode, items_buf[0..num_items]);
+    for (items_generated) |item| {
         ret.items.appendAssumeCapacity(.{
             .product = .{
                 .kind = .{ .item = item },
@@ -123,7 +116,7 @@ pub fn canBuy(run: *const Run, product: *const Product) bool {
     return run.gold >= price and run.canPickupProduct(product);
 }
 
-fn unqProductSlot(cmd_buf: *ImmUI.CmdBuf, slot: *ProductSlot, run: *const Run) Error!bool {
+fn unqProductSlot(cmd_buf: *ImmUI.CmdBuf, tooltip_buf: *ImmUI.CmdBuf, slot: *ProductSlot, run: *const Run) Error!bool {
     const data = App.get().data;
     const plat = getPlat();
     const ui_scaling: f32 = 3;
@@ -137,13 +130,6 @@ fn unqProductSlot(cmd_buf: *ImmUI.CmdBuf, slot: *ProductSlot, run: *const Run) E
     const can_buy = slot_enabled and canBuy(run, &slot.product.?);
     const bg_color = Colorf.rgb(0.17, 0.15, 0.15);
     var slot_contents_pos = slot.rect.pos.add(V2f.splat(slot_margin));
-
-    if (hovered) {
-        _ = slot.hover_timer.tick(false);
-    } else {
-        slot.hover_timer.restart();
-    }
-    slot.is_long_hovered = (hovered and !slot.hover_timer.running);
 
     // background rect
     if (can_buy and hovered) {
@@ -166,12 +152,16 @@ fn unqProductSlot(cmd_buf: *ImmUI.CmdBuf, slot: *ProductSlot, run: *const Run) E
         ret = can_buy and hovered and clicked;
         switch (product.kind) {
             .spell => |*spell| {
-                // TODO maybe?
-                //const scaling = if (slot.is_long_hovered) ui_scaling + 1 else ui_scaling;
                 spell.unqRenderCard(cmd_buf, slot_contents_pos, null, ui_scaling);
+                if (slot.long_hover.update(hovered)) {
+                    try spell.unqRenderTooltip(tooltip_buf, slot_contents_pos.add(v2f(slot.rect.dims.x, 0)), ui_scaling);
+                }
             },
             .item => |*item| {
                 try item.unqRenderIcon(cmd_buf, slot_contents_pos, ui_scaling);
+                if (slot.long_hover.update(hovered)) {
+                    try item.unqRenderTooltip(tooltip_buf, slot_contents_pos.add(v2f(slot.rect.dims.x, 0)), ui_scaling);
+                }
             },
         }
         const price_font = data.fonts.get(.pixeloid);
@@ -196,19 +186,21 @@ fn unqProductSlot(cmd_buf: *ImmUI.CmdBuf, slot: *ProductSlot, run: *const Run) E
     return ret;
 }
 
-pub fn update(self: *Shop, run: *const Run) Error!?Product {
+pub fn update(self: *Shop, run: *Run) Error!?Product {
     const plat = getPlat();
     const data = App.get().data;
     const ui_scaling: f32 = 3;
     var ret: ?Product = null;
 
-    self.imm_ui.commands.clear();
+    try run.imm_ui.commands.append(.{ .clear = .{
+        .color = .gray,
+    } });
 
     const title_center_pos = plat.native_rect_cropped_offset.add(v2f(
         plat.native_rect_cropped_dims.x * 0.5,
         60,
     ));
-    try self.imm_ui.commands.append(.{ .label = .{
+    try run.imm_ui.commands.append(.{ .label = .{
         .pos = title_center_pos,
         .text = ImmUI.initLabel("Shoppy Woppy"),
         .opt = .{
@@ -258,7 +250,7 @@ pub fn update(self: *Shop, run: *const Run) Error!?Product {
     }
 
     for (self.spells.slice()) |*slot| {
-        if (try unqProductSlot(&self.imm_ui.commands, slot, run)) {
+        if (try unqProductSlot(&run.imm_ui.commands, &run.tooltip_ui.commands, slot, run)) {
             assert(canBuy(run, &slot.product.?));
             ret = slot.product.?;
             slot.product = null;
@@ -266,7 +258,7 @@ pub fn update(self: *Shop, run: *const Run) Error!?Product {
     }
 
     for (self.items.slice()) |*slot| {
-        if (try unqProductSlot(&self.imm_ui.commands, slot, run)) {
+        if (try unqProductSlot(&run.imm_ui.commands, &run.tooltip_ui.commands, slot, run)) {
             assert(canBuy(run, &slot.product.?));
             ret = slot.product.?;
             slot.product = null;
@@ -279,21 +271,10 @@ pub fn update(self: *Shop, run: *const Run) Error!?Product {
         const btn_center = items_center.add(v2f(0, item_slot_dims.y * 0.5 + 40 + proceed_btn_dims.y * 0.5));
         const proceed_btn_pos = btn_center.sub(proceed_btn_dims.scale(0.5));
 
-        if (menuUI.textButton(&self.imm_ui.commands, proceed_btn_pos, "Proceed", proceed_btn_dims)) {
+        if (menuUI.textButton(&run.imm_ui.commands, proceed_btn_pos, "Proceed", proceed_btn_dims)) {
             self.state = .done;
         }
     }
 
     return ret;
-}
-
-pub fn render(self: *Shop, run: *Run, native_render_texture: Platform.RenderTexture2D) Error!void {
-    _ = run;
-    const plat = getPlat();
-
-    plat.startRenderToTexture(native_render_texture);
-    plat.clear(Colorf.rgb(0.2, 0.2, 0.2));
-    plat.setBlend(.render_tex_alpha);
-
-    try ImmUI.render(&self.imm_ui.commands);
 }

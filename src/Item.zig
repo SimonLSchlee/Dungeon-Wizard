@@ -331,7 +331,7 @@ pub fn getItemWeights(items: []const Item) WeightsArray {
     return ret;
 }
 
-pub fn generateRandom(rng: std.Random, mask: Obtainableness.Mask, mode: Run.Mode, allow_duplicates: bool, buf: []Item) usize {
+pub fn generateRandom(rng: std.Random, mask: Obtainableness.Mask, mode: Run.Mode, allow_duplicates: bool, buf: []Item) []Item {
     var num: usize = 0;
     var item_pool = ItemArray{};
     for (all_items) |item| {
@@ -347,14 +347,14 @@ pub fn generateRandom(rng: std.Random, mask: Obtainableness.Mask, mode: Run.Mode
         buf[i] = item;
         num += 1;
     }
-    return num;
+    return buf[0..num];
 }
 
-pub fn makeRoomReward(rng: std.Random, mode: Run.Mode, buf: []Item) usize {
+pub fn makeRoomReward(rng: std.Random, mode: Run.Mode, buf: []Item) []Item {
     return generateRandom(rng, Obtainableness.Mask.initOne(.room_reward), mode, false, buf);
 }
 
-pub fn makeShopItems(rng: std.Random, mode: Run.Mode, buf: []Item) usize {
+pub fn makeShopItems(rng: std.Random, mode: Run.Mode, buf: []Item) []Item {
     return generateRandom(rng, Obtainableness.Mask.initOne(.shop), mode, false, buf);
 }
 

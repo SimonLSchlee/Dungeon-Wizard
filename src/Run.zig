@@ -363,9 +363,10 @@ pub fn makeRewards(self: *Run, difficulty: f32) void {
     var reward_ui = Reward.UI{};
 
     { // spells
+        const num_spells = Reward.base_spells;
         var reward: Reward = .{ .kind = .{ .spell_choice = .{} } };
         var buf: [Reward.max_spells]Spell = undefined;
-        const spells = Spell.makeRoomReward(random, self.mode, buf[0..Reward.base_spells]);
+        const spells = Spell.makeRoomReward(random, self.mode, buf[0..num_spells]);
         for (spells) |spell| {
             reward.kind.spell_choice.appendAssumeCapacity(.{ .spell = spell });
         }
@@ -374,11 +375,9 @@ pub fn makeRewards(self: *Run, difficulty: f32) void {
     { // items
         const num_items = random.uintAtMost(usize, Reward.base_items);
         if (num_items > 0) {
-            var items = std.BoundedArray(Item, Reward.max_items){};
-            items.resize(num_items) catch unreachable;
-            const num_items_generated = Item.makeRoomReward(random, self.mode, items.slice());
-            items.resize(num_items_generated) catch unreachable;
-            for (items.constSlice()) |item| {
+            var buf: [Reward.max_items]Item = undefined;
+            const items = Item.makeRoomReward(random, self.mode, buf[0..num_items]);
+            for (items) |item| {
                 reward_ui.rewards.appendAssumeCapacity(.{ .kind = .{ .item = item } });
             }
         }
@@ -1000,11 +999,7 @@ pub fn render(self: *Run, native_render_texture: Platform.RenderTexture2D) Error
         },
         .pause_menu => {},
         .reward => {},
-        .shop => {
-            assert(self.shop != null);
-            const shop = &self.shop.?;
-            try shop.render(self, native_render_texture);
-        },
+        .shop => {},
         .dead => {
             try self.dead_menu.modal.render();
             try self.dead_menu.new_run_button.render();

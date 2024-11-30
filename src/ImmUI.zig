@@ -43,6 +43,13 @@ pub const Command = union(enum) {
 
     panel_start: Panel,
     panel_end,
+    clear: struct {
+        color: draw.Colorf,
+        pub fn render(self: *const @This()) Error!void {
+            const plat = getPlat();
+            plat.clear(self.color);
+        }
+    },
     rect: struct {
         pos: V2f,
         dims: V2f,
