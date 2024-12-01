@@ -1,16 +1,7 @@
 { "frames": [
    {
-    "filename": "attack-E 0",
+    "filename": "attack-E  0",
     "frame": { "x": 0, "y": 0, "w": 48, "h": 52 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 52 },
-    "sourceSize": { "w": 48, "h": 52 },
-    "duration": 400
-   },
-   {
-    "filename": "attack-E 1",
-    "frame": { "x": 48, "y": 0, "w": 48, "h": 52 },
     "rotated": false,
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 52 },
@@ -18,7 +9,16 @@
     "duration": 300
    },
    {
-    "filename": "attack-E 2",
+    "filename": "attack-E  1",
+    "frame": { "x": 48, "y": 0, "w": 48, "h": 52 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 52 },
+    "sourceSize": { "w": 48, "h": 52 },
+    "duration": 700
+   },
+   {
+    "filename": "attack-E  2",
     "frame": { "x": 96, "y": 0, "w": 48, "h": 52 },
     "rotated": false,
     "trimmed": false,
@@ -27,7 +27,7 @@
     "duration": 100
    },
    {
-    "filename": "attack-E 3",
+    "filename": "attack-E  3",
     "frame": { "x": 144, "y": 0, "w": 48, "h": 52 },
     "rotated": false,
     "trimmed": false,
@@ -36,7 +36,7 @@
     "duration": 100
    },
    {
-    "filename": "attack-E 4",
+    "filename": "attack-E  4",
     "frame": { "x": 192, "y": 0, "w": 48, "h": 52 },
     "rotated": false,
     "trimmed": false,
@@ -45,7 +45,7 @@
     "duration": 100
    },
    {
-    "filename": "attack-E 5",
+    "filename": "attack-E  5",
     "frame": { "x": 240, "y": 0, "w": 48, "h": 52 },
     "rotated": false,
     "trimmed": false,
@@ -54,17 +54,8 @@
     "duration": 200
    },
    {
-    "filename": "attack-W 0",
+    "filename": "attack-W  0",
     "frame": { "x": 0, "y": 52, "w": 48, "h": 52 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 52 },
-    "sourceSize": { "w": 48, "h": 52 },
-    "duration": 400
-   },
-   {
-    "filename": "attack-W 1",
-    "frame": { "x": 48, "y": 52, "w": 48, "h": 52 },
     "rotated": false,
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 52 },
@@ -72,7 +63,16 @@
     "duration": 300
    },
    {
-    "filename": "attack-W 2",
+    "filename": "attack-W  1",
+    "frame": { "x": 48, "y": 52, "w": 48, "h": 52 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 52 },
+    "sourceSize": { "w": 48, "h": 52 },
+    "duration": 700
+   },
+   {
+    "filename": "attack-W  2",
     "frame": { "x": 96, "y": 52, "w": 48, "h": 52 },
     "rotated": false,
     "trimmed": false,
@@ -81,7 +81,7 @@
     "duration": 100
    },
    {
-    "filename": "attack-W 3",
+    "filename": "attack-W  3",
     "frame": { "x": 144, "y": 52, "w": 48, "h": 52 },
     "rotated": false,
     "trimmed": false,
@@ -90,7 +90,7 @@
     "duration": 100
    },
    {
-    "filename": "attack-W 4",
+    "filename": "attack-W  4",
     "frame": { "x": 192, "y": 52, "w": 48, "h": 52 },
     "rotated": false,
     "trimmed": false,
@@ -99,7 +99,7 @@
     "duration": 150
    },
    {
-    "filename": "attack-W 5",
+    "filename": "attack-W  5",
     "frame": { "x": 240, "y": 52, "w": 48, "h": 52 },
     "rotated": false,
     "trimmed": false,
@@ -128,6 +128,8 @@
    { "name": "arm-right", "opacity": 255, "blendMode": "normal" },
    { "name": "whoosh", "opacity": 255, "blendMode": "normal" },
    { "name": "dust", "opacity": 255, "blendMode": "normal" }
+  ],
+  "slices": [
   ]
  }
 }

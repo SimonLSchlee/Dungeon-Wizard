@@ -106,14 +106,14 @@
                 {
                  "height":0,
                  "id":6,
-                 "name":"spawn",
+                 "name":"creature:gobbomber",
                  "point":true,
                  "rotation":0,
                  "type":"",
                  "visible":true,
                  "width":0,
-                 "x":87.8791935980302,
-                 "y":108.839642967067
+                 "x":84.6291935980302,
+                 "y":82.839642967067
                 }],
          "opacity":1,
          "type":"objectgroup",
