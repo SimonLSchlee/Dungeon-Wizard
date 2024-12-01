@@ -250,15 +250,18 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
             place.room.waves_params.enemy_probabilities.getPtr(.slime).* = 1;
             place.room.waves_params.enemy_probabilities.getPtr(.bat).* = 0.5;
             place.room.waves_params.enemy_probabilities.getPtr(.gobbow).* = 1;
+            place.room.waves_params.enemy_probabilities.getPtr(.gobbomber).* = 0.5;
         }
         if (i >= 3) {
             place.room.waves_params.enemy_probabilities.getPtr(.slime).* = 0;
             place.room.waves_params.enemy_probabilities.getPtr(.bat).* = 0;
             place.room.waves_params.enemy_probabilities.getPtr(.gobbow).* = 0.5;
-            place.room.waves_params.enemy_probabilities.getPtr(.sharpboi).* = 1;
+            place.room.waves_params.enemy_probabilities.getPtr(.gobbomber).* = 1;
             place.room.waves_params.enemy_probabilities.getPtr(.acolyte).* = 1;
         }
         if (i >= 4) {
+            place.room.waves_params.enemy_probabilities.getPtr(.gobbow).* = 1;
+            place.room.waves_params.enemy_probabilities.getPtr(.sharpboi).* = 1;
             place.room.waves_params.enemy_probabilities.getPtr(.troll).* = 1;
         }
         place.room.difficulty = 2 + u.as(f32, i) * 2;
