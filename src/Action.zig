@@ -23,51 +23,12 @@ const Spell = @import("Spell.zig");
 const Item = @import("Item.zig");
 const gameUI = @import("gameUI.zig");
 const sprites = @import("sprites.zig");
+const projectiles = @import("projectiles.zig");
 const Action = @This();
 
 // Loosely defined, an Action is a behavior that occurs over a predictable timespan
 // E.g. Shooting an arrow, casting a spell, dashing...
 // Walking to player is NOT a predictable timespan, too many variables. so not an Action.
-
-pub const Projectile = enum {
-    arrow,
-
-    pub fn prototype(self: Projectile) Thing {
-        switch (self) {
-            .arrow => return gobbowArrow(),
-        }
-        unreachable;
-    }
-};
-
-fn gobbowArrow() Thing {
-    const arrow = Thing{
-        .kind = .projectile,
-        .coll_radius = 5,
-        .accel_params = .{
-            .accel = 4,
-            .friction = 0,
-            .max_speed = 4,
-        },
-        .coll_mask = Thing.Collision.Mask.initMany(&.{.tile}),
-        .controller = .{ .projectile = .{} },
-        .renderer = .{ .shape = .{
-            .kind = .{ .arrow = .{
-                .length = 35,
-                .thickness = 4,
-            } },
-            .poly_opt = .{ .fill_color = draw.Coloru.rgb(220, 172, 89).toColorf() },
-        } },
-        .hitbox = .{
-            .active = true,
-            .deactivate_on_hit = true,
-            .deactivate_on_update = false,
-            .effect = .{ .damage = 7 },
-            .radius = 4,
-        },
-    };
-    return arrow;
-}
 
 pub const MeleeAttack = struct {
     pub const enum_name = "melee_attack";
@@ -80,9 +41,10 @@ pub const MeleeAttack = struct {
 
 pub const ProjectileAttack = struct {
     pub const enum_name = "projectile_attack";
-    projectile: Projectile,
+    projectile: projectiles.ProjectileKind,
     range: f32 = 100,
     LOS_thiccness: f32 = 10,
+    target_pos: V2f = .{},
 };
 
 pub const SpellCast = struct {
@@ -183,7 +145,7 @@ pub fn begin(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) E
             _ = melee;
         },
         .projectile_attack => |*proj| {
-            _ = proj;
+            proj.target_pos = doing.params.pos;
         },
         .spell_cast => |*sp| {
             _ = sp;
@@ -210,6 +172,18 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
             const events = self.animator.?.play(.attack, .{ .loop = true });
             if (events.contains(.commit)) {
                 doing.can_turn = false;
+                self.hitbox = melee.hitbox;
+                const hitbox = &self.hitbox.?;
+                const dir_ang = self.dir.toAngleRadians();
+                hitbox.rel_pos = V2f.fromAngleRadians(dir_ang).scale(hitbox.rel_pos.length());
+                if (hitbox.sweep_to_rel_pos) |*sw| {
+                    sw.* = V2f.fromAngleRadians(dir_ang).scale(sw.length());
+                }
+                if (self.animator.?.getTicksUntilEvent(.hit)) |ticks_til_hit_event| {
+                    hitbox.indicator = .{
+                        .timer = utl.TickCounter.init(ticks_til_hit_event),
+                    };
+                }
             }
             // predict hit
             if (doing.can_turn) {
@@ -231,9 +205,7 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
             // end and hit are mutually exclusive
             if (events.contains(.end)) {
                 // deactivate hitbox
-                if (self.hitbox) |*hitbox| {
-                    hitbox.active = false;
-                }
+                self.hitbox.?.active = false;
                 if (melee.lunge_accel) |accel_params| {
                     self.coll_mask.insert(.creature);
                     self.coll_layer.insert(.creature);
@@ -244,15 +216,9 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
 
             if (events.contains(.hit)) {
                 self.renderer.creature.draw_color = Colorf.red;
-                self.hitbox = melee.hitbox;
                 const hitbox = &self.hitbox.?;
                 //std.debug.print("hit targetu\n", .{});
                 hitbox.mask = Thing.Faction.opposing_masks.get(self.faction);
-                const dir_ang = self.dir.toAngleRadians();
-                hitbox.rel_pos = V2f.fromAngleRadians(dir_ang).scale(hitbox.rel_pos.length());
-                if (hitbox.sweep_to_rel_pos) |*sw| {
-                    sw.* = V2f.fromAngleRadians(dir_ang).scale(sw.length());
-                }
                 hitbox.active = true;
                 if (maybe_target_thing) |target_thing| {
                     if (melee.hit_to_side_force > 0) {
@@ -272,17 +238,18 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                 }
             }
         },
-        .projectile_attack => |atk| {
+        .projectile_attack => |*atk| {
             self.updateVel(.{}, .{});
             const events = self.animator.?.play(.attack, .{ .loop = true });
             if (events.contains(.commit)) {
                 doing.can_turn = false;
             }
             // face/track target
-            var projectile = atk.projectile.prototype();
+            var projectile: Thing = atk.projectile.prototype();
             if (doing.can_turn) {
                 // default to original target pos
                 self.dir = doing.params.pos.sub(self.pos).normalizedChecked() orelse self.dir;
+                atk.target_pos = doing.params.pos;
                 if (maybe_target_thing) |target| {
                     if (self.animator.?.getTicksUntilEvent(.hit)) |ticks_til_hit_event| {
                         if (target.hurtbox) |hurtbox| { // TODO hurtbox pos?
@@ -291,12 +258,22 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                             var ticks_til_hit = utl.as(f32, ticks_til_hit_event);
                             ticks_til_hit += range / projectile.accel_params.max_speed;
                             const predicted_target_pos = target.pos.add(target.vel.scale(ticks_til_hit));
-                            // make sure we can actually still get past nearby walls with this new angle!
-                            if (room.tilemap.isLOSBetweenThicc(self.pos, predicted_target_pos, atk.LOS_thiccness)) {
-                                self.dir = predicted_target_pos.sub(self.pos).normalizedChecked() orelse self.dir;
-                            } else if (room.tilemap.isLOSBetweenThicc(self.pos, target.pos, atk.LOS_thiccness)) {
-                                // otherwise just face target directly
-                                self.dir = target.pos.sub(self.pos).normalizedChecked() orelse self.dir;
+                            switch (atk.projectile) {
+                                .arrow => {
+                                    // make sure we can actually still get past nearby walls with this new angle!
+                                    if (room.tilemap.isLOSBetweenThicc(self.pos, predicted_target_pos, atk.LOS_thiccness)) {
+                                        atk.target_pos = predicted_target_pos;
+                                        self.dir = predicted_target_pos.sub(self.pos).normalizedChecked() orelse self.dir;
+                                    } else if (room.tilemap.isLOSBetweenThicc(self.pos, target.pos, atk.LOS_thiccness)) {
+                                        // otherwise just face target directly
+                                        atk.target_pos = target.pos;
+                                        self.dir = target.pos.sub(self.pos).normalizedChecked() orelse self.dir;
+                                    }
+                                },
+                                .bomb => {
+                                    atk.target_pos = predicted_target_pos;
+                                    self.dir = predicted_target_pos.sub(self.pos).normalizedChecked() orelse self.dir;
+                                },
                             }
                         }
                     }
@@ -310,13 +287,22 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
             if (events.contains(.hit)) {
                 self.renderer.creature.draw_color = Colorf.red;
                 projectile.dir = self.dir;
-                projectile.hitbox.?.mask = Thing.Faction.opposing_masks.get(self.faction);
                 switch (atk.projectile) {
                     .arrow => {
                         projectile.hitbox.?.rel_pos = self.dir.scale(28);
-                        _ = try room.queueSpawnThing(&projectile, self.pos);
+                        projectile.hitbox.?.mask = Thing.Faction.opposing_masks.get(self.faction);
+                    },
+                    .bomb => {
+                        const dist = atk.target_pos.dist(self.pos);
+                        const ticks_til_hit = utl.as(i64, dist / projectile.accel_params.max_speed);
+                        projectile.hitbox.?.mask = Thing.Faction.Mask.initFull();
+                        projectile.hitbox.?.indicator = .{
+                            .timer = utl.TickCounter.init(ticks_til_hit),
+                        };
+                        projectile.controller.projectile.target_pos = atk.target_pos;
                     },
                 }
+                _ = try room.queueSpawnThing(&projectile, self.pos);
             }
         },
         .spell_cast => |*spc| {

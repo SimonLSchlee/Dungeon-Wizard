@@ -33,6 +33,7 @@ pub const Collision = @import("Collision.zig");
 const AI = @import("AI.zig");
 const Action = @import("Action.zig");
 const icon_text = @import("icon_text.zig");
+const projectiles = @import("projectiles.zig");
 
 pub const Kind = enum {
     creature,
@@ -117,7 +118,7 @@ controller: union(enum) {
     ai_actor: AI.ActorController,
     spell: Spell.Controller,
     item: Item.Controller, // not pickup-able items, stuff/vfx that using an item may spawn or whatnot
-    projectile: ProjectileController,
+    projectile: projectiles.Controller,
     spawner: SpawnerController,
     cast_vfx: CastVFXController,
     text_vfx: TextVFXController,
@@ -384,9 +385,28 @@ pub const HitBox = struct {
     deactivate_on_update: bool = true,
     deactivate_on_hit: bool = true,
     effect: HitEffect,
+    indicator: ?struct {
+        state: enum {
+            fade_in,
+            fade_out,
+        } = .fade_in,
+        timer: utl.TickCounter,
+    } = null,
 
     pub fn update(_: *HitBox, self: *Thing, room: *Room) void {
         const hitbox = &self.hitbox.?;
+
+        if (hitbox.indicator) |*indicator| {
+            switch (indicator.state) {
+                .fade_in => if (indicator.timer.tick(false)) {
+                    indicator.state = .fade_out;
+                    indicator.timer = utl.TickCounter.init(core.secsToTicks(0.15));
+                },
+                .fade_out => if (indicator.timer.tick(false)) {
+                    hitbox.indicator = null;
+                },
+            }
+        }
         if (!hitbox.active) {
             _ = self.dbg.hitbox_active_timer.tick(false);
             return;
@@ -926,23 +946,6 @@ pub const SpawnerController = struct {
     }
 };
 
-pub const ProjectileController = struct {
-    pub fn update(self: *Thing, room: *Room) Error!void {
-        assert(self.spawn_state == .spawned);
-        if (self.hitbox) |hitbox| {
-            if (!hitbox.active) {
-                self.deferFree(room);
-                return;
-            }
-        }
-        self.updateVel(self.dir, self.accel_params);
-        if (self.last_coll) |_| {
-            self.deferFree(room);
-            return;
-        }
-    }
-};
-
 pub const ShapeRenderer = struct {
     pub const PointArray = std.BoundedArray(V2f, 32);
     pub const TextLabel = utl.BoundedString(24);
@@ -1358,6 +1361,36 @@ pub fn renderOver(self: *const Thing, room: *const Room) Error!void {
         if (self.hurtbox) |hurtbox| {
             const color = Colorf.yellow.fade(0.5);
             plat.circlef(self.pos.add(hurtbox.rel_pos), hurtbox.radius, .{ .fill_color = color });
+        }
+    }
+    // hitbox indicator
+    if (self.hitbox) |hitbox| {
+        if (hitbox.indicator) |indicator| {
+            const timer_f = indicator.timer.remapTo0_1();
+            const f = if (indicator.state == .fade_in) timer_f else 1 - timer_f;
+            const color = Colorf.red.fade(f);
+            const circle_opt = draw.PolyOpt{
+                .fill_color = null,
+                .outline = .{
+                    .color = color,
+                    .smoothing = .bilinear,
+                },
+            };
+            const pos: V2f = self.pos.add(hitbox.rel_pos);
+
+            plat.circlef(pos, hitbox.radius, circle_opt);
+            if (hitbox.sweep_to_rel_pos) |rel_end| {
+                const end_pos = self.pos.add(rel_end);
+                const len = end_pos.dist(pos);
+                const divisions = @ceil(len / (hitbox.radius * 1.2));
+                const dist = len / divisions;
+                const num = utl.as(usize, divisions) + 1;
+                const v = rel_end.normalizedChecked() orelse V2f.right;
+                for (1..num) |i| {
+                    const p = pos.add(v.scale(dist * utl.as(f32, i)));
+                    plat.circlef(p, hitbox.radius, circle_opt);
+                }
+            }
         }
     }
 }

@@ -36,6 +36,7 @@ pub const Kind = enum {
     bat,
     acolyte,
     slime,
+    gobbomber,
 };
 
 pub const proto_fns = blk: {
@@ -237,6 +238,33 @@ pub fn acolyteProto() Thing {
         .cooldown = utl.TickCounter.initStopped(5 * core.fups_per_sec),
     });
     ret.enemy_difficulty = 2.5;
+    return ret;
+}
+
+pub fn gobbomberProto() Thing {
+    var ret = creatureProto(
+        .gobbomber,
+        .gobbomber,
+        .enemy,
+        .{ .ranged_flee = .{} },
+        18,
+        .medium,
+        12,
+    );
+    ret.hp.?.addShield(10, null);
+    ret.accel_params = .{
+        .max_speed = 0.8,
+    };
+    ret.controller.ai_actor.flee_range = 150;
+    ret.controller.ai_actor.actions.getPtr(.projectile_attack_1).* = (.{
+        .kind = .{ .projectile_attack = .{
+            .projectile = .bomb,
+            .range = 200,
+            .LOS_thiccness = 10,
+        } },
+        .cooldown = utl.TickCounter.initStopped(90),
+    });
+    ret.enemy_difficulty = 2.0;
     return ret;
 }
 

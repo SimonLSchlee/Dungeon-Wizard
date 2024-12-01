@@ -73,7 +73,10 @@ pub fn inAttackRangeAndLOS(self: *const Thing, room: *const Room, action: *const
             return in_range and in_LOS;
         },
         .projectile_attack => |proj| {
-            return range <= proj.range and room.tilemap.isLOSBetweenThicc(self.pos, target.pos, proj.LOS_thiccness);
+            return switch (proj.projectile) {
+                .arrow => range <= proj.range and room.tilemap.isLOSBetweenThicc(self.pos, target.pos, proj.LOS_thiccness),
+                .bomb => range <= proj.range,
+            };
         },
         .spell_cast => |spc| {
             const spell: Spell = spc.spell;
