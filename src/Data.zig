@@ -228,6 +228,11 @@ pub const FontName = enum {
 };
 pub const FontArr = std.EnumArray(FontName, Platform.Font);
 
+pub const MusicName = enum {
+    dungongnu,
+};
+pub const MusicArr = std.EnumArray(MusicName, Platform.Sound);
+
 pub const RoomKind = enum {
     testu,
     first,
@@ -315,6 +320,7 @@ text_icons: EnumSpriteSheet(icon_text.Icon),
 card_sprites: EnumSpriteSheet(Spell.CardSpriteEnum),
 card_mana_cost: EnumSpriteSheet(Spell.ManaCost.SpriteEnum),
 sounds: std.EnumArray(SFX, ?Platform.Sound),
+music: MusicArr,
 shaders: ShaderArr,
 fonts: FontArr,
 // roooms
@@ -943,9 +949,15 @@ pub fn loadFonts(self: *Data) Error!void {
     self.fonts.getPtr(.seven_x_five).* = try plat.loadPixelFont("7x5.ttf", 8);
 }
 
+pub fn loadMusic(self: *Data) Error!void {
+    const plat = App.getPlat();
+    self.music.getPtr(.dungongnu).* = try plat.loadMusic("dungongnu.wav");
+}
+
 pub fn reload(self: *Data) Error!void {
     self.loadSpriteSheets() catch |err| std.debug.print("WARNING: failed to load all sprites: {any}\n", .{err});
     self.loadSounds() catch |err| std.debug.print("WARNING: failed to load all sounds: {any}\n", .{err});
+    self.loadMusic() catch |err| std.debug.print("WARNING: failed to load all music: {any}\n", .{err});
     inline for (@typeInfo(creatures.Kind).@"enum".fields) |f| {
         const kind: creatures.Kind = @enumFromInt(f.value);
         self.creature_protos.getPtr(kind).* = creatures.proto_fns.get(kind)();

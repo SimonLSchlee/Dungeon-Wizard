@@ -113,6 +113,8 @@ fn startNewRun(self: *App, mode: Run.Mode) Error!void {
     _ = try Run.initRandom(&self.run, mode);
     try self.run.startRun();
     self.screen = .run;
+    //const plat = getPlat();
+    //plat.playSound(self.data.music.get(.dungongnu));
 }
 
 pub fn deinit(self: *App) void {

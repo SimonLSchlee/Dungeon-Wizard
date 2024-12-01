@@ -878,15 +878,24 @@ pub fn setSoundVolume(_: *Platform, sound: Sound, volume: f32) void {
     r.SetSoundVolume(sound.r_sound, volume);
 }
 
-pub fn loadSound(self: *Platform, path: []const u8) Error!Sound {
+pub fn _loadSound(_: *Platform, name: []const u8, path_z: [:0]const u8) Error!Sound {
     @setRuntimeSafety(core.rt_safe_blocks);
-    const path_z = try std.fmt.bufPrintZ(self.str_fmt_buf, "{s}/sounds/{s}", .{ self.assets_path, path });
     const r_sound = r.LoadSound(path_z);
     const ret: Sound = .{
-        .name = path,
+        .name = name,
         .r_sound = r_sound,
     };
     return ret;
+}
+
+pub fn loadSound(self: *Platform, path: []const u8) Error!Sound {
+    const path_z = try std.fmt.bufPrintZ(self.str_fmt_buf, "{s}/sounds/{s}", .{ self.assets_path, path });
+    return self._loadSound(path, path_z);
+}
+
+pub fn loadMusic(self: *Platform, path: []const u8) Error!Sound {
+    const path_z = try std.fmt.bufPrintZ(self.str_fmt_buf, "{s}/music/{s}", .{ self.assets_path, path });
+    return self._loadSound(path, path_z);
 }
 
 pub fn exit(self: *Platform) void {
