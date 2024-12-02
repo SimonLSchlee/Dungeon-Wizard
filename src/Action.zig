@@ -188,16 +188,18 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
             // predict hit
             if (doing.can_turn) {
                 if (maybe_target_thing) |target| {
-                    if (self.animator.?.getTicksUntilEvent(.hit)) |ticks_til_hit_event| {
-                        if (target.hurtbox) |hurtbox| {
-                            const dist = target.pos.dist(self.pos);
-                            const range = @max(dist - hurtbox.radius, 0);
-                            var ticks_til_hit = utl.as(f32, ticks_til_hit_event);
-                            if (melee.lunge_accel) |accel| {
-                                ticks_til_hit += range / accel.max_speed;
+                    if (!target.isInvisible()) {
+                        if (self.animator.?.getTicksUntilEvent(.hit)) |ticks_til_hit_event| {
+                            if (target.hurtbox) |hurtbox| {
+                                const dist = target.pos.dist(self.pos);
+                                const range = @max(dist - hurtbox.radius, 0);
+                                var ticks_til_hit = utl.as(f32, ticks_til_hit_event);
+                                if (melee.lunge_accel) |accel| {
+                                    ticks_til_hit += range / accel.max_speed;
+                                }
+                                const target_pos = target.pos.add(target.vel.scale(ticks_til_hit));
+                                self.dir = target_pos.sub(self.pos).normalizedChecked() orelse self.dir;
                             }
-                            const target_pos = target.pos.add(target.vel.scale(ticks_til_hit));
-                            self.dir = target_pos.sub(self.pos).normalizedChecked() orelse self.dir;
                         }
                     }
                 }
@@ -250,30 +252,33 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                 // default to original target pos
                 self.dir = doing.params.pos.sub(self.pos).normalizedChecked() orelse self.dir;
                 atk.target_pos = doing.params.pos;
+
                 if (maybe_target_thing) |target| {
-                    if (self.animator.?.getTicksUntilEvent(.hit)) |ticks_til_hit_event| {
-                        if (target.hurtbox) |hurtbox| { // TODO hurtbox pos?
-                            const dist = target.pos.dist(self.pos);
-                            const range = @max(dist - hurtbox.radius, 0);
-                            var ticks_til_hit = utl.as(f32, ticks_til_hit_event);
-                            ticks_til_hit += range / projectile.accel_params.max_speed;
-                            const predicted_target_pos = target.pos.add(target.vel.scale(ticks_til_hit));
-                            switch (atk.projectile) {
-                                .arrow => {
-                                    // make sure we can actually still get past nearby walls with this new angle!
-                                    if (room.tilemap.isLOSBetweenThicc(self.pos, predicted_target_pos, atk.LOS_thiccness)) {
+                    if (!target.isInvisible()) {
+                        if (self.animator.?.getTicksUntilEvent(.hit)) |ticks_til_hit_event| {
+                            if (target.hurtbox) |hurtbox| { // TODO hurtbox pos?
+                                const dist = target.pos.dist(self.pos);
+                                const range = @max(dist - hurtbox.radius, 0);
+                                var ticks_til_hit = utl.as(f32, ticks_til_hit_event);
+                                ticks_til_hit += range / projectile.accel_params.max_speed;
+                                const predicted_target_pos = target.pos.add(target.vel.scale(ticks_til_hit));
+                                switch (atk.projectile) {
+                                    .arrow => {
+                                        // make sure we can actually still get past nearby walls with this new angle!
+                                        if (room.tilemap.isLOSBetweenThicc(self.pos, predicted_target_pos, atk.LOS_thiccness)) {
+                                            atk.target_pos = predicted_target_pos;
+                                            self.dir = predicted_target_pos.sub(self.pos).normalizedChecked() orelse self.dir;
+                                        } else if (room.tilemap.isLOSBetweenThicc(self.pos, target.pos, atk.LOS_thiccness)) {
+                                            // otherwise just face target directly
+                                            atk.target_pos = target.pos;
+                                            self.dir = target.pos.sub(self.pos).normalizedChecked() orelse self.dir;
+                                        }
+                                    },
+                                    .bomb => {
                                         atk.target_pos = predicted_target_pos;
                                         self.dir = predicted_target_pos.sub(self.pos).normalizedChecked() orelse self.dir;
-                                    } else if (room.tilemap.isLOSBetweenThicc(self.pos, target.pos, atk.LOS_thiccness)) {
-                                        // otherwise just face target directly
-                                        atk.target_pos = target.pos;
-                                        self.dir = target.pos.sub(self.pos).normalizedChecked() orelse self.dir;
-                                    }
-                                },
-                                .bomb => {
-                                    atk.target_pos = predicted_target_pos;
-                                    self.dir = predicted_target_pos.sub(self.pos).normalizedChecked() orelse self.dir;
-                                },
+                                    },
+                                }
                             }
                         }
                     }
