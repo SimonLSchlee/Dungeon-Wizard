@@ -79,14 +79,8 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, slot: *Sl
     const mouse_pos = plat.getMousePosScreen();
     const hovered = geom.pointIsInRectf(mouse_pos, slot.rect);
     const clicked = hovered and plat.input_buffer.mouseBtnIsJustPressed(.left);
-    // TODO anything else here?
-    const slot_enabled = slot.kind != null and caster.isAliveCreature() and (if (slot.cooldown_timer) |timer| !timer.running else true);
-    const can_activate_slot = slot_enabled and switch (slot.kind.?) {
-        .pause => true,
-        .action => |a| switch (a) {
-            inline else => |k| !std.meta.hasMethod(@TypeOf(k), "canUse") or k.canUse(room, caster),
-        },
-    };
+    const slot_enabled = Slots.slotIsEnabled(slot, caster);
+    const can_activate_slot = Slots.canActivateSlot(slot, room, caster);
     const bg_color = slot_bg_color;
     var slot_contents_pos = slot.rect.pos;
     var border_color = Colorf.darkgray;
@@ -504,6 +498,27 @@ pub const Slots = struct {
             }
         }
         return null;
+    }
+
+    pub fn slotIsEnabled(slot: *const Slot, caster: *const Thing) bool {
+        return slot.kind != null and caster.isAliveCreature() and (if (slot.cooldown_timer) |timer| !timer.running else true);
+    }
+
+    pub fn canActivateSlot(slot: *const Slot, room: *const Room, caster: *const Thing) bool {
+        return slotIsEnabled(slot, caster) and switch (slot.kind.?) {
+            .pause => true,
+            .action => |a| switch (a) {
+                inline else => |k| !std.meta.hasMethod(@TypeOf(k), "canUse") or k.canUse(room, caster),
+            },
+        };
+    }
+
+    pub fn cancelSelectedActionSlotIfInvalid(self: *Slots, room: *const Room, caster: *const Thing) void {
+        if (self.getSelectedActionSlot()) |*slot| {
+            if (!canActivateSlot(slot, room, caster)) {
+                self.unselectSlot();
+            }
+        }
     }
 
     pub fn getNextEmptyItemSlot(self: *const Slots) ?Slot {
