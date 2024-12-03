@@ -267,6 +267,7 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, slot: *Sl
 }
 
 // Run slots (just items, and some additional data)
+// Used to populate Slots but also state in Run
 pub const RunSlots = struct {
     pub const ItemSlot = struct {
         item: ?Item,
@@ -275,6 +276,7 @@ pub const RunSlots = struct {
     };
     num_spell_slots: usize = 4, // populated from deck
     items: std.BoundedArray(ItemSlot, max_item_slots) = .{},
+    item_menu_open: ?usize = null,
     discard_button: bool = false,
 };
 

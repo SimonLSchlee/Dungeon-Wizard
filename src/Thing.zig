@@ -210,9 +210,15 @@ pub const HP = struct {
             i += 1;
         }
     }
-    pub fn heal(hp: *HP, amount: f32, self: *Thing, room: *Room) void {
+
+    pub fn healNoVFX(hp: *HP, amount: f32) f32 {
         const amount_healed = @min(amount, hp.max - hp.curr);
         hp.curr += amount_healed;
+        return amount_healed;
+    }
+
+    pub fn heal(hp: *HP, amount: f32, self: *Thing, room: *Room) void {
+        const amount_healed = hp.healNoVFX(amount);
         const proto = Thing.LoopVFXController.proto(
             .swirlies,
             .loop,

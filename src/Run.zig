@@ -431,14 +431,6 @@ pub fn pickupProduct(self: *Run, product: *const Shop.Product) void {
             }
         },
         .item => |item| {
-            // TODO ugh?
-            if (self.room_exists) {
-                if (self.room.ui_slots.getNextEmptyItemSlot()) |slot| {
-                    self.room.ui_slots.items.buffer[slot.idx].kind = .{ .action = .{ .item = item } };
-                } else {
-                    unreachable;
-                }
-            }
             for (self.slots.items.slice()) |*item_slot| {
                 if (item_slot.item == null) {
                     item_slot.item = item;
@@ -447,12 +439,54 @@ pub fn pickupProduct(self: *Run, product: *const Shop.Product) void {
             } else {
                 unreachable;
             }
+            if (self.room_exists) {
+                self.syncItems(.run);
+            }
         },
     }
 }
 
 fn loadNextPlace(self: *Run) void {
     self.load_state = .fade_out;
+}
+
+// TODO aaghhghghghg
+// just put gameUI in Run bruv
+pub fn syncItems(self: *Run, precedence: enum { run, room }) void {
+    assert(self.room_exists);
+    const room = &self.room;
+    switch (precedence) {
+        .room => {
+            self.slots.items = .{};
+            for (room.ui_slots.items.constSlice()) |slot| {
+                const item: ?Item = if (slot.kind) |k| k.action.item else null;
+                self.slots.items.append(.{
+                    .item = item,
+                }) catch unreachable;
+            }
+        },
+        .run => {
+            for (self.slots.items.constSlice(), 0..) |slot, i| {
+                room.ui_slots.clearSlotByActionKind(i, .item);
+                if (slot.item) |*item| {
+                    room.ui_slots.items.buffer[i].kind = .{ .action = .{ .item = item.* } };
+                }
+            }
+        },
+    }
+}
+
+pub fn syncPlayerThing(self: *Run, precedence: enum { run, room }) void {
+    assert(self.room_exists);
+    const room = &self.room;
+    switch (precedence) {
+        .room => {
+            self.player_thing.hp = room.getConstPlayer().?.hp.?;
+        },
+        .run => {
+            room.getPlayer().?.hp = self.player_thing.hp.?;
+        },
+    }
 }
 
 pub fn roomUpdate(self: *Run) Error!void {
@@ -502,14 +536,8 @@ pub fn roomUpdate(self: *Run) Error!void {
     }
     try room.update();
 
-    // keep run slots in sync with gameUI's
-    self.slots.items = .{};
-    for (room.ui_slots.items.constSlice()) |slot| {
-        const item: ?Item = if (slot.kind) |k| k.action.item else null;
-        self.slots.items.append(.{
-            .item = item,
-        }) catch unreachable;
-    }
+    self.syncItems(.room);
+    self.syncPlayerThing(.room);
 
     switch (room.progress_state) {
         .none => {},
@@ -524,7 +552,6 @@ pub fn roomUpdate(self: *Run) Error!void {
         },
         .exited => |exit_door| {
             _ = exit_door;
-            self.player_thing.hp = room.getConstPlayer().?.hp.?;
             self.loadNextPlace();
         },
     }
@@ -568,18 +595,69 @@ pub fn itemsUpdate(self: *Run) Error!void {
             try item.unqRenderIcon(&self.imm_ui.commands, rect.pos, ui_scaling);
         }
     }
+
     for (self.slots.items.slice(), 0..) |*slot, i| {
         const rect = items_rects.get(i);
         const hovered = geom.pointIsInRectf(mouse_pos, rect);
-        const clicked = hovered and (plat.input_buffer.mouseBtnIsJustPressed(.left) or plat.input_buffer.mouseBtnIsJustPressed(.left));
+        const clicked_somewhere = (plat.input_buffer.mouseBtnIsJustPressed(.left) or plat.input_buffer.mouseBtnIsJustPressed(.right));
+        const clicked_on = hovered and clicked_somewhere;
+        const menu_is_open = if (self.slots.item_menu_open) |idx| idx == i else false;
 
         if (slot.item) |item| {
             if (slot.long_hover.update(hovered)) {
                 try item.unqRenderTooltip(&self.tooltip_ui.commands, rect.pos.add(v2f(rect.dims.x, 0)), ui_scaling);
             }
-            if (clicked) {
-                // TODO discard/use menu
+            if (clicked_on) {
+                self.slots.item_menu_open = i;
             }
+        } else if (menu_is_open) {
+            self.slots.item_menu_open = null;
+        }
+    }
+    if (self.slots.item_menu_open) |idx| {
+        self.tooltip_ui.commands.clear(); // TODO - rethink??
+        assert(idx < self.slots.items.len);
+        const slot: *gameUI.RunSlots.ItemSlot = &self.slots.items.buffer[idx];
+        assert(slot.item != null);
+        const item = &slot.item.?;
+        const slot_rect: geom.Rectf = items_rects.get(idx);
+        const btn_dims = v2f(100, 75);
+        const can_use = item.canUseInRun(&self.player_thing, self);
+        const menu_padding = V2f.splat(4);
+        const num_menu_items: f32 = if (can_use) 2 else 1;
+        const menu_dims = v2f(btn_dims.x, btn_dims.y * num_menu_items).add(menu_padding.scale(2).add(v2f(0, (num_menu_items - 1) * menu_padding.y)));
+        const menu_pos = slot_rect.pos.add(v2f(0, -menu_dims.y));
+
+        self.imm_ui.commands.appendAssumeCapacity(.{ .rect = .{
+            .pos = menu_pos,
+            .dims = menu_dims,
+            .opt = .{ .fill_color = .gray },
+        } });
+
+        var curr_pos = menu_pos.add(menu_padding);
+        const use_pressed = if (can_use) blk: {
+            const ret = menuUI.textButton(&self.imm_ui.commands, curr_pos, "Use", btn_dims);
+            curr_pos.y += btn_dims.y + menu_padding.y;
+            break :blk ret;
+        } else false;
+        const discard_pressed = menuUI.textButton(&self.imm_ui.commands, curr_pos, "Discard", btn_dims);
+
+        if (use_pressed and !discard_pressed) {
+            try item.useInRun(&self.player_thing, self);
+            slot.item = null;
+        } else if (discard_pressed) {
+            slot.item = null;
+        } else {
+            const hovered = geom.pointIsInRectf(mouse_pos, slot_rect);
+            const clicked_somewhere = (plat.input_buffer.mouseBtnIsJustPressed(.left) or plat.input_buffer.mouseBtnIsJustPressed(.right));
+            const clicked_on_slot = hovered and clicked_somewhere;
+            if (clicked_somewhere and !use_pressed and !discard_pressed and !clicked_on_slot) {
+                self.slots.item_menu_open = null;
+            }
+        }
+        if (self.room_exists) {
+            self.syncItems(.run);
+            self.syncPlayerThing(.run);
         }
     }
 }

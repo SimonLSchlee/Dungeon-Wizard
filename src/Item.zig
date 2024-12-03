@@ -72,8 +72,20 @@ pub const PotionHP = struct {
         }
     }
 
-    pub fn canUse(_: *const Item, _: *const Room, caster: *const Thing) bool {
-        if (caster.hp) |hp| {
+    pub fn canUse(self: *const Item, _: *const Room, user: *const Thing) bool {
+        return self.canUseInRun(user, null);
+    }
+
+    pub fn useInRun(self: *const Item, user: *Thing, maybe_run: ?*Run) Error!void {
+        assert(self.canUseInRun(user, maybe_run));
+        const pot_hp = self.kind.pot_hp;
+        if (user.hp) |*hp| {
+            _ = hp.healNoVFX(hp.max * (pot_hp.hp_restored_percent * 0.01));
+        }
+    }
+
+    pub fn canUseInRun(_: *const Item, user: *const Thing, _: ?*const Run) bool {
+        if (user.hp) |hp| {
             return (hp.curr < hp.max);
         }
         return false;
@@ -400,16 +412,41 @@ pub fn use(self: *const Item, caster: *Thing, room: *Room, params: Params) Error
     }
 }
 
-pub fn canUse(self: *const Item, room: *const Room, caster: *const Thing) bool {
+pub fn canUse(self: *const Item, room: *const Room, user: *const Thing) bool {
     switch (self.kind) {
         inline else => |k| {
             const K = @TypeOf(k);
             if (std.meta.hasMethod(K, "canUse")) {
-                return K.canUse(self, room, caster);
+                return K.canUse(self, room, user);
             }
         },
     }
     return true;
+}
+
+pub fn useInRun(self: *const Item, user: *Thing, maybe_run: ?*Run) Error!void {
+    assert(self.canUseInRun(user, maybe_run));
+    switch (self.kind) {
+        inline else => |k| {
+            const K = @TypeOf(k);
+            if (std.meta.hasMethod(K, "useInRun")) {
+                return K.useInRun(self, user, maybe_run);
+            }
+        },
+    }
+}
+
+pub fn canUseInRun(self: *const Item, user: *const Thing, maybe_run: ?*const Run) bool {
+    switch (self.kind) {
+        inline else => |k| {
+            const K = @TypeOf(k);
+            if (std.meta.hasMethod(K, "canUseInRun")) {
+                return K.canUseInRun(self, user, maybe_run);
+            }
+        },
+    }
+    // NOTE: false by default, not true like canUse!
+    return false;
 }
 
 pub fn getDescription(self: *const Item) Error![]const u8 {
