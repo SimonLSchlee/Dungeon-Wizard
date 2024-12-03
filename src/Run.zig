@@ -150,12 +150,12 @@ shop: ?Shop = null,
 game_pause_ui: GamePauseUI = undefined,
 dead_menu: DeadMenu = undefined,
 screen: enum {
-    game,
+    room,
     pause_menu,
     reward,
     shop,
     dead,
-} = .game,
+} = .room,
 seed: u64,
 rng: std.Random.DefaultPrng = undefined,
 places: Place.Array = .{},
@@ -341,7 +341,7 @@ pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
             // TODO hacky
             // update once to clear fog
             try self.room.update();
-            self.screen = .game;
+            self.screen = .room;
         },
         .shop => |s| {
             _ = s.num;
@@ -455,7 +455,7 @@ fn loadNextPlace(self: *Run) void {
     self.load_state = .fade_out;
 }
 
-pub fn gameUpdate(self: *Run) Error!void {
+pub fn roomUpdate(self: *Run) Error!void {
     const plat = getPlat();
     assert(self.room_exists);
     const room = &self.room;
@@ -539,11 +539,11 @@ pub fn pauseMenuUpdate(self: *Run) Error!void {
     assert(self.room_exists);
     const room = &self.room;
     //if (plat.input_buffer.keyIsJustPressed(.escape)) {
-    //    self.screen = .game;
+    //    self.screen = .room;
     //}
     if (plat.input_buffer.keyIsJustPressed(.space)) {
         room.paused = false;
-        self.screen = .game;
+        self.screen = .room;
     }
 }
 
@@ -815,7 +815,7 @@ pub fn rewardUpdate(self: *Run) Error!void {
         skip_btn_text = "Continue";
     }
     if (menuUI.textButton(&self.imm_ui.commands, skip_btn_topleft, skip_btn_text, skip_btn_dims)) {
-        self.screen = .game;
+        self.screen = .room;
         assert(self.room_exists);
         self.room.took_reward = true;
     }
@@ -856,7 +856,7 @@ pub fn deadUpdate(self: *Run) Error!void {
     } else if (self.dead_menu.retry_room_button.isClicked()) {
         assert(self.room_exists);
         try self.room.reset();
-        self.screen = .game;
+        self.screen = .room;
     }
 }
 
@@ -886,7 +886,7 @@ pub fn update(self: *Run) Error!void {
 
     switch (self.load_state) {
         .none => switch (self.screen) {
-            .game => try self.gameUpdate(),
+            .room => try self.roomUpdate(),
             .pause_menu => try self.pauseMenuUpdate(),
             .reward => {
                 try self.rewardUpdate();
@@ -1008,7 +1008,7 @@ pub fn render(self: *Run, native_render_texture: Platform.RenderTexture2D) Error
     plat.startRenderToTexture(native_render_texture);
     plat.setBlend(.render_tex_alpha);
     switch (self.screen) {
-        .game => {
+        .room => {
             assert(self.room_exists);
             const room = &self.room;
             if (room.paused) {
