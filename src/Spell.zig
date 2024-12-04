@@ -1083,7 +1083,10 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caste
         }
     }
     {
-        const tags = self.getNewTags() catch NewTag.Array{};
+        const tags = self.getNewTags() catch |e| blk: {
+            debug.errorAndStackTrace(e);
+            break :blk NewTag.Array{};
+        };
         const tag_topleft = pos.add(card_tags_topleft_offset.scale(scaling));
         var curr_tag_topleft = tag_topleft;
         for (tags.constSlice()) |tag| {
@@ -1110,7 +1113,6 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caste
                 tag.card_label.constSlice(),
                 curr_tag_topleft.add(V2f.splat(1 * scaling)),
                 scaling,
-                .white,
             ) catch {};
             curr_tag_topleft.x += tag_dims_scaled.x + 1 * scaling;
         }

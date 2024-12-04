@@ -285,9 +285,9 @@ pub const HP = struct {
             opts = @bitCast(p);
         }
         if (opts.max_only) {
-            writer.print("{any}{d:.0}", .{ icon_text.Icon.heart, @ceil(self.max) }) catch return Error.EncodingFail;
+            writer.print("{any}{any}{any}{d:.0}", .{ icon_text.Fmt{ .tint = .red }, icon_text.Icon.heart, icon_text.Fmt{ .tint = .white }, @ceil(self.max) }) catch return Error.EncodingFail;
         } else {
-            writer.print("{any}{d:.0}/{d:.0}", .{ icon_text.Icon.heart, @ceil(self.curr), @ceil(self.max) }) catch return Error.EncodingFail;
+            writer.print("{any}{any}{any}{d:.0}/{d:.0}", .{ icon_text.Fmt{ .tint = .red }, icon_text.Icon.heart, icon_text.Fmt{ .tint = .white }, @ceil(self.curr), @ceil(self.max) }) catch return Error.EncodingFail;
         }
     }
 };

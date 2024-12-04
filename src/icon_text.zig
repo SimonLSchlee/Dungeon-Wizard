@@ -21,11 +21,13 @@ const getData = App.getData;
 const Data = @import("Data.zig");
 const ImmUI = @import("ImmUI.zig");
 
-pub const IconText = struct {
-    buf: []u8,
-};
+// A "Private Use Area" of unicode
+pub const pua_codepoint_start: u21 = 0xE000;
+pub const pua_codepoint_end: u21 = 0xF8FF;
+pub const pua_num_codepoints: u21 = 6400;
+pub const pua_codepoint_num_utf8_bytes = 3;
 
-pub const Icon = enum {
+pub const Icon = enum(u8) {
     target,
     skull,
     mouse,
@@ -69,67 +71,149 @@ pub const Icon = enum {
     impling,
     summon,
 
+    pub const codepoint_start: u21 = pua_codepoint_start;
+    pub const codepoint_end: u21 = codepoint_start + std.math.maxInt(@typeInfo(Icon).@"enum".tag_type);
+
     pub fn format(self: Icon, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) Error!void {
         _ = fmt;
         _ = options;
-        var buf: [icon_num_utf8_bytes]u8 = undefined;
-        const s = iconToUtf8(&buf, self) catch return Error.EncodingFail;
+        var buf: [pua_codepoint_num_utf8_bytes]u8 = undefined;
+        const s = self.toUtf8(&buf) catch return Error.EncodingFail;
         writer.print("{s}", .{s}) catch return Error.EncodingFail;
+    }
+    pub inline fn toCodePoint(icon: Icon) u21 {
+        return codepoint_start + @intFromEnum(icon);
+    }
+    pub inline fn checkCodePoint(codepoint: u21) bool {
+        return codepoint >= codepoint_start and codepoint < codepoint_end;
+    }
+    pub inline fn fromCodePoint(codepoint: u21) Icon {
+        assert(checkCodePoint(codepoint));
+        return @enumFromInt(codepoint - codepoint_start);
+    }
+    pub fn toUtf8(icon: Icon, buf: []u8) Error![]u8 {
+        const codepoint = icon.toCodePoint();
+        return fmtCodePoint(buf, codepoint);
+    }
+    pub fn fromUtf8(buf: []const u8) Error!?Icon {
+        if (try parseCodePoint(buf)) |codepoint| {
+            if (!checkCodePoint(codepoint)) return null;
+            return fromCodePoint(codepoint);
+        }
+        return null;
+    }
+};
+
+pub const Fmt = packed struct(u8) {
+    pub const Tint = enum(u3) {
+        white,
+        red,
+
+        pub const colors = std.EnumArray(Tint, Colorf).init(.{
+            .white = .white,
+            .red = .red,
+        });
+        pub fn toColor(tint: Tint) Colorf {
+            return colors.get(tint);
+        }
+    };
+    tint: Tint = .white,
+    _: u5 = 0,
+
+    pub const codepoint_start: u21 = Icon.codepoint_end;
+    pub const codepoint_end: u21 = codepoint_start + @typeInfo(Tint).@"enum".fields.len;
+
+    pub fn format(self: Fmt, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) Error!void {
+        _ = fmt;
+        _ = options;
+        var buf: [pua_codepoint_num_utf8_bytes]u8 = undefined;
+        const s = self.toUtf8(&buf) catch return Error.EncodingFail;
+        writer.print("{s}", .{s}) catch return Error.EncodingFail;
+    }
+    pub inline fn toCodePoint(fmt: Fmt) u21 {
+        comptime {
+            if (codepoint_end > pua_codepoint_end) {
+                @compileError("Too many Fmt codepoints");
+            }
+        }
+        const fmt_bits: u8 = @bitCast(fmt);
+        return codepoint_start + utl.as(u21, fmt_bits);
+    }
+    pub inline fn checkCodePoint(codepoint: u21) bool {
+        return codepoint >= codepoint_start and codepoint < codepoint_end;
+    }
+    pub inline fn fromCodePoint(codepoint: u21) Fmt {
+        assert(checkCodePoint(codepoint));
+        const bits: u21 = codepoint - codepoint_start;
+        return @bitCast(utl.as(u8, bits));
+    }
+    pub fn toUtf8(fmt: Fmt, buf: []u8) Error![]u8 {
+        const codepoint = fmt.toCodePoint();
+        return fmtCodePoint(buf, codepoint);
+    }
+    pub fn fromUtf8(buf: []const u8) Error!?Fmt {
+        if (try parseCodePoint(buf)) |codepoint| {
+            if (!checkCodePoint(codepoint)) return null;
+            return fromCodePoint(codepoint);
+        }
+        return null;
     }
 };
 
 pub const Part = union(enum) {
+    fmt: Fmt,
     icon: Icon,
     text: []const u8,
 };
 
-pub const icon_codepoint_start: u21 = 0xE000;
-pub const icon_codepoint_end: u21 = icon_codepoint_start + @typeInfo(Icon).@"enum".fields.len;
-pub const icon_num_utf8_bytes = 3;
-
-pub inline fn iconToCodePoint(icon: Icon) u21 {
-    return icon_codepoint_start + @intFromEnum(icon);
-}
-
-pub inline fn codePointToIcon(codepoint: u21) Icon {
-    assert(codepoint >= icon_codepoint_start and codepoint < icon_codepoint_end);
-    return @enumFromInt(codepoint - icon_codepoint_start);
-}
-
-pub fn iconToUtf8(buf: []u8, icon: Icon) Error![]u8 {
-    const codepoint = iconToCodePoint(icon);
+pub fn fmtCodePoint(buf: []u8, codepoint: u21) Error![]u8 {
     const num = std.unicode.utf8Encode(codepoint, buf) catch |e| {
-        std.debug.print("ERROR: {any}\n", .{e});
+        debug.errorAndStackTrace(e);
         return Error.EncodingFail;
     };
-    assert(num == icon_num_utf8_bytes);
+    assert(num == pua_codepoint_num_utf8_bytes);
     return buf[0..num];
 }
 
-pub fn utf8ToIcon(buf: []const u8) Error!?Icon {
-    if (buf.len < icon_num_utf8_bytes) return null;
+pub fn parseCodePoint(buf: []const u8) Error!?u21 {
+    if (buf.len < pua_codepoint_num_utf8_bytes) return null;
     const num_bytes_in_codepoint = std.unicode.utf8ByteSequenceLength(buf[0]) catch return Error.DecodingFail;
-    if (num_bytes_in_codepoint != icon_num_utf8_bytes) return null;
+    if (num_bytes_in_codepoint != pua_codepoint_num_utf8_bytes) return null;
     const codepoint = std.unicode.utf8Decode3(buf[0..3].*) catch |e| {
-        std.debug.print("ERROR: {any}\n", .{e});
+        debug.errorAndStackTrace(e);
         return Error.DecodingFail;
     };
-    if (codepoint < icon_codepoint_start or codepoint >= icon_codepoint_end) return null;
+    return codepoint;
+}
 
-    const icon = codePointToIcon(codepoint);
-    return icon;
+pub fn parseFmtOrIconPart(buf: []const u8) Error!?Part {
+    if (try parseCodePoint(buf)) |codepoint| {
+        if (Icon.checkCodePoint(codepoint)) {
+            return .{ .icon = Icon.fromCodePoint(codepoint) };
+        } else if (Fmt.checkCodePoint(codepoint)) {
+            return .{ .fmt = Fmt.fromCodePoint(codepoint) };
+        }
+    }
+    return null;
 }
 
 pub fn partsToUtf8(buf: []u8, parts: []const Part) Error![]u8 {
     var idx: usize = 0;
     for (parts) |part| {
         switch (part) {
-            .icon => |icon| {
-                if (buf[idx..].len < icon_num_utf8_bytes) {
+            .fmt => |fmt| {
+                if (buf[idx..].len < pua_codepoint_num_utf8_bytes) {
                     return Error.NoSpaceLeft;
                 }
-                _ = try iconToUtf8(buf[idx..], icon);
-                idx += icon_num_utf8_bytes;
+                const b = try fmt.toUtf8(buf[idx..]);
+                idx += b.len;
+            },
+            .icon => |icon| {
+                if (buf[idx..].len < pua_codepoint_num_utf8_bytes) {
+                    return Error.NoSpaceLeft;
+                }
+                const b = try icon.toUtf8(buf[idx..]);
+                idx += b.len;
             },
             .text => |text| {
                 if (buf[idx..].len < text.len) {
@@ -152,15 +236,16 @@ const Utf8ToPartsIterator = struct {
         var curr_idx: usize = self.idx;
 
         while (curr_idx < self.buf.len) {
-            const maybe_icon = utf8ToIcon(self.buf[curr_idx..]) catch |e| {
-                std.debug.print("ERROR: {any}\n", .{e});
+            const maybe_part = parseFmtOrIconPart(self.buf[curr_idx..]) catch |e| {
+                debug.errorAndStackTrace(e);
                 return null;
             };
-            if (maybe_icon) |icon| {
+            if (maybe_part) |part| {
                 if (curr_idx == self.idx) {
-                    self.idx += icon_num_utf8_bytes;
-                    return .{ .icon = icon };
+                    self.idx += pua_codepoint_num_utf8_bytes;
+                    return part;
                 } else {
+                    // text followed by icon; return the text and ignore the Part till next time
                     break;
                 }
             } else {
@@ -198,6 +283,9 @@ pub fn measureIconText(buf: []const u8) V2f {
     var last_was_text: bool = false;
     while (it.next()) |part| {
         switch (part) {
+            .fmt => |fmt| {
+                _ = fmt;
+            },
             .icon => |icon| {
                 curr_line_width += 1; // pre-spacing (after text or icon)
                 curr_line_width += data.text_icons.sprite_dims_cropped.?.get(icon).x;
@@ -225,23 +313,27 @@ pub fn measureIconText(buf: []const u8) V2f {
     return dims;
 }
 
-pub fn unqRenderIconText(cmd_buf: *ImmUI.CmdBuf, buf: []const u8, pos: V2f, scaling: f32, color: Colorf) Error!void {
+pub fn unqRenderIconText(cmd_buf: *ImmUI.CmdBuf, buf: []const u8, pos: V2f, scaling: f32) Error!void {
     const plat = getPlat();
     const data = App.get().data;
     const icon_text_font = data.fonts.get(.seven_x_five);
-    const icon_text_opt = draw.TextOpt{
+    var icon_text_opt = draw.TextOpt{
         .font = icon_text_font,
         .size = icon_text_font.base_size * utl.as(u32, @round(scaling)),
         .smoothing = .none,
-        .color = color,
+        .color = .white,
     };
     const line_height = utl.as(f32, icon_text_font.base_size * utl.as(u32, @round(scaling)));
     const line_spacing: f32 = 2 * scaling;
     var it = utf8ToPartsIterator(buf);
     var curr_pos: V2f = pos;
     var last_was_text: bool = false;
+    var fmt = Fmt{};
     while (it.next()) |part| {
         switch (part) {
+            .fmt => |f| {
+                fmt = f;
+            },
             .icon => |icon| {
                 curr_pos.x += 1 * scaling; // pre-spacing (after text or icon)
                 const cropped_dims = data.text_icons.sprite_dims_cropped.?.get(icon);
@@ -253,6 +345,7 @@ pub fn unqRenderIconText(cmd_buf: *ImmUI.CmdBuf, buf: []const u8, pos: V2f, scal
                             .src_dims = cropped_dims,
                             .src_pos = rf.pos.toV2f(),
                             .uniform_scaling = scaling,
+                            .tint = fmt.tint.toColor(),
                         },
                     } });
                 }
@@ -263,6 +356,7 @@ pub fn unqRenderIconText(cmd_buf: *ImmUI.CmdBuf, buf: []const u8, pos: V2f, scal
                 if (!last_was_text) curr_pos.x += 1 * scaling; // pre-spacing (icon)
                 last_was_text = true;
                 var line_it = std.mem.splitScalar(u8, text, '\n');
+                icon_text_opt.color = fmt.tint.toColor();
                 while (line_it.next()) |line| {
                     cmd_buf.appendAssumeCapacity(.{ .label = .{
                         .pos = curr_pos,

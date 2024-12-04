@@ -20,3 +20,8 @@ pub const show_waves = false;
 // stats n whatnot
 pub const show_num_enemies = false;
 pub const show_highest_num_things_in_room = false;
+
+pub fn errorAndStackTrace(e: anytype) void {
+    std.debug.print("ERROR: {any}\n", .{e});
+    std.debug.dumpCurrentStackTrace(null);
+}

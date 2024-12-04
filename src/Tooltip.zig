@@ -123,11 +123,11 @@ pub fn unqRenderInfo(info: *const Info, cmd_buf: *ImmUI.CmdBuf, pos: V2f, ui_sca
     }
     var curr_pos = content_pos;
     if (title.len > 0) {
-        try icon_text.unqRenderIconText(cmd_buf, title, curr_pos, ui_scaling, .white);
+        try icon_text.unqRenderIconText(cmd_buf, title, curr_pos, ui_scaling);
         const title_dims = icon_text.measureIconText(title);
         curr_pos.y += (title_dims.y + info_section_spacing) * ui_scaling;
     }
-    try icon_text.unqRenderIconText(cmd_buf, desc, curr_pos, ui_scaling, .white);
+    try icon_text.unqRenderIconText(cmd_buf, desc, curr_pos, ui_scaling);
 }
 
 const tooltip_section_spacing: f32 = 4;
@@ -190,11 +190,11 @@ pub fn unqRender(tt: *const Tooltip, cmd_buf: *ImmUI.CmdBuf, pos: V2f, scaling: 
 
     var content_curr_pos = adjusted_pos.add(padding);
     if (tt.title.len > 0) {
-        try icon_text.unqRenderIconText(cmd_buf, tt.title.constSlice(), content_curr_pos, scaling, .white);
+        try icon_text.unqRenderIconText(cmd_buf, tt.title.constSlice(), content_curr_pos, scaling);
         content_curr_pos.y += title_dims.y + section_spacing;
     }
     if (tt.desc.len > 0) {
-        try icon_text.unqRenderIconText(cmd_buf, tt.desc.constSlice(), content_curr_pos, scaling, .white);
+        try icon_text.unqRenderIconText(cmd_buf, tt.desc.constSlice(), content_curr_pos, scaling);
         content_curr_pos.y += desc_dims.y + section_spacing;
     }
 
