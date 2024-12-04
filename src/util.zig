@@ -276,3 +276,7 @@ pub fn enumToString(E: type, m: E) []const u8 {
     }
     unreachable;
 }
+
+pub fn PaddingBits(T: type, bits_used: usize) type {
+    return @Type(.{ .int = .{ .bits = @bitSizeOf(T) - bits_used, .signedness = .unsigned } });
+}

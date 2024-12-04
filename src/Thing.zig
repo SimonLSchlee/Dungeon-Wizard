@@ -274,6 +274,22 @@ pub const HP = struct {
         self.curr -= final_damage_amount;
         self.total_damage_done += final_damage_amount;
     }
+    pub const FmtOpts = packed struct(usize) {
+        max_only: bool = false,
+        _: utl.PaddingBits(usize, 1) = 0,
+    };
+    pub fn format(self: HP, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) Error!void {
+        _ = fmt;
+        var opts: FmtOpts = .{};
+        if (options.precision) |p| {
+            opts = @bitCast(p);
+        }
+        if (opts.max_only) {
+            writer.print("{any}{d:.0}", .{ icon_text.Icon.heart, @ceil(self.max) }) catch return Error.EncodingFail;
+        } else {
+            writer.print("{any}{d:.0}/{d:.0}", .{ icon_text.Icon.heart, @ceil(self.curr), @ceil(self.max) }) catch return Error.EncodingFail;
+        }
+    }
 };
 
 pub const Damage = struct {
@@ -339,6 +355,7 @@ pub const Damage = struct {
         pub const FmtOpts = packed struct(usize) {
             aoe: bool = false,
             name_string: bool = false,
+            _: utl.PaddingBits(usize, 2) = 0,
         };
         pub fn format(self: Damage.Kind, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) Error!void {
             _ = fmt;
@@ -358,7 +375,7 @@ pub const Damage = struct {
     amount: f32,
     pub const FmtOpts = packed struct(usize) {
         aoe: bool = false,
-        _: @Type(.{ .int = .{ .bits = @bitSizeOf(usize) - 1, .signedness = .unsigned } }) = 0,
+        _: utl.PaddingBits(usize, 1) = 0,
     };
     pub fn format(self: Damage, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) Error!void {
         _ = fmt;

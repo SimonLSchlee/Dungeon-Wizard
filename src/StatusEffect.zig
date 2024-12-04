@@ -331,16 +331,15 @@ pub fn fmtDesc(buf: []u8, kind: StatusEffect.Kind) Error![]u8 {
         .prickly => try std.fmt.bufPrint(buf, "Melee attackers take 1 damage per stack", .{}),
         .lit => try std.fmt.bufPrint(
             buf,
-            "Take 4 damage over {} seconds per stack\nRemove 1 stack every {} seconds\nMax {} stacks (24 damage over 12 seconds)",
+            "Take 1 damage per second per stack.\nRemove 1 stack every {} seconds\nMax {} stacks",
             .{
-                utl.as(i32, @floor(core.fups_to_secsf(status.cooldown.num_ticks))),
                 utl.as(i32, @floor(core.fups_to_secsf(status.cooldown.num_ticks))),
                 status.max_stacks,
             },
         ),
         .moist => try std.fmt.bufPrint(
             buf,
-            "Remove all stacks of {any}lit.\nImmune to {any}lit until duration expires",
+            "Remove all stacks of {any}lit.\nImmune to {any}lit until duration\nexpires",
             .{
                 icon_text.Icon.burn,
                 icon_text.Icon.burn,

@@ -21,6 +21,7 @@ const Room = @import("../Room.zig");
 const Thing = @import("../Thing.zig");
 const TileMap = @import("../TileMap.zig");
 const StatusEffect = @import("../StatusEffect.zig");
+const icon_text = @import("../icon_text.zig");
 
 const Spell = @import("../Spell.zig");
 const TargetKind = Spell.TargetKind;
@@ -64,33 +65,30 @@ pub const description =
     \\endeavors.
 ;
 
-pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
-    const impling: @This() = self.kind.impling;
-    _ = impling;
+pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
+    _ = self;
     const fmt =
-        \\Impling hp: {}
-        \\Impling damage: {}
-        \\
-        \\{s}
-        \\
+        \\{any}Summon an {any}.
     ;
-    const summonProto = App.get().data.creature_protos.getPtr(.impling);
-    const hp: i32 = utl.as(i32, summonProto.hp.?.max);
-    const damage: i32 = utl.as(i32, summonProto.hitbox.?.effect.damage);
-    return std.fmt.bufPrint(buf, fmt, .{ hp, damage, description });
+    tt.desc = try Spell.Tooltip.Desc.fromSlice(
+        try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{
+            icon_text.Icon.summon,
+            Thing.CreatureKind.impling,
+        }),
+    );
+    tt.infos.appendAssumeCapacity(.{ .creature = .impling });
 }
 
-pub fn getTags(self: *const Spell) Spell.Tag.Array {
+pub fn getNewTags(self: *const Spell) Error!Spell.NewTag.Array {
     _ = self;
-    return Spell.Tag.makeArray(&.{
-        &.{
-            .{ .icon = .{ .sprite_enum = .target } },
-            .{ .icon = .{ .sprite_enum = .mouse } },
+    return Spell.NewTag.Array.fromSlice(&.{
+        .{
+            .card_label = try Spell.NewTag.CardLabel.fromSlice(
+                try utl.bufPrintLocal("{any}{any}", .{
+                    icon_text.Icon.summon,
+                    icon_text.Icon.impling,
+                }),
+            ),
         },
-        &.{
-            .{ .icon = .{ .sprite_enum = .doorway } },
-            .{ .icon = .{ .sprite_enum = .arrow_right } },
-            .{ .icon = .{ .sprite_enum = .monster_with_sword } },
-        },
-    });
+    }) catch unreachable;
 }

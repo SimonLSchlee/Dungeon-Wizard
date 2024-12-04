@@ -32,10 +32,12 @@ const Tooltip = @This();
 pub const InfoKind = enum {
     status,
     damage,
+    creature,
 };
 pub const Info = union(InfoKind) {
     status: StatusEffect.Kind,
     damage: Thing.Damage.Kind,
+    creature: Thing.CreatureKind,
 
     pub fn eql(a: Info, b: Info) bool {
         if (std.meta.activeTag(a) != std.meta.activeTag(b)) return false;
@@ -56,23 +58,27 @@ desc: Desc = .{},
 pub const info_section_spacing: f32 = 4;
 
 pub fn measureInfoContent(info: *const Info) V2f {
-    var buf: [128]u8 = undefined;
-    var title_dims = V2f{};
-    var desc_dims = V2f{};
+    var title_buf: [64]u8 = undefined;
+    var desc_buf: [256]u8 = undefined;
+    var title: []const u8 = "";
+    var desc: []const u8 = "";
+
     switch (info.*) {
         .status => |kind| {
-            const title = StatusEffect.fmtName(&buf, kind) catch "";
-            title_dims = icon_text.measureIconText(title);
-            const desc = StatusEffect.fmtDesc(&buf, kind) catch "";
-            desc_dims = icon_text.measureIconText(desc);
+            title = StatusEffect.fmtName(&title_buf, kind) catch "";
+            desc = StatusEffect.fmtDesc(&desc_buf, kind) catch "";
         },
         .damage => |kind| {
-            const title = Thing.Damage.Kind.fmtName(&buf, kind, false) catch "";
-            title_dims = icon_text.measureIconText(title);
-            const desc = Thing.Damage.Kind.fmtDesc(&buf, kind) catch "";
-            desc_dims = icon_text.measureIconText(desc);
+            title = Thing.Damage.Kind.fmtName(&title_buf, kind, false) catch "";
+            desc = Thing.Damage.Kind.fmtDesc(&desc_buf, kind) catch "";
+        },
+        .creature => |kind| {
+            title = kind.fmtName(&title_buf) catch "";
+            desc = kind.fmtDesc(&desc_buf) catch "";
         },
     }
+    const title_dims = icon_text.measureIconText(title);
+    const desc_dims = icon_text.measureIconText(desc);
     return v2f(
         @max(title_dims.x, desc_dims.x),
         title_dims.y + desc_dims.y + if (title_dims.y > 0 and desc_dims.y > 0) info_section_spacing else 0,
@@ -82,7 +88,10 @@ pub fn measureInfoContent(info: *const Info) V2f {
 pub const tooltip_padding = V2f.splat(5);
 
 pub fn unqRenderInfo(info: *const Info, cmd_buf: *ImmUI.CmdBuf, pos: V2f, ui_scaling: f32) Error!void {
-    var buf: [128]u8 = undefined;
+    var title_buf: [64]u8 = undefined;
+    var desc_buf: [256]u8 = undefined;
+    var title: []const u8 = "";
+    var desc: []const u8 = "";
     const content_dims = measureInfoContent(info).scale(ui_scaling);
     const padding = tooltip_padding.scale(ui_scaling);
     const rect_dims = content_dims.add(padding.scale(2));
@@ -97,30 +106,28 @@ pub fn unqRenderInfo(info: *const Info, cmd_buf: *ImmUI.CmdBuf, pos: V2f, ui_sca
             .outline = .{ .color = .gray, .thickness = ui_scaling },
         },
     } });
+
     switch (info.*) {
         .status => |kind| {
-            var curr_pos = content_pos;
-            const title = StatusEffect.fmtName(&buf, kind) catch "";
-            if (title.len > 0) {
-                try icon_text.unqRenderIconText(cmd_buf, title, curr_pos, ui_scaling, .white);
-                const title_dims = icon_text.measureIconText(title);
-                curr_pos.y += (title_dims.y + info_section_spacing) * ui_scaling;
-            }
-            const desc = StatusEffect.fmtDesc(&buf, kind) catch "";
-            try icon_text.unqRenderIconText(cmd_buf, desc, curr_pos, ui_scaling, .white);
+            title = StatusEffect.fmtName(&title_buf, kind) catch "";
+            desc = StatusEffect.fmtDesc(&desc_buf, kind) catch "";
         },
         .damage => |kind| {
-            var curr_pos = content_pos;
-            const title = Thing.Damage.Kind.fmtName(&buf, kind, false) catch ""; // TODO aoe?
-            if (title.len > 0) {
-                try icon_text.unqRenderIconText(cmd_buf, title, curr_pos, ui_scaling, .white);
-                const title_dims = icon_text.measureIconText(title);
-                curr_pos.y += (title_dims.y + info_section_spacing) * ui_scaling;
-            }
-            const desc = Thing.Damage.Kind.fmtDesc(&buf, kind) catch "";
-            try icon_text.unqRenderIconText(cmd_buf, desc, curr_pos, ui_scaling, .white);
+            title = Thing.Damage.Kind.fmtName(&title_buf, kind, false) catch ""; // TODO aoe?
+            desc = Thing.Damage.Kind.fmtDesc(&desc_buf, kind) catch "";
+        },
+        .creature => |kind| {
+            title = kind.fmtName(&title_buf) catch "";
+            desc = kind.fmtDesc(&desc_buf) catch "";
         },
     }
+    var curr_pos = content_pos;
+    if (title.len > 0) {
+        try icon_text.unqRenderIconText(cmd_buf, title, curr_pos, ui_scaling, .white);
+        const title_dims = icon_text.measureIconText(title);
+        curr_pos.y += (title_dims.y + info_section_spacing) * ui_scaling;
+    }
+    try icon_text.unqRenderIconText(cmd_buf, desc, curr_pos, ui_scaling, .white);
 }
 
 const tooltip_section_spacing: f32 = 4;

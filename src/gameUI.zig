@@ -697,9 +697,9 @@ pub const Slots = struct {
                 .opt = hp_mana_rect_opt,
             } });
             if (caster.hp) |hp| {
-                const cropped_dims = data.spell_tags_icons.sprite_dims_cropped.?.get(.heart);
+                const cropped_dims = data.text_icons.sprite_dims_cropped.?.get(.heart);
                 var curr_pos = self.hp_rect.pos.add(v2f(3, 4).scale(ui_scaling));
-                if (data.spell_tags_icons.getRenderFrame(.heart)) |rf| {
+                if (data.text_icons.getRenderFrame(.heart)) |rf| {
                     try self.immui.commands.append(.{ .texture = .{
                         .pos = curr_pos,
                         .texture = rf.texture,
@@ -725,9 +725,9 @@ pub const Slots = struct {
                 .opt = hp_mana_rect_opt,
             } });
             if (caster.mana) |mana| {
-                const cropped_dims = data.spell_tags_icons.sprite_dims_cropped.?.get(.mana_crystal);
+                const cropped_dims = data.text_icons.sprite_dims_cropped.?.get(.mana_crystal);
                 var curr_pos = self.mana_rect.pos.add(v2f(3, 4).scale(ui_scaling));
-                if (data.spell_tags_icons.getRenderFrame(.mana_crystal)) |rf| {
+                if (data.text_icons.getRenderFrame(.mana_crystal)) |rf| {
                     try self.immui.commands.append(.{ .texture = .{
                         .pos = curr_pos,
                         .texture = rf.texture,

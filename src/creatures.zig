@@ -24,7 +24,9 @@ const TileMap = @import("TileMap.zig");
 const AI = @import("AI.zig");
 const player = @import("player.zig");
 const sprites = @import("sprites.zig");
+const icon_text = @import("icon_text.zig");
 const Spell = @import("Spell.zig");
+const Action = @import("Action.zig");
 
 pub const Kind = enum {
     player,
@@ -37,6 +39,53 @@ pub const Kind = enum {
     acolyte,
     slime,
     gobbomber,
+
+    pub fn getIcon(self: Kind) icon_text.Icon {
+        if (self == .player) {
+            return .wizard;
+        }
+        const enum_name = utl.enumToString(Thing.CreatureKind, self);
+        if (std.meta.stringToEnum(icon_text.Icon, enum_name)) |icon| {
+            return icon;
+        }
+        return .skull;
+    }
+    pub fn fmtName(self: Kind, buf: []u8) Error![]const u8 {
+        return std.fmt.bufPrint(buf, "{any}", .{self});
+    }
+    pub fn fmtDesc(self: Kind, buf: []u8) Error![]const u8 {
+        const proto = App.get().data.creature_protos.get(self);
+        const hp_fmt_opts: usize = @bitCast(Thing.HP.FmtOpts{ .max_only = true });
+        const hp_buf = if (proto.hp) |hp| try std.fmt.bufPrint(buf, "{any:." ++ std.fmt.comptimePrint("{}", .{hp_fmt_opts}) ++ "}", .{hp}) else "";
+        if (proto.controller != .ai_actor) return hp_buf;
+        const ai_actor = proto.controller.ai_actor;
+        var curr_idx: usize = hp_buf.len;
+        if (false) {
+            var action_bufs = std.EnumArray(Action.Slot, []u8).initFill("");
+            var action_it = ai_actor.actions.iterator();
+            while (action_it.next()) |slot| {
+                if (slot.value == null) continue;
+                if (curr_idx >= buf.len) break;
+                buf[curr_idx] = '\n';
+                curr_idx += 1;
+                const action_buf = try std.fmt.bufPrint(buf[curr_idx..], "{any}", .{slot.value.?});
+                curr_idx += action_buf.len;
+                action_bufs.getPtr(slot.key).* = action_buf;
+            }
+        }
+        return buf[0..curr_idx];
+    }
+    pub fn format(self: Kind, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) Error!void {
+        _ = fmt;
+        _ = options;
+        const enum_name = utl.enumToString(Thing.CreatureKind, self);
+        const first_letter = [1]u8{std.ascii.toUpper(enum_name[0])};
+        writer.print("{any}{s}{s}", .{
+            self.getIcon(),
+            &first_letter,
+            enum_name[1..],
+        }) catch return Error.EncodingFail;
+    }
 };
 
 pub const proto_fns = blk: {
