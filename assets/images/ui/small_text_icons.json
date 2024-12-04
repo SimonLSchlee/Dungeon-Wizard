@@ -376,6 +376,15 @@
     "spriteSourceSize": { "x": 0, "y": 0, "w": 7, "h": 7 },
     "sourceSize": { "w": 7, "h": 7 },
     "duration": 100
+   },
+   {
+    "filename": "mislay  0",
+    "frame": { "x": 0, "y": 294, "w": 7, "h": 7 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 7, "h": 7 },
+    "sourceSize": { "w": 7, "h": 7 },
+    "duration": 100
    }
  ],
  "meta": {
@@ -383,7 +392,7 @@
   "version": "1.3.6-arm64",
   "image": "small_text_icons.png",
   "format": "RGBA8888",
-  "size": { "w": 7, "h": 294 },
+  "size": { "w": 7, "h": 301 },
   "scale": "1",
   "frameTags": [
    { "name": "target", "from": 0, "to": 0, "direction": "forward", "color": "#000000ff" },
@@ -427,7 +436,8 @@
    { "name": "draw_card", "from": 38, "to": 38, "direction": "forward", "color": "#000000ff" },
    { "name": "shield", "from": 39, "to": 39, "direction": "forward", "color": "#000000ff" },
    { "name": "impling", "from": 40, "to": 40, "direction": "forward", "color": "#000000ff" },
-   { "name": "summon", "from": 41, "to": 41, "direction": "forward", "color": "#000000ff" }
+   { "name": "summon", "from": 41, "to": 41, "direction": "forward", "color": "#000000ff" },
+   { "name": "mislay", "from": 42, "to": 42, "direction": "forward", "color": "#000000ff" }
   ],
   "layers": [
    { "name": "icon", "opacity": 255, "blendMode": "normal" },
