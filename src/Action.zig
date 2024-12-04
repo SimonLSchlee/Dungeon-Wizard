@@ -260,7 +260,14 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                                 const dist = target.pos.dist(self.pos);
                                 const range = @max(dist - hurtbox.radius, 0);
                                 var ticks_til_hit = utl.as(f32, ticks_til_hit_event);
-                                ticks_til_hit += range / projectile.accel_params.max_speed;
+                                switch (atk.projectile) {
+                                    .arrow => {
+                                        ticks_til_hit += range / projectile.accel_params.max_speed;
+                                    },
+                                    .bomb => {
+                                        ticks_til_hit += utl.as(f32, projectile.controller.projectile.flight_timer.num_ticks);
+                                    },
+                                }
                                 const predicted_target_pos = target.pos.add(target.vel.scale(ticks_til_hit));
                                 switch (atk.projectile) {
                                     .arrow => {
@@ -299,7 +306,8 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                     },
                     .bomb => {
                         const dist = atk.target_pos.dist(self.pos);
-                        const ticks_til_hit = utl.as(i64, dist / projectile.accel_params.max_speed);
+                        const ticks_til_hit = projectile.controller.projectile.flight_timer.num_ticks;
+                        projectile.accel_params.max_speed = dist / utl.as(f32, ticks_til_hit);
                         projectile.hitbox.?.mask = Thing.Faction.Mask.initFull();
                         projectile.hitbox.?.indicator = .{
                             .timer = utl.TickCounter.init(ticks_til_hit),

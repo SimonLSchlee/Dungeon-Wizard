@@ -105,6 +105,7 @@ pub const Controller = struct {
         hitting,
     } = .in_flight,
     target_pos: V2f = .{},
+    flight_timer: utl.TickCounter = utl.TickCounter.init(core.secsToTicks(2)),
 
     pub fn update(self: *Thing, room: *Room) Error!void {
         assert(self.spawn_state == .spawned);
