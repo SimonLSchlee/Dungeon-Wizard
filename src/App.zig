@@ -175,11 +175,12 @@ fn menuUpdate(self: *App) Error!void {
         }
 
         curr_btn_pos.y += btn_dims.y + btn_spacing;
+
+        if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "      New Run\n(Mandy 3-mana)", btn_dims)) {
+            try self.startNewRun(.mandy_3_mana);
+        }
+        curr_btn_pos.y += btn_dims.y + btn_spacing;
     }
-    if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "      New Run\n(Mandy 3-mana)", btn_dims)) {
-        try self.startNewRun(.mandy_3_mana);
-    }
-    curr_btn_pos.y += btn_dims.y + btn_spacing;
 
     if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "      New Run\n(Crispin\nCrystal-picker)", btn_dims)) {
         try self.startNewRun(.crispin_picker);
