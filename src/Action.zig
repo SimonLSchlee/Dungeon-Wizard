@@ -265,7 +265,7 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                                         ticks_til_hit += range / projectile.accel_params.max_speed;
                                     },
                                     .bomb => {
-                                        ticks_til_hit += utl.as(f32, projectile.controller.projectile.flight_timer.num_ticks);
+                                        ticks_til_hit += utl.as(f32, projectile.controller.projectile.timer.num_ticks);
                                     },
                                 }
                                 const predicted_target_pos = target.pos.add(target.vel.scale(ticks_til_hit));
@@ -306,7 +306,7 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                     },
                     .bomb => {
                         const dist = atk.target_pos.dist(self.pos);
-                        const ticks_til_hit = projectile.controller.projectile.flight_timer.num_ticks;
+                        const ticks_til_hit = projectile.controller.projectile.timer.num_ticks;
                         projectile.accel_params.max_speed = dist / utl.as(f32, ticks_til_hit);
                         projectile.hitbox.?.mask = Thing.Faction.Mask.initFull();
                         projectile.hitbox.?.indicator = .{

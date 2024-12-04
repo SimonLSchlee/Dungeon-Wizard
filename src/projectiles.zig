@@ -70,7 +70,11 @@ fn gobbowArrow() Thing {
 }
 
 fn gobbomberBomb() Thing {
-    const arrow = Thing{
+    const flight_ticks = core.secsToTicks(2);
+    const max_y: f32 = 300;
+    const v0: f32 = 2 * max_y / utl.as(f32, flight_ticks);
+    const g = -2 * v0 / utl.as(f32, flight_ticks);
+    const bomb = Thing{
         .kind = .projectile,
         .coll_radius = 5,
         .accel_params = .{
@@ -80,10 +84,13 @@ fn gobbomberBomb() Thing {
         },
         .controller = .{ .projectile = .{
             .kind = .bomb,
+            .timer = utl.TickCounter.init(flight_ticks),
+            .z_vel = v0,
+            .z_accel = g,
         } },
         .renderer = .{ .shape = .{
             .kind = .{ .circle = .{
-                .radius = 6,
+                .radius = 8,
             } },
             .poly_opt = .{ .fill_color = Colorf.rgb(0.2, 0.18, 0.2) },
         } },
@@ -95,7 +102,7 @@ fn gobbomberBomb() Thing {
             .radius = 35,
         },
     };
-    return arrow;
+    return bomb;
 }
 
 pub const Controller = struct {
@@ -105,7 +112,9 @@ pub const Controller = struct {
         hitting,
     } = .in_flight,
     target_pos: V2f = .{},
-    flight_timer: utl.TickCounter = utl.TickCounter.init(core.secsToTicks(2)),
+    timer: utl.TickCounter = .{},
+    z_vel: f32 = 0,
+    z_accel: f32 = 0,
 
     pub fn update(self: *Thing, room: *Room) Error!void {
         assert(self.spawn_state == .spawned);
@@ -124,6 +133,17 @@ pub const Controller = struct {
                     .in_flight => {
                         if (self.hitbox) |*h| {
                             h.rel_pos = controller.target_pos.sub(self.pos);
+                        }
+                        _ = controller.timer.tick(false);
+                        controller.z_vel += controller.z_accel;
+                        self.renderer.shape.rel_pos.y += -controller.z_vel;
+                        if (false) {
+                            if (controller.timer.curr_tick < controller.timer.num_ticks / 2) {
+                                // ascend
+                                controller.z_vel += controller.z_accel;
+                            } else {
+                                // descend
+                            }
                         }
                         if (self.pos.dist(controller.target_pos) < self.accel_params.max_speed) {
                             self.vel = .{};

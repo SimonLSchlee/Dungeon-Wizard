@@ -1005,26 +1005,28 @@ pub const ShapeRenderer = struct {
     draw_under: bool = false,
     draw_normal: bool = true,
     draw_over: bool = false,
+    rel_pos: V2f = .{},
 
     fn _render(self: *const Thing, renderer: *const ShapeRenderer, _: *const Room) void {
         const plat = App.getPlat();
+        const pos = self.pos.add(renderer.rel_pos);
         switch (renderer.kind) {
             .circle => |s| {
-                plat.circlef(self.pos, s.radius, renderer.poly_opt);
+                plat.circlef(pos, s.radius, renderer.poly_opt);
             },
             .sector => |s| {
-                plat.sectorf(self.pos, s.radius, s.start_ang_rads, s.end_ang_rads, renderer.poly_opt);
+                plat.sectorf(pos, s.radius, s.start_ang_rads, s.end_ang_rads, renderer.poly_opt);
             },
             .arrow => |s| {
                 const color: Colorf = if (renderer.poly_opt.fill_color) |c| c else .white;
-                plat.arrowf(self.pos, self.pos.add(self.dir.scale(s.length)), .{ .thickness = s.thickness, .color = color });
+                plat.arrowf(pos, pos.add(self.dir.scale(s.length)), .{ .thickness = s.thickness, .color = color });
             },
             .text => |s| {
                 const data = App.get().data;
                 const font = data.fonts.get(s.font);
                 var opt = s.opt;
                 opt.font = font;
-                plat.textf(self.pos, "{s}", .{s.text.constSlice()}, opt) catch {};
+                plat.textf(pos, "{s}", .{s.text.constSlice()}, opt) catch {};
             },
             else => @panic("unimplemented"),
         }
