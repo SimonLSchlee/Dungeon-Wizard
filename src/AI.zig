@@ -186,6 +186,29 @@ pub const AITroll = struct {
     }
 };
 
+pub const AIGobbomber = struct {
+    ai_ranged_flee: AIRangedFlee = .{},
+
+    pub fn decide(ai: *AIGobbomber, self: *Thing, room: *Room) Decision {
+        const controller = &self.controller.ai_actor;
+        if (self.hp) |*hp| {
+            if (hp.shields.len == 0) {
+                const action = &controller.actions.getPtr(.ability_1).*.?;
+                if (!action.cooldown.running) {
+                    return .{ .action = .{
+                        .slot = .ability_1,
+                        .params = .{
+                            .target_kind = .self,
+                            .thing = self.id,
+                        },
+                    } };
+                }
+            }
+        }
+        return ai.ai_ranged_flee.decide(self, room);
+    }
+};
+
 pub const AIRangedFlee = struct {
     ai_aggro: AIAggro = .{},
     pub fn decide(ai: *AIRangedFlee, self: *Thing, room: *Room) Decision {
@@ -266,12 +289,14 @@ pub const ActorController = struct {
         acolyte,
         troll,
         ranged_flee,
+        gobbomber,
     };
     pub const KindData = union(Kind) {
         aggro: AIAggro,
         acolyte: AIAcolyte,
         troll: AITroll,
         ranged_flee: AIRangedFlee,
+        gobbomber: AIGobbomber,
     };
 
     actions: Action.Slot.Array = Action.Slot.Array.initFill(null),

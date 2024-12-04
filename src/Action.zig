@@ -61,11 +61,18 @@ pub const RegenHp = struct {
     timer: utl.TickCounter = utl.TickCounter.init(60),
 };
 
+pub const ShieldUp = struct {
+    pub const enum_name = "shield_up";
+    amount: f32 = 10,
+    timer: utl.TickCounter = utl.TickCounter.init(60),
+};
+
 pub const ActionTypes = [_]type{
     MeleeAttack,
     ProjectileAttack,
     SpellCast,
     RegenHp,
+    ShieldUp,
 };
 
 pub const Kind = utl.EnumFromTypes(&ActionTypes, "enum_name");
@@ -152,6 +159,9 @@ pub fn begin(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) E
         },
         .regen_hp => |*r| {
             r.amount_regened = 0;
+            r.timer.restart();
+        },
+        .shield_up => |*r| {
             r.timer.restart();
         },
     }
@@ -351,6 +361,16 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                 }
                 r.amount_regened += r.amount_per_sec;
                 if (r.amount_regened >= r.max_regen) {
+                    return true;
+                }
+            }
+            self.updateVel(.{}, .{});
+            _ = self.animator.?.play(.idle, .{ .loop = true });
+        },
+        .shield_up => |*r| {
+            if (r.timer.tick(true)) {
+                if (self.hp) |*hp| {
+                    hp.addShield(r.amount, null);
                     return true;
                 }
             }

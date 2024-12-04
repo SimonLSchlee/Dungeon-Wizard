@@ -295,24 +295,30 @@ pub fn gobbomberProto() Thing {
         .gobbomber,
         .gobbomber,
         .enemy,
-        .{ .ranged_flee = .{} },
+        .{ .gobbomber = .{} },
         18,
         .medium,
         12,
     );
-    ret.hp.?.addShield(10, null);
+    ret.hp.?.addShield(8, null);
     ret.accel_params = .{
         .max_speed = 0.8,
     };
     ret.controller.ai_actor.flee_range = 150;
-    ret.controller.ai_actor.actions.getPtr(.projectile_attack_1).* = (.{
+    ret.controller.ai_actor.actions.getPtr(.ability_1).* = .{
+        .kind = .{ .shield_up = .{
+            .amount = 8,
+        } },
+        .cooldown = utl.TickCounter.initStopped(core.secsToTicks(10)),
+    };
+    ret.controller.ai_actor.actions.getPtr(.projectile_attack_1).* = .{
         .kind = .{ .projectile_attack = .{
             .projectile = .bomb,
             .range = 200,
             .LOS_thiccness = 10,
         } },
         .cooldown = utl.TickCounter.initStopped(90),
-    });
+    };
     ret.enemy_difficulty = 2.0;
     return ret;
 }
