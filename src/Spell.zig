@@ -823,6 +823,37 @@ pub const Tag = struct {
     }
 };
 
+pub const Keyword = enum {
+    mislay,
+
+    pub fn getIcon(self: Keyword) icon_text.Icon {
+        const enum_name = utl.enumToString(Keyword, self);
+        if (std.meta.stringToEnum(icon_text.Icon, enum_name)) |icon| {
+            return icon;
+        }
+        return .target; // TODO?
+    }
+    pub fn fmtName(self: Keyword, buf: []u8) Error![]const u8 {
+        return std.fmt.bufPrint(buf, "{any}", .{self});
+    }
+    pub fn fmtDesc(self: Keyword, buf: []u8) Error![]const u8 {
+        return switch (self) {
+            .mislay => try std.fmt.bufPrint(buf, "The card is lost until the next room", .{}),
+        };
+    }
+    pub fn format(self: Keyword, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) Error!void {
+        _ = fmt;
+        _ = options;
+        const enum_name = utl.enumToString(Keyword, self);
+        const first_letter = [1]u8{std.ascii.toUpper(enum_name[0])};
+        writer.print("{any}{s}{s}", .{
+            self.getIcon(),
+            &first_letter,
+            enum_name[1..],
+        }) catch return Error.EncodingFail;
+    }
+};
+
 pub const CastTime = enum {
     slow,
     medium,

@@ -21,6 +21,7 @@ const Room = @import("../Room.zig");
 const Thing = @import("../Thing.zig");
 const TileMap = @import("../TileMap.zig");
 const StatusEffect = @import("../StatusEffect.zig");
+const icon_text = @import("../icon_text.zig");
 
 const Collision = @import("../Collision.zig");
 const Spell = @import("../Spell.zig");
@@ -58,7 +59,7 @@ pub const proto = Spell.makeProto(
 );
 
 line_hit_effect: Thing.HitEffect = .{
-    .damage = 10,
+    .damage = 5,
 },
 end_hit_effect: Thing.HitEffect = .{
     .damage = 5,
@@ -144,52 +145,51 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     caster.pos = target_pos;
 }
 
-pub const description =
-    \\Zip around like a bolt of lightning!
-    \\Enemies you pass through are damaged.
-    \\Enemies near the target location take
-    \\additional damage and are stunned.
-;
-
-pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
+pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
     const zap_dash: @This() = self.kind.zap_dash;
+    const line_hit_damage = Thing.Damage{
+        .kind = .lightning,
+        .amount = zap_dash.line_hit_effect.damage,
+    };
+    const end_hit_damage = Thing.Damage{
+        .kind = .lightning,
+        .amount = zap_dash.end_hit_effect.damage,
+    };
     const fmt =
-        \\Line damage: {}
-        \\Target area damage: {}
-        \\Stun duration: {} secs
-        \\
-        \\{s}
-        \\
+        \\Teleport a short distance.
+        \\Deal {any} damage to creatures
+        \\in a line. Deal an additional
+        \\{any} damage and {any}stun
+        \\for {d:.0} seconds near the
+        \\destination.
     ;
-    const line_damage: i32 = utl.as(i32, zap_dash.line_hit_effect.damage);
-    const end_damage: i32 = utl.as(i32, zap_dash.end_hit_effect.damage);
-    const dur_secs: i32 = zap_dash.end_hit_effect.status_stacks.get(.stunned) * utl.as(i32, @divFloor(StatusEffect.proto_array.get(.stunned).cooldown.num_ticks, core.fups_per_sec));
-    return std.fmt.bufPrint(buf, fmt ++ "\n", .{ line_damage, end_damage, dur_secs, description });
+    tt.desc = try Spell.Tooltip.Desc.fromSlice(
+        try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{
+            line_hit_damage,
+            end_hit_damage,
+            StatusEffect.getIcon(.stunned),
+            StatusEffect.getDurationSeconds(.stunned, zap_dash.end_hit_effect.status_stacks.get(.stunned)).?,
+        }),
+    );
 }
 
-pub fn getTags(self: *const Spell) Spell.Tag.Array {
+pub fn getNewTags(self: *const Spell) Error!Spell.NewTag.Array {
+    var buf: [64]u8 = undefined;
     const zap_dash: @This() = self.kind.zap_dash;
-    return Spell.Tag.makeArray(&.{
-        &.{
-            .{ .icon = .{ .sprite_enum = .target } },
-            .{ .icon = .{ .sprite_enum = .mouse } },
+    return Spell.NewTag.Array.fromSlice(&.{
+        .{
+            .card_label = try Spell.NewTag.CardLabel.fromSlice(
+                try std.fmt.bufPrint(&buf, "{any}{any}{any}{any}{any}", .{
+                    icon_text.Fmt{ .tint = .orange },
+                    icon_text.Icon.wizard,
+                    icon_text.Fmt{ .tint = .white },
+                    icon_text.Icon.arrow_right,
+                    icon_text.Icon.wizard,
+                }),
+            ),
         },
-        &.{
-            .{ .icon = .{ .sprite_enum = .wizard } },
-            .{ .icon = .{ .sprite_enum = .arrow_right } },
-            .{ .icon = .{ .sprite_enum = .wizard, .tint = .orange } },
-        },
-        &.{
-            .{ .icon = .{ .sprite_enum = .lightning } },
-            .{ .label = Spell.Tag.fmtLabel("{d:.0}", .{zap_dash.line_hit_effect.damage}) },
-        },
-        &.{
-            .{ .icon = .{ .sprite_enum = .aoe_lightning } },
-            .{ .label = Spell.Tag.fmtLabel("{d:.0}", .{zap_dash.end_hit_effect.damage}) },
-        },
-        &.{
-            .{ .icon = .{ .sprite_enum = .spiral_yellow } },
-            .{ .icon = .{ .sprite_enum = .ouchy_skull } },
-        },
-    });
+        try Spell.NewTag.makeDamage(.lightning, zap_dash.line_hit_effect.damage, false),
+        try Spell.NewTag.makeDamage(.lightning, zap_dash.end_hit_effect.damage, false),
+        try Spell.NewTag.makeStatus(.stunned, zap_dash.end_hit_effect.status_stacks.get(.stunned)),
+    }) catch unreachable;
 }

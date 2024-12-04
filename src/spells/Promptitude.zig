@@ -55,33 +55,23 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     _ = room;
 }
 
-pub const description =
-    \\Move and cast spells 2x faster.
-    \\Memory (slot cooldown) unaffected.
-;
-
-pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
+pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
     const promptitude: @This() = self.kind.promptitude;
     const fmt =
-        \\Duration: {} secs
-        \\
-        \\{s}
-        \\
+        \\Gain {any}promptitude for {d:.0} seconds.
     ;
-    const dur_secs: i32 = promptitude.num_stacks * utl.as(i32, @divFloor(StatusEffect.proto_array.get(.promptitude).cooldown.num_ticks, core.fups_per_sec));
-    return std.fmt.bufPrint(buf, fmt, .{ dur_secs, description });
+    tt.desc = try Spell.Tooltip.Desc.fromSlice(
+        try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{
+            StatusEffect.getIcon(.promptitude),
+            @floor(StatusEffect.getDurationSeconds(.promptitude, promptitude.num_stacks).?),
+        }),
+    );
+    tt.infos.appendAssumeCapacity(.{ .status = .promptitude });
 }
 
-pub fn getTags(self: *const Spell) Spell.Tag.Array {
-    _ = self;
-    return Spell.Tag.makeArray(&.{
-        &.{
-            .{ .icon = .{ .sprite_enum = .target } },
-            .{ .icon = .{ .sprite_enum = .wizard, .tint = .orange } },
-        },
-        &.{
-            .{ .icon = .{ .sprite_enum = .fast_forward } },
-            .{ .icon = .{ .sprite_enum = .wizard, .tint = .orange } },
-        },
-    });
+pub fn getNewTags(self: *const Spell) Error!Spell.NewTag.Array {
+    const promptitude: @This() = self.kind.promptitude;
+    return Spell.NewTag.Array.fromSlice(&.{
+        try Spell.NewTag.makeStatus(.promptitude, promptitude.num_stacks),
+    }) catch unreachable;
 }

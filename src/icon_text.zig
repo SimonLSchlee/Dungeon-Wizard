@@ -70,6 +70,7 @@ pub const Icon = enum(u8) {
     shield,
     impling,
     summon,
+    mislay,
 
     pub const codepoint_start: u21 = pua_codepoint_start;
     pub const codepoint_end: u21 = codepoint_start + std.math.maxInt(@typeInfo(Icon).@"enum".tag_type);
@@ -108,10 +109,12 @@ pub const Fmt = packed struct(u8) {
     pub const Tint = enum(u3) {
         white,
         red,
+        orange,
 
         pub const colors = std.EnumArray(Tint, Colorf).init(.{
             .white = .white,
             .red = .red,
+            .orange = .orange,
         });
         pub fn toColor(tint: Tint) Colorf {
             return colors.get(tint);

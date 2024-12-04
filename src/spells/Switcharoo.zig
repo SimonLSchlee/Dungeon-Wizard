@@ -21,6 +21,7 @@ const Room = @import("../Room.zig");
 const Thing = @import("../Thing.zig");
 const TileMap = @import("../TileMap.zig");
 const StatusEffect = @import("../StatusEffect.zig");
+const icon_text = @import("../icon_text.zig");
 
 const Collision = @import("../Collision.zig");
 const Spell = @import("../Spell.zig");
@@ -70,39 +71,38 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     }
 }
 
-pub const description =
-    \\Switch your position with another
-    \\creature. The creature takes
-    \\damage.
-;
-
-pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
+pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
     const switcharoo: @This() = self.kind.switcharoo;
+    const hit_damage = Thing.Damage{
+        .kind = .magic,
+        .amount = switcharoo.hit_effect.damage,
+    };
     const fmt =
-        \\Damage: {}
-        \\
-        \\{s}
-        \\
+        \\Switch your position with another
+        \\creature. Deal {any} damage.
     ;
-    const damage: i32 = utl.as(i32, switcharoo.hit_effect.damage);
-    return std.fmt.bufPrint(buf, fmt ++ "\n", .{ damage, description });
+    tt.desc = try Spell.Tooltip.Desc.fromSlice(
+        try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{
+            hit_damage,
+        }),
+    );
 }
 
-pub fn getTags(self: *const Spell) Spell.Tag.Array {
+pub fn getNewTags(self: *const Spell) Error!Spell.NewTag.Array {
+    var buf: [64]u8 = undefined;
     const switcharoo: @This() = self.kind.switcharoo;
-    return Spell.Tag.makeArray(&.{
-        &.{
-            .{ .icon = .{ .sprite_enum = .target } },
-            .{ .icon = .{ .sprite_enum = .skull } },
+    return Spell.NewTag.Array.fromSlice(&.{
+        .{
+            .card_label = try Spell.NewTag.CardLabel.fromSlice(
+                try std.fmt.bufPrint(&buf, "{any}{any}{any}{any}{any}", .{
+                    icon_text.Fmt{ .tint = .orange },
+                    icon_text.Icon.wizard,
+                    icon_text.Fmt{ .tint = .white },
+                    icon_text.Icon.arrows_opp,
+                    icon_text.Icon.skull,
+                }),
+            ),
         },
-        &.{
-            .{ .icon = .{ .sprite_enum = .wizard, .tint = .orange } },
-            .{ .icon = .{ .sprite_enum = .arrows_opp } },
-            .{ .icon = .{ .sprite_enum = .ouchy_skull } },
-        },
-        &.{
-            .{ .icon = .{ .sprite_enum = .magic } },
-            .{ .label = Spell.Tag.fmtLabel("{d:.0}", .{switcharoo.hit_effect.damage}) },
-        },
-    });
+        try Spell.NewTag.makeDamage(.magic, switcharoo.hit_effect.damage, false),
+    }) catch unreachable;
 }

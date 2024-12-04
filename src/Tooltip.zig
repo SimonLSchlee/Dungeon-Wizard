@@ -26,6 +26,7 @@ const ImmUI = @import("ImmUI.zig");
 const Action = @import("Action.zig");
 const Run = @import("Run.zig");
 const StatusEffect = @import("StatusEffect.zig");
+const Spell = @import("Spell.zig");
 const icon_text = @import("icon_text.zig");
 const Tooltip = @This();
 
@@ -33,11 +34,13 @@ pub const InfoKind = enum {
     status,
     damage,
     creature,
+    keyword,
 };
 pub const Info = union(InfoKind) {
     status: StatusEffect.Kind,
     damage: Thing.Damage.Kind,
     creature: Thing.CreatureKind,
+    keyword: Spell.Keyword,
 
     pub fn eql(a: Info, b: Info) bool {
         if (std.meta.activeTag(a) != std.meta.activeTag(b)) return false;
@@ -73,6 +76,10 @@ pub fn measureInfoContent(info: *const Info) V2f {
             desc = Thing.Damage.Kind.fmtDesc(&desc_buf, kind) catch "";
         },
         .creature => |kind| {
+            title = kind.fmtName(&title_buf) catch "";
+            desc = kind.fmtDesc(&desc_buf) catch "";
+        },
+        .keyword => |kind| {
             title = kind.fmtName(&title_buf) catch "";
             desc = kind.fmtDesc(&desc_buf) catch "";
         },
@@ -117,6 +124,10 @@ pub fn unqRenderInfo(info: *const Info, cmd_buf: *ImmUI.CmdBuf, pos: V2f, ui_sca
             desc = Thing.Damage.Kind.fmtDesc(&desc_buf, kind) catch "";
         },
         .creature => |kind| {
+            title = kind.fmtName(&title_buf) catch "";
+            desc = kind.fmtDesc(&desc_buf) catch "";
+        },
+        .keyword => |kind| {
             title = kind.fmtName(&title_buf) catch "";
             desc = kind.fmtDesc(&desc_buf) catch "";
         },

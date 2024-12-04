@@ -167,3 +167,23 @@ pub fn getTags(self: *const Spell) Spell.Tag.Array {
         },
     });
 }
+
+pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
+    _ = self;
+    const fmt =
+        \\Gain {any}trailblaze.
+    ;
+    tt.desc = try Spell.Tooltip.Desc.fromSlice(
+        try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{
+            StatusEffect.getIcon(.trailblaze),
+        }),
+    );
+    tt.infos.appendAssumeCapacity(.{ .status = .trailblaze });
+}
+
+pub fn getNewTags(self: *const Spell) Error!Spell.NewTag.Array {
+    const trailblaze: @This() = self.kind.trailblaze;
+    return Spell.NewTag.Array.fromSlice(&.{
+        try Spell.NewTag.makeStatus(.trailblaze, trailblaze.num_stacks),
+    }) catch unreachable;
+}

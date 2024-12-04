@@ -69,14 +69,17 @@ pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
     _ = self;
     const fmt =
         \\{any}Summon an {any}.
+        \\{any}.
     ;
     tt.desc = try Spell.Tooltip.Desc.fromSlice(
         try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{
             icon_text.Icon.summon,
             Thing.CreatureKind.impling,
+            Spell.Keyword.mislay,
         }),
     );
     tt.infos.appendAssumeCapacity(.{ .creature = .impling });
+    tt.infos.appendAssumeCapacity(.{ .keyword = .mislay });
 }
 
 pub fn getNewTags(self: *const Spell) Error!Spell.NewTag.Array {
@@ -87,6 +90,13 @@ pub fn getNewTags(self: *const Spell) Error!Spell.NewTag.Array {
                 try utl.bufPrintLocal("{any}{any}", .{
                     icon_text.Icon.summon,
                     icon_text.Icon.impling,
+                }),
+            ),
+        },
+        .{
+            .card_label = try Spell.NewTag.CardLabel.fromSlice(
+                try utl.bufPrintLocal("{any}", .{
+                    Spell.Keyword.mislay.getIcon(),
                 }),
             ),
         },

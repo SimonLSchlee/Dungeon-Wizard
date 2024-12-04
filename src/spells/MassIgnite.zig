@@ -21,6 +21,7 @@ const Room = @import("../Room.zig");
 const Thing = @import("../Thing.zig");
 const TileMap = @import("../TileMap.zig");
 const StatusEffect = @import("../StatusEffect.zig");
+const icon_text = @import("../icon_text.zig");
 
 const Collision = @import("../Collision.zig");
 const Spell = @import("../Spell.zig");
@@ -81,53 +82,50 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     }
 }
 
-pub const description =
-    \\Set ALL enemies ablaze.
-    \\If an enemy is already ablaze,
-    \\also stun them and do bonus
-    \\damage per ablaze stack.
-;
-
-pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
+pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
     const mass_ignite: @This() = self.kind.mass_ignite;
-    _ = mass_ignite;
+    const bonus_dmg = Thing.Damage{
+        .kind = .fire,
+        .amount = mass_ignite.bonus_hit_effect.damage,
+    };
     const fmt =
-        \\Stun duration: 2 secs per ablaze stack
-        \\Bonus damage: 3 per ablaze stack
-        \\
-        \\{s}
-        \\
+        \\{any}Light ALL enemies on fire.
+        \\For each existing stack of
+        \\{any}lit, deal an additional
+        \\{any} damage and {any}stun
+        \\for {d:.0} seconds.
     ;
-    return std.fmt.bufPrint(buf, fmt, .{description});
+    tt.desc = try Spell.Tooltip.Desc.fromSlice(
+        try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{
+            StatusEffect.getIcon(.lit),
+            StatusEffect.getIcon(.lit),
+            bonus_dmg,
+            StatusEffect.getIcon(.stunned),
+            StatusEffect.getDurationSeconds(.stunned, mass_ignite.bonus_hit_effect.status_stacks.get(.stunned)).?,
+        }),
+    );
+    tt.infos.appendAssumeCapacity(.{ .damage = .fire });
+    tt.infos.appendAssumeCapacity(.{ .status = .lit });
+    tt.infos.appendAssumeCapacity(.{ .status = .stunned });
 }
 
-pub fn getTags(self: *const Spell) Spell.Tag.Array {
+pub fn getNewTags(self: *const Spell) Error!Spell.NewTag.Array {
+    var buf: [64]u8 = undefined;
     const mass_ignite: @This() = self.kind.mass_ignite;
-    var ret = Spell.Tag.makeArray(&.{
-        &.{
-            .{ .icon = .{ .sprite_enum = .target } },
-            .{ .icon = .{ .sprite_enum = .skull } },
-            .{ .icon = .{ .sprite_enum = .skull } },
-            .{ .icon = .{ .sprite_enum = .skull } },
+    return Spell.NewTag.Array.fromSlice(&.{
+        .{
+            .card_label = try Spell.NewTag.CardLabel.fromSlice(
+                try std.fmt.bufPrint(&buf, "{any}{any}{any}{any}", .{ icon_text.Icon.target, icon_text.Icon.skull, icon_text.Icon.skull, icon_text.Icon.skull }),
+            ),
         },
-        &.{
-            .{ .icon = .{ .sprite_enum = .fire } },
+        try Spell.NewTag.makeStatus(.lit, 1),
+        .{
+            .card_label = try Spell.NewTag.CardLabel.fromSlice(
+                try std.fmt.bufPrint(&buf, "Bonus/{any}:", .{StatusEffect.getIcon(.lit)}),
+            ),
+            .start_on_new_line = true,
         },
-        &.{
-            .{ .label = Spell.Tag.Label.fromSlice("Bonus /") catch unreachable },
-            .{ .icon = .{ .sprite_enum = .fire } },
-            .{ .label = Spell.Tag.Label.fromSlice(":") catch unreachable },
-        },
-        &.{
-            .{ .icon = .{ .sprite_enum = .fire } },
-            .{ .label = Spell.Tag.fmtLabel("{d:.0}", .{mass_ignite.bonus_hit_effect.damage}) },
-        },
-        &.{
-            .{ .icon = .{ .sprite_enum = .spiral_yellow } },
-            .{ .icon = .{ .sprite_enum = .ouchy_skull } },
-        },
-    });
-    ret.buffer[2].start_on_new_line = true;
-    ret.buffer[3].start_on_new_line = true;
-    return ret;
+        try Spell.NewTag.makeDamage(.fire, mass_ignite.bonus_hit_effect.damage, false),
+        try Spell.NewTag.makeStatus(.stunned, mass_ignite.bonus_hit_effect.status_stacks.get(.stunned)),
+    }) catch unreachable;
 }
