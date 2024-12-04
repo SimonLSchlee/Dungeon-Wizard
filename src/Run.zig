@@ -30,6 +30,7 @@ const player = @import("player.zig");
 const ImmUI = @import("ImmUI.zig");
 const sprites = @import("sprites.zig");
 const Tooltip = @import("Tooltip.zig");
+const icon_text = @import("icon_text.zig");
 
 pub const Mode = enum {
     pub const Mask = std.EnumSet(Mode);
@@ -986,6 +987,26 @@ pub fn update(self: *Run) Error!void {
             self.load_state = .fade_in;
         },
     }
+
+    { // gold
+        const scaling = 3;
+        const padding = v2f(5, 5);
+        const gold_text = try u.bufPrintLocal("{any}{}", .{ icon_text.Icon.coin, self.gold });
+        const rect_dims = icon_text.measureIconText(gold_text).scale(scaling).add(padding.scale(2));
+        const topleft = plat.native_rect_cropped_offset.add(v2f(
+            10,
+            10,
+        ));
+        self.imm_ui.commands.appendAssumeCapacity(.{ .rect = .{
+            .pos = topleft,
+            .dims = rect_dims,
+            .opt = .{
+                .fill_color = Colorf.black.fade(0.7),
+            },
+        } });
+        try icon_text.unqRenderIconText(&self.imm_ui.commands, gold_text, topleft.add(padding), scaling);
+    }
+
     self.curr_tick += 1;
 }
 
@@ -1109,20 +1130,6 @@ pub fn render(self: *Run, native_render_texture: Platform.RenderTexture2D) Error
     try ImmUI.render(&self.tooltip_ui.commands);
     plat.startRenderToTexture(native_render_texture);
     plat.setBlend(.render_tex_alpha);
-    { // gold
-        const gold_fill_color = Colorf.rgb(1, 0.9, 0);
-        const topleft = plat.native_rect_cropped_offset.add(v2f(
-            10,
-            10,
-        ));
-        const rect_dims = v2f(20, 60);
-        plat.rectf(topleft, rect_dims, .{ .fill_color = Colorf.black.fade(0.5) });
-        plat.circlef(topleft.add(v2f(10, 10)), 8, .{ .fill_color = gold_fill_color });
-        try plat.textf(topleft.add(v2f(16 + 4, 0)), "{}", .{self.gold}, .{
-            .color = .white,
-            .size = 25,
-        });
-    }
     switch (self.load_state) {
         .none => {},
         .fade_in => {
