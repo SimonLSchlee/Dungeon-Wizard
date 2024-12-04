@@ -2,6 +2,7 @@ const std = @import("std");
 const raylib_build = @import("raylib");
 
 const title = "action-deckbuilder";
+const version = "v0.8";
 
 const raylib_config = "-DSUPPORT_CUSTOM_FRAME_CONTROL=1";
 
@@ -17,6 +18,20 @@ fn linkOSStuff(b: *std.Build, target: std.Build.ResolvedTarget, artifact: *std.B
         },
         else => {},
     }
+}
+
+pub fn addDynGameConfig(b: *std.Build, module: *std.Build.Module) void {
+    const options = b.addOptions();
+    options.addOption([]const u8, "version", version);
+    module.addOptions("config", options);
+}
+
+pub fn addExeConfig(b: *std.Build, module: *std.Build.Module, static_lib: bool, is_release: bool) void {
+    const options = b.addOptions();
+    options.addOption(bool, "static_lib", static_lib);
+    options.addOption(bool, "is_release", is_release);
+    options.addOption([]const u8, "version", version);
+    module.addOptions("config", options);
 }
 
 pub fn buildDynamic(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, app_only: bool, do_release: bool) ![]*std.Build.Step.Compile {
@@ -50,6 +65,7 @@ pub fn buildDynamic(b: *std.Build, target: std.Build.ResolvedTarget, optimize: s
     });
     app_lib.linkLibrary(raylib);
     app_lib.addIncludePath(b.path("raylib/src"));
+    addDynGameConfig(b, &app_lib.root_module);
 
     if (!app_only) {
         const exe = b.addExecutable(.{
@@ -62,10 +78,7 @@ pub fn buildDynamic(b: *std.Build, target: std.Build.ResolvedTarget, optimize: s
         exe.addIncludePath(b.path("raylib/src"));
         linkOSStuff(b, target, exe);
 
-        const options = b.addOptions();
-        options.addOption(bool, "static_lib", false);
-        options.addOption(bool, "is_release", do_release);
-        exe.root_module.addOptions("config", options);
+        addExeConfig(b, &exe.root_module, false, do_release);
 
         if (target.query.isNative()) {
             // This *creates* a Run step in the build graph, to be executed when another
@@ -121,10 +134,7 @@ pub fn buildStatic(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
     exe.addIncludePath(b.path("raylib/src"));
     linkOSStuff(b, target, exe);
 
-    const options = b.addOptions();
-    options.addOption(bool, "static_lib", true);
-    options.addOption(bool, "is_release", do_release);
-    exe.root_module.addOptions("config", options);
+    addExeConfig(b, &exe.root_module, true, do_release);
 
     if (target.query.isNative()) {
         const run_cmd = b.addRunArtifact(exe);

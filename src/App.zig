@@ -20,6 +20,7 @@ const Data = @import("Data.zig");
 const Options = @import("Options.zig");
 const ImmUI = @import("ImmUI.zig");
 const menuUI = @import("menuUI.zig");
+const config = @import("config");
 
 var _app: ?*App = null;
 var _plat: ?*Platform = null;
@@ -156,11 +157,24 @@ fn menuUpdate(self: *App) Error!void {
 
     const title_topleft = panel_topleft.add(title_padding);
     const title_center = title_topleft.add(title_dims.scale(0.5));
+
     self.menu_ui.commands.append(.{
         .label = .{
             .pos = title_center,
             .text = ImmUI.initLabel(title_text),
             .opt = title_opt,
+        },
+    }) catch unreachable;
+    const version_text = config.version;
+    const version_opt = draw.TextOpt{
+        .color = .white,
+        .size = 20,
+    };
+    self.menu_ui.commands.append(.{
+        .label = .{
+            .pos = title_center.add(v2f(title_dims.x * 0.5 + 5, 0)),
+            .text = ImmUI.initLabel(version_text),
+            .opt = version_opt,
         },
     }) catch unreachable;
 

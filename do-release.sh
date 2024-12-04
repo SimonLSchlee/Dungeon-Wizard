@@ -3,7 +3,7 @@
 set -xe
 
 ASSETS="$(pwd)/assets"
-VERSION="v0.0007-fishnslime"
+VERSION="v0.8-crispin-crystal"
 
 rm -rf zig-out/release
 
