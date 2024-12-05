@@ -92,39 +92,23 @@ pub fn debugLogBytes(self: *Platform, bytes: []const u8) void {
     };
 }
 
-pub const num_logs_to_keep = 2;
+fn makeLogFile(_: Platform) !std.fs.File {
+    const curr_log_name = "debug-log.txt";
+    const prev_log_name = "old-debug-log.txt";
+    const cwd = std.fs.cwd();
 
-fn makeLogFile(self: Platform) !std.fs.File {
-    const sess_prefix = "sess-";
-    var dir = try std.fs.cwd().openDir(".", .{ .iterate = true });
-    defer dir.close();
-    var walker = try dir.walk(self.heap);
-    defer walker.deinit();
-    var used_sess_nums: [num_logs_to_keep]bool = .{false} ** num_logs_to_keep;
-    while (try walker.next()) |entry| {
-        if (entry.kind != .file) continue;
-        if (!(std.mem.startsWith(u8, entry.basename, sess_prefix) and std.mem.endsWith(u8, entry.basename, ".txt"))) {
-            continue;
+    // rename old log
+    const maybe_stat: ?std.fs.Dir.Stat = cwd.statFile(curr_log_name) catch null;
+    if (maybe_stat) |stat| {
+        if (stat.kind == .file) {
+            try cwd.rename(curr_log_name, prev_log_name);
+        } else {
+            // TODO
+            @panic("idk what to do");
         }
-        var it = std.mem.tokenizeAny(u8, entry.basename, "-.");
-        _ = it.next();
-        const num_str = it.next().?;
-        const num = std.fmt.parseUnsigned(u8, num_str, 10) catch continue;
-        if (num >= num_logs_to_keep) continue;
-        used_sess_nums[num] = true;
     }
-    // TODO this doesn't work cos it will just keep overwriting sess-0.txt lol
-    const sess_num = blk: {
-        for (used_sess_nums, 0..) |used, i| {
-            if (!used) {
-                break :blk i;
-            }
-        } else break :blk 0;
-    };
 
-    const filename = try std.fmt.bufPrint(self.str_fmt_buf, "{s}{}.txt", .{ sess_prefix, sess_num });
-
-    return try std.fs.cwd().createFile(filename, .{});
+    return try cwd.createFile(curr_log_name, .{});
 }
 
 pub fn init(title: []const u8) Error!Platform {

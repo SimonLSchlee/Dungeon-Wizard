@@ -65,7 +65,7 @@ pub fn logRaw(comptime fmt: []const u8, args: anytype) void {
 pub fn logLevel(level: LogLevel, comptime fmt: []const u8, args: anytype) void {
     const plat = App.getPlat();
 
-    const pre = std.fmt.bufPrint(plat.str_fmt_buf, "[{any}] {any} ", .{ level, DateTime.getLocal() }) catch "[FMT ERR]";
+    const pre = std.fmt.bufPrint(plat.str_fmt_buf, "[{any}] {any} ", .{ level, DateTime.getUTC() }) catch "[FMT ERR]";
     plat.debugLogBytes(pre);
     const msg = std.fmt.bufPrint(plat.str_fmt_buf, fmt, args) catch plat.str_fmt_buf;
     plat.debugLogBytes(msg);
