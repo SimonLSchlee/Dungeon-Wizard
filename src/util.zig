@@ -1,5 +1,4 @@
 const std = @import("std");
-const Self = @This();
 
 pub const pi: f32 = std.math.pi;
 pub const tau: f32 = 2 * std.math.pi;

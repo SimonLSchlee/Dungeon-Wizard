@@ -4,6 +4,7 @@ const utl = @import("util.zig");
 
 pub const Platform = @import("raylib.zig");
 const core = @import("core.zig");
+const debug = @import("debug.zig");
 const Error = core.Error;
 const Key = core.Key;
 const draw = @import("draw.zig");
@@ -575,7 +576,7 @@ fn renderTile(self: *const TileMap, pos: V2f, tile: TileLayer.Tile) void {
     const plat = getPlat();
     const data = App.get().data;
     const ref = self.tileIdxToTileSetRef(tile.idx) orelse {
-        std.debug.print("unknown tileset ref!\n", .{});
+        debug.err("unknown tileset ref!", .{});
         return;
     };
     assert(ref.data_idx < data.tilesets.items.len);

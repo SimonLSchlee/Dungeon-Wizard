@@ -1,5 +1,6 @@
 const std = @import("std");
 const assert = std.debug.assert;
+const debug = @import("debug.zig");
 const Platform = @This();
 const u = @import("util.zig");
 const r = @cImport({
@@ -17,6 +18,7 @@ const V2f = @import("V2f.zig");
 const v2f = V2f.v2f;
 const V2i = @import("V2i.zig");
 const v2i = V2i.v2i;
+const DateTime = @import("DateTime.zig");
 
 const builtin = @import("builtin");
 const config = @import("config");
@@ -63,6 +65,7 @@ prev_frame_time_ns: i64 = 0,
 input_buffer: core.InputBuffer = .{},
 str_fmt_buf: []u8 = undefined,
 assets_path: []const u8 = undefined,
+debug_logfile: std.fs.File = undefined,
 
 pub fn updateDims(self: *Platform, dims: V2i) void {
     self.screen_dims = dims;
@@ -77,12 +80,64 @@ pub fn updateDims(self: *Platform, dims: V2i) void {
     self.native_rect_cropped_dims = self.screen_dims_f.scale(1 / self.native_to_screen_scaling);
 }
 
+pub fn debugLogfileSync(self: *Platform) void {
+    self.debug_logfile.sync() catch |e| {
+        std.debug.print("SYNC ERROR: {any}\n", .{e});
+    };
+}
+
+pub fn debugLogBytes(self: *Platform, bytes: []const u8) void {
+    self.debug_logfile.writeAll(bytes) catch |e| {
+        std.debug.print("WRITE ERROR: {any}\n", .{e});
+    };
+}
+
+pub const num_logs_to_keep = 2;
+
+fn makeLogFile(self: Platform) !std.fs.File {
+    const sess_prefix = "sess-";
+    var dir = try std.fs.cwd().openDir(".", .{ .iterate = true });
+    defer dir.close();
+    var walker = try dir.walk(self.heap);
+    defer walker.deinit();
+    var used_sess_nums: [num_logs_to_keep]bool = .{false} ** num_logs_to_keep;
+    while (try walker.next()) |entry| {
+        if (entry.kind != .file) continue;
+        if (!(std.mem.startsWith(u8, entry.basename, sess_prefix) and std.mem.endsWith(u8, entry.basename, ".txt"))) {
+            continue;
+        }
+        var it = std.mem.tokenizeAny(u8, entry.basename, "-.");
+        _ = it.next();
+        const num_str = it.next().?;
+        const num = std.fmt.parseUnsigned(u8, num_str, 10) catch continue;
+        if (num >= num_logs_to_keep) continue;
+        used_sess_nums[num] = true;
+    }
+    // TODO this doesn't work cos it will just keep overwriting sess-0.txt lol
+    const sess_num = blk: {
+        for (used_sess_nums, 0..) |used, i| {
+            if (!used) {
+                break :blk i;
+            }
+        } else break :blk 0;
+    };
+
+    const filename = try std.fmt.bufPrint(self.str_fmt_buf, "{s}{}.txt", .{ sess_prefix, sess_num });
+
+    return try std.fs.cwd().createFile(filename, .{});
+}
+
 pub fn init(title: []const u8) Error!Platform {
     @setRuntimeSafety(core.rt_safe_blocks);
-
     const dims = core.native_dims;
 
     var ret: Platform = .{};
+    ret.str_fmt_buf = try ret.heap.alloc(u8, str_fmt_buf_size);
+    ret.assets_path = try ret.getAssetsPath();
+    ret.debug_logfile = ret.makeLogFile() catch |e| {
+        std.debug.print("ERROR: create log file: {any}\n", .{e});
+        return Error.FileSystemFail;
+    };
     ret.stack_base = ret.getStackPointer();
     const title_z = try std.fmt.allocPrintZ(ret.heap, "{s}", .{title});
 
@@ -90,9 +145,6 @@ pub fn init(title: []const u8) Error!Platform {
     r.InitWindow(@intCast(dims.x), @intCast(dims.y), title_z);
     // show raylib init INFO, then just warnings
     r.SetTraceLogLevel(r.LOG_WARNING);
-
-    ret.str_fmt_buf = try ret.heap.alloc(u8, str_fmt_buf_size);
-    ret.assets_path = try ret.getAssetsPath();
 
     ret.updateDims(dims);
     ret.default_font = try ret.loadFont("Roboto-Regular.ttf"); // NOTE uses str_fmt_buf initialized above

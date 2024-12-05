@@ -18,6 +18,7 @@ pub const Error = error{
     ParseFail,
     EncodingFail,
     DecodingFail,
+    FormatFail,
 };
 
 pub const Key = enum(u32) {
