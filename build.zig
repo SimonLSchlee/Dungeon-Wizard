@@ -16,6 +16,13 @@ fn linkOSStuff(b: *std.Build, target: std.Build.ResolvedTarget, artifact: *std.B
                 artifact.addIncludePath(.{ .cwd_relative = b.pathJoin(&.{ sdk, "/System/Library/Frameworks/CoreFoundation.framework/Versions/Current/Headers" }) });
             }
         },
+        .windows => {
+            artifact.linkLibC();
+            artifact.linkSystemLibrary("c");
+            artifact.linkSystemLibrary("User32");
+            artifact.linkSystemLibrary("Gdi32");
+            artifact.linkSystemLibrary("shell32");
+        },
         else => {},
     }
 }
@@ -74,9 +81,9 @@ pub fn buildDynamic(b: *std.Build, target: std.Build.ResolvedTarget, optimize: s
             .target = target,
             .optimize = optimize,
         });
+        linkOSStuff(b, target, exe);
         exe.linkLibrary(raylib);
         exe.addIncludePath(b.path("raylib/src"));
-        linkOSStuff(b, target, exe);
 
         addExeConfig(b, &exe.root_module, false, do_release);
 
@@ -130,9 +137,9 @@ pub fn buildStatic(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
         .target = target,
         .optimize = optimize,
     });
+    linkOSStuff(b, target, exe);
     exe.linkLibrary(raylib);
     exe.addIncludePath(b.path("raylib/src"));
-    linkOSStuff(b, target, exe);
 
     addExeConfig(b, &exe.root_module, true, do_release);
 
