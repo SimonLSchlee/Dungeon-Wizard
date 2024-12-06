@@ -2,10 +2,14 @@ const std = @import("std");
 const assert = std.debug.assert;
 const debug = @import("debug.zig");
 const Platform = @This();
+const Log = @import("Log.zig");
 const u = @import("util.zig");
 const r = @cImport({
     @cInclude("raylib.h");
     @cInclude("rlgl.h");
+});
+const stdio = @cImport({
+    @cInclude("stdio.h");
 });
 const core = @import("core.zig");
 const draw = @import("draw.zig");
@@ -24,6 +28,7 @@ const builtin = @import("builtin");
 const config = @import("config");
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+var __plat: *Platform = undefined;
 
 const str_fmt_buf_size = 4096;
 
@@ -45,6 +50,7 @@ pub const RenderTexture2D = struct {
     r_render_tex: r.RenderTexture2D,
 };
 
+log: Log = undefined,
 stack_base: usize = 0,
 should_exit: bool = false,
 app_dll: ?std.DynLib = null,
@@ -65,7 +71,6 @@ prev_frame_time_ns: i64 = 0,
 input_buffer: core.InputBuffer = .{},
 str_fmt_buf: []u8 = undefined,
 assets_path: []const u8 = undefined,
-debug_logfile: std.fs.File = undefined,
 
 pub fn updateDims(self: *Platform, dims: V2i) void {
     self.screen_dims = dims;
@@ -80,51 +85,54 @@ pub fn updateDims(self: *Platform, dims: V2i) void {
     self.native_rect_cropped_dims = self.screen_dims_f.scale(1 / self.native_to_screen_scaling);
 }
 
-pub fn debugLogfileSync(self: *Platform) void {
-    self.debug_logfile.sync() catch |e| {
-        std.debug.print("SYNC ERROR: {any}\n", .{e});
-    };
-}
-
-pub fn debugLogBytes(self: *Platform, bytes: []const u8) void {
-    self.debug_logfile.writeAll(bytes) catch |e| {
-        std.debug.print("WRITE ERROR: {any}\n", .{e});
-    };
-}
-
-fn makeLogFile(_: Platform) !std.fs.File {
-    const curr_log_name = "debug-log.txt";
-    const prev_log_name = "old-debug-log.txt";
-    const cwd = std.fs.cwd();
-
-    // rename old log
-    const maybe_stat: ?std.fs.Dir.Stat = cwd.statFile(curr_log_name) catch null;
-    if (maybe_stat) |stat| {
-        if (stat.kind == .file) {
-            try cwd.rename(curr_log_name, prev_log_name);
-        } else {
-            // TODO
-            @panic("idk what to do");
-        }
+fn raylibTraceLog(msg_type: c_int, text: [*c]const u8, args: stdio.va_list) callconv(.C) void {
+    const plat = getPlat();
+    var fmt_buf: [1024]u8 = undefined;
+    const len_i = stdio.vsnprintf(&fmt_buf, fmt_buf.len, text, args);
+    if (len_i < 0) {
+        plat.log.err("raylib failed to log message!", .{});
+        plat.log.raw("{s}\n", .{text});
     }
-
-    return try cwd.createFile(curr_log_name, .{});
+    const len = u.as(usize, len_i);
+    const maybe_log_level: ?Log.Level = switch (msg_type) {
+        r.LOG_DEBUG => .debug,
+        r.LOG_INFO => .info,
+        r.LOG_WARNING => .warn,
+        r.LOG_ERROR => .err,
+        r.LOG_FATAL => .fatal,
+        else => null,
+    };
+    if (maybe_log_level) |log_level| {
+        plat.log.level(log_level, "[raylib] {s}", .{fmt_buf[0..len]});
+    } else {
+        plat.log.raw("[raylib] {s}", .{fmt_buf[0..len]});
+    }
 }
 
-pub fn init(title: []const u8) Error!Platform {
+fn getPlat() *Platform {
+    return __plat;
+}
+
+pub fn init(title: []const u8) Error!*Platform {
     @setRuntimeSafety(core.rt_safe_blocks);
     const dims = core.native_dims;
+    const heap = gpa.allocator();
 
-    var ret: Platform = .{};
-    ret.str_fmt_buf = try ret.heap.alloc(u8, str_fmt_buf_size);
-    ret.assets_path = try ret.getAssetsPath();
-    ret.debug_logfile = ret.makeLogFile() catch |e| {
-        std.debug.print("ERROR: create log file: {any}\n", .{e});
+    var ret = try heap.create(Platform);
+    ret.* = .{};
+    ret.log = Log.init(std.fs.cwd(), heap) catch |e| {
+        std.debug.print("ERROR: init logger: {any}\n", .{e});
         return Error.FileSystemFail;
     };
+    ret.str_fmt_buf = try ret.heap.alloc(u8, str_fmt_buf_size);
+    ret.assets_path = try ret.getAssetsPath();
     ret.stack_base = ret.getStackPointer();
-    const title_z = try std.fmt.allocPrintZ(ret.heap, "{s}", .{title});
 
+    // only useable by code statically linked to raylib.zig
+    __plat = ret;
+
+    r.SetTraceLogCallback(raylibTraceLog);
+    const title_z = try std.fmt.allocPrintZ(ret.heap, "{s}", .{title});
     //r.SetConfigFlags(r.FLAG_WINDOW_RESIZABLE);
     r.InitWindow(@intCast(dims.x), @intCast(dims.y), title_z);
     // show raylib init INFO, then just warnings
@@ -210,16 +218,16 @@ fn loadAppDll(self: *Platform) Error!void {
     //
     self.app_dll = blk: for ([_][]const u8{ cwd_path, "zig-out/lib", "zig-out/bin" }) |path| {
         const app_dll_path = try std.fmt.bufPrint(self.str_fmt_buf[cwd_path.len..], "{s}/{s}", .{ path, app_dll_name });
-        std.debug.print("######### LOAD {s} ######\n", .{app_dll_path});
+        self.log.info("######### LOAD {s} ######", .{app_dll_path});
         break :blk std.DynLib.open(app_dll_path) catch |e| {
-            std.debug.print("{s}: {any}\n", .{ app_dll_path, e });
+            self.log.warn("{s}: {any}", .{ app_dll_path, e });
             continue;
         };
     } else {
         @panic("Fail to load app dll");
     };
     var dll = self.app_dll.?;
-    std.debug.print("######### LOADED ######\n", .{});
+    self.log.info("######### LOADED ######", .{});
     self.appInit = dll.lookup(@TypeOf(self.appInit), "appInit") orelse return error.LookupFail;
     self.appReload = dll.lookup(@TypeOf(self.appReload), "appReload") orelse return error.LookupFail;
     self.appTick = dll.lookup(@TypeOf(self.appTick), "appTick") orelse return error.LookupFail;
@@ -228,7 +236,7 @@ fn loadAppDll(self: *Platform) Error!void {
 
 fn unloadAppDll(self: *Platform) void {
     if (self.app_dll) |*dll| {
-        std.debug.print("######### UNLOAD ######\n", .{});
+        self.log.info("######### UNLOAD ######", .{});
         dll.close();
         self.app_dll = null;
     }
@@ -240,15 +248,15 @@ fn recompileAppDll(self: *Platform) Error!void {
         "build",
         "-Dapp-only=true",
     };
-    std.debug.print("\n#### START RECOMPILE OUTPUT ####\n", .{});
+    self.log.info("\n#### START RECOMPILE OUTPUT ####\n", .{});
     const result = std.process.Child.run(.{
         .allocator = self.heap,
         .argv = &proc_args,
     }) catch return Error.RecompileFail;
 
-    std.debug.print("stderr:\n{s}\n", .{result.stderr});
-    std.debug.print("stdout:\n{s}\n", .{result.stdout});
-    std.debug.print("\n#### END RECOMPILE OUTPUT ####\n", .{});
+    self.log.info("stderr:\n{s}", .{result.stderr});
+    self.log.info("stdout:\n{s}", .{result.stdout});
+    self.log.info("#### END RECOMPILE OUTPUT ####\n", .{});
     self.heap.free(result.stderr);
     self.heap.free(result.stdout);
     switch (result.term) {
@@ -283,8 +291,8 @@ pub fn run(self: *Platform) Error!void {
     const refresh_rate = u.as(i64, r.GetMonitorRefreshRate(r.GetCurrentMonitor()));
     const ns_per_refresh = @divTrunc(core.ns_per_sec, refresh_rate);
     const min_sleep_time_ns = 1500000;
-    std.debug.print("refresh rate: {}\n", .{refresh_rate});
-    std.debug.print("ns per refresh: {}\n", .{ns_per_refresh});
+    //std.debug.print("refresh rate: {}\n", .{refresh_rate});
+    //std.debug.print("ns per refresh: {}\n", .{ns_per_refresh});
 
     while (!r.WindowShouldClose() and !self.should_exit) {
         if (!config.static_lib and !config.is_release and r.IsKeyPressed(r.KEY_F5)) {
@@ -313,8 +321,8 @@ pub fn run(self: *Platform) Error!void {
         }
 
         if (false) {
-            const num_updates_to_do: i64 = @divTrunc(self.accumulated_update_ns, core.fixed_ns_per_update);
-            std.debug.print("{}", .{num_updates_to_do});
+            //const num_updates_to_do: i64 = @divTrunc(self.accumulated_update_ns, core.fixed_ns_per_update);
+            //std.debug.print("{}", .{num_updates_to_do});
         }
 
         while (self.accumulated_update_ns >= core.fixed_ns_per_update_upper) {

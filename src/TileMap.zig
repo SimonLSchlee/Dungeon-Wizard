@@ -16,6 +16,7 @@ const V2i = @import("V2i.zig");
 const v2i = V2i.v2i;
 
 const App = @import("App.zig");
+const Log = App.Log;
 const getPlat = App.getPlat;
 const Thing = @import("Thing.zig");
 const Room = @import("Room.zig");
@@ -576,7 +577,7 @@ fn renderTile(self: *const TileMap, pos: V2f, tile: TileLayer.Tile) void {
     const plat = getPlat();
     const data = App.get().data;
     const ref = self.tileIdxToTileSetRef(tile.idx) orelse {
-        debug.err("unknown tileset ref!", .{});
+        Log.err("unknown tileset ref!", .{});
         return;
     };
     assert(ref.data_idx < data.tilesets.items.len);

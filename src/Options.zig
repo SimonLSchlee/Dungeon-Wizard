@@ -15,6 +15,7 @@ const V2i = @import("V2i.zig");
 const v2i = V2i.v2i;
 
 const App = @import("App.zig");
+const Log = App.Log;
 const Run = @import("Run.zig");
 const Data = @import("Data.zig");
 const menuUI = @import("menuUI.zig");
@@ -67,7 +68,7 @@ ui: struct {
 
 pub fn writeToTxt(self: Options) void {
     const options_file = std.fs.cwd().createFile("options.txt", .{}) catch {
-        std.log.warn("WARNING: Failed to open options.txt for writing\n", .{});
+        Log.warn("WARNING: Failed to open options.txt for writing\n", .{});
         return;
     };
     defer options_file.close();
@@ -108,7 +109,7 @@ fn trySetFromKeyVal(self: *Options, key: []const u8, val: []const u8) void {
             }
         }
     }
-    std.log.warn("WARNING: Options parse fail. key: \"{s}\", val: \"{s}\"\n", .{ key, val });
+    Log.warn("WARNING: Options parse fail. key: \"{s}\", val: \"{s}\"\n", .{ key, val });
 }
 
 pub fn initTryLoad() Options {

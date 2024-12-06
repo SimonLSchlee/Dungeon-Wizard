@@ -17,6 +17,7 @@ const v2i = V2i.v2i;
 
 const Thing = @This();
 const App = @import("App.zig");
+const Log = App.Log;
 const getPlat = App.getPlat;
 const Room = @import("Room.zig");
 const TileMap = @import("TileMap.zig");
@@ -238,7 +239,7 @@ pub const HP = struct {
     pub fn addShield(self: *HP, amount: f32, ticks: ?i64) void {
         if (self.shields.len >= self.shields.buffer.len) {
             _ = self.shields.orderedRemove(0);
-            std.log.warn("Ran out of shields space!", .{});
+            Log.warn("Ran out of shields space!", .{});
         }
         self.shields.append(.{
             .curr = amount,

@@ -17,6 +17,7 @@ const v2i = V2i.v2i;
 
 const Room = @This();
 const App = @import("App.zig");
+const Log = App.Log;
 const getPlat = App.getPlat;
 const Data = @import("Data.zig");
 const Thing = @import("Thing.zig");
@@ -88,21 +89,21 @@ fn makeWaves(tilemap: *const TileMap, rng: std.Random, params: WavesParams, arra
     }
 
     var difficulty_left = params.difficulty;
-    std.debug.print("\n\n#############\n", .{});
-    std.debug.print("Making waves! difficulty: {d:.1}\n", .{params.difficulty});
+    Log.raw("#############\n", .{});
+    Log.info("Making waves! difficulty: {d:.1}", .{params.difficulty});
     const num_waves = rng.intRangeLessThan(usize, params.min_waves, params.max_waves);
     const difficulty_per_wave = params.difficulty / u.as(f32, num_waves);
     const difficulty_error_per_wave = params.difficulty_error / u.as(f32, num_waves);
-    std.debug.print("num_waves: {}, difficulty per wave: {d:.1}\n", .{ num_waves, difficulty_per_wave });
+    Log.info("num_waves: {}, difficulty per wave: {d:.1}", .{ num_waves, difficulty_per_wave });
 
     var all_spawn_positions = @TypeOf(tilemap.wave_spawns){};
     all_spawn_positions.insertSlice(0, tilemap.wave_spawns.constSlice()) catch unreachable;
-    std.debug.print("  total spawn positions: {}\n", .{all_spawn_positions.len});
+    Log.info("  total spawn positions: {}", .{all_spawn_positions.len});
 
     for (0..num_waves) |i| {
         var difficulty_left_in_wave = difficulty_per_wave;
         var wave = Wave{};
-        std.debug.print(" Wave {}:\n", .{i});
+        Log.info(" Wave {}:", .{i});
 
         var enemy_protos: std.BoundedArray(Thing, WavesParams.max_max_kinds_per_wave) = .{};
 
@@ -110,7 +111,7 @@ fn makeWaves(tilemap: *const TileMap, rng: std.Random, params: WavesParams, arra
             const idx = rng.weightedIndex(f32, &params.enemy_probabilities.values);
             const kind: Thing.CreatureKind = @enumFromInt(idx);
             enemy_protos.append(data.creature_protos.get(kind)) catch unreachable;
-            std.debug.print("  possible enemy: {any} : probability: {d:.2}\n", .{ kind, params.enemy_probabilities.get(kind) });
+            Log.info("  possible enemy: {any} : probability: {d:.2}", .{ kind, params.enemy_probabilities.get(kind) });
         }
 
         rng.shuffleWithIndex(V2f, all_spawn_positions.slice(), u32);
@@ -125,17 +126,17 @@ fn makeWaves(tilemap: *const TileMap, rng: std.Random, params: WavesParams, arra
                 .pos = all_spawn_positions.buffer[curr_spawn_pos_idx],
                 .proto = proto,
             }) catch unreachable;
-            std.debug.print("  spawn: {any}\n", .{proto.creature_kind.?});
+            Log.info("  spawn: {any}", .{proto.creature_kind.?});
             curr_spawn_pos_idx += 1;
         }
 
-        std.debug.print("  = wave difficulty: {d:.2}\n", .{wave.total_difficulty});
+        Log.info("  = wave difficulty: {d:.2}", .{wave.total_difficulty});
         difficulty_left -= wave.total_difficulty;
         array.append(wave) catch unreachable;
         if (difficulty_left < params.difficulty_error) break;
     }
 
-    std.debug.print("#############\n\n", .{});
+    Log.info("#############\n", .{});
 }
 
 camera: draw.Camera2D = .{},
@@ -234,7 +235,7 @@ pub fn reset(self: *Room) Error!void {
     makeWaves(tilemap, self.rng.random(), self.init_params.waves_params, &self.waves);
 
     for (tilemap.creatures.constSlice()) |spawn| {
-        std.debug.print("Room init: spawning a {any}\n", .{spawn.kind});
+        Log.info("Room init: spawning a {any}", .{spawn.kind});
         if (spawn.kind == .player) {
             self.player_id = try self.queueSpawnThing(&self.init_params.player, spawn.pos);
         } else {
@@ -266,8 +267,8 @@ pub fn queueSpawnThing(self: *Room, proto: *const Thing, pos: V2f) Error!?pool.I
         if (thing.isEnemy()) self.num_enemies_alive += 1;
         return thing.id;
     } else {
-        std.debug.print(
-            "#################\nWARNING: Failed to allocate Thing\n{} / {} Things allocated\n",
+        Log.warn(
+            "################# Failed to allocate Thing! {} / {} Things allocated",
             .{ self.things.num_allocated, max_things_in_room },
         );
     }
@@ -337,7 +338,7 @@ pub fn spawnCurrWave(self: *Room) Error!void {
     assert(self.curr_wave < self.waves.len);
     const wave = self.waves.get(u.as(usize, self.curr_wave));
     const wave_delay_secs = self.init_params.waves_params.wave_secs_per_difficulty * wave.total_difficulty;
-    std.debug.print("Spawning wave {}, next wave in {d:.1} secs\n", .{ self.curr_wave, wave_delay_secs });
+    Log.info("Spawning wave {}, next wave in {d:.1} secs", .{ self.curr_wave, wave_delay_secs });
     self.wave_timer = u.TickCounter.init(core.secsToTicks(wave_delay_secs));
     for (wave.spawns.constSlice()) |spawn| {
         const spawner_proto = Thing.SpawnerController.prototype(spawn.proto.creature_kind.?);
@@ -417,7 +418,6 @@ pub fn update(self: *Room) Error!void {
         if (self.edit_mode) {
             if (plat.input_buffer.mouseBtnIsJustPressed(.left)) {
                 const pos = plat.getMousePosWorld(self.camera);
-                //std.debug.print("spawn sheep at {d:0.2}, {d:0.2}\n", .{ pos.x, pos.y });
                 _ = try self.queueSpawnCreatureByKind(.troll, pos);
             }
         }

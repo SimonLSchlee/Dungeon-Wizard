@@ -16,6 +16,7 @@ const V2i = @import("V2i.zig");
 const v2i = V2i.v2i;
 
 const App = @import("App.zig");
+const Log = App.Log;
 const getPlat = App.getPlat;
 const Room = @import("Room.zig");
 const Thing = @import("Thing.zig");
@@ -1115,7 +1116,7 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caste
     }
     {
         const tags = self.getNewTags() catch |e| blk: {
-            debug.errorAndStackTrace(e);
+            Log.errorAndStackTrace(e);
             break :blk NewTag.Array{};
         };
         const tag_topleft = pos.add(card_tags_topleft_offset.scale(scaling));

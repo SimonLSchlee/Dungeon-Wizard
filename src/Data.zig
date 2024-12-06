@@ -16,6 +16,7 @@ const V2i = @import("V2i.zig");
 const v2i = V2i.v2i;
 
 const App = @import("App.zig");
+const Log = App.Log;
 const Thing = @import("Thing.zig");
 const Room = @import("Room.zig");
 const sprites = @import("sprites.zig");
@@ -101,7 +102,7 @@ pub const SpriteSheet = struct {
                 .int => |i| u.as(f32, i),
                 .float => |f| f,
                 .string => {
-                    std.log.warn("Failed to parse Meta.data \"{s}\" as f32\n", .{self.name.constSlice()});
+                    Log.warn("Failed to parse Meta.data \"{s}\" as f32\n", .{self.name.constSlice()});
                     return Error.ParseFail;
                 },
             };
@@ -253,8 +254,8 @@ pub fn FileWalkerIterator(assets_rel_dir: []const u8, file_suffix: []const u8) t
             const plat = App.getPlat();
             const path = try u.bufPrintLocal("{s}/{s}", .{ plat.assets_path, assets_rel_dir });
             var dir = std.fs.cwd().openDir(path, .{ .iterate = true }) catch |err| {
-                debug.err("Error opening dir \"{s}\"", .{path});
-                debug.errorAndStackTrace(err);
+                Log.err("Error opening dir \"{s}\"", .{path});
+                Log.errorAndStackTrace(err);
                 return Error.FileSystemFail;
             };
             const walker = try dir.walk(allocator);
@@ -561,7 +562,7 @@ pub fn loadCreatureSpriteSheets(self: *Data) Error!void {
                         .frame = u.as(i32, m.data.int),
                         .kind = @enumFromInt(f.value),
                     }) catch {
-                        debug.warn("Skipped adding anim event \"{s}\"; buffer full", .{f.name});
+                        Log.warn("Skipped adding anim event \"{s}\"; buffer full", .{f.name});
                     };
                     continue :meta_blk;
                 }
@@ -624,7 +625,7 @@ pub fn loadVFXSpriteSheets(self: *Data) Error!void {
                                     .frame = u.as(i32, m.data.int),
                                     .kind = @enumFromInt(f.value),
                                 }) catch {
-                                    debug.err("Skipped adding vfx anim event \"{s}\"; buffer full", .{f.name});
+                                    Log.err("Skipped adding vfx anim event \"{s}\"; buffer full", .{f.name});
                                 };
                                 continue :meta_blk;
                             }
@@ -635,11 +636,11 @@ pub fn loadVFXSpriteSheets(self: *Data) Error!void {
                     self.vfx_sprite_sheet_mappings.getPtr(vfx_sheet_name).getPtr(vfx_anim_name).* = sheet_idx;
                     self.vfx_anim_mappings.getPtr(vfx_sheet_name).getPtr(vfx_anim_name).* = anim_idx;
                 } else {
-                    debug.warn("Unknown vfx anim skipped: {s}", .{tag.name.constSlice()});
+                    Log.warn("Unknown vfx anim skipped: {s}", .{tag.name.constSlice()});
                 }
             }
         } else {
-            debug.warn("Unknown vfx spritesheet skipped: {s}", .{sheet.name.constSlice()});
+            Log.warn("Unknown vfx spritesheet skipped: {s}", .{sheet.name.constSlice()});
         }
     }
 }
@@ -733,7 +734,7 @@ pub fn loadTileSets(self: *Data) Error!void {
         const tileset = try self.tilesets.addOne();
         try loadTileSetFromJsonString(tileset, str, "maps/tilesets");
         tileset.id = id;
-        debug.info("Loaded tileset: {s}", .{tileset.name.constSlice()});
+        Log.info("Loaded tileset: {s}", .{tileset.name.constSlice()});
     }
 }
 
@@ -930,7 +931,7 @@ pub fn loadTileMaps(self: *Data) Error!void {
                 }
             }
         }
-        debug.info("Loaded tilemap: {s}", .{tilemap.name.constSlice()});
+        Log.info("Loaded tilemap: {s}", .{tilemap.name.constSlice()});
     }
 }
 
@@ -957,15 +958,15 @@ pub fn loadMusic(self: *Data) Error!void {
 }
 
 pub fn reload(self: *Data) Error!void {
-    self.loadSpriteSheets() catch |err| debug.warn("failed to load all sprites: {any}", .{err});
-    self.loadSounds() catch |err| debug.warn("failed to load all sounds: {any}", .{err});
-    self.loadMusic() catch |err| debug.warn("failed to load all music: {any}", .{err});
+    self.loadSpriteSheets() catch |err| Log.warn("failed to load all sprites: {any}", .{err});
+    self.loadSounds() catch |err| Log.warn("failed to load all sounds: {any}", .{err});
+    self.loadMusic() catch |err| Log.warn("failed to load all music: {any}", .{err});
     inline for (@typeInfo(creatures.Kind).@"enum".fields) |f| {
         const kind: creatures.Kind = @enumFromInt(f.value);
         self.creature_protos.getPtr(kind).* = creatures.proto_fns.get(kind)();
     }
-    self.loadTileSets() catch |err| debug.warn("failed to load all tilesets: {any}", .{err});
-    self.loadTileMaps() catch |err| debug.warn("failed to load all tilemaps: {any}", .{err});
+    self.loadTileSets() catch |err| Log.warn("failed to load all tilesets: {any}", .{err});
+    self.loadTileMaps() catch |err| Log.warn("failed to load all tilemaps: {any}", .{err});
     inline for (std.meta.fields(RoomKind)) |f| {
         const kind: RoomKind = @enumFromInt(f.value);
         const tilemaps = self.room_kind_tilemaps.getPtr(kind);
@@ -976,6 +977,6 @@ pub fn reload(self: *Data) Error!void {
             }
         }
     }
-    self.loadShaders() catch |err| debug.warn("failed to load all shaders: {any}", .{err});
-    self.loadFonts() catch |err| debug.warn("failed to load all fonts: {any}", .{err});
+    self.loadShaders() catch |err| Log.warn("failed to load all shaders: {any}", .{err});
+    self.loadFonts() catch |err| Log.warn("failed to load all fonts: {any}", .{err});
 }

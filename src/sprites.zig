@@ -16,6 +16,7 @@ const V2i = @import("V2i.zig");
 const v2i = V2i.v2i;
 
 const App = @import("App.zig");
+const Log = App.Log;
 const getPlat = App.getPlat;
 const Data = @import("Data.zig");
 const Thing = @import("Thing.zig");
@@ -243,7 +244,7 @@ pub const Animator = struct {
                 };
             },
         }
-        debug.err("No anim found: anim: {any} kind: {any}", .{ self.curr_anim, self.kind });
+        Log.err("No anim found: anim: {any} kind: {any}", .{ self.curr_anim, self.kind });
         return null;
     }
 
@@ -256,7 +257,7 @@ pub const Animator = struct {
                 return App.get().data.getCreatureAnimSpriteSheetOrDefault(creature.kind, self.curr_anim);
             },
         }
-        debug.err("No spritesheet found: anim: {any} kind: {any}", .{ self.curr_anim, self.kind });
+        Log.err("No spritesheet found: anim: {any} kind: {any}", .{ self.curr_anim, self.kind });
         return null;
     }
 
@@ -308,7 +309,7 @@ pub const Animator = struct {
         if (self.getCurrAnim()) |anim_union| switch (anim_union) {
             inline else => |anim| {
                 const sprite_sheet = if (self.getCurrSpriteSheet()) |s| s else {
-                    std.debug.print("{s}: WARNING: tried to get non-existent spritesheet\n", .{@src().file});
+                    Log.warn("{s}: tried to get non-existent spritesheet\n", .{@src().file});
                     ret.insert(.end);
                     return ret;
                 };
@@ -347,7 +348,7 @@ pub const Animator = struct {
                 return ret;
             },
         } else {
-            std.debug.print("{s}: WARNING: tried to play non-existent anim: {any} \n", .{ @src().file, self.kind });
+            Log.warn("{s}: tried to play non-existent anim: {any} \n", .{ @src().file, self.kind });
             ret.insert(.end);
             return ret;
         }

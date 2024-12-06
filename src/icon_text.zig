@@ -16,6 +16,7 @@ const V2i = @import("V2i.zig");
 const v2i = V2i.v2i;
 
 const App = @import("App.zig");
+const Log = App.Log;
 const getPlat = App.getPlat;
 const getData = App.getData;
 const Data = @import("Data.zig");
@@ -171,7 +172,7 @@ pub const Part = union(enum) {
 
 pub fn fmtCodePoint(buf: []u8, codepoint: u21) Error![]u8 {
     const num = std.unicode.utf8Encode(codepoint, buf) catch |e| {
-        debug.errorAndStackTrace(e);
+        Log.errorAndStackTrace(e);
         return Error.EncodingFail;
     };
     assert(num == pua_codepoint_num_utf8_bytes);
@@ -183,7 +184,7 @@ pub fn parseCodePoint(buf: []const u8) Error!?u21 {
     const num_bytes_in_codepoint = std.unicode.utf8ByteSequenceLength(buf[0]) catch return Error.DecodingFail;
     if (num_bytes_in_codepoint != pua_codepoint_num_utf8_bytes) return null;
     const codepoint = std.unicode.utf8Decode3(buf[0..3].*) catch |e| {
-        debug.errorAndStackTrace(e);
+        Log.errorAndStackTrace(e);
         return Error.DecodingFail;
     };
     return codepoint;
@@ -240,7 +241,7 @@ const Utf8ToPartsIterator = struct {
 
         while (curr_idx < self.buf.len) {
             const maybe_part = parseFmtOrIconPart(self.buf[curr_idx..]) catch |e| {
-                debug.errorAndStackTrace(e);
+                Log.errorAndStackTrace(e);
                 return null;
             };
             if (maybe_part) |part| {

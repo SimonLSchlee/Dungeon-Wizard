@@ -3,6 +3,7 @@ const assert = std.debug.assert;
 const utl = @import("util.zig");
 
 pub const Platform = @import("raylib.zig");
+const LogType = @import("Log.zig");
 const debug = @import("debug.zig");
 const core = @import("core.zig");
 const Error = core.Error;
@@ -26,15 +27,20 @@ const config = @import("config");
 var _app: ?*App = null;
 var _plat: ?*Platform = null;
 
-pub fn get() *App {
+pub inline fn get() *App {
     return _app orelse @panic("_app not found");
 }
 
-pub fn getPlat() *Platform {
+pub inline fn getPlat() *Platform {
     return _plat orelse @panic("_plat not found");
 }
 
-pub fn getData() *Data {
+pub const Log = LogType.GlobalInterface(getLog);
+fn getLog() *LogType {
+    return &getPlat().log;
+}
+
+pub inline fn getData() *Data {
     return get().data;
 }
 
@@ -57,7 +63,9 @@ render_texture: Platform.RenderTexture2D = undefined,
 export fn appInit(plat: *Platform) *anyopaque {
     // everything depends on plat global
     _plat = plat;
-    debug.info("Init app {s}", .{config.version});
+
+    Log.info("Init app {s}", .{config.version});
+
     var app = plat.heap.create(App) catch @panic("Out of memory");
     app.* = .{
         .options = Options.initTryLoad(),
