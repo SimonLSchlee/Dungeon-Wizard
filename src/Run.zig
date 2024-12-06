@@ -17,6 +17,7 @@ const debug = @import("debug.zig");
 
 const Run = @This();
 const App = @import("App.zig");
+const Log = App.Log;
 const getPlat = App.getPlat;
 const Room = @import("Room.zig");
 const Spell = @import("Spell.zig");
@@ -142,8 +143,9 @@ gold: i32 = 0,
 room: Room = undefined,
 // debug room history states
 room_buf: []Room = undefined,
-room_buf_tail: usize = undefined,
+room_buf_tail: usize = 0,
 room_buf_head: usize = 0,
+room_buf_size: usize = 0,
 
 room_exists: bool = false,
 reward_ui: ?Reward.UI = null,
@@ -182,7 +184,7 @@ tooltip_ui: struct {
 pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
     const plat = getPlat();
     const app = App.get();
-
+    Log.info("Allocating debug room buf: {}KiB\n", .{(@sizeOf(Room) * 60) / 1024});
     run.* = .{
         .room_buf = try plat.heap.alloc(Room, 60),
         .rng = std.Random.DefaultPrng.init(seed),
@@ -193,8 +195,9 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
         .player_thing = player.modePrototype(mode),
         .mode = mode,
     };
+    run.room_buf_size = 0;
     run.room_buf_head = 0;
-    run.room_buf_tail = run.room_buf.len - 1;
+    run.room_buf_tail = 0;
 
     // TODO elsewhererre?
     run.slots.discard_button = mode == .mandy_3_mana;
@@ -511,12 +514,12 @@ pub fn roomUpdate(self: *Run) Error!void {
             }
         }
         if (plat.input_buffer.keyIsJustPressed(.comma)) {
-            const prev = (self.room_buf_head + self.room_buf.len - 1) % self.room_buf.len;
-            // head is directly after tail; buffer is empty
-            if (prev != self.room_buf_tail) {
+            if (self.room_buf_size > 0) {
+                const prev = (self.room_buf_head + self.room_buf.len - 1) % self.room_buf.len;
                 self.room.deinit();
                 self.room = self.room_buf[prev];
                 self.room_buf_head = prev;
+                self.room_buf_size -= 1;
             }
             self.room.paused = true;
         }
@@ -528,12 +531,18 @@ pub fn roomUpdate(self: *Run) Error!void {
         //}
     }
     if (!room.paused) {
-        // buffer full, move forward tail to overwrite last entry
-        if (self.room_buf_head == self.room_buf_tail) {
-            self.room_buf_tail = (self.room_buf_tail + 1) % self.room_buf.len;
+        const next_head = (self.room_buf_head + 1) % self.room_buf.len;
+        const next_tail = (self.room_buf_tail + 1) % self.room_buf.len;
+        // equal means either full or empty
+        if (self.room_buf_head == self.room_buf_tail and self.room_buf_size == self.room_buf.len) {
+            // full, deinit so we can overwrite, and bump tail along
+            self.room_buf[self.room_buf_head].deinit();
+            self.room_buf_tail = next_tail;
+            self.room_buf_size -= 1;
         }
         try room.clone(&self.room_buf[self.room_buf_head]);
-        self.room_buf_head = (self.room_buf_head + 1) % self.room_buf.len;
+        self.room_buf_head = next_head;
+        self.room_buf_size += 1;
     }
     try room.update();
 
@@ -941,6 +950,7 @@ pub fn deadUpdate(self: *Run) Error!void {
 
 pub fn update(self: *Run) Error!void {
     const plat = App.getPlat();
+
     self.imm_ui.commands.clear();
     self.tooltip_ui.commands.clear();
 

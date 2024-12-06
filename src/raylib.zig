@@ -125,6 +125,7 @@ pub fn init(title: []const u8) Error!*Platform {
         std.debug.print("ERROR: init logger: {any}\n", .{e});
         return Error.FileSystemFail;
     };
+    ret.log.info("Allocated Platform: {}KiB\n", .{@sizeOf(Platform) / 1024});
     ret.str_fmt_buf = try ret.heap.alloc(u8, str_fmt_buf_size);
     ret.assets_path = try ret.getAssetsPath();
     ret.stack_base = ret.getStackPointer();

@@ -66,6 +66,8 @@ export fn appInit(plat: *Platform) *anyopaque {
 
     Log.info("Init app {s}", .{config.version});
 
+    Log.info("Allocating App: {}KiB\n", .{@sizeOf(App) / 1024});
+
     var app = plat.heap.create(App) catch @panic("Out of memory");
     app.* = .{
         .options = Options.initTryLoad(),
