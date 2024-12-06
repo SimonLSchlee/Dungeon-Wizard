@@ -253,6 +253,7 @@ fn render(self: *App) Error!void {
             plat.setBlend(.render_tex_alpha);
             plat.clear(.gray);
             try ImmUI.render(&self.menu_ui.commands);
+            plat.endRenderToTexture();
         },
         .run => {
             try self.run.render(self.render_texture);
@@ -261,7 +262,6 @@ fn render(self: *App) Error!void {
     if (self.options_open) {
         try self.options.render(self.render_texture);
     }
-    plat.endRenderToTexture();
     const texture_opt = draw.TextureOpt{
         .flip_y = true,
         .uniform_scaling = plat.native_to_screen_scaling,

@@ -1138,8 +1138,6 @@ pub fn render(self: *Run, native_render_texture: Platform.RenderTexture2D) Error
     }
     try ImmUI.render(&self.imm_ui.commands);
     try ImmUI.render(&self.tooltip_ui.commands);
-    plat.startRenderToTexture(native_render_texture);
-    plat.setBlend(.render_tex_alpha);
     switch (self.load_state) {
         .none => {},
         .fade_in => {
@@ -1151,4 +1149,5 @@ pub fn render(self: *Run, native_render_texture: Platform.RenderTexture2D) Error
             plat.rectf(.{}, core.native_dims_f, .{ .fill_color = color });
         },
     }
+    plat.endRenderToTexture();
 }

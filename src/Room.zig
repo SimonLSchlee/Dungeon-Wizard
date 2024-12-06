@@ -197,7 +197,6 @@ pub fn init(self: *Room, params: *const InitParams) Error!void {
 }
 
 pub fn deinit(self: *Room) void {
-    self.clearThings();
     self.fog.deinit();
 }
 
@@ -645,4 +644,5 @@ pub fn render(self: *const Room, native_render_texture: Platform.RenderTexture2D
     if (debug.show_highest_num_things_in_room) {
         try plat.textf(v2f(10, 30), "highest_num_things: {} / {}", .{ self.highest_num_things, max_things_in_room }, .{ .color = .white });
     }
+    plat.endRenderToTexture();
 }
