@@ -92,6 +92,7 @@ fn raylibTraceLog(msg_type: c_int, text: [*c]const u8, args: stdio.va_list) call
     if (len_i < 0) {
         plat.log.err("raylib failed to log message!", .{});
         plat.log.raw("{s}\n", .{text});
+        return;
     }
     const len = u.as(usize, len_i);
     const maybe_log_level: ?Log.Level = switch (msg_type) {
