@@ -150,6 +150,7 @@ selectable: ?struct {
 } = null,
 statuses: StatusEffect.StatusArray = StatusEffect.proto_array,
 enemy_difficulty: f32 = 0,
+find_path_timer: utl.TickCounter = utl.TickCounter.init(6),
 
 pub const Faction = enum {
     object,
@@ -1256,6 +1257,7 @@ inline fn canAct(self: *const Thing) bool {
 }
 
 pub fn update(self: *Thing, room: *Room) Error!void {
+    _ = self.find_path_timer.tick(false);
     if (self.canAct()) {
         try updateController(self, room);
         if (self.statuses.get(.promptitude).stacks > 0) {
@@ -1512,7 +1514,11 @@ pub fn followPathGetNextPoint(self: *Thing, dist: f32) V2f {
 }
 
 pub fn findPath(self: *Thing, room: *Room, goal: V2f) Error!void {
+    if (self.player_input == null and self.find_path_timer.running) {
+        return;
+    }
     self.path = try room.tilemap.findPathThetaStar(getPlat().heap, self.pos, goal, self.coll_radius, &self.dbg.coords_searched);
+    self.find_path_timer.restart();
     if (self.path.len == 0) {
         self.path.append(self.pos) catch unreachable;
         self.path.append(goal) catch unreachable;
