@@ -9,7 +9,10 @@ const r = @cImport({
     @cInclude("rlgl.h");
 });
 const stdio = @cImport({
+    @cDefine("_NO_CRT_STDIO_INLINE", "1");
+    @cDefine("_GNU_SOURCE", {}); // needed for vsnprintf()
     @cInclude("stdio.h");
+    @cUndef("_GNU_SOURCE");
 });
 const core = @import("core.zig");
 const draw = @import("draw.zig");
