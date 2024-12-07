@@ -296,7 +296,7 @@ pub fn gobbomberProto() Thing {
         .gobbomber,
         .enemy,
         .{ .gobbomber = .{} },
-        18,
+        15,
         .medium,
         12,
     );
