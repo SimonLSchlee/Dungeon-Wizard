@@ -188,11 +188,13 @@ pub const AITroll = struct {
 
 pub const AIGobbomber = struct {
     ai_ranged_flee: AIRangedFlee = .{},
+    shield_wait_timer: utl.TickCounter = utl.TickCounter.init(core.secsToTicks(3)),
 
     pub fn decide(ai: *AIGobbomber, self: *Thing, room: *Room) Decision {
         const controller = &self.controller.ai_actor;
         if (self.hp) |*hp| {
-            if (hp.shields.len == 0) {
+            if (hp.shields.len == 0 and !ai.shield_wait_timer.running) {
+                ai.shield_wait_timer.restart();
                 const action = &controller.actions.getPtr(.ability_1).*.?;
                 if (!action.cooldown.running) {
                     return .{ .action = .{
@@ -206,6 +208,23 @@ pub const AIGobbomber = struct {
             }
         }
         return ai.ai_ranged_flee.decide(self, room);
+    }
+
+    pub fn update(ai: *AIGobbomber, self: *Thing, room: *Room) Error!void {
+        _ = room;
+        const controller = &self.controller.ai_actor;
+        // check if doing the shield already
+        switch (controller.decision) {
+            .action => |doing| {
+                if (doing.slot == .ability_1) return;
+            },
+            else => {},
+        }
+        if (self.hp) |*hp| {
+            if (hp.shields.len == 0) {
+                _ = ai.shield_wait_timer.tick(false);
+            }
+        }
     }
 };
 
@@ -329,7 +348,7 @@ pub const ActorController = struct {
 
         // tick ai
         switch (controller.ai) {
-            inline else => |ai| {
+            inline else => |*ai| {
                 if (std.meta.hasMethod(@TypeOf(ai), "update")) {
                     try ai.update(self, room);
                 }
