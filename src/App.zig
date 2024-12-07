@@ -53,6 +53,7 @@ screen: enum {
     menu,
     run,
 } = .menu,
+paused: bool = false,
 options_open: bool = false,
 run: Run = undefined,
 menu_ui: struct {
@@ -224,6 +225,104 @@ fn menuUpdate(self: *App) Error!void {
     }
 }
 
+fn pauseMenuUpdate(self: *App) Error!void {
+    const plat = getPlat();
+    const data = self.data;
+    const title_font = data.fonts.get(.pixeloid);
+    const title_text = "Iiiiits a pause menu";
+    const title_opt = draw.TextOpt{
+        .center = true,
+        .color = .white,
+        .size = title_font.base_size * 3,
+        .font = title_font,
+        .smoothing = .none,
+    };
+    const title_dims = try plat.measureText(title_text, title_opt);
+    const btn_dims = v2f(140, 60);
+    const title_padding = v2f(30, 30);
+    const btn_spacing: f32 = 20;
+    const bottom_spacing: f32 = 50;
+    const num_buttons = 4;
+    const panel_dims = v2f(
+        title_dims.x + title_padding.x * 2,
+        title_dims.y + title_padding.y * 2 + btn_dims.y * num_buttons + btn_spacing * (num_buttons - 1) + bottom_spacing,
+    );
+    const panel_topleft = plat.native_rect_cropped_offset.add(plat.native_rect_cropped_dims.sub(panel_dims).scale(0.5));
+    self.menu_ui.commands.clear();
+    self.menu_ui.commands.append(.{
+        .rect = .{
+            .pos = panel_topleft,
+            .dims = panel_dims,
+            .opt = .{
+                .fill_color = Colorf.rgb(0.1, 0.1, 0.1),
+            },
+        },
+    }) catch unreachable;
+
+    const title_topleft = panel_topleft.add(title_padding);
+    const title_center = title_topleft.add(title_dims.scale(0.5));
+    self.menu_ui.commands.append(.{
+        .label = .{
+            .pos = title_center,
+            .text = ImmUI.initLabel(title_text),
+            .opt = title_opt,
+        },
+    }) catch unreachable;
+
+    const btns_topleft = v2f(
+        panel_topleft.x + (panel_dims.x - btn_dims.x) * 0.5,
+        title_topleft.y + title_dims.y + title_padding.y,
+    );
+    var curr_btn_pos = btns_topleft;
+
+    if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "Resume", btn_dims)) {
+        self.paused = false;
+    }
+    curr_btn_pos.y += btn_dims.y + btn_spacing;
+
+    if (false) {
+        if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "Options", btn_dims)) {
+            self.options_open = true;
+        }
+        curr_btn_pos.y += btn_dims.y + btn_spacing;
+    }
+
+    if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "New Run", btn_dims)) {
+        self.paused = false;
+        try self.startNewRun(.crispin_picker);
+    }
+    curr_btn_pos.y += btn_dims.y + btn_spacing;
+
+    if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "Abandon\n(Main Menu)", btn_dims)) {
+        self.paused = false;
+        self.run.deinit();
+        self.screen = .menu;
+    }
+    curr_btn_pos.y += btn_dims.y + btn_spacing;
+
+    if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "Abandon\n(Exit)", btn_dims)) {
+        self.paused = false;
+        plat.exit();
+    }
+
+    curr_btn_pos.y += btn_dims.y + btn_spacing + 10;
+    const seed_text = try utl.bufPrintLocal("Run seed: {x:}", .{self.run.seed});
+    const seed_opt = draw.TextOpt{
+        .center = true,
+        .color = .white,
+        .size = title_font.base_size * 2,
+        .font = title_font,
+        .smoothing = .none,
+    };
+    self.menu_ui.commands.append(.{
+        .label = .{
+            .pos = v2f(title_center.x, curr_btn_pos.y),
+            .text = ImmUI.initLabel(seed_text),
+            .opt = seed_opt,
+        },
+    }) catch unreachable;
+}
+
 fn update(self: *App) Error!void {
     if (self.options_open) {
         switch (try self.options.update()) {
@@ -236,7 +335,14 @@ fn update(self: *App) Error!void {
                 try self.menuUpdate();
             },
             .run => {
-                try self.run.update();
+                if (getPlat().input_buffer.keyIsJustPressed(.escape)) {
+                    self.paused = !self.paused;
+                }
+                if (self.paused) {
+                    try self.pauseMenuUpdate();
+                } else {
+                    try self.run.update();
+                }
             },
         }
     }
@@ -257,6 +363,12 @@ fn render(self: *App) Error!void {
         },
         .run => {
             try self.run.render(self.render_texture);
+            if (self.paused) {
+                plat.startRenderToTexture(self.render_texture);
+                plat.setBlend(.render_tex_alpha);
+                try ImmUI.render(&self.menu_ui.commands);
+                plat.endRenderToTexture();
+            }
         },
     }
     if (self.options_open) {

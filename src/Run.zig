@@ -66,11 +66,6 @@ pub const Reward = struct {
     long_hover: menuUI.LongHover = .{},
 };
 
-pub const GamePauseUI = struct {
-    deck_button: menuUI.Button,
-    pause_menu_button: menuUI.Button,
-};
-
 pub const DeadMenu = struct {
     modal: menuUI.Modal,
     retry_room_button: menuUI.Button,
@@ -150,11 +145,9 @@ room_buf_size: usize = 0,
 room_exists: bool = false,
 reward_ui: ?Reward.UI = null,
 shop: ?Shop = null,
-game_pause_ui: GamePauseUI = undefined,
 dead_menu: DeadMenu = undefined,
 screen: enum {
     room,
-    pause_menu,
     reward,
     shop,
     dead,
@@ -190,7 +183,6 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
         .rng = std.Random.DefaultPrng.init(seed),
         .seed = seed,
         .deck = makeStarterDeck(false),
-        .game_pause_ui = makeGamePauseUI(),
         .dead_menu = makeDeadMenu(),
         .player_thing = player.modePrototype(mode),
         .mode = mode,
@@ -567,20 +559,6 @@ pub fn roomUpdate(self: *Run) Error!void {
     }
     if (room.paused) {
         // TODO update game pause ui
-    }
-}
-
-pub fn pauseMenuUpdate(self: *Run) Error!void {
-    const plat = getPlat();
-    // TODO could pause in shop or w/e
-    assert(self.room_exists);
-    const room = &self.room;
-    //if (plat.input_buffer.keyIsJustPressed(.escape)) {
-    //    self.screen = .room;
-    //}
-    if (plat.input_buffer.keyIsJustPressed(.space)) {
-        room.paused = false;
-        self.screen = .room;
     }
 }
 
@@ -976,7 +954,6 @@ pub fn update(self: *Run) Error!void {
     switch (self.load_state) {
         .none => switch (self.screen) {
             .room => try self.roomUpdate(),
-            .pause_menu => try self.pauseMenuUpdate(),
             .reward => {
                 try self.rewardUpdate();
                 try self.itemsUpdate();
@@ -1075,38 +1052,6 @@ fn makeDeadMenu() DeadMenu {
     };
 }
 
-fn makeGamePauseUI() GamePauseUI {
-    const screen_margin = v2f(30, 60);
-    const button_dims = v2f(100, 50);
-    const button_y = core.native_dims_f.y - screen_margin.y - button_dims.y;
-    var deck_button = menuUI.Button{
-        .clickable_rect = .{ .rect = .{
-            .pos = v2f(screen_margin.x, button_y),
-            .dims = button_dims,
-        } },
-        .poly_opt = .{ .fill_color = .orange },
-        .text_opt = .{ .center = true, .color = .black, .size = 30 },
-        .text_rel_pos = button_dims.scale(0.5),
-    };
-    deck_button.text = @TypeOf(deck_button.text).fromSlice("Deck") catch unreachable;
-
-    var pause_menu_button = menuUI.Button{
-        .clickable_rect = .{ .rect = .{
-            .pos = v2f(core.native_dims_f.x - screen_margin.x - button_dims.x, button_y),
-            .dims = button_dims,
-        } },
-        .poly_opt = .{ .fill_color = .orange },
-        .text_opt = .{ .center = true, .color = .black, .size = 30 },
-        .text_rel_pos = button_dims.scale(0.5),
-    };
-    pause_menu_button.text = @TypeOf(pause_menu_button.text).fromSlice("Menu") catch unreachable;
-
-    return .{
-        .deck_button = deck_button,
-        .pause_menu_button = pause_menu_button,
-    };
-}
-
 pub fn render(self: *Run, native_render_texture: Platform.RenderTexture2D) Error!void {
     const plat = getPlat();
 
@@ -1117,16 +1062,7 @@ pub fn render(self: *Run, native_render_texture: Platform.RenderTexture2D) Error
     plat.startRenderToTexture(native_render_texture);
     plat.setBlend(.render_tex_alpha);
     switch (self.screen) {
-        .room => {
-            assert(self.room_exists);
-            const room = &self.room;
-            if (room.paused) {
-                // TODO these dont work so don't show em
-                //try self.game_pause_ui.deck_button.render();
-                //try self.game_pause_ui.pause_menu_button.render();
-            }
-        },
-        .pause_menu => {},
+        .room => {},
         .reward => {},
         .shop => {},
         .dead => {
