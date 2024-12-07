@@ -519,7 +519,7 @@ pub fn update(self: *Room) Error!void {
 pub fn render(self: *const Room, native_render_texture: Platform.RenderTexture2D) Error!void {
     const plat = getPlat();
 
-    const fog_enabled = !self.edit_mode;
+    const fog_enabled = false and !self.edit_mode;
     if (fog_enabled) {
         try self.fog.renderToTexture(self.camera);
     }
