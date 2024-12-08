@@ -713,15 +713,14 @@ pub const Slots = struct {
                 const cropped_dims = data.text_icons.sprite_dims_cropped.?.get(.heart);
                 var curr_pos = self.hp_rect.pos.add(v2f(3, 4).scale(ui_scaling));
                 if (data.text_icons.getRenderFrame(.heart)) |rf| {
+                    var opt = rf.toTextureOpt(ui_scaling);
+                    opt.src_dims = cropped_dims;
+                    opt.tint = .red;
+                    opt.origin = .topleft;
                     try self.immui.commands.append(.{ .texture = .{
                         .pos = curr_pos,
                         .texture = rf.texture,
-                        .opt = .{
-                            .src_dims = cropped_dims,
-                            .src_pos = rf.pos.toV2f(),
-                            .uniform_scaling = ui_scaling,
-                            .tint = .red,
-                        },
+                        .opt = opt,
                     } });
                 }
                 curr_pos = curr_pos.add(v2f(cropped_dims.x + 1, -2).scale(ui_scaling));
@@ -738,17 +737,16 @@ pub const Slots = struct {
                 .opt = hp_mana_rect_opt,
             } });
             if (caster.mana) |mana| {
-                const cropped_dims = data.text_icons.sprite_dims_cropped.?.get(.mana_crystal);
-                var curr_pos = self.mana_rect.pos.add(v2f(3, 4).scale(ui_scaling));
-                if (data.text_icons.getRenderFrame(.mana_crystal)) |rf| {
+                const cropped_dims = data.text_icons.sprite_dims_cropped.?.get(.mana_crystal_smol);
+                var curr_pos = self.mana_rect.pos.add(v2f(3, 3).scale(ui_scaling));
+                if (data.text_icons.getRenderFrame(.mana_crystal_smol)) |rf| {
+                    var opt = rf.toTextureOpt(ui_scaling);
+                    opt.src_dims = cropped_dims;
+                    opt.origin = .topleft;
                     try self.immui.commands.append(.{ .texture = .{
                         .pos = curr_pos,
                         .texture = rf.texture,
-                        .opt = .{
-                            .src_dims = cropped_dims,
-                            .src_pos = rf.pos.toV2f(),
-                            .uniform_scaling = ui_scaling,
-                        },
+                        .opt = opt,
                     } });
                 }
                 curr_pos = curr_pos.add(v2f(cropped_dims.x + 1, -2).scale(ui_scaling));

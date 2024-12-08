@@ -27,6 +27,14 @@ pub const RenderFrame = struct {
     size: V2i,
     texture: Platform.Texture2D,
     origin: draw.TextureOrigin,
+    pub fn toTextureOpt(self: *const RenderFrame, scaling: f32) draw.TextureOpt {
+        return .{
+            .origin = self.origin,
+            .src_pos = self.pos.toV2f(),
+            .src_dims = self.size.toV2f(),
+            .uniform_scaling = scaling,
+        };
+    }
 };
 
 pub const RenderIconInfo = union(enum) {

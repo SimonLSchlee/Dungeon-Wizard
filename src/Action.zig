@@ -311,7 +311,7 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                 projectile.dir = self.dir;
                 switch (atk.projectile) {
                     .arrow => {
-                        projectile.hitbox.?.rel_pos = self.dir.scale(28);
+                        projectile.hitbox.?.rel_pos = self.dir.scale(projectile.hitbox.?.rel_pos.length());
                         projectile.hitbox.?.mask = Thing.Faction.opposing_masks.get(self.faction);
                     },
                     .bomb => {

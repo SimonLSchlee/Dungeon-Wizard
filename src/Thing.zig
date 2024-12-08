@@ -1218,20 +1218,35 @@ pub const CreatureRenderer = struct {
                     }
                 }
                 if (self.mana) |mana| {
-                    const mana_bar_width = hp_width;
-                    const mana_bar_height = 8;
-                    const mana_topleft = hp_topleft.sub(v2f(0, mana_bar_height));
-                    const mana_inc_px = mana_bar_width / utl.as(f32, mana.max);
-                    const mana_diam = 6;
-                    const mana_radius = mana_diam * 0.5;
-                    const mana_spacing = (mana_inc_px - mana_diam) * 0.666666; // this makes sense cos of reasons
-                    var curr_pos = mana_topleft.add(v2f(mana_spacing + mana_radius, mana_bar_height * 0.5));
-                    for (0..utl.as(usize, mana.curr)) |_| {
-                        plat.circlef(curr_pos, mana_radius, .{
-                            .fill_color = Colorf.rgb(0, 0.5, 1),
-                            .outline = .{ .color = .black },
-                        });
-                        curr_pos.x += mana_spacing + mana_diam;
+                    const data = App.getData();
+                    if (data.text_icons.getRenderFrame(.mana_crystal_smol)) |rf| {
+                        const cropped_dims = data.text_icons.sprite_dims_cropped.?.get(.mana_crystal_smol);
+                        var opt = rf.toTextureOpt(1);
+                        opt.smoothing = .none;
+                        opt.origin = .topleft;
+                        opt.src_dims = cropped_dims;
+                        const mana_topleft = hp_topleft.sub(v2f(0, cropped_dims.y + 1)).round();
+                        var curr_pos = mana_topleft;
+                        for (0..utl.as(usize, mana.curr)) |_| {
+                            plat.texturef(curr_pos, rf.texture, opt);
+                            curr_pos.x += cropped_dims.x - 2;
+                        }
+                    } else {
+                        const mana_bar_width = hp_width;
+                        const mana_bar_height = 8;
+                        const mana_topleft = hp_topleft.sub(v2f(0, mana_bar_height));
+                        const mana_inc_px = mana_bar_width / utl.as(f32, mana.max);
+                        const mana_diam = 6;
+                        const mana_radius = mana_diam * 0.5;
+                        const mana_spacing = (mana_inc_px - mana_diam) * 0.666666; // this makes sense cos of reasons
+                        var curr_pos = mana_topleft.add(v2f(mana_spacing + mana_radius, mana_bar_height * 0.5));
+                        for (0..utl.as(usize, mana.curr)) |_| {
+                            plat.circlef(curr_pos, mana_radius, .{
+                                .fill_color = Colorf.rgb(0, 0.5, 1),
+                                .outline = .{ .color = .black },
+                            });
+                            curr_pos.x += mana_spacing + mana_diam;
+                        }
                     }
                 }
             }

@@ -54,7 +54,7 @@ fn gobbowArrow() Thing {
         .renderer = .{ .shape = .{
             .kind = .{ .arrow = .{
                 .length = 17.5,
-                .thickness = 2,
+                .thickness = 1.5,
             } },
             .poly_opt = .{ .fill_color = draw.Coloru.rgb(220, 172, 89).toColorf() },
         } },
@@ -64,6 +64,7 @@ fn gobbowArrow() Thing {
             .deactivate_on_update = false,
             .effect = .{ .damage = 7 },
             .radius = 2,
+            .rel_pos = V2f.right.scale(14),
         },
     };
     return arrow;
@@ -109,6 +110,7 @@ pub const Controller = struct {
     state: enum {
         in_flight,
         hitting,
+        destroyed,
     } = .in_flight,
     target_pos: V2f = .{},
     timer: utl.TickCounter = .{},
@@ -120,12 +122,27 @@ pub const Controller = struct {
         var controller = &self.controller.projectile;
         switch (controller.kind) {
             .arrow => {
-                const done = self.last_coll != null or if (self.hitbox) |h| !h.active else false;
-                if (done) {
-                    self.deferFree(room);
-                    return;
+                switch (controller.state) {
+                    .in_flight => {
+                        const done = self.last_coll != null or if (self.hitbox) |h| !h.active else false;
+                        if (done) {
+                            controller.state = .hitting;
+                            self.vel = .{};
+                            return;
+                        }
+                        self.updateVel(self.dir, self.accel_params);
+                    },
+                    .hitting => {
+                        // TODO anim
+                        self.deferFree(room);
+                        return;
+                    },
+                    .destroyed => {
+                        // TODO anim
+                        self.deferFree(room);
+                        return;
+                    },
                 }
-                self.updateVel(self.dir, self.accel_params);
             },
             .bomb => {
                 switch (controller.state) {
@@ -152,6 +169,10 @@ pub const Controller = struct {
                             self.deferFree(room);
                             return;
                         }
+                    },
+                    else => {
+                        self.deferFree(room);
+                        return;
                     },
                 }
             },
