@@ -12,6 +12,7 @@ pub const enable_debug_controls = false;
 // misc
 pub const show_mouse_pos = false;
 pub const hide_ui = false;
+pub const show_game_canvas_size = false;
 
 // ai stuff
 pub const show_thing_paths = false;

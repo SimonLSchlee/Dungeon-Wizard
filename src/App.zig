@@ -353,7 +353,7 @@ fn update(self: *App) Error!void {
 
 fn render(self: *App) Error!void {
     const plat = getPlat();
-    plat.clear(Colorf.magenta);
+    plat.clear(.black);
 
     switch (self.screen) {
         .menu => {

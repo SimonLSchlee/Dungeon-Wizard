@@ -624,13 +624,15 @@ pub fn render(self: *const Room, ui_render_texture: Platform.RenderTexture2D, ga
         plat.setBlend(.render_tex_alpha);
     }
 
-    plat.rectf(.{}, plat.game_canvas_dims_f, .{
-        .fill_color = null,
-        .outline = .{
-            .color = .red,
-            .thickness = 4,
-        },
-    });
+    if (debug.show_game_canvas_size) {
+        plat.rectf(.{}, plat.game_canvas_dims_f, .{
+            .fill_color = null,
+            .outline = .{
+                .color = .red,
+                .thickness = 4,
+            },
+        });
+    }
     plat.endRenderToTexture();
 
     // ui ?
