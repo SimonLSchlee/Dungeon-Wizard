@@ -565,7 +565,7 @@ pub fn roomUpdate(self: *Run) Error!void {
 pub fn itemsUpdate(self: *Run) Error!void {
     //const data = App.get().data;
     const plat = getPlat();
-    const ui_scaling: f32 = 2;
+    const ui_scaling: f32 = plat.ui_scaling;
     const mouse_pos = plat.getMousePosScreen();
     const slot_bg_color = Colorf.rgb(0.07, 0.05, 0.05);
     const items_rects = gameUI.getItemsRects();
@@ -652,7 +652,7 @@ pub fn itemsUpdate(self: *Run) Error!void {
 
 pub fn rewardSpellChoiceUI(self: *Run, idx: usize) Error!void {
     const plat = getPlat();
-    const ui_scaling: f32 = 3;
+    const ui_scaling: f32 = plat.ui_scaling + 1;
 
     // modal background
     const modal_dims = v2f(plat.screen_dims_f.x * 0.6, plat.screen_dims_f.y * 0.6);
@@ -734,7 +734,7 @@ pub fn rewardSpellChoiceUI(self: *Run, idx: usize) Error!void {
 pub fn rewardUpdate(self: *Run) Error!void {
     const data = App.get().data;
     const plat = getPlat();
-    const ui_scaling: f32 = 2;
+    const ui_scaling: f32 = plat.ui_scaling;
     assert(self.reward_ui != null);
     const reward_ui = &self.reward_ui.?;
 
@@ -976,7 +976,7 @@ pub fn update(self: *Run) Error!void {
     }
 
     { // gold
-        const scaling = 3;
+        const scaling = plat.ui_scaling + 1;
         const padding = v2f(5, 5);
         const gold_text = try u.bufPrintLocal("{any}{}", .{ icon_text.Icon.coin, self.gold });
         const rect_dims = icon_text.measureIconText(gold_text).scale(scaling).add(padding.scale(2));
@@ -1056,6 +1056,12 @@ fn makeDeadMenu() DeadMenu {
 pub fn render(self: *Run, ui_render_texture: Platform.RenderTexture2D, game_render_texture: Platform.RenderTexture2D) Error!void {
     const plat = getPlat();
 
+    // clear ui here cos Room may draw something there (debug only tho)
+    // all the other UI is rendered here though so could be done after room render
+    plat.startRenderToTexture(ui_render_texture);
+    plat.clear(.blank);
+    plat.endRenderToTexture();
+
     if (self.room_exists) {
         try self.room.render(ui_render_texture, game_render_texture);
     }
@@ -1063,7 +1069,11 @@ pub fn render(self: *Run, ui_render_texture: Platform.RenderTexture2D, game_rend
     plat.startRenderToTexture(ui_render_texture);
     plat.setBlend(.render_tex_alpha);
     switch (self.screen) {
-        .room => {},
+        .room => {
+            if (!self.room.edit_mode) {
+                try self.room.ui_slots.render(&self.room);
+            }
+        },
         .reward => {},
         .shop => {},
         .dead => {

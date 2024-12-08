@@ -520,14 +520,14 @@ pub fn update(self: *Room) Error!void {
 pub fn render(self: *const Room, ui_render_texture: Platform.RenderTexture2D, game_render_texture: Platform.RenderTexture2D) Error!void {
     const plat = getPlat();
 
-    const fog_enabled = false and !self.edit_mode;
+    const fog_enabled = !self.edit_mode;
     if (fog_enabled) {
         try self.fog.renderToTexture(self.camera);
     }
 
     plat.startRenderToTexture(game_render_texture);
-    plat.clear(.black);
     plat.setBlend(.render_tex_alpha);
+    plat.clear(.black);
 
     plat.startCamera2D(self.camera, .{ .round_to_pixel = true });
     try self.tilemap.renderUnderObjects();
@@ -625,22 +625,6 @@ pub fn render(self: *const Room, ui_render_texture: Platform.RenderTexture2D, ga
         plat.setBlend(.render_tex_alpha);
     }
 
-    // edit mode msg
-    if (self.edit_mode) {
-        const text_opt: draw.TextOpt = .{ .center = true, .size = 30, .color = .white };
-        const txt = "edit mode";
-        const dims = (try plat.measureText(txt, text_opt)).add(v2f(10, 4));
-        const p: V2f = v2f(plat.screen_dims_f.x * 0.5, plat.screen_dims_f.y - 35);
-        plat.rectf(p.sub(dims.scale(0.5)), dims, .{ .fill_color = Colorf.black.fade(0.5) });
-        try plat.textf(p, "{s}", .{txt}, text_opt);
-    }
-
-    if (debug.show_num_enemies) {
-        try plat.textf(v2f(10, 10), "num_enemies_alive: {}", .{self.num_enemies_alive}, .{ .color = .white });
-    }
-    if (debug.show_highest_num_things_in_room) {
-        try plat.textf(v2f(10, 30), "highest_num_things: {} / {}", .{ self.highest_num_things, max_things_in_room }, .{ .color = .white });
-    }
     plat.rectf(.{}, plat.game_canvas_dims_f, .{
         .fill_color = null,
         .outline = .{
@@ -650,9 +634,22 @@ pub fn render(self: *const Room, ui_render_texture: Platform.RenderTexture2D, ga
     });
     plat.endRenderToTexture();
 
-    if (!self.edit_mode) {
-        plat.startRenderToTexture(ui_render_texture);
-        try self.ui_slots.render(self);
-        plat.endRenderToTexture();
+    // ui ?
+    plat.startRenderToTexture(ui_render_texture);
+    // edit mode msg
+    if (self.edit_mode) {
+        const text_opt: draw.TextOpt = .{ .center = true, .size = 30, .color = .white };
+        const txt = "edit mode";
+        const dims = (try plat.measureText(txt, text_opt)).add(v2f(10, 4));
+        const p: V2f = v2f(plat.screen_dims_f.x * 0.5, plat.screen_dims_f.y - 35);
+        plat.rectf(p.sub(dims.scale(0.5)), dims, .{ .fill_color = Colorf.black.fade(0.5) });
+        try plat.textf(p, "{s}", .{txt}, text_opt);
     }
+    if (debug.show_num_enemies) {
+        try plat.textf(v2f(10, 10), "num_enemies_alive: {}", .{self.num_enemies_alive}, .{ .color = .white });
+    }
+    if (debug.show_highest_num_things_in_room) {
+        try plat.textf(v2f(10, 30), "highest_num_things: {} / {}", .{ self.highest_num_things, max_things_in_room }, .{ .color = .white });
+    }
+    plat.endRenderToTexture();
 }

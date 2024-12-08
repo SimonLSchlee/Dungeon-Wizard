@@ -114,7 +114,7 @@ pub fn canBuy(run: *const Run, product: *const Product) bool {
 fn unqProductSlot(cmd_buf: *ImmUI.CmdBuf, tooltip_buf: *ImmUI.CmdBuf, slot: *ProductSlot, run: *const Run) Error!bool {
     const data = App.get().data;
     const plat = getPlat();
-    const ui_scaling: f32 = 3;
+    const ui_scaling: f32 = plat.ui_scaling + 1;
     var ret: bool = false;
 
     const mouse_pos = plat.getMousePosScreen();
@@ -184,7 +184,7 @@ fn unqProductSlot(cmd_buf: *ImmUI.CmdBuf, tooltip_buf: *ImmUI.CmdBuf, slot: *Pro
 pub fn update(self: *Shop, run: *Run) Error!?Product {
     const plat = getPlat();
     const data = App.get().data;
-    const ui_scaling: f32 = 3;
+    const ui_scaling: f32 = plat.ui_scaling + 1;
     var ret: ?Product = null;
 
     try run.imm_ui.commands.append(.{ .clear = .{

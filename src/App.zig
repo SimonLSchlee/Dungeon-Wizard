@@ -376,10 +376,10 @@ fn render(self: *App) Error!void {
     if (self.options_open) {
         try self.options.render(self.ui_render_texture);
     }
-    plat.texturef(plat.screen_dims_f.scale(0.5).round(), self.game_render_texture.texture, .{
+    plat.setBlend(.alpha);
+    plat.texturef(plat.game_canvas_screen_topleft_offset, self.game_render_texture.texture, .{
         .flip_y = true,
         .smoothing = .none,
-        .origin = .center,
         .uniform_scaling = plat.game_scaling,
     });
     if (!debug.hide_ui) {

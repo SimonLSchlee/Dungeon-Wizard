@@ -81,6 +81,11 @@ input_buffer: core.InputBuffer = .{},
 str_fmt_buf: []u8 = undefined,
 assets_path: []const u8 = undefined,
 
+// move where the game is drawn so it's centered, e.g. if the UI is blocking some part of the screen
+pub fn centerGameRect(self: *Platform, screen_rect_pos: V2f, screen_rect_dims: V2f) void {
+    self.game_canvas_screen_topleft_offset = screen_rect_pos.add(screen_rect_dims.sub(self.game_canvas_dims_f.scale(self.game_scaling)).scale(0.5));
+}
+
 pub fn updateScreenDims(self: *Platform, dims: V2i) void {
     self.screen_dims = dims;
     self.screen_dims_f = dims.toV2f();
@@ -189,7 +194,7 @@ pub fn init(title: []const u8) Error!*Platform {
     r.SetTraceLogCallback(raylibTraceLog);
     const title_z = try std.fmt.allocPrintZ(ret.heap, "{s}", .{title});
     //r.SetConfigFlags(r.FLAG_WINDOW_RESIZABLE);
-    const dims = core.min_resolution.scale(2).add(v2i(32, 32));
+    const dims = v2i(1352, 878); //core.min_resolution.scale(1); //.add(v2i(32, 32));
     r.InitWindow(@intCast(dims.x), @intCast(dims.y), title_z);
     // show raylib init INFO, then just warnings
     r.SetTraceLogLevel(r.LOG_WARNING);
