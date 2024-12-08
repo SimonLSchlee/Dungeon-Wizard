@@ -59,7 +59,8 @@ run: Run = undefined,
 menu_ui: struct {
     commands: ImmUI.CmdBuf = .{},
 } = .{},
-render_texture: Platform.RenderTexture2D = undefined,
+game_render_texture: Platform.RenderTexture2D = undefined,
+ui_render_texture: Platform.RenderTexture2D = undefined,
 
 export fn appInit(plat: *Platform) *anyopaque {
     // everything depends on plat global
@@ -80,7 +81,8 @@ export fn appInit(plat: *Platform) *anyopaque {
 
     // populate _app here, Room.init() uses it
     _app = app;
-    app.render_texture = plat.createRenderTexture("app", core.native_dims);
+    app.game_render_texture = plat.createRenderTexture("app_game", plat.game_canvas_dims);
+    app.ui_render_texture = plat.createRenderTexture("app_ui", plat.screen_dims);
 
     //app.startNewRun(._4_slot_frank) catch @panic("Failed to go straight into run");
 
@@ -155,7 +157,7 @@ fn menuUpdate(self: *App) Error!void {
         title_dims.x + title_padding.x * 2,
         title_dims.y + title_padding.y * 2 + btn_dims.y * num_buttons + btn_spacing * (num_buttons - 1) + bottom_spacing,
     );
-    const panel_topleft = plat.native_rect_cropped_offset.add(plat.native_rect_cropped_dims.sub(panel_dims).scale(0.5));
+    const panel_topleft = plat.screen_dims_f.sub(panel_dims).scale(0.5);
     self.menu_ui.commands.clear();
     self.menu_ui.commands.append(.{
         .rect = .{
@@ -247,7 +249,7 @@ fn pauseMenuUpdate(self: *App) Error!void {
         title_dims.x + title_padding.x * 2,
         title_dims.y + title_padding.y * 2 + btn_dims.y * num_buttons + btn_spacing * (num_buttons - 1) + bottom_spacing,
     );
-    const panel_topleft = plat.native_rect_cropped_offset.add(plat.native_rect_cropped_dims.sub(panel_dims).scale(0.5));
+    const panel_topleft = plat.screen_dims_f.sub(panel_dims).scale(0.5);
     self.menu_ui.commands.clear();
     self.menu_ui.commands.append(.{
         .rect = .{
@@ -355,16 +357,16 @@ fn render(self: *App) Error!void {
 
     switch (self.screen) {
         .menu => {
-            plat.startRenderToTexture(self.render_texture);
+            plat.startRenderToTexture(self.ui_render_texture);
             plat.setBlend(.render_tex_alpha);
             plat.clear(.gray);
             try ImmUI.render(&self.menu_ui.commands);
             plat.endRenderToTexture();
         },
         .run => {
-            try self.run.render(self.render_texture);
+            try self.run.render(self.ui_render_texture, self.game_render_texture);
             if (self.paused) {
-                plat.startRenderToTexture(self.render_texture);
+                plat.startRenderToTexture(self.ui_render_texture);
                 plat.setBlend(.render_tex_alpha);
                 try ImmUI.render(&self.menu_ui.commands);
                 plat.endRenderToTexture();
@@ -372,15 +374,29 @@ fn render(self: *App) Error!void {
         },
     }
     if (self.options_open) {
-        try self.options.render(self.render_texture);
+        try self.options.render(self.ui_render_texture);
     }
-    const texture_opt = draw.TextureOpt{
+    plat.texturef(plat.screen_dims_f.scale(0.5).round(), self.game_render_texture.texture, .{
         .flip_y = true,
-        .uniform_scaling = plat.native_to_screen_scaling,
-        .origin = .center,
         .smoothing = .none,
-    };
-    plat.texturef(plat.screen_dims_f.scale(0.5), self.render_texture.texture, texture_opt);
+        .origin = .center,
+        .uniform_scaling = plat.game_scaling,
+    });
+    if (!debug.hide_ui) {
+        plat.texturef(.{}, self.ui_render_texture.texture, .{
+            .flip_y = true,
+            .smoothing = .none,
+        });
+    }
+
+    if (debug.show_mouse_pos) {
+        try plat.textf(v2f(10, 10), "mouse screen: {d}", .{plat.getMousePosScreen()}, .{ .color = .white });
+        if (self.screen == .run) {
+            if (self.run.room_exists) {
+                try plat.textf(v2f(10, 40), "mouse world: {d}", .{plat.getMousePosWorld(self.run.room.camera)}, .{ .color = .white });
+            }
+        }
+    }
 }
 
 pub fn copyString(allocator: *std.mem.Allocator, str: []const u8) []u8 {

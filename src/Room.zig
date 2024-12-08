@@ -213,11 +213,12 @@ fn clearThings(self: *Room) void {
 }
 
 pub fn reset(self: *Room) Error!void {
+    const plat = getPlat();
     const data = App.get().data;
     self.clearThings();
     self.fog.clearAll();
     self.camera = .{
-        .offset = core.native_dims_f.scale(0.5),
+        .offset = plat.game_canvas_dims_f.scale(0.5),
         .zoom = 1,
     };
     self.curr_tick = 0;
@@ -482,7 +483,7 @@ pub fn update(self: *Room) Error!void {
         self.fog.clearVisible();
         if (self.getPlayer()) |player| {
             // TODO better
-            self.camera.pos = player.pos.add(v2f(0, plat.native_rect_cropped_dims.y * 0.125));
+            self.camera.pos = player.pos; //.add(v2f(0, plat.screen_dims_f.y * 0.125));
             try self.fog.addVisibleCircle(
                 self.tilemap.getRoomRect(),
                 player.pos,
@@ -516,7 +517,7 @@ pub fn update(self: *Room) Error!void {
     }
 }
 
-pub fn render(self: *const Room, native_render_texture: Platform.RenderTexture2D) Error!void {
+pub fn render(self: *const Room, ui_render_texture: Platform.RenderTexture2D, game_render_texture: Platform.RenderTexture2D) Error!void {
     const plat = getPlat();
 
     const fog_enabled = false and !self.edit_mode;
@@ -524,7 +525,7 @@ pub fn render(self: *const Room, native_render_texture: Platform.RenderTexture2D
         try self.fog.renderToTexture(self.camera);
     }
 
-    plat.startRenderToTexture(native_render_texture);
+    plat.startRenderToTexture(game_render_texture);
     plat.clear(.black);
     plat.setBlend(.render_tex_alpha);
 
@@ -624,16 +625,12 @@ pub fn render(self: *const Room, native_render_texture: Platform.RenderTexture2D
         plat.setBlend(.render_tex_alpha);
     }
 
-    if (!self.edit_mode) {
-        try self.ui_slots.render(self);
-    }
-
     // edit mode msg
     if (self.edit_mode) {
         const text_opt: draw.TextOpt = .{ .center = true, .size = 30, .color = .white };
         const txt = "edit mode";
         const dims = (try plat.measureText(txt, text_opt)).add(v2f(10, 4));
-        const p: V2f = plat.native_rect_cropped_offset.add(v2f(plat.native_rect_cropped_dims.x * 0.5, plat.native_rect_cropped_dims.y - 35));
+        const p: V2f = v2f(plat.screen_dims_f.x * 0.5, plat.screen_dims_f.y - 35);
         plat.rectf(p.sub(dims.scale(0.5)), dims, .{ .fill_color = Colorf.black.fade(0.5) });
         try plat.textf(p, "{s}", .{txt}, text_opt);
     }
@@ -644,5 +641,18 @@ pub fn render(self: *const Room, native_render_texture: Platform.RenderTexture2D
     if (debug.show_highest_num_things_in_room) {
         try plat.textf(v2f(10, 30), "highest_num_things: {} / {}", .{ self.highest_num_things, max_things_in_room }, .{ .color = .white });
     }
+    plat.rectf(.{}, plat.game_canvas_dims_f, .{
+        .fill_color = null,
+        .outline = .{
+            .color = .red,
+            .thickness = 4,
+        },
+    });
     plat.endRenderToTexture();
+
+    if (!self.edit_mode) {
+        plat.startRenderToTexture(ui_render_texture);
+        try self.ui_slots.render(self);
+        plat.endRenderToTexture();
+    }
 }

@@ -9,6 +9,10 @@ pub const assert = std.debug.assert;
 
 pub const enable_debug_controls = false;
 
+// misc
+pub const show_mouse_pos = false;
+pub const hide_ui = true;
+
 // ai stuff
 pub const show_thing_paths = false;
 pub const show_thing_coords_searched = false;

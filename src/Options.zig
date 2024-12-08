@@ -268,6 +268,6 @@ pub fn layoutUI(self: *Options) void {
     self.ui.labels_width = element_label_max_width + ui_el_text_padding.y * 2;
     // TODO ??
     // center it?
-    self.ui.rect.pos = plat.native_rect_cropped_offset.add(plat.native_rect_cropped_dims.sub(self.ui.rect.dims).scale(0.5));
+    self.ui.rect.pos = plat.screen_dims_f.sub(self.ui.rect.dims).scale(0.5);
     self.ui.back_button.clickable_rect.rect.pos = self.ui.back_button.clickable_rect.rect.pos.add(self.ui.rect.pos);
 }

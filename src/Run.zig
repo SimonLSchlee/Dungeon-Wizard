@@ -655,8 +655,8 @@ pub fn rewardSpellChoiceUI(self: *Run, idx: usize) Error!void {
     const ui_scaling: f32 = 3;
 
     // modal background
-    const modal_dims = v2f(core.native_dims_f.x * 0.6, core.native_dims_f.y * 0.6);
-    const modal_topleft = core.native_dims_f.sub(modal_dims).scale(0.5);
+    const modal_dims = v2f(plat.screen_dims_f.x * 0.6, plat.screen_dims_f.y * 0.6);
+    const modal_topleft = plat.screen_dims_f.sub(modal_dims).scale(0.5);
     self.imm_ui.commands.appendAssumeCapacity(.{ .rect = .{
         .pos = modal_topleft,
         .dims = modal_dims,
@@ -744,8 +744,8 @@ pub fn rewardUpdate(self: *Run) Error!void {
     }
 
     // modal background
-    const modal_dims = v2f(core.native_dims_f.x * 0.6, core.native_dims_f.y * 0.6);
-    const modal_topleft = core.native_dims_f.sub(modal_dims).scale(0.5);
+    const modal_dims = v2f(plat.screen_dims_f.x * 0.6, plat.screen_dims_f.y * 0.6);
+    const modal_topleft = plat.screen_dims_f.sub(modal_dims).scale(0.5);
     self.imm_ui.commands.appendAssumeCapacity(.{ .rect = .{
         .pos = modal_topleft,
         .dims = modal_dims,
@@ -980,10 +980,10 @@ pub fn update(self: *Run) Error!void {
         const padding = v2f(5, 5);
         const gold_text = try u.bufPrintLocal("{any}{}", .{ icon_text.Icon.coin, self.gold });
         const rect_dims = icon_text.measureIconText(gold_text).scale(scaling).add(padding.scale(2));
-        const topleft = plat.native_rect_cropped_offset.add(v2f(
+        const topleft = v2f(
             10,
             10,
-        ));
+        );
         self.imm_ui.commands.appendAssumeCapacity(.{ .rect = .{
             .pos = topleft,
             .dims = rect_dims,
@@ -998,8 +998,9 @@ pub fn update(self: *Run) Error!void {
 }
 
 fn makeDeadMenu() DeadMenu {
-    const modal_dims = v2f(core.native_dims_f.x * 0.6, core.native_dims_f.y * 0.7);
-    const modal_topleft = core.native_dims_f.sub(modal_dims).scale(0.5);
+    const plat = getPlat();
+    const modal_dims = v2f(plat.screen_dims_f.x * 0.6, plat.screen_dims_f.y * 0.7);
+    const modal_topleft = plat.screen_dims_f.sub(modal_dims).scale(0.5);
     const modal_center = modal_topleft.add(modal_dims.scale(0.5));
     var modal = menuUI.Modal{
         .rect = .{
@@ -1052,14 +1053,14 @@ fn makeDeadMenu() DeadMenu {
     };
 }
 
-pub fn render(self: *Run, native_render_texture: Platform.RenderTexture2D) Error!void {
+pub fn render(self: *Run, ui_render_texture: Platform.RenderTexture2D, game_render_texture: Platform.RenderTexture2D) Error!void {
     const plat = getPlat();
 
     if (self.room_exists) {
-        try self.room.render(native_render_texture);
+        try self.room.render(ui_render_texture, game_render_texture);
     }
 
-    plat.startRenderToTexture(native_render_texture);
+    plat.startRenderToTexture(ui_render_texture);
     plat.setBlend(.render_tex_alpha);
     switch (self.screen) {
         .room => {},
@@ -1078,11 +1079,11 @@ pub fn render(self: *Run, native_render_texture: Platform.RenderTexture2D) Error
         .none => {},
         .fade_in => {
             const color = Colorf.black.fade(1 - self.load_timer.remapTo0_1());
-            plat.rectf(.{}, core.native_dims_f, .{ .fill_color = color });
+            plat.rectf(.{}, plat.screen_dims_f, .{ .fill_color = color });
         },
         .fade_out => {
             const color = Colorf.black.fade(self.load_timer.remapTo0_1());
-            plat.rectf(.{}, core.native_dims_f, .{ .fill_color = color });
+            plat.rectf(.{}, plat.screen_dims_f, .{ .fill_color = color });
         },
     }
     plat.endRenderToTexture();

@@ -90,14 +90,16 @@ pub const Input = struct {
         }
 
         // clicking rmb cancels buffered action
-        if (!room.ui_clicked and plat.input_buffer.mouseBtnIsJustPressed(.right)) {
+        // !room.ui_clicked and
+        if (plat.input_buffer.mouseBtnIsJustPressed(.right)) {
             input.move_press_ui_timer.restart();
             ui_slots.unselectSlot();
             controller.action_buffered = null;
         }
         // holding rmb sets path, only if an action isn't buffered
         // so movement can be 'canceled' with an action, even if still holding RMB
-        if (!room.ui_hovered and controller.action_buffered == null and plat.input_buffer.mouseBtnIsDown(.right)) {
+        // !room.ui_hovered and
+        if (controller.action_buffered == null and plat.input_buffer.mouseBtnIsDown(.right)) {
             try self.findPath(room, mouse_pos);
             _ = input.move_press_ui_timer.tick(true);
             input.move_release_ui_timer.restart();

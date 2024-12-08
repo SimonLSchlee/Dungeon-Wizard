@@ -55,27 +55,27 @@ pub const SizeCategory = enum {
 
     pub const coll_radii = std.EnumArray(SizeCategory, f32).init(.{
         .none = 0,
-        .smol = 4,
-        .medium = 9,
-        .big = 11,
+        .smol = @round(0.065 * TileMap.tile_sz_f),
+        .medium = @round(0.14 * TileMap.tile_sz_f),
+        .big = @round(0.172 * TileMap.tile_sz_f),
     });
     pub const draw_radii = std.EnumArray(SizeCategory, f32).init(.{
         .none = 0,
-        .smol = 14,
-        .medium = 20,
-        .big = 25,
+        .smol = @round(0.2 * TileMap.tile_sz_f),
+        .medium = @round(0.3 * TileMap.tile_sz_f),
+        .big = @round(0.4 * TileMap.tile_sz_f),
     });
     pub const hurtbox_radii = std.EnumArray(SizeCategory, f32).init(.{
         .none = 0,
-        .smol = 12,
-        .medium = 15,
-        .big = 20,
+        .smol = @round(0.2 * TileMap.tile_sz_f),
+        .medium = @round(0.3 * TileMap.tile_sz_f),
+        .big = @round(0.4 * TileMap.tile_sz_f),
     });
     pub const select_radii = std.EnumArray(SizeCategory, f32).init(.{
         .none = 0,
-        .smol = 18,
-        .medium = 24,
-        .big = 30,
+        .smol = @round(0.25 * TileMap.tile_sz_f),
+        .medium = @round(0.35 * TileMap.tile_sz_f),
+        .big = @round(0.45 * TileMap.tile_sz_f),
     });
 };
 
@@ -734,7 +734,7 @@ pub const CastVFXController = struct {
     pub fn castingProto(caster: *Thing) Thing {
         var cast_offset = V2f{};
         if (App.get().data.getCreatureAnimOrDefault(caster.animator.?.kind.creature.kind, .cast)) |anim| {
-            cast_offset = anim.cast_offset.scale(core.pixel_art_scaling);
+            cast_offset = anim.cast_offset.scale(core.game_sprite_scaling);
             if (caster.dir.x < 0) {
                 cast_offset.x *= -1;
             }
@@ -779,7 +779,7 @@ pub const VFXRenderer = struct {
             .origin = frame.origin,
             .src_pos = frame.pos.toV2f(),
             .src_dims = frame.size.toV2f(),
-            .uniform_scaling = core.pixel_art_scaling,
+            .uniform_scaling = core.game_sprite_scaling,
             .tint = tint,
             .flip_x = renderer.flip_x_to_dir and self.dir.x < 0,
             .rot_rads = if (renderer.rotate_to_dir) self.dir.toAngleRadians() else 0,
@@ -827,7 +827,7 @@ pub const SpawnerRenderer = struct {
             .origin = frame.origin,
             .src_pos = frame.pos.toV2f(),
             .src_dims = frame.size.toV2f(),
-            .uniform_scaling = core.pixel_art_scaling,
+            .uniform_scaling = core.game_sprite_scaling,
             .tint = tint,
         };
         plat.texturef(self.pos, frame.texture, opt);
@@ -1103,7 +1103,7 @@ pub const CreatureRenderer = struct {
             .origin = frame.origin,
             .src_pos = frame.pos.toV2f(),
             .src_dims = frame.size.toV2f(),
-            .uniform_scaling = core.pixel_art_scaling,
+            .uniform_scaling = core.game_sprite_scaling,
             .tint = tint,
         };
         plat.texturef(self.pos, frame.texture, opt);

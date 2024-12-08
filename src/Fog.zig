@@ -51,7 +51,7 @@ pub fn init() Error!Fog {
     const plat = getPlat();
     return .{
         .visited = Map.init(plat.heap),
-        .render_tex = plat.createRenderTexture("fog", core.native_dims),
+        .render_tex = plat.createRenderTexture("fog", plat.screen_dims),
     };
 }
 
@@ -65,7 +65,7 @@ pub fn clone(self: *const Fog) Error!Fog {
     const plat = getPlat();
     var ret = self.*;
     ret.visited = try self.visited.clone();
-    ret.render_tex = plat.createRenderTexture("fog", core.native_dims);
+    ret.render_tex = plat.createRenderTexture("fog", plat.screen_dims);
     return ret;
 }
 

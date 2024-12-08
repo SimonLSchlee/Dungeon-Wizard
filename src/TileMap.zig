@@ -32,7 +32,7 @@ pub const max_map_exits = 4;
 pub const max_map_spawns = 32;
 pub const max_map_creatures = 32;
 
-pub const tile_sz: i64 = 64;
+pub const tile_sz: i64 = 32;
 pub const tile_sz_f: f32 = tile_sz;
 pub const tile_dims = V2f.splat(tile_sz);
 pub const tile_dims_2 = V2f.splat(tile_sz_f * 0.5);
@@ -530,7 +530,7 @@ pub fn debugDrawPath(_: *const TileMap, camera: draw.Camera2D, path: []const V2i
 pub fn debugDrawGrid(_: *const TileMap, camera: draw.Camera2D) void {
     const plat = getPlat();
     const inv_zoom = 1 / camera.zoom;
-    const camera_dims = core.native_dims_f.scale(inv_zoom);
+    const camera_dims = plat.game_canvas_dims.scale(inv_zoom);
     const line_thickness = inv_zoom;
     // add 2 to grid dims to make sure it covers the screen
     const grid_dims = camera_dims.scale(1 / tile_sz_f).toV2i().add(v2i(2, 2));
@@ -592,7 +592,7 @@ fn renderTile(self: *const TileMap, pos: V2f, tile: TileLayer.Tile) void {
     const opt = draw.TextureOpt{
         .src_dims = tileset.tile_dims.toV2f(),
         .src_pos = src_px_coord.toV2f(),
-        .uniform_scaling = core.pixel_art_scaling,
+        .uniform_scaling = core.game_sprite_scaling,
     };
     plat.texturef(pos, tileset.texture, opt);
 }
@@ -633,7 +633,7 @@ pub fn renderOverObjects(self: *const TileMap, cam: draw.Camera2D, things: []con
         const visible_circle = t.getApproxVisibleCircle();
         var pos = plat.camPosToScreenPos(cam, visible_circle.pos);
         // shader screen pos needs y inverted!
-        pos.y = core.native_dims_f.y - pos.y;
+        pos.y = plat.game_canvas_dims_f.y - pos.y;
         const radius = visible_circle.radius;
         const pos_name = try utl.bufPrintLocal("circles[{}].pos", .{i});
         try plat.setShaderValue(shader, pos_name, pos);

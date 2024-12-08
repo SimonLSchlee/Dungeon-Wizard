@@ -50,10 +50,10 @@ pub fn getItemsRects() std.BoundedArray(geom.Rectf, max_item_slots) {
         utl.as(f32, max_items_per_row) * (item_slot_dims.x + item_slot_spacing.x) - item_slot_spacing.x,
         utl.as(f32, max_items_rows) * (item_slot_dims.y + item_slot_spacing.y) - item_slot_spacing.y,
     );
-    const items_topleft = plat.native_rect_cropped_offset.add(v2f(
+    const items_topleft = v2f(
         items_margin.x,
-        plat.native_rect_cropped_dims.y - items_margin.y - max_items_dims.y,
-    ));
+        plat.screen_dims_f.y - items_margin.y - max_items_dims.y,
+    );
     for (0..max_items_rows) |j| {
         const y_off = (item_slot_dims.x + item_slot_spacing.y) * utl.as(f32, j);
         for (0..max_items_per_row) |i| {
@@ -408,10 +408,10 @@ pub const Slots = struct {
         const ui_scaling: f32 = 2;
         const spell_slot_dims = Spell.card_dims.scale(ui_scaling);
         // spells must be centered on screen
-        const spells_center_pos: V2f = plat.native_rect_cropped_offset.add(v2f(
-            plat.native_rect_cropped_dims.x * 0.5,
-            plat.native_rect_cropped_dims.y - 10 - spell_slot_dims.y * 0.5,
-        ));
+        const spells_center_pos: V2f = v2f(
+            plat.screen_dims_f.x * 0.5,
+            plat.screen_dims_f.y - 10 - spell_slot_dims.y * 0.5,
+        );
         const spells_dims = v2f(
             (utl.as(f32, self.spells.len)) * (spell_slot_dims.x + spell_slot_spacing) - spell_slot_spacing,
             spell_slot_dims.y,
@@ -466,14 +466,14 @@ pub const Slots = struct {
         }
         // background rect covers everything at bottom of screen
         const bg_rect_pos = v2f(
-            plat.native_rect_cropped_offset.x,
+            0,
             @min(spells_topleft.y, items_rects.get(0).pos.y) - 16,
         );
         self.ui_bg_rect = .{
             .pos = bg_rect_pos,
             .dims = v2f(
-                plat.native_rect_cropped_dims.x,
-                plat.native_rect_cropped_offset.y + plat.native_rect_cropped_dims.y - bg_rect_pos.y,
+                plat.screen_dims_f.x,
+                plat.screen_dims_f.y - bg_rect_pos.y,
             ),
         };
     }

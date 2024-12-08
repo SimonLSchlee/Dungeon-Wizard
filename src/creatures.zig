@@ -99,13 +99,13 @@ pub const proto_fns = blk: {
 };
 
 pub fn playerProto() Thing {
-    var ret = creatureProto(.player, .wizard, .player, null, 40, .medium, 15);
+    var ret = creatureProto(.player, .wizard, .player, null, 40, .medium, 9);
     ret.accel_params = .{
-        .accel = 0.15,
-        .friction = 0.09,
-        .max_speed = 1.2,
+        .accel = 0.0023 * TileMap.tile_sz_f,
+        .friction = 0.0014 * TileMap.tile_sz_f,
+        .max_speed = 0.01875 * TileMap.tile_sz_f,
     };
-    ret.vision_range = 300;
+    ret.vision_range = 150;
     ret.player_input = player.Input{};
     ret.controller = .{ .player = .{} };
 
@@ -324,7 +324,7 @@ pub fn gobbomberProto() Thing {
 }
 
 pub fn dummyProto() Thing {
-    var ret = creatureProto(.dummy, .dummy, .enemy, null, 25, .medium, 20);
+    var ret = creatureProto(.dummy, .dummy, .enemy, null, 25, .medium, 10);
     ret.enemy_difficulty = 1.5;
     return ret;
 }
@@ -348,7 +348,7 @@ pub fn creatureProto(creature_kind: Kind, sprite_kind: sprites.CreatureAnim.Kind
             .radius = Thing.SizeCategory.hurtbox_radii.get(size_cat),
         },
         .selectable = .{
-            .height = select_height_px * core.pixel_art_scaling,
+            .height = select_height_px * core.game_sprite_scaling,
             .radius = Thing.SizeCategory.select_radii.get(size_cat),
         },
         .hp = Thing.HP.init(hp),

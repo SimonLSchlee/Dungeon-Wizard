@@ -178,12 +178,11 @@ pub fn unqRender(tt: *const Tooltip, cmd_buf: *ImmUI.CmdBuf, pos: V2f, scaling: 
 
     var adjusted_pos = pos;
     const bot_right = adjusted_pos.add(entire_everything_dims).add(padding);
-    const native_cropped_rect_bot_right = plat.native_rect_cropped_offset.add(plat.native_rect_cropped_dims);
-    if (bot_right.x > native_cropped_rect_bot_right.x) {
-        adjusted_pos.x -= (bot_right.x - native_cropped_rect_bot_right.x);
+    if (bot_right.x > plat.screen_dims_f.x) {
+        adjusted_pos.x -= (bot_right.x - plat.screen_dims_f.x);
     }
-    if (bot_right.y > native_cropped_rect_bot_right.y) {
-        adjusted_pos.y -= (bot_right.y - native_cropped_rect_bot_right.y);
+    if (bot_right.y > plat.screen_dims_f.y) {
+        adjusted_pos.y -= (bot_right.y - plat.screen_dims_f.y);
     }
     adjusted_pos = adjusted_pos.floor();
 

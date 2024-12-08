@@ -63,29 +63,80 @@ appTick: *const fn () void = undefined,
 appRender: *const fn () void = undefined,
 heap: std.mem.Allocator = gpa.allocator(),
 default_font: Font = undefined,
+
+// screeeeen
 screen_dims: V2i = .{},
 screen_dims_f: V2f = .{},
-native_to_screen_scaling: f32 = 1,
-native_to_screen_offset: V2f = .{},
-native_rect_cropped_offset: V2f = .{},
-native_rect_cropped_dims: V2f = .{},
+// set when resolution changes
+game_scaling: f32 = 1,
+game_canvas_dims: V2i = core.min_resolution,
+game_canvas_dims_f: V2f = core.min_resolution.toV2f(),
+game_canvas_screen_topleft_offset: V2f = .{},
+// ui canvas size == screen size
+ui_scaling: f32 = 1,
+
 accumulated_update_ns: i64 = 0,
 prev_frame_time_ns: i64 = 0,
 input_buffer: core.InputBuffer = .{},
 str_fmt_buf: []u8 = undefined,
 assets_path: []const u8 = undefined,
 
-pub fn updateDims(self: *Platform, dims: V2i) void {
+pub fn updateScreenDims(self: *Platform, dims: V2i) void {
     self.screen_dims = dims;
     self.screen_dims_f = dims.toV2f();
-    const x_scaling = self.screen_dims_f.x / core.native_dims_f.x;
-    const y_scaling = self.screen_dims_f.y / core.native_dims_f.y;
-    self.native_to_screen_scaling = @max(x_scaling, y_scaling);
-    const scaled_native_dims = core.native_dims_f.scale(self.native_to_screen_scaling);
-    self.native_to_screen_offset = self.screen_dims_f.sub(scaled_native_dims).scale(0.5);
-    // in native space, get rectangle that is actually shown on the screen, for UI anchoring and such
-    self.native_rect_cropped_offset = self.native_to_screen_offset.scale(1 / self.native_to_screen_scaling).neg();
-    self.native_rect_cropped_dims = self.screen_dims_f.scale(1 / self.native_to_screen_scaling);
+    // get ui scale - fit inside or equal screen dims
+    var ui_scaling: i32 = 0;
+    for (0..100) |_| {
+        const ui_dims = core.min_resolution.scale(ui_scaling + 1);
+        if (ui_dims.x > dims.x or ui_dims.y > dims.y) {
+            break;
+        }
+        ui_scaling += 1;
+    }
+    self.ui_scaling = u.as(f32, ui_scaling);
+    // get game scale
+    if (false) {
+        // cover screen
+        var game_scaling: i32 = 1;
+        for (0..100) |_| {
+            const game_dims = core.min_resolution.scale(game_scaling);
+            if (game_dims.x >= dims.x and game_dims.y >= dims.y) {
+                self.game_canvas_dims = game_dims;
+                break;
+            }
+            const game_dims_wide = core.min_wide_resolution.scale(game_scaling);
+            if (game_dims_wide.x >= dims.x and game_dims_wide.y >= dims.y) {
+                self.game_canvas_dims = game_dims_wide;
+                break;
+            }
+            game_scaling += 1;
+        }
+        self.game_scaling = u.as(f32, game_scaling);
+    } else {
+        // fit into screen
+        var game_scaling: i32 = 0;
+        for (0..100) |_| {
+            const game_dims = core.min_resolution.scale(game_scaling + 1);
+            if (game_dims.x > dims.x and game_dims.y > dims.y) {
+                self.game_canvas_dims = core.min_resolution;
+                break;
+            }
+            const game_dims_wide = core.min_wide_resolution.scale(game_scaling + 1);
+            if (game_dims_wide.x > dims.x and game_dims_wide.y > dims.y) {
+                self.game_canvas_dims = core.min_wide_resolution;
+                break;
+            }
+            game_scaling += 1;
+        }
+        self.game_scaling = u.as(f32, game_scaling);
+    }
+    self.game_canvas_dims_f = self.game_canvas_dims.toV2f();
+    self.game_canvas_screen_topleft_offset = self.screen_dims_f.sub(self.game_canvas_dims_f.scale(self.game_scaling)).scale(0.5);
+    self.log.info("Scaling\n\tScreen: {}x{}\n\tGame: {}x{} scaled by {d}, offset by {d}", .{
+        self.screen_dims.x,      self.screen_dims.y,
+        self.game_canvas_dims.x, self.game_canvas_dims.y,
+        self.game_scaling,       self.game_canvas_screen_topleft_offset,
+    });
 }
 
 fn raylibTraceLog(msg_type: c_int, text: [*c]const u8, args: stdio.va_list) callconv(.C) void {
@@ -119,7 +170,6 @@ fn getPlat() *Platform {
 
 pub fn init(title: []const u8) Error!*Platform {
     @setRuntimeSafety(core.rt_safe_blocks);
-    const dims = core.native_dims;
     const heap = gpa.allocator();
 
     var ret = try heap.create(Platform);
@@ -139,11 +189,12 @@ pub fn init(title: []const u8) Error!*Platform {
     r.SetTraceLogCallback(raylibTraceLog);
     const title_z = try std.fmt.allocPrintZ(ret.heap, "{s}", .{title});
     //r.SetConfigFlags(r.FLAG_WINDOW_RESIZABLE);
+    const dims = core.min_resolution.scale(2).add(v2i(32, 32));
     r.InitWindow(@intCast(dims.x), @intCast(dims.y), title_z);
     // show raylib init INFO, then just warnings
     r.SetTraceLogLevel(r.LOG_WARNING);
 
-    ret.updateDims(dims);
+    ret.updateScreenDims(dims);
     ret.default_font = try ret.loadFont("Roboto-Regular.ttf"); // NOTE uses str_fmt_buf initialized above
 
     r.InitAudioDevice();
@@ -829,9 +880,13 @@ pub fn endCamera2D(_: *Platform) void {
 }
 
 pub fn screenPosToCamPos(self: *Platform, cam: draw.Camera2D, pos: V2f) V2f {
-    var c = cam;
-    c.offset = c.offset.add(self.native_to_screen_offset);
-    return zVec(r.GetScreenToWorld2D(cVec(pos), cCam(c)));
+    const c = draw.Camera2D{
+        .pos = cam.pos,
+        .offset = cam.offset.scale(self.game_scaling),
+        .zoom = cam.zoom * self.game_scaling,
+    };
+    const p = pos.sub(self.game_canvas_screen_topleft_offset);
+    return zVec(r.GetScreenToWorld2D(cVec(p), cCam(c)));
 }
 
 pub fn camPosToScreenPos(self: *Platform, cam: draw.Camera2D, pos: V2f) V2f {
@@ -840,16 +895,11 @@ pub fn camPosToScreenPos(self: *Platform, cam: draw.Camera2D, pos: V2f) V2f {
 }
 
 pub fn getMousePosWorld(self: *Platform, cam: draw.Camera2D) V2f {
-    const mouse_cam = draw.Camera2D{
-        .pos = cam.pos,
-        .offset = self.screen_dims_f.scale(0.5).sub(self.native_to_screen_offset),
-        .zoom = cam.zoom * self.native_to_screen_scaling,
-    };
-    return self.screenPosToCamPos(mouse_cam, self.mousePosf());
+    return self.screenPosToCamPos(cam, self.mousePosf());
 }
 
 pub fn getMousePosScreen(self: *Platform) V2f {
-    return self.mousePosf().sub(self.native_to_screen_offset).scale(1 / self.native_to_screen_scaling);
+    return self.mousePosf();
 }
 
 pub fn startRenderToTexture(_: *Platform, render_tex: RenderTexture2D) void {

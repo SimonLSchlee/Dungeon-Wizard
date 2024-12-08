@@ -172,20 +172,22 @@ pub fn nsToSecs(ns: i64) f64 {
     return utl.as(f64, ns) / utl.as(f64, ns_per_sec);
 }
 
-pub const native_dims: V2i = v2i(1280, 900);
-pub const native_dims_f: V2f = native_dims.toV2f();
-pub const native_dims_xy_ratio: f32 = native_dims_f.x / native_dims_f.y;
-pub const supported_resolutions = [_]V2i{
-    native_dims,
-    v2i(1366, 768),
-    v2i(1600, 900),
-    v2i(1920, 1200),
-    v2i(1920, 1080),
-    v2i(2560, 1440),
-    v2i(3440, 1440),
-    v2i(3840, 2160),
+// 4:3
+pub const min_resolution = v2i(480, 360);
+// 16:9
+pub const min_wide_resolution = v2i(640, 360);
+
+pub const game_sprite_scaling: f32 = 2;
+
+// TODO maybe dont need this list..?
+pub const min_aspect_resolutions = [_]V2i{
+    min_resolution,
+    v2i(960, 720),
+    v2i(1440, 1080),
+    v2i(1920, 1440),
+    v2i(2400, 1800),
+    // etc...
 };
-pub const pixel_art_scaling: f32 = 4;
 
 pub const fixed_updates_per_sec: i64 = 60;
 pub const fups_per_sec = fixed_updates_per_sec;

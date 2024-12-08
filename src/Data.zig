@@ -846,7 +846,7 @@ pub fn loadTileMapFromJsonString(tilemap: *TileMap, json_string: []u8) Error!voi
                                 .integer => |i| u.as(f64, i),
                                 else => return Error.ParseFail,
                             }),
-                        ).scale(core.pixel_art_scaling).sub(TileMap.tile_dims_2);
+                        ).scale(core.game_sprite_scaling).sub(TileMap.tile_dims_2);
                         if (startsWith(u8, obj_name, "creature")) {
                             var it = std.mem.tokenizeScalar(u8, obj_name, ':');
                             _ = it.next() orelse return Error.ParseFail;

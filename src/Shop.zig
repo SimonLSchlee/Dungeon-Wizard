@@ -56,7 +56,6 @@ const ProductSlot = struct {
     long_hover: menuUI.LongHover = .{},
 };
 
-render_texture: Platform.RenderTexture2D,
 spells: std.BoundedArray(ProductSlot, max_num_spells) = .{},
 items: std.BoundedArray(ProductSlot, max_num_items) = .{},
 rng: std.Random.DefaultPrng,
@@ -66,10 +65,7 @@ state: enum {
 } = .shopping,
 
 pub fn init(seed: u64, run: *Run) Error!Shop {
-    const plat = App.getPlat();
-
     var ret = Shop{
-        .render_texture = plat.createRenderTexture("shop", core.native_dims),
         .rng = std.Random.DefaultPrng.init(seed),
     };
 
@@ -99,8 +95,7 @@ pub fn init(seed: u64, run: *Run) Error!Shop {
 }
 
 pub fn deinit(self: *Shop) void {
-    const plat = App.getPlat();
-    plat.destroyRenderTexture(self.render_texture);
+    _ = self;
 }
 
 pub fn reset(self: *Shop, run: *Run) Error!*Shop {
@@ -196,10 +191,10 @@ pub fn update(self: *Shop, run: *Run) Error!?Product {
         .color = .gray,
     } });
 
-    const title_center_pos = plat.native_rect_cropped_offset.add(v2f(
-        plat.native_rect_cropped_dims.x * 0.5,
+    const title_center_pos = v2f(
+        plat.screen_dims_f.x * 0.5,
         60,
-    ));
+    );
     try run.imm_ui.commands.append(.{ .label = .{
         .pos = title_center_pos,
         .text = ImmUI.initLabel("Shoppy Woppy"),
