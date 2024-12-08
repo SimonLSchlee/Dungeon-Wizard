@@ -61,16 +61,11 @@ pub const SizeCategory = enum {
     });
     pub const draw_radii = std.EnumArray(SizeCategory, f32).init(.{
         .none = 0,
-        .smol = @round(0.2 * TileMap.tile_sz_f),
-        .medium = @round(0.3 * TileMap.tile_sz_f),
-        .big = @round(0.4 * TileMap.tile_sz_f),
+        .smol = @round(0.17 * TileMap.tile_sz_f),
+        .medium = @round(0.24 * TileMap.tile_sz_f),
+        .big = @round(0.38 * TileMap.tile_sz_f),
     });
-    pub const hurtbox_radii = std.EnumArray(SizeCategory, f32).init(.{
-        .none = 0,
-        .smol = @round(0.2 * TileMap.tile_sz_f),
-        .medium = @round(0.3 * TileMap.tile_sz_f),
-        .big = @round(0.4 * TileMap.tile_sz_f),
-    });
+    pub const hurtbox_radii = draw_radii;
     pub const select_radii = std.EnumArray(SizeCategory, f32).init(.{
         .none = 0,
         .smol = @round(0.275 * TileMap.tile_sz_f),
@@ -696,8 +691,8 @@ pub const TextVFXController = struct {
             },
         };
         proto.renderer.shape.kind.text.opt.color = color;
-        proto.renderer.shape.kind.text.opt.size *= utl.as(u32, scale + 1);
-        proto.renderer.shape.kind.text.opt.border.?.dist *= (scale + 1);
+        proto.renderer.shape.kind.text.opt.size *= utl.as(u32, scale);
+        proto.renderer.shape.kind.text.opt.border.?.dist *= (scale);
 
         _ = try room.queueSpawnThing(&proto, rpos);
     }
@@ -1064,21 +1059,23 @@ pub const CreatureRenderer = struct {
     draw_radius: f32 = 10,
     draw_color: Colorf = Colorf.red,
 
-    pub fn renderUnder(self: *const Thing, _: *const Room) Error!void {
+    pub fn renderUnder(self: *const Thing, room: *const Room) Error!void {
         assert(self.spawn_state == .spawned);
         const plat = getPlat();
         const renderer = &self.renderer.creature;
 
-        if (self.isAliveCreature()) {
-            plat.circlef(self.pos, renderer.draw_radius, .{
-                .fill_color = null,
-                .smoothing = .none,
-                .round_to_pixel = false,
-                .outline = .{ .color = renderer.draw_color },
-            });
-            const arrow_start = self.pos.add(self.dir.scale(renderer.draw_radius));
-            const arrow_end = self.pos.add(self.dir.scale(renderer.draw_radius + 2.5));
-            plat.arrowf(arrow_start, arrow_end, .{ .thickness = 2.5, .color = renderer.draw_color });
+        if (room.paused) {
+            if (self.isAliveCreature()) {
+                plat.circlef(self.pos, renderer.draw_radius, .{
+                    .fill_color = null,
+                    .smoothing = .none,
+                    .round_to_pixel = false,
+                    .outline = .{ .color = renderer.draw_color },
+                });
+                const arrow_start = self.pos.add(self.dir.scale(renderer.draw_radius));
+                const arrow_end = self.pos.add(self.dir.scale(renderer.draw_radius + 2.5));
+                plat.arrowf(arrow_start, arrow_end, .{ .thickness = 2.5, .color = renderer.draw_color });
+            }
         }
     }
 
@@ -1138,31 +1135,48 @@ pub const CreatureRenderer = struct {
         const renderer = &self.renderer.creature;
 
         const hp_height = 3;
-        const hp_width = renderer.draw_radius * 2;
-        const hp_y_offset = if (self.selectable) |s| s.height + 10 else renderer.draw_radius * 3.5;
-        const hp_offset = v2f(-hp_width * 0.5, -hp_y_offset);
-        const hp_topleft = self.pos.add(hp_offset);
-        const shields_y_offset = hp_y_offset - hp_height;
+        const hp_width = @round(renderer.draw_radius * 2.5);
+        const hp_y_offset = if (self.selectable) |s| s.height + 10 else @round(renderer.draw_radius * 3.5);
+        const hp_offset = v2f(-hp_width * 0.5, -hp_y_offset).round();
+        const hp_topleft = self.pos.add(hp_offset).round();
+        const shields_y_offset = @round(hp_y_offset - hp_height);
         const shields_height = 3;
-        const shields_offset = v2f(-hp_width * 0.5, -shields_y_offset);
-        const shields_topleft = self.pos.add(shields_offset);
+        const shields_offset = v2f(-hp_width * 0.5, -shields_y_offset).round();
+        const shields_topleft = self.pos.add(shields_offset).round();
 
         if (self.isAliveCreature()) {
             if (self.hp) |hp| {
-                const curr_width = utl.remapClampf(0, hp.max, 0, hp_width, hp.curr);
-                plat.rectf(hp_topleft, v2f(hp_width, hp_height), .{ .fill_color = Colorf.black });
-                plat.rectf(hp_topleft, v2f(curr_width, hp_height), .{ .fill_color = HP.faction_colors.get(self.faction) });
+                const curr_width = @round(utl.remapClampf(0, hp.max, 0, hp_width, hp.curr));
+                plat.rectf(
+                    hp_topleft,
+                    v2f(hp_width, hp_height),
+                    .{
+                        .fill_color = Colorf.black,
+                        .round_to_pixel = true,
+                        .smoothing = .none,
+                    },
+                );
+                plat.rectf(
+                    hp_topleft,
+                    v2f(curr_width, hp_height),
+                    .{
+                        .fill_color = HP.faction_colors.get(self.faction),
+                        .round_to_pixel = true,
+                        .smoothing = .none,
+                    },
+                );
                 { // lines
                     const line_hp_inc: f32 = if (hp.max < 100) 10 else 50;
                     var i: f32 = line_hp_inc;
                     while (i < hp.curr) {
-                        const line_x = curr_width * (i / hp.curr);
+                        const line_x = @ceil(curr_width * (i / hp.curr));
                         const top = hp_topleft.add(v2f(line_x, 0));
                         const bot = hp_topleft.add(v2f(line_x, hp_height));
                         plat.linef(top, bot, .{
                             .thickness = 1,
                             .color = Colorf.black.fade(0.5),
                             .round_to_pixel = true,
+                            .smoothing = .none,
                         });
                         i += line_hp_inc;
                     }
@@ -1177,7 +1191,7 @@ pub const CreatureRenderer = struct {
                     const shield_color = Colorf.rgb(0.7, 0.7, 0.4);
                     var curr_pos = shields_topleft;
                     for (hp.shields.constSlice()) |shield| {
-                        const shield_width = hp_width * shield.curr / total_shield_amount;
+                        const shield_width = @round(hp_width * shield.curr / total_shield_amount);
                         plat.rectf(curr_pos, v2f(shield_width, shields_height), .{
                             .fill_color = shield_color,
                             .smoothing = .bilinear,
@@ -1186,11 +1200,11 @@ pub const CreatureRenderer = struct {
                         curr_pos.x += shield_width;
                     }
                     { // lines
-                        const curr_shield_width = utl.remapClampf(0, total_shield_amount, 0, hp_width, curr_shield_amount);
+                        const curr_shield_width = @round(utl.remapClampf(0, total_shield_amount, 0, hp_width, curr_shield_amount));
                         const line_shield_inc: f32 = if (total_shield_amount < 100) 10 else 50;
-                        var i: f32 = 0;
-                        while (i <= curr_shield_amount) {
-                            const line_x = curr_shield_width * (i / curr_shield_amount);
+                        var i: f32 = line_shield_inc;
+                        while (i < curr_shield_amount) {
+                            const line_x = @ceil(curr_shield_width * (i / curr_shield_amount));
                             const top = shields_topleft.add(v2f(line_x, 0));
                             const bot = shields_topleft.add(v2f(line_x, shields_height));
                             plat.linef(top, bot, .{
