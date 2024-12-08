@@ -41,11 +41,11 @@ pub const ProjectileKind = enum {
 fn gobbowArrow() Thing {
     const arrow = Thing{
         .kind = .projectile,
-        .coll_radius = 5,
+        .coll_radius = 2.5,
         .accel_params = .{
-            .accel = 4,
+            .accel = 2,
             .friction = 0,
-            .max_speed = 4,
+            .max_speed = 2,
         },
         .coll_mask = Thing.Collision.Mask.initMany(&.{.tile}),
         .controller = .{ .projectile = .{
@@ -53,8 +53,8 @@ fn gobbowArrow() Thing {
         } },
         .renderer = .{ .shape = .{
             .kind = .{ .arrow = .{
-                .length = 35,
-                .thickness = 4,
+                .length = 17.5,
+                .thickness = 2,
             } },
             .poly_opt = .{ .fill_color = draw.Coloru.rgb(220, 172, 89).toColorf() },
         } },
@@ -63,7 +63,7 @@ fn gobbowArrow() Thing {
             .deactivate_on_hit = true,
             .deactivate_on_update = false,
             .effect = .{ .damage = 7 },
-            .radius = 4,
+            .radius = 2,
         },
     };
     return arrow;
@@ -71,16 +71,15 @@ fn gobbowArrow() Thing {
 
 fn gobbomberBomb() Thing {
     const flight_ticks = core.secsToTicks(2);
-    const max_y: f32 = 300;
+    const max_y: f32 = 150;
     const v0: f32 = 2 * max_y / utl.as(f32, flight_ticks);
     const g = -2 * v0 / utl.as(f32, flight_ticks);
     const bomb = Thing{
         .kind = .projectile,
-        .coll_radius = 5,
         .accel_params = .{
-            .accel = 4,
+            .accel = 2,
             .friction = 0,
-            .max_speed = 2,
+            .max_speed = 1,
         },
         .controller = .{ .projectile = .{
             .kind = .bomb,
@@ -90,7 +89,7 @@ fn gobbomberBomb() Thing {
         } },
         .renderer = .{ .shape = .{
             .kind = .{ .circle = .{
-                .radius = 8,
+                .radius = 4,
             } },
             .poly_opt = .{ .fill_color = Colorf.rgb(0.2, 0.18, 0.2) },
         } },
@@ -99,7 +98,7 @@ fn gobbomberBomb() Thing {
             .deactivate_on_hit = false,
             .deactivate_on_update = true,
             .effect = .{ .damage = 10 },
-            .radius = 35,
+            .radius = 17.5,
         },
     };
     return bomb;
@@ -137,14 +136,6 @@ pub const Controller = struct {
                         _ = controller.timer.tick(false);
                         controller.z_vel += controller.z_accel;
                         self.renderer.shape.rel_pos.y += -controller.z_vel;
-                        if (false) {
-                            if (controller.timer.curr_tick < controller.timer.num_ticks / 2) {
-                                // ascend
-                                controller.z_vel += controller.z_accel;
-                            } else {
-                                // descend
-                            }
-                        }
                         if (self.pos.dist(controller.target_pos) < self.accel_params.max_speed) {
                             self.vel = .{};
                             if (self.hitbox) |*h| {

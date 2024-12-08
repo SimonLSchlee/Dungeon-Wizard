@@ -33,9 +33,9 @@ pub const title = "Fire Boom";
 pub const enum_name = "flamey_explodey";
 pub const Controllers = [_]type{Projectile};
 
-const base_explode_radius = 70;
-const base_ball_radius = 10;
-const base_range = 300;
+const base_explode_radius = 35;
+const base_ball_radius = 5;
+const base_range = 150;
 
 pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
@@ -51,7 +51,7 @@ pub const proto = Spell.makeProto(
             .ray_to_mouse = .{
                 .ends_at_coll_mask = Collision.Mask.initMany(&.{.tile}),
                 .thickness = base_ball_radius * 2, // TODO use radius below?
-                .cast_orig_dist = 30,
+                .cast_orig_dist = 15,
             },
             .radius_at_target = base_explode_radius,
         },
@@ -67,9 +67,9 @@ ball_hit_effect: Thing.HitEffect = .{
 },
 ball_radius: f32 = base_ball_radius,
 explode_radius: f32 = base_explode_radius,
-fire_spawn_radius: f32 = base_explode_radius + 20,
+fire_spawn_radius: f32 = base_explode_radius + 10,
 range: f32 = base_range,
-max_speed: f32 = 6,
+max_speed: f32 = 3,
 
 pub fn spawnFiresInRadius(room: *Room, pos: V2f, radius: f32, comptime max_spawned: usize) Error!void {
     if (max_spawned > 100) {
@@ -155,10 +155,6 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
         .vel = target_dir.scale(flamey_explodey.max_speed),
         .coll_radius = flamey_explodey.ball_radius,
         .coll_mask = Thing.Collision.Mask.initMany(&.{.tile}),
-        .accel_params = .{
-            .accel = 0.5,
-            .max_speed = 5,
-        },
         .controller = .{ .spell = .{
             .spell = self.*,
             .params = params,

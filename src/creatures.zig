@@ -99,7 +99,7 @@ pub const proto_fns = blk: {
 };
 
 pub fn playerProto() Thing {
-    var ret = creatureProto(.player, .wizard, .player, null, 40, .medium, 9);
+    var ret = creatureProto(.player, .wizard, .player, null, 40, .medium, 18);
     ret.accel_params = .{
         .accel = 0.0023 * TileMap.tile_sz_f,
         .friction = 0.0014 * TileMap.tile_sz_f,
@@ -116,18 +116,18 @@ pub fn implingProto() Thing {
     var ret = creatureProto(.impling, .impling, .ally, .{ .aggro = .{} }, 25, .medium, 13);
 
     ret.accel_params = .{
-        .max_speed = 1.0,
+        .max_speed = 0.0156 * TileMap.tile_sz_f,
     };
     ret.controller.ai_actor.actions.getPtr(.melee_attack_1).* = (.{
         .kind = .{
             .melee_attack = .{
                 .hitbox = .{
                     .mask = Thing.Faction.opposing_masks.get(.ally),
-                    .radius = 20,
-                    .rel_pos = V2f.right.scale(20),
+                    .radius = 10,
+                    .rel_pos = V2f.right.scale(10),
                     .effect = .{ .damage = 6 },
                 },
-                .range = 30,
+                .range = 15,
             },
         },
         .cooldown = utl.TickCounter.initStopped(60),
@@ -138,18 +138,18 @@ pub fn implingProto() Thing {
 pub fn slimeProto() Thing {
     var c = creatureProto(.slime, .slime, .enemy, .{ .aggro = .{} }, 14, .big, 13);
     c.accel_params = .{
-        .max_speed = 0.7,
+        .max_speed = 0.0109 * TileMap.tile_sz_f,
     };
     c.controller.ai_actor.actions.getPtr(.melee_attack_1).* = (.{
         .kind = .{
             .melee_attack = .{
                 .hitbox = .{
-                    .radius = 20,
-                    .rel_pos = V2f.right.scale(10),
-                    .sweep_to_rel_pos = V2f.right.scale(40),
+                    .radius = 10,
+                    .rel_pos = V2f.right.scale(5),
+                    .sweep_to_rel_pos = V2f.right.scale(20),
                     .effect = .{ .damage = 6 },
                 },
-                .range = 40,
+                .range = 20,
             },
         },
         .cooldown = utl.TickCounter.initStopped(90),
@@ -161,17 +161,17 @@ pub fn slimeProto() Thing {
 pub fn batProto() Thing {
     var ret = creatureProto(.bat, .bat, .enemy, .{ .aggro = .{} }, 4, .smol, 17);
     ret.accel_params = .{
-        .max_speed = 1.1,
+        .max_speed = 0.0172 * TileMap.tile_sz_f,
     };
     ret.controller.ai_actor.actions.getPtr(.melee_attack_1).* = (.{
         .kind = .{
             .melee_attack = .{
                 .hitbox = .{
-                    .radius = 20,
-                    .rel_pos = V2f.right.scale(20),
+                    .radius = 10,
+                    .rel_pos = V2f.right.scale(10),
                     .effect = .{ .damage = 3 },
                 },
-                .range = 25,
+                .range = 12.5,
             },
         },
         .cooldown = utl.TickCounter.initStopped(70),
@@ -183,18 +183,18 @@ pub fn batProto() Thing {
 pub fn trollProto() Thing {
     var ret = creatureProto(.troll, .troll, .enemy, .{ .troll = .{} }, 40, .big, 20);
     ret.accel_params = .{
-        .max_speed = 0.7,
+        .max_speed = 0.0109 * TileMap.tile_sz_f,
     };
     ret.controller.ai_actor.actions.getPtr(.melee_attack_1).* = (.{
         .kind = .{
             .melee_attack = .{
                 .hitbox = .{
-                    .radius = 20,
-                    .rel_pos = V2f.right.scale(20),
-                    .sweep_to_rel_pos = V2f.right.scale(50),
+                    .radius = 10,
+                    .rel_pos = V2f.right.scale(10),
+                    .sweep_to_rel_pos = V2f.right.scale(25),
                     .effect = .{ .damage = 12 },
                 },
-                .range = 50,
+                .range = 25,
             },
         },
         .cooldown = utl.TickCounter.initStopped(90),
@@ -224,14 +224,14 @@ pub fn gobbowProto() Thing {
         12,
     );
     ret.accel_params = .{
-        .max_speed = 0.9,
+        .max_speed = 0.0141 * TileMap.tile_sz_f,
     };
-    ret.controller.ai_actor.flee_range = 230;
+    ret.controller.ai_actor.flee_range = 115;
     ret.controller.ai_actor.actions.getPtr(.projectile_attack_1).* = (.{
         .kind = .{ .projectile_attack = .{
             .projectile = .arrow,
-            .range = 270,
-            .LOS_thiccness = 10,
+            .range = 135,
+            .LOS_thiccness = 5,
         } },
         .cooldown = utl.TickCounter.initStopped(60),
     });
@@ -243,26 +243,26 @@ pub fn sharpboiProto() Thing {
     var ret = creatureProto(.sharpboi, .sharpboi, .enemy, .{ .aggro = .{} }, 25, .medium, 18);
 
     ret.accel_params = .{
-        .max_speed = 0.9,
+        .max_speed = 0.0141 * TileMap.tile_sz_f,
     };
     ret.controller.ai_actor.actions.getPtr(.melee_attack_1).* = (.{
         .kind = .{
             .melee_attack = .{
                 .lunge_accel = .{
-                    .accel = 5,
-                    .max_speed = 5,
+                    .accel = 2.5,
+                    .max_speed = 2.5,
                     .friction = 0,
                 },
                 .hitbox = .{
                     .mask = Thing.Faction.opposing_masks.get(.enemy),
-                    .radius = 15,
-                    .rel_pos = V2f.right.scale(40),
+                    .radius = 7.5,
+                    .rel_pos = V2f.right.scale(20),
                     .effect = .{ .damage = 8 },
                     .deactivate_on_update = false,
                     .deactivate_on_hit = true,
                 },
-                .hit_to_side_force = 2.5,
-                .range = 110,
+                .hit_to_side_force = 1.25,
+                .range = 55,
                 .LOS_thiccness = ret.coll_radius * 0.5,
             },
         },
@@ -275,11 +275,10 @@ pub fn sharpboiProto() Thing {
 pub fn acolyteProto() Thing {
     var ret = creatureProto(.acolyte, .acolyte, .enemy, .{ .acolyte = .{} }, 25, .medium, 12);
     ret.accel_params = .{
-        .accel = 0.3,
-        .friction = 0.09,
-        .max_speed = 1.25,
+        .accel = 0.0047 * TileMap.tile_sz_f,
+        .max_speed = 0.0188 * TileMap.tile_sz_f,
     };
-    ret.controller.ai_actor.flee_range = 250;
+    ret.controller.ai_actor.flee_range = 125;
     ret.controller.ai_actor.actions.getPtr(.spell_cast_summon_1).* = (.{
         .kind = .{ .spell_cast = .{
             .spell = Spell.getProto(.summon_bat),
@@ -302,9 +301,9 @@ pub fn gobbomberProto() Thing {
     );
     ret.hp.?.addShield(8, null);
     ret.accel_params = .{
-        .max_speed = 0.8,
+        .max_speed = 0.0125 * TileMap.tile_sz_f,
     };
-    ret.controller.ai_actor.flee_range = 150;
+    ret.controller.ai_actor.flee_range = 100;
     ret.controller.ai_actor.actions.getPtr(.ability_1).* = .{
         .kind = .{ .shield_up = .{
             .amount = 8,
@@ -314,8 +313,8 @@ pub fn gobbomberProto() Thing {
     ret.controller.ai_actor.actions.getPtr(.projectile_attack_1).* = .{
         .kind = .{ .projectile_attack = .{
             .projectile = .bomb,
-            .range = 200,
-            .LOS_thiccness = 10,
+            .range = 100,
+            .LOS_thiccness = 5,
         } },
         .cooldown = utl.TickCounter.initStopped(90),
     };
@@ -324,7 +323,7 @@ pub fn gobbomberProto() Thing {
 }
 
 pub fn dummyProto() Thing {
-    var ret = creatureProto(.dummy, .dummy, .enemy, null, 25, .medium, 10);
+    var ret = creatureProto(.dummy, .dummy, .enemy, null, 25, .medium, 20);
     ret.enemy_difficulty = 1.5;
     return ret;
 }
@@ -334,7 +333,7 @@ pub fn creatureProto(creature_kind: Kind, sprite_kind: sprites.CreatureAnim.Kind
         .kind = .creature,
         .creature_kind = creature_kind,
         .spawn_state = .instance,
-        .vision_range = 160,
+        .vision_range = 80,
         .coll_radius = Thing.SizeCategory.coll_radii.get(size_cat),
         .coll_mask = Thing.Collision.Mask.initMany(&.{ .creature, .tile }),
         .coll_layer = Thing.Collision.Mask.initMany(&.{.creature}),

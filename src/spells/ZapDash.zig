@@ -34,9 +34,9 @@ pub const title = "Zap Dash";
 pub const enum_name = "zap_dash";
 pub const Controllers = [_]type{Projectile};
 
-const base_line_thickness = 12;
-const base_end_radius = 50;
-const base_range = 200;
+const base_line_thickness = 6;
+const base_end_radius = 25;
+const base_range = 100;
 
 pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
@@ -68,7 +68,6 @@ end_hit_effect: Thing.HitEffect = .{
 line_thickness: f32 = base_line_thickness,
 end_radius: f32 = base_end_radius,
 range: f32 = base_range,
-max_speed: f32 = 6,
 
 pub const Projectile = struct {
     pub const controller_enum_name = enum_name ++ "_projectile";
@@ -112,7 +111,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
         .renderer = .{ .shape = .{ .kind = .{
             .arrow = .{
                 .length = target_pos.sub(caster.pos).length(),
-                .thickness = 5,
+                .thickness = zap_dash.line_thickness,
             },
         }, .poly_opt = .{ .fill_color = Colorf.white } } },
         .hitbox = .{

@@ -32,7 +32,7 @@ pub const title = "Frost Vom";
 pub const enum_name = "frost_vom";
 pub const Controllers = [_]type{Projectile};
 
-const cone_radius = 200;
+const cone_radius = 100;
 const cone_rads: f32 = utl.pi / 3;
 
 pub const proto = Spell.makeProto(
@@ -45,7 +45,7 @@ pub const proto = Spell.makeProto(
         .targeting_data = .{
             .kind = .pos,
             .cone_from_self_to_mouse = .{
-                .radius = 200,
+                .radius = cone_radius,
                 .radians = cone_rads,
             },
         },
@@ -140,11 +140,6 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     const vom = Thing{
         .kind = .projectile,
         .dir = target_dir,
-        .coll_radius = 5,
-        .accel_params = .{
-            .accel = 0.5,
-            .max_speed = 5,
-        },
         .controller = .{ .spell = .{
             .spell = self.*,
             .params = params,

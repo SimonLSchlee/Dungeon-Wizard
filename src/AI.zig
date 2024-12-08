@@ -248,8 +248,8 @@ pub const AIRangedFlee = struct {
                     // flee if too close and have LOS
                     if (target.pos.dist(self.pos) <= controller.flee_range) { // and room.tilemap.isLOSBetween(self.pos, target.pos)) {
                         return .{ .flee = .{
-                            .min_dist = 100,
-                            .max_dist = 300,
+                            .min_dist = 50,
+                            .max_dist = 150,
                             .target_id = target.id,
                             .at_least_secs = 3,
                             .cooldown_secs = 1,
@@ -289,7 +289,7 @@ pub const AIAcolyte = struct {
                 if (target.pos.dist(self.pos) <= controller.flee_range) {
                     return .{
                         .flee = .{
-                            .min_dist = 100,
+                            .min_dist = 50,
                             .max_dist = controller.flee_range,
                             .target_id = target.id,
                             .at_least_secs = core.fups_to_secsf(action.cooldown.num_ticks),
@@ -327,7 +327,7 @@ pub const ActorController = struct {
     non_action_decision_cooldown: utl.TickCounter = utl.TickCounter.initStopped(0),
 
     // range at which we should flee
-    flee_range: f32 = 250,
+    flee_range: f32 = 125,
     // dont flee again for this long (TODO for all Decisions?)
     flee_cooldown: utl.TickCounter = utl.TickCounter.initStopped(1 * core.fups_per_sec),
     // debug for flee
@@ -403,12 +403,12 @@ pub const ActorController = struct {
                 const dist_til_in_range = range - s.attack_range;
                 var target_pos = target.pos;
                 // predictive movement if close enough
-                if (range < 80) {
+                if (range < 40) {
                     const time_til_reach = dist_til_in_range / self.accel_params.max_speed;
                     target_pos = target.pos.add(target.vel.scale(time_til_reach));
                 }
                 try self.findPath(room, target_pos);
-                const p = self.followPathGetNextPoint(10);
+                const p = self.followPathGetNextPoint(5);
                 self.updateVel(p.sub(self.pos).normalizedOrZero(), self.accel_params);
                 if (!self.vel.isAlmostZero()) {
                     self.dir = self.vel.normalized();
@@ -448,7 +448,7 @@ pub const ActorController = struct {
                     }
                 }
                 _ = self.animator.?.play(.move, .{ .loop = true });
-                const p = self.followPathGetNextPoint(10);
+                const p = self.followPathGetNextPoint(5);
                 self.updateVel(p.sub(self.pos).normalizedOrZero(), self.accel_params);
                 if (!self.vel.isAlmostZero()) {
                     self.dir = self.vel.normalized();

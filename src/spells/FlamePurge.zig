@@ -35,7 +35,7 @@ pub const title = "Flame Purge";
 pub const enum_name = "flame_purge";
 pub const Controllers = [_]type{Projectile};
 
-const base_explode_radius = 100;
+const base_explode_radius = 50;
 
 pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
@@ -53,7 +53,7 @@ pub const proto = Spell.makeProto(
 explode_hit_effect: Thing.HitEffect = .{
     .damage = 6,
     .status_stacks = StatusEffect.StacksArray.initDefault(0, .{ .lit = 1 }),
-    .force = .{ .from_center = 4 },
+    .force = .{ .from_center = 2 },
 },
 bonus_damage_per_lit: f32 = 2,
 explode_radius: f32 = base_explode_radius,

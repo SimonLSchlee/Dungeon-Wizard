@@ -32,7 +32,7 @@ pub const title = "Expose";
 pub const enum_name = "expose";
 pub const Controllers = [_]type{Projectile};
 
-const base_radius = 50;
+const base_radius = 20;
 
 pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
@@ -44,7 +44,7 @@ pub const proto = Spell.makeProto(
         .targeting_data = .{
             .kind = .pos,
             .target_faction_mask = Thing.Faction.Mask.initOne(.enemy),
-            .max_range = 200,
+            .max_range = 100,
             .show_max_range_ring = true,
             .radius_at_target = base_radius,
         },

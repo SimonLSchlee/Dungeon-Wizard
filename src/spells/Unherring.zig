@@ -40,7 +40,7 @@ pub const proto = Spell.makeProto(
         .targeting_data = .{
             .kind = .thing,
             .target_faction_mask = Thing.Faction.Mask.initOne(.enemy),
-            .max_range = 175,
+            .max_range = 85,
             .show_max_range_ring = true,
             .ray_to_mouse = .{ .thickness = 1 },
             .requires_los_to_thing = true,
@@ -56,7 +56,7 @@ pub const Projectile = struct {
     pub const controller_enum_name = enum_name ++ "_projectile";
 
     target_pos: V2f = .{},
-    target_radius: f32 = 10,
+    target_radius: f32 = 50,
     state: enum {
         loop,
         end,
@@ -125,10 +125,9 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
 
     const herring = Thing{
         .kind = .projectile,
-        .coll_radius = 5,
         .accel_params = .{
             .accel = 99,
-            .max_speed = 7.5,
+            .max_speed = 3.75,
         },
         .controller = .{ .spell = .{
             .spell = self.*,

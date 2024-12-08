@@ -33,7 +33,7 @@ pub const title = "Switcharoo";
 
 pub const enum_name = "switcharoo";
 
-const base_range = 300;
+const base_range = 100;
 
 pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,

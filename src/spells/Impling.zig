@@ -43,7 +43,7 @@ pub const proto = Spell.makeProto(
         .targeting_data = .{
             .kind = .pos,
             .target_mouse_pos = true,
-            .max_range = 200,
+            .max_range = 100,
             .show_max_range_ring = true,
         },
         .mislay = true,

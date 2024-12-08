@@ -204,12 +204,12 @@ pub const Input = struct {
             const release_f = 0; //input.move_release_ui_timer.remapTo0_1();
             const bounce_f = input.move_press_ui_timer.remapTo0_1();
             const bounce_t = @sin(bounce_f * 3);
-            const bounce_range = 10;
+            const bounce_range = 5;
             const y_off = -bounce_range * bounce_t;
             var points: [3]V2f = .{
                 v2f(0, 0),
-                v2f(8, -10),
-                v2f(-8, -10),
+                v2f(4, -5),
+                v2f(-4, -5),
             };
             for (&points) |*p| {
                 p.* = p.add(move_pos);
@@ -217,7 +217,7 @@ pub const Input = struct {
             }
             plat.circlef(
                 move_pos,
-                10,
+                if (self.hurtbox) |h| h.radius else 5,
                 .{
                     .outline = .{ .color = Colorf.green.fade(0.6 * (1 - release_f)) },
                     .fill_color = null,
@@ -305,7 +305,7 @@ pub const Controller = struct {
         }
 
         {
-            const p = self.followPathGetNextPoint(20);
+            const p = self.followPathGetNextPoint(5);
             const input_dir = p.sub(self.pos).normalizedOrZero();
 
             const accel_dir: V2f = input_dir;

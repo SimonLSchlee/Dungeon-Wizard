@@ -33,8 +33,8 @@ pub const title = "Flare Dart";
 pub const enum_name = "flare_dart";
 pub const Controllers = [_]type{Projectile};
 
-const base_ball_radius = 6.5;
-const base_range = 250;
+const base_ball_radius = 3.25;
+const base_range = 125;
 
 pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
@@ -48,7 +48,7 @@ pub const proto = Spell.makeProto(
             .ray_to_mouse = .{
                 .ends_at_coll_mask = Collision.Mask.initMany(&.{.tile}),
                 .thickness = base_ball_radius * 2, // TODO use radius below?
-                .cast_orig_dist = 20,
+                .cast_orig_dist = 10,
             },
         },
     },
@@ -60,7 +60,7 @@ hit_effect: Thing.HitEffect = .{
 },
 ball_radius: f32 = base_ball_radius,
 range: f32 = base_range,
-max_speed: f32 = 6,
+max_speed: f32 = 3,
 
 pub const Projectile = struct {
     pub const controller_enum_name = enum_name ++ "_projectile";
@@ -94,10 +94,6 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
         .vel = target_dir.scale(flare_dart.max_speed),
         .coll_radius = flare_dart.ball_radius,
         .coll_mask = Thing.Collision.Mask.initMany(&.{.tile}),
-        .accel_params = .{
-            .accel = 0.5,
-            .max_speed = 5,
-        },
         .controller = .{ .spell = .{
             .spell = self.*,
             .params = params,

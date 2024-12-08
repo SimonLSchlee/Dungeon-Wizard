@@ -73,8 +73,8 @@ pub const SizeCategory = enum {
     });
     pub const select_radii = std.EnumArray(SizeCategory, f32).init(.{
         .none = 0,
-        .smol = @round(0.25 * TileMap.tile_sz_f),
-        .medium = @round(0.35 * TileMap.tile_sz_f),
+        .smol = @round(0.275 * TileMap.tile_sz_f),
+        .medium = @round(0.375 * TileMap.tile_sz_f),
         .big = @round(0.45 * TileMap.tile_sz_f),
     });
 };
@@ -145,8 +145,8 @@ mana: ?struct {
 faction: Faction = .object,
 selectable: ?struct {
     // its a half capsule shape
-    radius: f32 = 20,
-    height: f32 = 50,
+    radius: f32 = 10,
+    height: f32 = 25,
 } = null,
 statuses: StatusEffect.StatusArray = StatusEffect.proto_array,
 enemy_difficulty: f32 = 0,
@@ -652,8 +652,8 @@ pub const TextVFXController = struct {
         } else switch (controller.movement) {
             .float_up => {
                 const f = controller.timer.remapTo0_1();
-                self.pos.y -= 2;
-                self.pos.x = controller.initial_pos.x + ((@sin((f + controller.roffset) * utl.pi * 2) * 2) - 1) * 3;
+                self.pos.y -= 1;
+                self.pos.x = controller.initial_pos.x + ((@sin((f + controller.roffset) * utl.pi * 2) * 2) - 1) * 1.5;
                 // fade doesn't look good with the borders...
                 //self.renderer.shape.kind.text.opt.color = controller.color.fade(f);
                 //self.renderer.shape.kind.text.opt.border.?.color = Colorf.black.fade(f);
@@ -814,7 +814,14 @@ pub const SpawnerRenderer = struct {
     pub fn renderUnder(self: *const Thing, _: *const Room) Error!void {
         const renderer = &self.renderer.spawner;
         const plat = App.getPlat();
-        plat.circlef(self.pos, renderer.base_circle_radius, .{ .fill_color = renderer.base_circle_color, .smoothing = .bilinear });
+        plat.circlef(
+            self.pos,
+            renderer.base_circle_radius,
+            .{
+                .fill_color = renderer.base_circle_color,
+                .smoothing = .none,
+            },
+        );
     }
 
     pub fn render(self: *const Thing, _: *const Room) Error!void {
@@ -882,7 +889,7 @@ pub const ManaPickupController = struct {
             const d = self.vel.sub(c.normal.scale(self.vel.dot(c.normal) * 2));
             self.vel = d;
         }
-        self.updateVel(.{}, .{ .friction = 0.01 });
+        self.updateVel(.{}, .{ .friction = 0.005 });
     }
     pub fn spawnSome(num: usize, pos: V2f, room: *Room) void {
         const radius = 14;
@@ -906,8 +913,8 @@ pub const ManaPickupController = struct {
         var rnd = room.rng.random();
         for (0..num) |_| {
             const rdir = V2f.fromAngleRadians(rnd.float(f32) * utl.tau);
-            const rdist = 10 + rnd.float(f32) * 30;
-            proto.vel = rdir.scale(0.5 + rnd.float(f32) * 1);
+            const rdist = 5 + rnd.float(f32) * 15;
+            proto.vel = rdir.scale(0.25 + rnd.float(f32) * 0.5);
             _ = room.queueSpawnThing(&proto, pos.add(rdir.scale(rdist))) catch {};
         }
     }
@@ -1054,7 +1061,7 @@ pub const ShapeRenderer = struct {
 };
 
 pub const CreatureRenderer = struct {
-    draw_radius: f32 = 20,
+    draw_radius: f32 = 10,
     draw_color: Colorf = Colorf.red,
 
     pub fn renderUnder(self: *const Thing, _: *const Room) Error!void {
@@ -1065,11 +1072,13 @@ pub const CreatureRenderer = struct {
         if (self.isAliveCreature()) {
             plat.circlef(self.pos, renderer.draw_radius, .{
                 .fill_color = null,
+                .smoothing = .none,
+                .round_to_pixel = false,
                 .outline = .{ .color = renderer.draw_color },
             });
             const arrow_start = self.pos.add(self.dir.scale(renderer.draw_radius));
-            const arrow_end = self.pos.add(self.dir.scale(renderer.draw_radius + 5));
-            plat.arrowf(arrow_start, arrow_end, .{ .thickness = 5, .color = renderer.draw_color });
+            const arrow_end = self.pos.add(self.dir.scale(renderer.draw_radius + 2.5));
+            plat.arrowf(arrow_start, arrow_end, .{ .thickness = 2.5, .color = renderer.draw_color });
         }
     }
 
@@ -1128,18 +1137,19 @@ pub const CreatureRenderer = struct {
         const plat = getPlat();
         const renderer = &self.renderer.creature;
 
-        const hp_height = 6;
+        const hp_height = 3;
         const hp_width = renderer.draw_radius * 2;
-        const hp_y_offset = if (self.selectable) |s| s.height + 20 else renderer.draw_radius * 3.5;
+        const hp_y_offset = if (self.selectable) |s| s.height + 10 else renderer.draw_radius * 3.5;
         const hp_offset = v2f(-hp_width * 0.5, -hp_y_offset);
+        const hp_topleft = self.pos.add(hp_offset);
         const shields_y_offset = hp_y_offset - hp_height;
-        const shields_height = 6;
+        const shields_height = 3;
         const shields_offset = v2f(-hp_width * 0.5, -shields_y_offset);
+        const shields_topleft = self.pos.add(shields_offset);
 
         if (self.isAliveCreature()) {
             if (self.hp) |hp| {
                 const curr_width = utl.remapClampf(0, hp.max, 0, hp_width, hp.curr);
-                const hp_topleft = self.pos.add(hp_offset);
                 plat.rectf(hp_topleft, v2f(hp_width, hp_height), .{ .fill_color = Colorf.black });
                 plat.rectf(hp_topleft, v2f(curr_width, hp_height), .{ .fill_color = HP.faction_colors.get(self.faction) });
                 { // lines
@@ -1165,7 +1175,6 @@ pub const CreatureRenderer = struct {
                 }
                 if (total_shield_amount > 0) {
                     const shield_color = Colorf.rgb(0.7, 0.7, 0.4);
-                    const shields_topleft = self.pos.add(shields_offset);
                     var curr_pos = shields_topleft;
                     for (hp.shields.constSlice()) |shield| {
                         const shield_width = hp_width * shield.curr / total_shield_amount;
@@ -1196,11 +1205,10 @@ pub const CreatureRenderer = struct {
                 }
                 if (self.mana) |mana| {
                     const mana_bar_width = hp_width;
-                    const mana_bar_height = 15;
+                    const mana_bar_height = 8;
                     const mana_topleft = hp_topleft.sub(v2f(0, mana_bar_height));
                     const mana_inc_px = mana_bar_width / utl.as(f32, mana.max);
-                    // restrict radius to keep 4 pixels around it even when only 1-2 mana
-                    const mana_diam = @min(mana_inc_px * 0.8, mana_bar_height - 4);
+                    const mana_diam = 6;
                     const mana_radius = mana_diam * 0.5;
                     const mana_spacing = (mana_inc_px - mana_diam) * 0.666666; // this makes sense cos of reasons
                     var curr_pos = mana_topleft.add(v2f(mana_spacing + mana_radius, mana_bar_height * 0.5));
@@ -1214,17 +1222,25 @@ pub const CreatureRenderer = struct {
                 }
             }
             // debug draw statuses
-            const status_height = 14;
-            const status_y_offset = shields_y_offset - (shields_height + 3);
-            var status_pos = self.pos.add(v2f(-hp_width * 0.5, -status_y_offset));
+            const font = App.get().data.fonts.get(.seven_x_five);
+            const status_height: f32 = utl.as(f32, font.base_size);
+            var status_pos = shields_topleft.add(v2f(0, shields_height));
             for (self.statuses.values) |status| {
                 if (status.stacks == 0) continue;
                 const text = try utl.bufPrintLocal("{}", .{status.stacks});
-                const text_dims = try plat.measureText(text, .{ .size = status_height - 1 });
-                const status_box_width = text_dims.x;
+                const text_dims = try plat.measureText(text, .{ .size = font.base_size });
+                const status_box_width = text_dims.x + 2;
                 const text_color = Colorf.getContrasting(status.color);
-                plat.rectf(status_pos, v2f(status_box_width, status_height), .{ .fill_color = status.color });
-                try plat.textf(status_pos, "{s}", .{text}, .{ .size = status_height - 1, .color = text_color });
+                plat.rectf(status_pos, v2f(status_box_width, status_height), .{
+                    .fill_color = status.color,
+                });
+
+                try plat.textf(status_pos.add(V2f.splat(1)), "{s}", .{text}, .{
+                    .size = font.base_size,
+                    .color = text_color,
+                    .font = font,
+                    .smoothing = .none,
+                });
                 status_pos.x += status_box_width;
             }
         }
@@ -1322,7 +1338,7 @@ pub fn renderOver(self: *const Thing, room: *const Room) Error!void {
     if (debug.show_thing_collisions) {
         plat.circlef(self.pos, self.coll_radius, .{ .outline = .{ .color = .red }, .fill_color = null });
         if (self.last_coll) |coll| {
-            plat.arrowf(coll.pos, coll.pos.add(coll.normal.scale(self.coll_radius * 0.75)), 3, Colorf.red);
+            plat.arrowf(coll.pos, coll.pos.add(coll.normal.scale(self.coll_radius * 0.75)), .{ .thickness = 2, .color = Colorf.red });
         }
     }
     if (debug.show_thing_coords_searched) {
@@ -1339,7 +1355,7 @@ pub fn renderOver(self: *const Thing, room: *const Room) Error!void {
                 .idle => "idle",
                 .pursue_to_attack => |p| blk: {
                     if (room.getConstThingById(p.target_id)) |target| {
-                        plat.arrowf(self.pos, target.pos, .{ .color = .red, .thickness = 2 });
+                        plat.arrowf(self.pos, target.pos, .{ .color = .red, .thickness = 1 });
                     }
                     break :blk "pursue";
                 },
@@ -1550,13 +1566,13 @@ pub fn updateDir(self: *Thing, desired_dir: V2f, params: DirAccelParams) void {
 }
 
 pub const AccelParams = struct {
-    accel: f32 = 0.125,
-    friction: f32 = 0.09,
-    max_speed: f32 = 0.8,
+    accel: f32 = 0.0019 * TileMap.tile_sz_f,
+    friction: f32 = 0.0014 * TileMap.tile_sz_f,
+    max_speed: f32 = 0.0125 * TileMap.tile_sz_f,
 };
 
 pub fn updateVel(self: *Thing, accel_dir: V2f, params: AccelParams) void {
-    const speed_limit: f32 = 20;
+    const speed_limit: f32 = 10;
     const min_speed_threshold = 0.001;
 
     const accel = accel_dir.scale(params.accel);

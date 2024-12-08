@@ -482,8 +482,7 @@ pub fn update(self: *Room) Error!void {
         // fog and camera
         self.fog.clearVisible();
         if (self.getPlayer()) |player| {
-            // TODO better
-            self.camera.pos = player.pos; //.add(v2f(0, plat.screen_dims_f.y * 0.125));
+            self.camera.pos = player.pos;
             try self.fog.addVisibleCircle(
                 self.tilemap.getRoomRect(),
                 player.pos,
@@ -605,7 +604,7 @@ pub fn render(self: *const Room, ui_render_texture: Platform.RenderTexture2D, ga
     if (false) {
         if (self.getConstPlayer()) |player| {
             const mouse_pos = plat.getMousePosWorld(self.camera);
-            plat.linef(player.pos, mouse_pos, .{ .thickness = 2, .color = .red });
+            plat.linef(player.pos, mouse_pos, .{ .thickness = 1, .color = .red });
             if (self.tilemap.raycastLOS(player.pos, mouse_pos)) |tile_coord| {
                 const rect = TileMap.tileCoordToRect(tile_coord);
                 plat.rectf(rect.pos, rect.dims, .{ .fill_color = Colorf.red.fade(0.4) });

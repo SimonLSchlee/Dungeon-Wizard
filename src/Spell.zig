@@ -358,7 +358,7 @@ pub const TargetingData = struct {
                         const selectable = thing.selectable.?;
                         plat.circlef(
                             thing.pos,
-                            selectable.radius - 10,
+                            selectable.radius - 5,
                             .{ .fill_color = targeting_data.color.fade(0.4) },
                         );
                     }
@@ -376,7 +376,7 @@ pub const TargetingData = struct {
                                     .fill_color = null,
                                     .outline = .{
                                         .color = Colorf.red.fade(0.6),
-                                        .thickness = 3,
+                                        .thickness = 1,
                                     },
                                 });
                             }
@@ -385,12 +385,24 @@ pub const TargetingData = struct {
                             plat.circlef(caster.pos, r, .{ .fill_color = targeting_color.fade(0.4) });
                         }
                         if (targeting_data.ray_to_mouse) |ray| {
-                            const ray_radius = ray.thickness * 0.5;
-                            plat.linef(caster.pos, thing.pos, .{ .thickness = ray.thickness, .color = targeting_color });
-                            plat.circlef(thing.pos, ray_radius, .{ .fill_color = targeting_color });
+                            const ray_radius = @max(@round(ray.thickness * 0.5), 1);
+                            plat.linef(caster.pos, thing.pos, .{
+                                .thickness = ray.thickness,
+                                .color = targeting_color,
+                                .round_to_pixel = true,
+                                .smoothing = .bilinear,
+                            });
+                            plat.circlef(thing.pos, ray_radius, .{
+                                .fill_color = targeting_color,
+                                .round_to_pixel = true,
+                                .smoothing = .bilinear,
+                            });
                         }
                         if (targeting_data.radius_at_target) |r| {
-                            plat.circlef(caster.pos, r, .{ .fill_color = targeting_color.fade(0.4) });
+                            plat.circlef(caster.pos, r, .{
+                                .fill_color = targeting_color.fade(0.4),
+                                .round_to_pixel = true,
+                            });
                         }
                         // we always gotta check this... things can become unselectable e.g. when dying
                         if (thing.selectable) |s| {

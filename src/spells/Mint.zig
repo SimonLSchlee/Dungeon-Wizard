@@ -33,8 +33,8 @@ pub const title = "Mint 'Em";
 pub const enum_name = "mint";
 pub const Controllers = [_]type{Projectile};
 
-const base_radius = 6.5;
-const base_range = 200;
+const base_radius = 3.25;
+const base_range = 100;
 
 pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
@@ -49,7 +49,7 @@ pub const proto = Spell.makeProto(
             .max_range = base_range,
             .ray_to_mouse = .{
                 .thickness = base_radius, // TODO use radius below?
-                .cast_orig_dist = 20,
+                .cast_orig_dist = 10,
             },
         },
         .mislay = true,
@@ -62,7 +62,7 @@ hit_effect: Thing.HitEffect = .{
 },
 radius: f32 = base_radius,
 range: f32 = base_range,
-max_speed: f32 = 6,
+max_speed: f32 = 3,
 gold_cost: i32 = 1,
 
 pub const Projectile = struct {
@@ -104,11 +104,6 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
         .kind = .projectile,
         .dir = target_dir,
         .vel = target_dir.scale(mint.max_speed),
-        .coll_radius = 5,
-        .accel_params = .{
-            .accel = 0.5,
-            .max_speed = 5,
-        },
         .controller = .{ .spell = .{
             .spell = self.*,
             .params = params,

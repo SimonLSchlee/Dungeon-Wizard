@@ -533,8 +533,8 @@ pub fn textf(self: *Platform, pos: V2f, comptime fmt: []const u8, args: anytype,
     } else cVec(pos);
     const r_filter = switch (opt.smoothing) {
         .none => blk: {
-            draw_pos.x = @floor(draw_pos.x);
-            draw_pos.y = @floor(draw_pos.y);
+            draw_pos.x = @round(draw_pos.x);
+            draw_pos.y = @round(draw_pos.y);
             break :blk r.TEXTURE_FILTER_POINT;
         },
         .bilinear => r.TEXTURE_FILTER_BILINEAR,
@@ -582,6 +582,10 @@ pub fn linef(_: *Platform, start: V2f, end: V2f, opt: draw.LineOpt) void {
     if (opt.round_to_pixel) {
         start_r = start.round();
         end_r = end.round();
+    }
+    switch (opt.smoothing) {
+        .bilinear => r.rlEnableSmoothLines(),
+        .none => r.rlDisableSmoothLines(),
     }
     r.DrawLineEx(cVec(start_r), cVec(end_r), opt.thickness, cColorf(opt.color));
 }

@@ -226,7 +226,7 @@ pub const PotionImp = struct {
             .targeting_data = .{
                 .kind = .pos,
                 .target_mouse_pos = true,
-                .max_range = 150,
+                .max_range = 100,
                 .show_max_range_ring = true,
             },
         },

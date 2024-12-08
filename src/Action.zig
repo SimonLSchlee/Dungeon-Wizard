@@ -35,15 +35,15 @@ pub const MeleeAttack = struct {
     hitbox: Thing.HitBox,
     lunge_accel: ?Thing.AccelParams = null,
     hit_to_side_force: f32 = 0,
-    range: f32 = 40,
+    range: f32 = 20,
     LOS_thiccness: f32 = 0,
 };
 
 pub const ProjectileAttack = struct {
     pub const enum_name = "projectile_attack";
     projectile: projectiles.ProjectileKind,
-    range: f32 = 100,
-    LOS_thiccness: f32 = 10,
+    range: f32 = 50,
+    LOS_thiccness: f32 = 5,
     target_pos: V2f = .{},
 };
 

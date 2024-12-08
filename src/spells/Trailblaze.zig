@@ -67,8 +67,8 @@ pub fn fireProto() Thing {
         },
         .hitbox = .{
             .mask = Thing.Faction.Mask.initFull(),
-            .radius = 25,
-            .sweep_to_rel_pos = v2f(0, -25),
+            .radius = 12.5,
+            .sweep_to_rel_pos = v2f(0, -12.5),
             .deactivate_on_hit = false,
             .deactivate_on_update = true,
             .effect = .{
@@ -128,44 +128,10 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     status.timer.num_ticks = 20;
     status.prev_pos = caster.pos;
     caster.accel_params = .{
-        .accel = 0.6,
-        .friction = 0.3,
-        .max_speed = 2.5,
+        .accel = 0.3,
+        .friction = 0.15,
+        .max_speed = 1.25,
     };
-}
-
-pub const description =
-    \\Move faster. Leave fire behind when
-    \\you move. The fire can hurt you too,
-    \\so careful!
-;
-
-pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
-    const trailblaze: @This() = self.kind.trailblaze;
-    const fmt =
-        \\Duration: {} secs
-        \\
-        \\{s}
-        \\
-    ;
-    const dur_secs: i32 = trailblaze.num_stacks * utl.as(i32, @divFloor(StatusEffect.proto_array.get(.trailblaze).cooldown.num_ticks, core.fups_per_sec));
-    return std.fmt.bufPrint(buf, fmt, .{ dur_secs, description });
-}
-
-pub fn getTags(self: *const Spell) Spell.Tag.Array {
-    const trailblaze: @This() = self.kind.trailblaze;
-    _ = trailblaze;
-    return Spell.Tag.makeArray(&.{
-        &.{
-            .{ .icon = .{ .sprite_enum = .target } },
-            .{ .icon = .{ .sprite_enum = .wizard, .tint = .orange } },
-        },
-        &.{
-            .{ .icon = .{ .sprite_enum = .fire } },
-            .{ .icon = .{ .sprite_enum = .fast_forward } },
-            .{ .icon = .{ .sprite_enum = .shoes } },
-        },
-    });
 }
 
 pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {

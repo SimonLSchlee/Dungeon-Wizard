@@ -808,8 +808,8 @@ pub const ExitDoor = struct {
         boss,
     };
 
-    const radius = 24;
-    const select_radius = 28;
+    const radius = 12;
+    const select_radius = 14;
     const closed_color = Colorf.rgb(0.4, 0.4, 0.4);
     const rim_color = Colorf.rgb(0.4, 0.3, 0.4);
     const open_color_1 = Colorf.rgb(0.2, 0.1, 0.2);
@@ -827,7 +827,7 @@ pub const ExitDoor = struct {
         if (room.getConstPlayer()) |p| {
             if (p.path.len > 0) {
                 const last_path_pos = p.path.buffer[p.path.len - 1];
-                self.selected = last_path_pos.dist(self.pos) <= ExitDoor.radius + 10;
+                self.selected = last_path_pos.dist(self.pos) <= ExitDoor.radius + 5;
                 if (self.selected) {
                     if (p.pos.dist(self.pos) <= select_radius) {
                         return true;
@@ -877,10 +877,10 @@ pub const ExitDoor = struct {
                 if (self.selected) {
                     color = Colorf.white;
                 }
-                const range = 20;
-                const base = self.pos.sub(v2f(0, 100 + range * t));
-                const end = base.add(v2f(0, 70));
-                plat.arrowf(base, end, .{ .thickness = 15, .color = color });
+                const range = 10;
+                const base = self.pos.sub(v2f(0, 50 + range * t));
+                const end = base.add(v2f(0, 35));
+                plat.arrowf(base, end, .{ .thickness = 7.5, .color = color });
             }
         }
     }
