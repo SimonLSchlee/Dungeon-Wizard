@@ -1108,24 +1108,6 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caste
             },
         } });
     }
-    // tags
-    {
-        const tags = self.getTags();
-        const tag_topleft = pos.add(card_tags_topleft_offset.scale(scaling));
-        var curr_tag_topleft = tag_topleft;
-        for (tags.constSlice()) |tag| {
-            // first measure
-            const tag_dims = measureTag(&tag);
-            const tag_dims_scaled = tag_dims.scale(scaling);
-            if (curr_tag_topleft.x != tag_topleft.x and (tag.start_on_new_line or curr_tag_topleft.x + tag_dims_scaled.x > tag_topleft.x + card_tags_dims.x * scaling)) {
-                curr_tag_topleft.y += tag_dims_scaled.y + (1 * scaling);
-                curr_tag_topleft.x = tag_topleft.x;
-            }
-            // now actually draw
-            unqRenderTag(&tag, cmd_buf, curr_tag_topleft, tag_dims, scaling);
-            curr_tag_topleft.x += tag_dims_scaled.x + 1 * scaling;
-        }
-    }
     {
         const tags = self.getNewTags() catch |e| blk: {
             Log.errorAndStackTrace(e);
@@ -1174,86 +1156,6 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caste
                     .tint = Colorf.black.fade(0.5),
                 },
             } });
-        }
-    }
-}
-
-pub fn measureTag(tag: *const Tag) V2f {
-    const plat = getPlat();
-    const data = App.get().data;
-    const tag_font = data.fonts.get(.seven_x_five);
-    const tag_text_opt = draw.TextOpt{
-        .color = .white,
-        .font = tag_font,
-        .size = tag_font.base_size,
-        .smoothing = .none,
-    };
-    var width_x: f32 = 1;
-    for (tag.parts.constSlice()) |part| {
-        switch (part) {
-            .icon => |s| {
-                width_x += (data.spell_tags_icons.sprite_dims_cropped.?.get(s.sprite_enum).x + 1);
-            },
-            .label => |label| {
-                const sz = plat.measureText(label.constSlice(), tag_text_opt) catch V2f{};
-                width_x += sz.x + 1;
-            },
-        }
-    }
-
-    return v2f(width_x, Tag.height);
-}
-
-pub fn unqRenderTag(tag: *const Tag, cmd_buf: *ImmUI.CmdBuf, pos: V2f, bg_dims: ?V2f, scaling: f32) void {
-    const plat = getPlat();
-    const data = App.get().data;
-    const tag_font = data.fonts.get(.seven_x_five);
-    const tag_text_opt = draw.TextOpt{
-        .color = .white,
-        .font = tag_font,
-        .size = tag_font.base_size * utl.as(u32, scaling),
-        .smoothing = .none,
-    };
-    if (bg_dims) |dims| {
-        cmd_buf.appendAssumeCapacity(.{
-            .rect = .{
-                .pos = pos,
-                .dims = dims.scale(scaling), // TODO put somewhere
-                .opt = .{
-                    .fill_color = .black,
-                    .edge_radius = 0.3,
-                },
-            },
-        });
-    }
-    var curr_part_topleft = pos.add(V2f.splat(1 * scaling));
-    for (tag.parts.constSlice()) |part| {
-        switch (part) {
-            .icon => |s| {
-                const cropped_dims = data.spell_tags_icons.sprite_dims_cropped.?.get(s.sprite_enum);
-                if (data.spell_tags_icons.getRenderFrame(s.sprite_enum)) |rf| {
-                    cmd_buf.appendAssumeCapacity(.{ .texture = .{
-                        .pos = curr_part_topleft,
-                        .texture = rf.texture,
-                        .opt = .{
-                            .src_dims = cropped_dims,
-                            .src_pos = rf.pos.toV2f(),
-                            .uniform_scaling = scaling,
-                            .tint = s.tint,
-                        },
-                    } });
-                }
-                curr_part_topleft.x += (cropped_dims.x + 1) * scaling;
-            },
-            .label => |label| {
-                const sz = plat.measureText(label.constSlice(), tag_text_opt) catch V2f{};
-                cmd_buf.appendAssumeCapacity(.{ .label = .{
-                    .pos = curr_part_topleft,
-                    .text = ImmUI.initLabel(label.constSlice()),
-                    .opt = tag_text_opt,
-                } });
-                curr_part_topleft.x += sz.x + 1 * scaling;
-            },
         }
     }
 }
