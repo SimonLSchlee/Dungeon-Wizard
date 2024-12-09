@@ -179,16 +179,6 @@ pub const min_wide_resolution = v2i(640, 360);
 
 pub const game_sprite_scaling: f32 = 2;
 
-// TODO maybe dont need this list..?
-pub const min_aspect_resolutions = [_]V2i{
-    min_resolution,
-    v2i(960, 720),
-    v2i(1440, 1080),
-    v2i(1920, 1440),
-    v2i(2400, 1800),
-    // etc...
-};
-
 pub const fixed_updates_per_sec: i64 = 60;
 pub const fups_per_sec = fixed_updates_per_sec;
 pub const fups_per_sec_f = utl.as(f32, fups_per_sec);

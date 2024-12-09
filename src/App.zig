@@ -68,7 +68,7 @@ export fn appInit(plat: *Platform) *anyopaque {
 
     Log.info("Init app {s}", .{config.version});
 
-    Log.info("Allocating App: {}KiB\n", .{@sizeOf(App) / 1024});
+    Log.info("Allocating App: {}KiB", .{@sizeOf(App) / 1024});
 
     var app = plat.heap.create(App) catch @panic("Out of memory");
     app.* = .{
@@ -158,7 +158,6 @@ fn menuUpdate(self: *App) Error!void {
         title_dims.y + title_padding.y * 2 + btn_dims.y * num_buttons + btn_spacing * (num_buttons - 1) + bottom_spacing,
     );
     const panel_topleft = plat.screen_dims_f.sub(panel_dims).scale(0.5);
-    self.menu_ui.commands.clear();
     self.menu_ui.commands.append(.{
         .rect = .{
             .pos = panel_topleft,
@@ -215,12 +214,10 @@ fn menuUpdate(self: *App) Error!void {
     }
     curr_btn_pos.y += btn_dims.y + btn_spacing;
 
-    if (false) {
-        if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "Options", btn_dims)) {
-            self.options_open = true;
-        }
-        curr_btn_pos.y += btn_dims.y + btn_spacing;
+    if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "Options", btn_dims)) {
+        self.options_open = true;
     }
+    curr_btn_pos.y += btn_dims.y + btn_spacing;
 
     if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "Exit", btn_dims)) {
         plat.exit();
@@ -282,12 +279,10 @@ fn pauseMenuUpdate(self: *App) Error!void {
     }
     curr_btn_pos.y += btn_dims.y + btn_spacing;
 
-    if (false) {
-        if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "Options", btn_dims)) {
-            self.options_open = true;
-        }
-        curr_btn_pos.y += btn_dims.y + btn_spacing;
+    if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "Options", btn_dims)) {
+        self.options_open = true;
     }
+    curr_btn_pos.y += btn_dims.y + btn_spacing;
 
     if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "New Run", btn_dims)) {
         self.paused = false;
@@ -326,8 +321,9 @@ fn pauseMenuUpdate(self: *App) Error!void {
 }
 
 fn update(self: *App) Error!void {
+    self.menu_ui.commands.clear();
     if (self.options_open) {
-        switch (try self.options.update()) {
+        switch (try self.options.update(&self.menu_ui.commands)) {
             .close => self.options_open = false,
             else => {},
         }
@@ -371,17 +367,14 @@ fn render(self: *App) Error!void {
                 try ImmUI.render(&self.menu_ui.commands);
                 plat.endRenderToTexture();
             }
+            plat.texturef(plat.game_canvas_screen_topleft_offset, self.game_render_texture.texture, .{
+                .flip_y = true,
+                .smoothing = .none,
+                .uniform_scaling = plat.game_scaling,
+            });
         },
     }
-    if (self.options_open) {
-        try self.options.render(self.ui_render_texture);
-    }
-    plat.setBlend(.alpha);
-    plat.texturef(plat.game_canvas_screen_topleft_offset, self.game_render_texture.texture, .{
-        .flip_y = true,
-        .smoothing = .none,
-        .uniform_scaling = plat.game_scaling,
-    });
+
     if (!debug.hide_ui) {
         plat.texturef(.{}, self.ui_render_texture.texture, .{
             .flip_y = true,

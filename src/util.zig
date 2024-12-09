@@ -279,3 +279,24 @@ pub fn enumToString(E: type, m: E) []const u8 {
 pub fn PaddingBits(T: type, bits_used: usize) type {
     return @Type(.{ .int = .{ .bits = @bitSizeOf(T) - bits_used, .signedness = .unsigned } });
 }
+
+pub fn typeFieldByName(T: type, comptime field_name: []const u8) switch (@typeInfo(T)) {
+    .@"struct" => std.builtin.Type.StructField,
+    .@"union" => std.builtin.Type.UnionField,
+    .@"enum" => std.builtin.Type.EnumField,
+    .error_set => std.builtin.Type.Error,
+    else => @compileError("Expected struct, union, error set or enum type, found '" ++ @typeName(T) ++ "'"),
+} {
+    const f_idx: usize = std.meta.fieldIndex(T, field_name).?;
+    return std.meta.fields(T)[f_idx];
+}
+
+pub fn typeBaseName(T: type) []const u8 {
+    const full_name = @typeName(T);
+    var it = std.mem.tokenizeScalar(u8, full_name, '.');
+    var name: []const u8 = "";
+    while (it.next()) |n| {
+        name = n;
+    }
+    return name;
+}

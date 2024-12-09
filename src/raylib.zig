@@ -144,6 +144,38 @@ pub fn updateScreenDims(self: *Platform, dims: V2i) void {
     });
 }
 
+pub fn getResolutions(self: *Platform, buf: []V2i) []V2i {
+    const m = r.GetCurrentMonitor();
+    const m_res = v2i(r.GetMonitorWidth(m), r.GetMonitorHeight(m));
+    var idx = 0;
+    for (0..100) |i| {
+        const dims = core.min_resolution.scale(u.as(i32, i));
+        if (dims.x > m_res.x) {
+            if (idx < buf.len) {
+                buf[idx] = m_res;
+                idx += 1;
+            } else {
+                self.log.warn("Not enough space for monitor resolution! Didn't append {}x{}", .{ m_res.x, m_res.y });
+            }
+            break;
+        }
+        // ignore really small resolutions relative to monitor
+        if (dims.x >= m_res.x / 3) {
+            buf[idx] = dims;
+            idx += 1;
+        }
+    }
+    return buf[0..idx];
+}
+
+pub fn toggleFullscreen(_: *Platform) void {
+    r.ToggleFullscreen();
+}
+
+pub fn toggleBorderlessWindowed(_: *Platform) void {
+    r.ToggleBorderlessWindowed();
+}
+
 fn raylibTraceLog(msg_type: c_int, text: [*c]const u8, args: stdio.va_list) callconv(.C) void {
     const plat = getPlat();
     var fmt_buf: [1024]u8 = undefined;

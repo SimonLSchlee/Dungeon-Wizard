@@ -69,12 +69,12 @@ pub fn getItemsRects() std.BoundedArray(geom.Rectf, max_item_slots) {
 
 // unq == update and queue (render)
 // Handle all updating and rendering of a generic action Slot, returning a CastMethod if it was activated
-pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, room: *Room) Error!?Options.CastMethod {
+pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, room: *Room) Error!?Options.Controls.CastMethod {
     const data = App.get().data;
     const plat = getPlat();
     const ui_scaling: f32 = plat.ui_scaling;
 
-    var ret: ?Options.CastMethod = null;
+    var ret: ?Options.Controls.CastMethod = null;
     const mouse_pos = plat.getMousePosScreen();
     const hovered = geom.pointIsInRectf(mouse_pos, slot.rect);
     const clicked = hovered and plat.input_buffer.mouseBtnIsJustPressed(.left);
@@ -119,7 +119,7 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, slot: *Sl
                 ret = .left_click;
                 activated = true;
             } else if (plat.input_buffer.keyIsJustPressed(slot.key)) {
-                ret = App.get().options.cast_method;
+                ret = App.get().options.controls.cast_method;
                 activated = true;
             }
             if (activated) {
@@ -342,7 +342,7 @@ pub const Slots = struct {
         action_kind: ?player.Action.Kind,
         slot_idx: usize,
     } = null,
-    selected_method: Options.CastMethod = .left_click,
+    selected_method: Options.Controls.CastMethod = .left_click,
     discard_slot: ?Slot = null,
     pause_slot: Slot = undefined, // Slots are for player.Action's
     mana_rect: geom.Rectf = .{},
@@ -563,7 +563,7 @@ pub const Slots = struct {
         }
     }
 
-    pub fn selectSlot(self: *Slots, slot_kind: Slot.Kind, action_kind: ?player.Action.Kind, cast_method: Options.CastMethod, idx: usize) void {
+    pub fn selectSlot(self: *Slots, slot_kind: Slot.Kind, action_kind: ?player.Action.Kind, cast_method: Options.Controls.CastMethod, idx: usize) void {
         self.unselectSlot();
         switch (slot_kind) {
             .pause => {

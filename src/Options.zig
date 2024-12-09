@@ -19,52 +19,87 @@ const Log = App.Log;
 const Run = @import("Run.zig");
 const Data = @import("Data.zig");
 const menuUI = @import("menuUI.zig");
+const ImmUI = @import("ImmUI.zig");
 const Options = @This();
 
-pub const UIShortString = utl.BoundedString(32);
-
-const ui_text_opt = draw.TextOpt{
-    .color = .white,
-    .size = 20,
-};
 const ui_el_text_padding: V2f = v2f(5, 5);
 
-pub const ClickableLabel = struct {
-    rect: geom.Rectf,
-    text: UIShortString,
+pub const Display = struct {
+    //monitor: i32 = 0, // TODO?
+    mode: enum {
+        windowed,
+        borderless,
+        fullscreen,
+    } = .windowed,
+    resolutions: std.BoundedArray(V2i, 24) = .{},
+    resolutions_dropdown_open: bool = false,
+    selected_resolution_idx: usize = 0,
+    selected_resolution: V2i = .{},
+    //vsync: bool = false, // TODO?
+    pub const OptionSerialize = struct {
+        mode: void,
+        selected_resolution: void,
+    };
 };
 
-pub const UIElementType = enum {
-    dropdown,
+pub const Controls = struct {
+    pub const CastMethod = enum {
+        left_click,
+        quick_release,
+        quick_press,
+        pub const strings = std.EnumArray(CastMethod, []const u8).init(.{
+            .left_click = "Left mouse click",
+            .quick_release = "Release hotkey",
+            .quick_press = "Press hotkey",
+        });
+    };
+    cast_method: CastMethod = .quick_release,
+    cast_method_dropdown_open: bool = false,
+    //auto_self_cast: bool = true, // TODO?
+    pub const OptionSerialize = struct {
+        cast_method: void,
+    };
 };
 
-pub const UIElement = struct {
-    rect: geom.Rectf,
-    value_rect: geom.Rectf = .{},
-    kind: union(UIElementType) {
-        dropdown: struct {
-            label: UIShortString,
-            items: std.BoundedArray(ClickableLabel, 8),
-            selected_idx: usize,
-            menu_open: bool = false,
-        },
-    },
+pub const Kind = enum {
+    controls,
+    display,
 };
 
-pub const CastMethod = enum {
-    left_click,
-    quick_press,
-    quick_release,
-};
+controls: Controls = .{},
+display: Display = .{},
+kind_selected: Kind = .controls,
 
-cast_method: CastMethod = .quick_release,
-// keep this at the end cos the other fields are parsed at comptime in order
-ui: struct {
-    rect: geom.Rectf = .{},
-    labels_width: f32 = 0, // values width = rect.dims.x - labels_width
-    elements: std.BoundedArray(UIElement, 8) = .{},
-    back_button: menuUI.Button = .{},
-} = .{},
+pub fn serialize(data: anytype, prefix: []const u8, file: std.fs.File) void {
+    const T = @TypeOf(data);
+    inline for (std.meta.fields(T.OptionSerialize)) |s_field| {
+        const field = utl.typeFieldByName(T, s_field.name);
+        switch (@typeInfo(field.type)) {
+            .@"enum" => |info| {
+                file.writeAll("# Possible values:\n") catch {};
+                inline for (info.fields) |efield| {
+                    const e = utl.bufPrintLocal("# {s}\n", .{efield.name}) catch break;
+                    file.writeAll(e) catch {};
+                }
+                const val_as_string = @tagName(@field(data, field.name));
+                const line = utl.bufPrintLocal("{s}.{s}={s}\n", .{ prefix, field.name, val_as_string }) catch break;
+                file.writeAll(line) catch break;
+            },
+            .@"struct" => {
+                if (@hasDecl(field.type, "Serialize")) {
+                    serialize(@field(data, field.name), prefix ++ "." ++ field.name, file);
+                } else if (comptime std.mem.eql(u8, utl.typeBaseName(field.type), "V2i")) {
+                    const v: V2i = @field(data, field.name);
+                    const line = utl.bufPrintLocal("{s}.{s}={d}\n", .{ prefix, field.name, v }) catch break;
+                    file.writeAll(line) catch break;
+                } else {
+                    @compileError("Idk how to serialize this struct");
+                }
+            },
+            else => continue,
+        }
+    }
+}
 
 pub fn writeToTxt(self: Options) void {
     const options_file = std.fs.cwd().createFile("options.txt", .{}) catch {
@@ -72,21 +107,8 @@ pub fn writeToTxt(self: Options) void {
         return;
     };
     defer options_file.close();
-    inline for (std.meta.fields(Options)) |field| {
-        switch (@typeInfo(field.type)) {
-            .@"enum" => |info| {
-                options_file.writeAll("# Possible values:\n") catch {};
-                inline for (info.fields) |efield| {
-                    const e = utl.bufPrintLocal("# {s}\n", .{efield.name}) catch break;
-                    options_file.writeAll(e) catch {};
-                }
-                const val_as_string = @tagName(@field(self, field.name));
-                const line = utl.bufPrintLocal("{s}={s}\n", .{ field.name, val_as_string }) catch break;
-                options_file.writeAll(line) catch break;
-            },
-            else => continue,
-        }
-    }
+    serialize(self.controls, "controls", options_file);
+    serialize(self.display, "display", options_file);
 }
 
 pub fn initEmpty() Options {
@@ -95,21 +117,59 @@ pub fn initEmpty() Options {
     return ret;
 }
 
-fn trySetFromKeyVal(self: *Options, key: []const u8, val: []const u8) void {
-    inline for (std.meta.fields(Options)) |field| {
-        if (std.mem.eql(u8, key, field.name)) {
-            switch (@typeInfo(field.type)) {
-                .@"enum" => {
-                    if (std.meta.stringToEnum(field.type, val)) |v| {
-                        @field(self, field.name) = v;
+fn setValByName(T: type, data: *T, key: []const u8, val: []const u8) void {
+    // check if we're at the leaf of the key  (key could be like controls.foo.bar, we do the actual setting at bar)
+    switch (@typeInfo(T)) {
+        .@"struct", .@"union" => {
+            for (key, 0..) |c, i| {
+                if (c == '.') {
+                    const first_part_of_key = key[0..i];
+                    const rest_of_key = key[i + 1 ..];
+                    inline for (std.meta.fields(T)) |field| {
+                        if (std.mem.eql(u8, first_part_of_key, field.name)) {
+                            setValByName(field.type, &@field(data, field.name), rest_of_key, val);
+                            return;
+                        }
+                    } else {
+                        Log.warn("{s}: Couldn't find key: \"{s}\"", .{ @src().fn_name, key });
                     }
                     return;
-                },
-                else => comptime continue,
+                }
             }
-        }
+        },
+        else => {},
     }
-    Log.warn("WARNING: Options parse fail. key: \"{s}\", val: \"{s}\"\n", .{ key, val });
+
+    switch (@typeInfo(T)) {
+        .@"enum" => {
+            if (std.meta.stringToEnum(T, val)) |v| {
+                data.* = v;
+            } else {
+                Log.warn("{s}: Couldn't parse enum. key: \"{s}\", val: \"{s}\", type \"{s}\"", .{ @src().fn_name, key, val, @typeName(T) });
+            }
+        },
+        .@"struct" => {
+            if (comptime std.mem.eql(u8, utl.typeBaseName(T), "V2i")) {
+                var v = V2i{};
+                _ = V2i.parse(val, &v) catch {
+                    Log.warn("{s}: Couldn't parse V2i key: \"{s}\", val: \"{s}\"", .{ @src().fn_name, key, val });
+                };
+                data.* = v;
+                return;
+            } else {
+                inline for (std.meta.fields(T)) |f| {
+                    if (std.mem.eql(u8, f.name, key)) {
+                        setValByName(f.type, &@field(data, f.name), "", val);
+                        break;
+                    }
+                }
+                //Log.warn("{s}: Couldn't parse key: \"{s}\", struct type \"{s}\"\n", .{ @src().fn_name, key, @typeName(T) });
+            }
+        },
+        else => {
+            Log.warn("{s}: Couldn't parse key: \"{s}\", type \"{s}\"", .{ @src().fn_name, key, @typeName(T) });
+        },
+    }
 }
 
 pub fn initTryLoad() Options {
@@ -125,149 +185,176 @@ pub fn initTryLoad() Options {
         var equals_it = std.mem.tokenizeScalar(u8, line, '=');
         const key = equals_it.next() orelse continue;
         const val = equals_it.next() orelse continue;
-        ret.trySetFromKeyVal(key, val);
+        setValByName(Options, &ret, key, val);
     }
     options_file.close();
     ret.writeToTxt();
-    ret.layoutUI();
     return ret;
 }
 
-pub fn update(self: *Options) Error!enum { dont_close, close } {
+const el_text_padding = v2f(4, 4);
+const el_bg_color = Colorf.rgb(0.2, 0.2, 0.2);
+const el_bg_color_hovered = Colorf.rgb(0.3, 0.3, 0.3);
+const el_bg_color_selected = Colorf.rgb(0.4, 0.4, 0.4);
+
+fn updateDisplay(self: *Options, cmd_buf: *ImmUI.CmdBuf, pos: V2f) Error!bool {
+    var dirty: bool = false;
+    _ = self;
+    _ = cmd_buf;
+    _ = pos;
+    dirty = false;
+    return dirty;
+}
+
+fn updateControls(self: *Options, cmd_buf: *ImmUI.CmdBuf, pos: V2f) Error!bool {
+    var dirty: bool = false;
     const plat = App.getPlat();
-    _ = plat;
-    for (self.ui.elements.slice()) |el| {
-        switch (el.kind) {
-            .dropdown => |dropdown| {
-                _ = dropdown;
-            },
+    const data = App.getData();
+    const font = data.fonts.get(.pixeloid);
+    const text_opt = draw.TextOpt{
+        .font = font,
+        .size = font.base_size * utl.as(u32, plat.ui_scaling),
+        .color = .white,
+    };
+    const ui_scaling = plat.ui_scaling;
+    const mouse_pos = plat.getMousePosScreen();
+    const mouse_clicked = plat.input_buffer.mouseBtnIsJustPressed(.left);
+    const el_padding = el_text_padding.scale(ui_scaling);
+    var curr_row_pos = pos;
+    const row_height: f32 = utl.as(f32, text_opt.size) + el_padding.y * 2;
+    {
+        const cast_method_text = "Cast Method:";
+        const cast_method_text_dims = try plat.measureText(cast_method_text, text_opt);
+        cmd_buf.appendAssumeCapacity(.{ .label = .{
+            .pos = curr_row_pos,
+            .text = ImmUI.initLabel(cast_method_text),
+            .opt = text_opt,
+        } });
+
+        var dropdown_el_pos = pos.add(v2f(cast_method_text_dims.x + 4, 0));
+        var dropdown_el_dims = V2f{};
+        for (Controls.CastMethod.strings.values) |str| {
+            const str_dims = try plat.measureText(str, text_opt);
+            if (str_dims.x > dropdown_el_dims.x) {
+                dropdown_el_dims.x = str_dims.x;
+            }
+            if (str_dims.y > dropdown_el_dims.y) {
+                dropdown_el_dims.y = str_dims.y;
+            }
         }
+        dropdown_el_dims = dropdown_el_dims.add(el_padding.scale(2));
+        // selected
+        cmd_buf.appendAssumeCapacity(.{ .rect = .{
+            .pos = dropdown_el_pos,
+            .dims = dropdown_el_dims,
+            .opt = .{ .fill_color = el_bg_color_selected },
+        } });
+        cmd_buf.appendAssumeCapacity(.{ .label = .{
+            .pos = dropdown_el_pos.add(el_padding),
+            .text = ImmUI.initLabel(Controls.CastMethod.strings.get(self.controls.cast_method)),
+            .opt = text_opt,
+        } });
+        // open/close dropdown
+        var mouse_clicked_inside_menu = false;
+        if (mouse_clicked and geom.pointIsInRectf(mouse_pos, .{ .pos = dropdown_el_pos, .dims = dropdown_el_dims })) {
+            self.controls.cast_method_dropdown_open = !self.controls.cast_method_dropdown_open;
+            mouse_clicked_inside_menu = true;
+        }
+        dropdown_el_pos.y += dropdown_el_dims.y;
+        var selection = self.controls.cast_method;
+        if (self.controls.cast_method_dropdown_open) {
+            inline for (std.meta.fields(Controls.CastMethod)) |f| {
+                const hovered = geom.pointIsInRectf(mouse_pos, .{ .pos = dropdown_el_pos, .dims = dropdown_el_dims });
+                const cast_method: Controls.CastMethod = @enumFromInt(f.value);
+                if (cast_method == self.controls.cast_method) comptime continue;
+                cmd_buf.appendAssumeCapacity(.{ .rect = .{
+                    .pos = dropdown_el_pos,
+                    .dims = dropdown_el_dims,
+                    .opt = .{
+                        .fill_color = if (hovered) el_bg_color_hovered else el_bg_color,
+                    },
+                } });
+                cmd_buf.appendAssumeCapacity(.{ .label = .{
+                    .pos = dropdown_el_pos.add(el_padding),
+                    .text = ImmUI.initLabel(Controls.CastMethod.strings.get(cast_method)),
+                    .opt = text_opt,
+                } });
+                if (mouse_clicked and hovered) {
+                    dirty = true;
+                    selection = cast_method;
+                    self.controls.cast_method_dropdown_open = false;
+                    mouse_clicked_inside_menu = true;
+                }
+                dropdown_el_pos.y += dropdown_el_dims.y;
+            }
+        }
+        if (mouse_clicked and !mouse_clicked_inside_menu) {
+            self.controls.cast_method_dropdown_open = false;
+        }
+        self.controls.cast_method = selection;
     }
-    if (self.ui.back_button.isClicked()) {
+    curr_row_pos.y += row_height;
+
+    return dirty;
+}
+
+pub const kind_rect_dims = v2f(300, 260);
+pub const full_panel_padding = v2f(10, 10);
+pub const top_bot_parts_height = 30;
+pub const full_panel_dims = kind_rect_dims.add(v2f(0, top_bot_parts_height * 2)).add(full_panel_padding.scale(2));
+
+pub fn update(self: *Options, cmd_buf: *ImmUI.CmdBuf) Error!enum { dont_close, close } {
+    const plat = App.getPlat();
+    const data = App.getData();
+    const font = data.fonts.get(.pixeloid);
+    const ui_scaling = plat.ui_scaling;
+
+    const panel_dims = full_panel_dims.scale(ui_scaling);
+    const kind_section_dims = kind_rect_dims.scale(ui_scaling);
+    const panel_pos = plat.screen_dims_f.sub(panel_dims).scale(0.5);
+
+    cmd_buf.appendAssumeCapacity(.{
+        .rect = .{
+            .pos = panel_pos,
+            .dims = panel_dims,
+            .opt = .{
+                .fill_color = Colorf.rgb(0.1, 0.1, 0.1),
+                .edge_radius = 0.2,
+            },
+        },
+    });
+    const padding = full_panel_padding.scale(ui_scaling);
+    const selected_btn_dims = v2f(
+        80,
+        utl.as(f32, font.base_size),
+    ).scale(ui_scaling);
+    const selected_info = @typeInfo(Kind).@"enum";
+    const num_selected_f = utl.as(f32, selected_info.fields.len);
+    const selected_dims = v2f(panel_dims.x - padding.x * 2, selected_btn_dims.y);
+    const selected_x_spacing = (selected_dims.x - (num_selected_f * selected_btn_dims.x)) / (num_selected_f - 1);
+    var selected_curr_pos = panel_pos.add(padding);
+    inline for (0..selected_info.fields.len) |i| {
+        const kind: Kind = @enumFromInt(i);
+        const enum_name = utl.enumToString(Kind, kind);
+        const text = try utl.bufPrintLocal("{c}{s}", .{ std.ascii.toUpper(enum_name[0]), enum_name[1..] });
+        if (menuUI.textButton(cmd_buf, selected_curr_pos, text, selected_btn_dims)) {
+            self.kind_selected = kind;
+        }
+        selected_curr_pos.x += selected_btn_dims.x + selected_x_spacing;
+    }
+
+    const kind_section_pos = panel_pos.add(padding).add(v2f(0, top_bot_parts_height * ui_scaling));
+    if (switch (self.kind_selected) {
+        .controls => try self.updateControls(cmd_buf, kind_section_pos),
+        .display => try self.updateDisplay(cmd_buf, kind_section_pos),
+    }) {
+        self.writeToTxt();
+    }
+
+    const back_btn_pos = kind_section_pos.add(v2f(0, kind_section_dims.y));
+    const back_btn_dims = v2f(60, top_bot_parts_height).scale(ui_scaling);
+    if (menuUI.textButton(cmd_buf, back_btn_pos, "Back", back_btn_dims)) {
         return .close;
     }
     return .dont_close;
-}
-
-pub fn render(self: *Options, render_texture: Platform.RenderTexture2D) Error!void {
-    const plat = App.getPlat();
-
-    plat.startRenderToTexture(render_texture);
-    plat.setBlend(.render_tex_alpha);
-
-    plat.rectf(self.ui.rect.pos, self.ui.rect.dims, .{
-        .fill_color = Colorf.rgba(0.1, 0.1, 0.1, 0.8),
-    });
-
-    const origin = self.ui.rect.pos;
-
-    for (self.ui.elements.slice()) |el| {
-        plat.rectf(origin.add(el.value_rect.pos), el.value_rect.dims, .{
-            .fill_color = null,
-            .outline = .{ .color = Colorf.rgb(0.8, 0.8, 0.0) },
-        });
-        switch (el.kind) {
-            .dropdown => |dropdown| {
-                const label_pos = origin.add(el.rect.pos).add(ui_el_text_padding);
-                try plat.textf(label_pos, "{s}", .{dropdown.label.constSlice()}, ui_text_opt);
-                const selected: ClickableLabel = dropdown.items.get(dropdown.selected_idx);
-                try plat.textf(origin.add(el.value_rect.pos.add(ui_el_text_padding)), "{s}", .{selected.text.constSlice()}, ui_text_opt);
-                //const el_origin = origin.add(el.rect.pos);
-            },
-        }
-    }
-
-    try self.ui.back_button.render();
-}
-
-pub fn layoutUI(self: *Options) void {
-    const plat = App.getPlat();
-    self.ui.elements.len = 0;
-
-    var element_label_max_width: f32 = 0;
-    var element_value_max_width: f32 = 0;
-    var curr_element_pos: V2f = .{};
-
-    inline for (std.meta.fields(Options)) |sfield| {
-        const el = blk: switch (@typeInfo(sfield.type)) {
-            .@"enum" => |info| {
-                var dropdown_el: UIElement = .{
-                    .rect = .{ .pos = curr_element_pos },
-                    .value_rect = .{ .pos = curr_element_pos },
-                    .kind = .{
-                        .dropdown = .{
-                            .label = UIShortString.fromSlice(sfield.name) catch unreachable,
-                            .items = .{},
-                            .selected_idx = if (sfield.default_value) |vptr| @intFromEnum(@as(*const sfield.type, @ptrCast(vptr)).*) else 0,
-                        },
-                    },
-                };
-                const el_label_dims = plat.measureText(sfield.name, ui_text_opt) catch @panic("measure text fail");
-                dropdown_el.rect.dims.y = el_label_dims.y + ui_el_text_padding.y * 2;
-                element_label_max_width = @max(element_label_max_width, el_label_dims.x);
-                curr_element_pos.y += dropdown_el.rect.dims.y;
-
-                var curr_label_pos: V2f = .{};
-                var label_max_width: f32 = 0;
-                inline for (info.fields) |efield| {
-                    var label: ClickableLabel = .{
-                        .text = UIShortString.fromSlice(efield.name) catch unreachable,
-                        .rect = .{
-                            .pos = curr_label_pos,
-                        },
-                    };
-                    const label_dims = plat.measureText(efield.name, ui_text_opt) catch @panic("measure text fail");
-                    label.rect.dims.y = label_dims.y + ui_el_text_padding.y * 2;
-                    curr_label_pos.y += label.rect.dims.y;
-                    label_max_width = @max(label_dims.x, label_max_width);
-                    dropdown_el.kind.dropdown.items.append(label) catch comptime continue;
-                }
-                element_value_max_width = @max(element_value_max_width, label_max_width);
-                for (dropdown_el.kind.dropdown.items.slice()) |*label| {
-                    label.rect.dims.x = label_max_width;
-                }
-                break :blk dropdown_el;
-            },
-            else => comptime continue,
-        };
-        self.ui.elements.append(el) catch comptime continue;
-    }
-    const total_width = element_label_max_width + element_value_max_width + ui_el_text_padding.x * 4;
-    const label_total_width = element_label_max_width + ui_el_text_padding.x * 2;
-    for (self.ui.elements.slice()) |*el| {
-        el.rect.dims.x = total_width;
-        el.value_rect.pos.x += label_total_width;
-        el.value_rect.dims = v2f(total_width - label_total_width, el.rect.dims.y);
-    }
-    // back button
-    {
-        const btn_dims = v2f(80, 30);
-        self.ui.back_button = .{
-            .text_padding = ui_el_text_padding,
-            .text_rel_pos = btn_dims.scale(0.5),
-            .text_opt = .{
-                .center = true,
-            },
-            .poly_opt = .{
-                .fill_color = .orange,
-            },
-            .clickable_rect = .{
-                .rect = .{
-                    .pos = curr_element_pos.add(ui_el_text_padding),
-                    .dims = btn_dims,
-                },
-            },
-        };
-        self.ui.back_button.text = @TypeOf(self.ui.back_button.text).fromSlice("Back") catch unreachable;
-        curr_element_pos.y += btn_dims.y + ui_el_text_padding.y * 2;
-    }
-    // ui rect finally
-    self.ui.rect = .{
-        .dims = v2f(total_width, curr_element_pos.y),
-    };
-    self.ui.labels_width = element_label_max_width + ui_el_text_padding.y * 2;
-    // TODO ??
-    // center it?
-    self.ui.rect.pos = plat.screen_dims_f.sub(self.ui.rect.dims).scale(0.5);
-    self.ui.back_button.clickable_rect.rect.pos = self.ui.back_button.clickable_rect.rect.pos.add(self.ui.rect.pos);
 }
