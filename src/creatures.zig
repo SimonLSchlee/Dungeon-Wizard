@@ -105,7 +105,7 @@ pub fn playerProto() Thing {
         .friction = 0.0014 * TileMap.tile_sz_f,
         .max_speed = 0.01875 * TileMap.tile_sz_f,
     };
-    ret.vision_range = 150;
+    ret.vision_range = TileMap.tile_sz_f * 3.5;
     ret.player_input = player.Input{};
     ret.controller = .{ .player = .{} };
 
