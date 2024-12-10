@@ -658,11 +658,17 @@ pub fn itemsUpdate(self: *Run) Error!void {
 
 pub fn rewardSpellChoiceUI(self: *Run, idx: usize) Error!void {
     const plat = getPlat();
-    const ui_scaling: f32 = plat.ui_scaling + 1;
+    const data = App.getData();
+    const ui_scaling: f32 = plat.ui_scaling;
 
     // modal background
-    const modal_dims = v2f(plat.screen_dims_f.x * 0.6, plat.screen_dims_f.y * 0.6);
-    const modal_topleft = plat.screen_dims_f.sub(modal_dims).scale(0.5);
+    var modal_dims = plat.screen_dims_f.scale(0.8);
+    var modal_topleft = plat.screen_dims_f.sub(modal_dims).scale(0.5);
+    if (self.room_exists) {
+        const game_rect_dims = self.room.ui_slots.getGameScreenRect();
+        modal_dims = v2f(game_rect_dims.x * 0.8, game_rect_dims.y * 0.94);
+        modal_topleft = game_rect_dims.sub(modal_dims).scale(0.5);
+    }
     self.imm_ui.commands.appendAssumeCapacity(.{ .rect = .{
         .pos = modal_topleft,
         .dims = modal_dims,
@@ -672,33 +678,36 @@ pub fn rewardSpellChoiceUI(self: *Run, idx: usize) Error!void {
         },
     } });
 
-    var curr_row_y = modal_topleft.y + 20;
+    var curr_row_y = modal_topleft.y + 10 * ui_scaling;
     const modal_center_x = modal_topleft.x + modal_dims.x * 0.5;
 
     // title
-    const title_center = v2f(modal_center_x, curr_row_y + 40);
+    const title_font = data.fonts.get(.pixeloid);
+    const title_center = v2f(modal_center_x, curr_row_y + 10 * ui_scaling);
     self.imm_ui.commands.appendAssumeCapacity(.{ .label = .{
         .pos = title_center,
         .text = ImmUI.initLabel("Choose a spell"),
         .opt = .{
-            .size = 40,
+            .size = title_font.base_size * u.as(u32, ui_scaling + 2),
+            .font = title_font,
+            .smoothing = .none,
             .color = .white,
             .center = true,
         },
     } });
-    curr_row_y += 80;
+    curr_row_y += 30 * ui_scaling;
 
     // spells
     var spell_choices: *Reward.SpellChoiceArray = &self.reward_ui.?.rewards.buffer[idx].kind.spell_choice;
     assert(spell_choices.len > 0);
-    const spell_dims = Spell.card_dims.scale(ui_scaling);
+    const spell_dims = Spell.card_dims.scale(ui_scaling + 1);
     var spell_rects = std.BoundedArray(geom.Rectf, Reward.max_spells){};
     spell_rects.resize(spell_choices.len) catch unreachable;
     gameUI.layoutRectsFixedSize(
         spell_rects.len,
         spell_dims,
         v2f(modal_center_x, curr_row_y + spell_dims.y * 0.5),
-        .{ .direction = .horizontal, .space_between = 20 },
+        .{ .direction = .horizontal, .space_between = 10 * ui_scaling },
         spell_rects.slice(),
     );
 
@@ -710,7 +719,7 @@ pub fn rewardSpellChoiceUI(self: *Run, idx: usize) Error!void {
         if (hovered) {
             rect.pos.y -= 4;
         }
-        _ = spell_choice.spell.unqRenderCard(&self.imm_ui.commands, rect.pos, null, ui_scaling);
+        _ = spell_choice.spell.unqRenderCard(&self.imm_ui.commands, rect.pos, null, ui_scaling + 1);
         if (clicked) {
             const product = Shop.Product{ .kind = .{ .spell = spell_choice.spell } };
             if (self.canPickupProduct(&product)) {
@@ -727,10 +736,10 @@ pub fn rewardSpellChoiceUI(self: *Run, idx: usize) Error!void {
     }
 
     // anchor button to bottom of modal
-    const btn_dims = v2f(150, 70);
+    const btn_dims = v2f(60, 25).scale(ui_scaling);
     const btn_topleft = v2f(
         modal_topleft.x + (modal_dims.x - btn_dims.x) * 0.5,
-        modal_topleft.y + modal_dims.y - 10 - btn_dims.y * 0.5,
+        modal_topleft.y + modal_dims.y - 7 * ui_scaling - btn_dims.y,
     );
     if (menuUI.textButton(&self.imm_ui.commands, btn_topleft, "Back", btn_dims, ui_scaling)) {
         self.reward_ui.?.selected_spell_choice_idx = null;
@@ -750,8 +759,13 @@ pub fn rewardUpdate(self: *Run) Error!void {
     }
 
     // modal background
-    const modal_dims = v2f(plat.screen_dims_f.x * 0.6, plat.screen_dims_f.y * 0.6);
-    const modal_topleft = plat.screen_dims_f.sub(modal_dims).scale(0.5);
+    var modal_dims = plat.screen_dims_f.scale(0.6);
+    var modal_topleft = plat.screen_dims_f.sub(modal_dims).scale(0.5);
+    if (self.room_exists) {
+        const game_rect_dims = self.room.ui_slots.getGameScreenRect();
+        modal_dims = v2f(game_rect_dims.x * 0.6, game_rect_dims.y * 0.9);
+        modal_topleft = game_rect_dims.sub(modal_dims).scale(0.5);
+    }
     self.imm_ui.commands.appendAssumeCapacity(.{ .rect = .{
         .pos = modal_topleft,
         .dims = modal_dims,
@@ -759,31 +773,34 @@ pub fn rewardUpdate(self: *Run) Error!void {
             .fill_color = Colorf.rgba(0.1, 0.1, 0.1, 0.8),
             .outline = .{
                 .color = Colorf.rgba(0.1, 0.1, 0.2, 0.8),
-                .thickness = 4,
+                .thickness = 2 * ui_scaling,
             },
         },
     } });
 
-    var curr_row_y = modal_topleft.y + 20;
+    var curr_row_y = modal_topleft.y + 10 * ui_scaling;
     const modal_center_x = modal_topleft.x + modal_dims.x * 0.5;
 
     // title
-    const title_center = v2f(modal_center_x, curr_row_y + 40);
+    const title_font = data.fonts.get(.pixeloid);
+    const title_center = v2f(modal_center_x, curr_row_y + 10 * ui_scaling);
     self.imm_ui.commands.appendAssumeCapacity(.{ .label = .{
         .pos = title_center,
         .text = ImmUI.initLabel("Found some stuff"),
         .opt = .{
-            .size = 40,
+            .size = title_font.base_size * u.as(u32, ui_scaling + 2),
+            .font = title_font,
+            .smoothing = .none,
             .color = .white,
             .center = true,
         },
     } });
-    curr_row_y += 80;
+    curr_row_y += 30 * ui_scaling;
 
     // reward rows
     const row_icon_dims = Item.icon_dims.scale(ui_scaling);
-    const row_rect_dims = v2f(modal_dims.x - 20, row_icon_dims.y + 20);
-    const row_rect_x = modal_topleft.x + 20;
+    const row_rect_dims = v2f(modal_dims.x - 10 * ui_scaling, row_icon_dims.y + 10 * ui_scaling);
+    const row_rect_x = modal_topleft.x + 5 * ui_scaling;
     const mouse_pos = plat.getMousePosScreen();
 
     var removed_idx: ?usize = null;
@@ -804,8 +821,15 @@ pub fn rewardUpdate(self: *Run) Error!void {
                 .edge_radius = 0.1,
             },
         } });
-        const row_icon_pos = row_rect_pos.add(v2f(10, 10));
-        const row_text_pos = row_icon_pos.add(v2f(10 + row_icon_dims.x + 10, 10));
+        const row_text_font = data.fonts.get(.pixeloid);
+        const row_text_opt = draw.TextOpt{
+            .font = row_text_font,
+            .color = .white,
+            .size = row_text_font.base_size * u.as(u32, ui_scaling),
+        };
+        const row_icon_pos = row_rect_pos.add(v2f(5, 5).scale(ui_scaling));
+        const row_text_pos = row_icon_pos.add(v2f(5 * ui_scaling + row_icon_dims.x + 5 * ui_scaling, 7 * ui_scaling));
+
         switch (reward.kind) {
             .spell_choice => {
                 const info = sprites.RenderIconInfo{ .frame = data.misc_icons.getRenderFrame(.cards).? };
@@ -813,9 +837,7 @@ pub fn rewardUpdate(self: *Run) Error!void {
                 self.imm_ui.commands.appendAssumeCapacity(.{ .label = .{
                     .pos = row_text_pos,
                     .text = ImmUI.initLabel("Spell"),
-                    .opt = .{
-                        .color = .white,
-                    },
+                    .opt = row_text_opt,
                 } });
                 if (clicked) {
                     reward_ui.selected_spell_choice_idx = i;
@@ -832,9 +854,7 @@ pub fn rewardUpdate(self: *Run) Error!void {
                 self.imm_ui.commands.appendAssumeCapacity(.{ .label = .{
                     .pos = row_text_pos,
                     .text = ImmUI.initLabel(item.getName()),
-                    .opt = .{
-                        .color = .white,
-                    },
+                    .opt = row_text_opt,
                 } });
                 if (clicked) {
                     const product = Shop.Product{ .kind = .{ .item = item } };
@@ -854,9 +874,7 @@ pub fn rewardUpdate(self: *Run) Error!void {
                 self.imm_ui.commands.appendAssumeCapacity(.{ .label = .{
                     .pos = row_text_pos,
                     .text = ImmUI.initLabel(gold_str),
-                    .opt = .{
-                        .color = .white,
-                    },
+                    .opt = row_text_opt,
                 } });
                 if (clicked) {
                     self.gold += gold_amount;
@@ -877,10 +895,10 @@ pub fn rewardUpdate(self: *Run) Error!void {
     }
 
     // anchor skip button to bottom of modal
-    const skip_btn_dims = v2f(150, 70);
+    const skip_btn_dims = v2f(60, 25).scale(ui_scaling);
     const skip_btn_topleft = v2f(
         modal_topleft.x + (modal_dims.x - skip_btn_dims.x) * 0.5,
-        modal_topleft.y + modal_dims.y - 10 - skip_btn_dims.y * 0.5,
+        modal_topleft.y + modal_dims.y - 7 * ui_scaling - skip_btn_dims.y,
     );
     var skip_btn_text: []const u8 = "Skip";
     if (reward_ui.rewards.len == 0) {
@@ -1070,16 +1088,18 @@ pub fn render(self: *Run, ui_render_texture: Platform.RenderTexture2D, game_rend
 
     if (self.room_exists) {
         try self.room.render(ui_render_texture, game_render_texture);
+        plat.startRenderToTexture(ui_render_texture);
+        plat.setBlend(.render_tex_alpha);
+        if (!self.room.edit_mode) {
+            try self.room.ui_slots.render(&self.room);
+        }
+        plat.endRenderToTexture();
     }
 
     plat.startRenderToTexture(ui_render_texture);
     plat.setBlend(.render_tex_alpha);
     switch (self.screen) {
-        .room => {
-            if (!self.room.edit_mode) {
-                try self.room.ui_slots.render(&self.room);
-            }
-        },
+        .room => {},
         .reward => {},
         .shop => {},
         .dead => {

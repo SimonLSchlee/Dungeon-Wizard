@@ -201,7 +201,7 @@ pub fn textButton(cmd_buf: *ImmUI.CmdBuf, pos: V2f, str: []const u8, dims: V2f, 
             .dims = dims,
             .opt = .{
                 .fill_color = .orange,
-                .outline = if (hovered) .{ .color = .red, .thickness = 5 * scaling } else null,
+                .outline = if (hovered) .{ .color = .red, .thickness = 2 * scaling } else null,
             },
         },
     }) catch @panic("Fail to append rect cmd");

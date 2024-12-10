@@ -505,7 +505,12 @@ pub const Slots = struct {
             .pos = bg_rect_pos,
             .dims = bg_rect_dims,
         };
-        plat.centerGameRect(.{}, plat.screen_dims_f.sub(v2f(0, bg_rect_dims.y)));
+        plat.centerGameRect(.{}, self.getGameScreenRect());
+    }
+
+    pub fn getGameScreenRect(self: *Slots) V2f {
+        const plat = getPlat();
+        return plat.screen_dims_f.sub(v2f(0, self.ui_bg_rect.dims.y));
     }
 
     pub fn getSlotsByActionKind(self: *Slots, action_kind: player.Action.Kind) []Slot {
