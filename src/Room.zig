@@ -257,6 +257,8 @@ pub fn reloadFromTileMap(self: *Room, tilemap_idx: u32) Error!void {
 }
 
 pub fn resolutionChanged(self: *Room) void {
+    const plat = getPlat();
+    self.camera.offset = plat.game_canvas_dims_f.scale(0.5);
     self.fog.resolutionChanged();
     self.ui_slots.reflowRects();
 }

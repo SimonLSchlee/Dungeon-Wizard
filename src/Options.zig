@@ -293,21 +293,24 @@ pub fn updateScreenDims(plat: *Platform, dims: V2i) void {
         plat.game_scaling = utl.as(f32, game_scaling);
     } else {
         // fit into screen
-        var game_scaling: i32 = 0;
-        for (0..100) |_| {
-            const game_dims = core.min_resolution.scale(game_scaling + 1);
-            if (game_dims.x > dims.x and game_dims.y > dims.y) {
-                plat.game_canvas_dims = core.min_resolution;
-                break;
+        const min_dimses = &[_]V2i{ core.min_resolution, core.min_wide_resolution };
+        var best_diff: V2i = dims;
+        var best_game_dims = core.min_resolution;
+        var best_scaling: i32 = 1;
+        loop: for (1..100) |i| {
+            const game_scaling = utl.as(i32, i);
+            for (min_dimses) |min_dims| {
+                const game_dims = min_dims.scale(game_scaling);
+                const diff = dims.sub(game_dims);
+                if (diff.x < 0 or diff.y < 0) break :loop;
+                if (diff.mLen() < best_diff.mLen()) {
+                    best_game_dims = game_dims;
+                    best_scaling = game_scaling;
+                }
             }
-            const game_dims_wide = core.min_wide_resolution.scale(game_scaling + 1);
-            if (game_dims_wide.x > dims.x and game_dims_wide.y > dims.y) {
-                plat.game_canvas_dims = core.min_wide_resolution;
-                break;
-            }
-            game_scaling += 1;
         }
-        plat.game_scaling = utl.as(f32, game_scaling);
+        plat.game_canvas_dims = best_game_dims;
+        plat.game_scaling = utl.as(f32, best_scaling);
     }
     plat.game_canvas_dims_f = plat.game_canvas_dims.toV2f();
     plat.game_canvas_screen_topleft_offset = plat.screen_dims_f.sub(plat.game_canvas_dims_f.scale(plat.game_scaling)).scale(0.5);
