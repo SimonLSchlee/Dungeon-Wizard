@@ -34,6 +34,8 @@ const slot_bg_color = Colorf.rgb(0.07, 0.05, 0.05);
 pub const max_spell_slots = 6;
 pub const max_item_slots = 8;
 
+pub const bottom_screen_margin: f32 = 6;
+
 pub fn getItemsRects() std.BoundedArray(geom.Rectf, max_item_slots) {
     const plat = getPlat();
     const ui_scaling = plat.ui_scaling;
@@ -51,7 +53,7 @@ pub fn getItemsRects() std.BoundedArray(geom.Rectf, max_item_slots) {
     );
     const items_topleft = v2f(
         items_margin.x,
-        plat.screen_dims_f.y - items_margin.y - max_items_dims.y,
+        plat.screen_dims_f.y - bottom_screen_margin * ui_scaling - max_items_dims.y,
     );
     for (0..max_items_rows) |j| {
         const y_off = (item_slot_dims.x + item_slot_spacing.y) * utl.as(f32, j);
@@ -313,6 +315,8 @@ pub const Slots = struct {
         rect: geom.Rectf = .{},
     };
 
+    pub const text_box_padding = V2f.splat(2);
+
     pub const spell_idx_to_key = [max_spell_slots]core.Key{ .q, .w, .e, .r, .t, .y };
     pub const spell_idx_to_key_str = blk: {
         var arr: [max_spell_slots][3]u8 = undefined;
@@ -426,14 +430,15 @@ pub const Slots = struct {
 
         // spells anchored to items, or in center if big enough screen
         const spell_slot_dims = Spell.card_dims.scale(ui_scaling);
-        const spell_slot_spacing = 8 * ui_scaling;
+        const spell_slot_spacing = 7 * ui_scaling;
+        const spell_item_margin = 14 * ui_scaling;
         const spells_dims = v2f(
             (utl.as(f32, self.spells.len)) * (spell_slot_dims.x + spell_slot_spacing) - spell_slot_spacing,
             spell_slot_dims.y,
         );
-        const space_for_spells_center = plat.screen_dims_f.x - items_width * 2 - spell_slot_spacing * 2;
-        const spells_topleft_x = if (space_for_spells_center > spells_dims.x) (plat.screen_dims_f.x - spells_dims.x) * 0.5 else rightmost_items_x + spell_slot_spacing;
-        const spells_topleft_y = plat.screen_dims_f.y - 10 * ui_scaling - spell_slot_dims.y;
+        const space_for_spells_center = plat.screen_dims_f.x - items_width * 2 - spell_item_margin * 2;
+        const spells_topleft_x = if (space_for_spells_center > spells_dims.x) (plat.screen_dims_f.x - spells_dims.x) * 0.5 else rightmost_items_x + spell_item_margin;
+        const spells_topleft_y = plat.screen_dims_f.y - bottom_screen_margin * ui_scaling - spell_slot_dims.y;
         const spells_topleft = v2f(spells_topleft_x, spells_topleft_y);
         for (self.spells.slice(), 0..) |*slot, i| {
             const x_off = (spell_slot_dims.x + spell_slot_spacing) * utl.as(f32, i);
@@ -445,28 +450,40 @@ pub const Slots = struct {
         }
 
         // hp and mana above
-        const hp_height: f32 = 24 * ui_scaling;
-        const hp_topleft = items_rects.get(0).pos.sub(v2f(0, hp_height + 15 * ui_scaling));
+        const big_hp_txt = "9999/9999";
+        const big_mana_txt = "99/99";
+        const hp_mana_font = App.getData().fonts.get(.pixeloid);
+        const hp_mana_padding = text_box_padding.scale(ui_scaling);
+        const font_sz_f = utl.as(f32, hp_mana_font.base_size) * ui_scaling;
+        const hp_mana_text_opt = draw.TextOpt{
+            .font = hp_mana_font,
+            .size = utl.as(u32, font_sz_f),
+        };
+        const hp_text_max_dims = plat.measureText(big_hp_txt, hp_mana_text_opt) catch v2f(font_sz_f, 100 * ui_scaling);
+        const mana_text_max_dims = plat.measureText(big_mana_txt, hp_mana_text_opt) catch v2f(font_sz_f, 70 * ui_scaling);
+        const hp_dims = hp_text_max_dims.add(v2f(6 * ui_scaling, 0)).add(hp_mana_padding.scale(2));
+        const mana_dims = mana_text_max_dims.add(v2f(6 * ui_scaling, 0)).add(hp_mana_padding.scale(2));
+        const hp_topleft = items_rects.get(0).pos.sub(v2f(0, hp_dims.y + 30 * ui_scaling));
+        const mana_topleft = hp_topleft.add(v2f(hp_dims.x + 8 * ui_scaling, 0));
         self.hp_rect = .{
             .pos = hp_topleft,
-            .dims = v2f(82 * ui_scaling, hp_height),
+            .dims = hp_dims,
         };
-        const mana_topleft = hp_topleft.add(v2f(self.hp_rect.dims.x + 15 * ui_scaling, 0));
         self.mana_rect = .{
             .pos = mana_topleft,
-            .dims = v2f(50 * ui_scaling, hp_height),
+            .dims = mana_dims,
         };
 
         // discard and pause to the right
         {
             const spells_botright = spells_topleft.add(spells_dims);
             const btn_dims = v2f(24, 24).scale(ui_scaling);
-            const pause_topleft = spells_botright.add(v2f(8 * ui_scaling, -btn_dims.y));
+            const pause_topleft = spells_botright.add(v2f(7 * ui_scaling, -btn_dims.y));
             self.pause_slot.rect = .{
                 .pos = pause_topleft,
                 .dims = btn_dims,
             };
-            self.pause_slot.key_rect_pos = self.pause_slot.rect.pos.sub(v2f(5, 17).scale(ui_scaling));
+            self.pause_slot.key_rect_pos = self.pause_slot.rect.pos.sub(v2f(3, 17).scale(ui_scaling));
             if (self.discard_slot) |*slot| {
                 slot.rect = .{
                     .pos = pause_topleft.add(v2f(0, -20 * ui_scaling - btn_dims.y)),
@@ -478,7 +495,7 @@ pub const Slots = struct {
         // background rect covers everything at bottom of screen
         const bg_rect_pos = v2f(
             0,
-            @min(spells_topleft.y, items_rects.get(0).pos.y) - 8 * ui_scaling,
+            @min(spells_topleft.y, items_rects.get(0).pos.y) - 10 * ui_scaling,
         );
         const bg_rect_dims = v2f(
             plat.screen_dims_f.x,
@@ -666,7 +683,7 @@ pub const Slots = struct {
             .pos = self.ui_bg_rect.pos,
             .dims = self.ui_bg_rect.dims,
             .opt = .{
-                .fill_color = Colorf.rgb(0.12, 0.1, 0.12),
+                .fill_color = Colorf.rgb(0.13, 0.11, 0.13),
             },
         } }) catch @panic("Fail to append rect cmd");
         const mouse_pos = plat.getMousePosScreen();
@@ -691,7 +708,7 @@ pub const Slots = struct {
             self.pause_slot.selection_kind = null;
         }
         {
-            const ui_scaling: f32 = plat.ui_scaling + 1;
+            const ui_scaling: f32 = plat.ui_scaling;
             const data = App.get().data;
             const hp_mana_rect_opt = draw.PolyOpt{
                 .edge_radius = 0.2,
@@ -711,24 +728,27 @@ pub const Slots = struct {
             } });
             if (caster.hp) |hp| {
                 const cropped_dims = data.text_icons.sprite_dims_cropped.?.get(.heart);
-                var curr_pos = self.hp_rect.pos.add(v2f(3, 4).scale(ui_scaling));
+
                 if (data.text_icons.getRenderFrame(.heart)) |rf| {
-                    var opt = rf.toTextureOpt(ui_scaling);
+                    const heart_pos = self.hp_rect.pos.sub(v2f(cropped_dims.x * 0.5 * (ui_scaling + 2), 0));
+                    var opt = rf.toTextureOpt(ui_scaling + 2);
                     opt.src_dims = cropped_dims;
                     opt.tint = .red;
                     opt.origin = .topleft;
                     try self.immui.commands.append(.{ .texture = .{
-                        .pos = curr_pos,
+                        .pos = heart_pos,
                         .texture = rf.texture,
                         .opt = opt,
                     } });
                 }
-                curr_pos = curr_pos.add(v2f(cropped_dims.x + 1, -2).scale(ui_scaling));
-                try self.immui.commands.append(.{ .label = .{
-                    .pos = curr_pos,
-                    .text = ImmUI.initLabel(try utl.bufPrintLocal("{d:.0}/{d:.0}", .{ hp.curr, hp.max })),
-                    .opt = hp_mana_text_opt,
-                } });
+                const text_pos = self.hp_rect.pos.add((v2f(cropped_dims.x, 0).add(text_box_padding).scale(ui_scaling)));
+                try self.immui.commands.append(.{
+                    .label = .{
+                        .pos = text_pos,
+                        .text = ImmUI.initLabel(try utl.bufPrintLocal("{d:.0}/{d:.0}", .{ hp.curr, hp.max })),
+                        .opt = hp_mana_text_opt,
+                    },
+                });
             }
 
             try self.immui.commands.append(.{ .rect = .{
@@ -737,24 +757,26 @@ pub const Slots = struct {
                 .opt = hp_mana_rect_opt,
             } });
             if (caster.mana) |mana| {
-                const cropped_dims = data.text_icons.sprite_dims_cropped.?.get(.mana_crystal_smol);
-                var curr_pos = self.mana_rect.pos.add(v2f(3, 3).scale(ui_scaling));
-                if (data.text_icons.getRenderFrame(.mana_crystal_smol)) |rf| {
-                    var opt = rf.toTextureOpt(ui_scaling);
+                const cropped_dims = data.text_icons.sprite_dims_cropped.?.get(.mana_crystal);
+                if (data.text_icons.getRenderFrame(.mana_crystal)) |rf| {
+                    const mana_crystal_pos = self.mana_rect.pos.sub(v2f(cropped_dims.x * 0.5 * (ui_scaling + 2), 0));
+                    var opt = rf.toTextureOpt(ui_scaling + 2);
                     opt.src_dims = cropped_dims;
                     opt.origin = .topleft;
                     try self.immui.commands.append(.{ .texture = .{
-                        .pos = curr_pos,
+                        .pos = mana_crystal_pos,
                         .texture = rf.texture,
                         .opt = opt,
                     } });
                 }
-                curr_pos = curr_pos.add(v2f(cropped_dims.x + 1, -2).scale(ui_scaling));
-                try self.immui.commands.append(.{ .label = .{
-                    .pos = curr_pos,
-                    .text = ImmUI.initLabel(try utl.bufPrintLocal("{d:.0}/{d:.0}", .{ mana.curr, mana.max })),
-                    .opt = hp_mana_text_opt,
-                } });
+                const text_pos = self.mana_rect.pos.add((v2f(cropped_dims.x, 0).add(text_box_padding).scale(ui_scaling)));
+                try self.immui.commands.append(.{
+                    .label = .{
+                        .pos = text_pos,
+                        .text = ImmUI.initLabel(try utl.bufPrintLocal("{d:.0}/{d:.0}", .{ mana.curr, mana.max })),
+                        .opt = hp_mana_text_opt,
+                    },
+                });
                 if (caster.controller == .player) {
                     if (caster.controller.player.mana_regen) |regen| {
                         const bar_max_dims = v2f(self.mana_rect.dims.x - 10, 5);
