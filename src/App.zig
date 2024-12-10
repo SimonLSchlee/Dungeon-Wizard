@@ -60,12 +60,14 @@ menu_ui: struct {
 game_render_texture: Platform.RenderTexture2D = undefined,
 ui_render_texture: Platform.RenderTexture2D = undefined,
 
-pub fn reinitRenderTextures(self: *App) void {
+pub fn resolutionChanged(self: *App) void {
     const plat = getPlat();
     plat.destroyRenderTexture(self.game_render_texture);
     plat.destroyRenderTexture(self.ui_render_texture);
     self.game_render_texture = plat.createRenderTexture("app_game", plat.game_canvas_dims);
     self.ui_render_texture = plat.createRenderTexture("app_ui", plat.screen_dims);
+
+    self.run.resolutionChanged();
 }
 
 export fn appInit(plat: *Platform) *anyopaque {

@@ -61,6 +61,12 @@ pub fn deinit(self: *Fog) void {
     plat.destroyRenderTexture(self.render_tex);
 }
 
+pub fn resolutionChanged(self: *Fog) void {
+    const plat = getPlat();
+    plat.destroyRenderTexture(self.render_tex);
+    self.render_tex = plat.createRenderTexture("fog", plat.screen_dims);
+}
+
 pub fn clone(self: *const Fog) Error!Fog {
     const plat = getPlat();
     var ret = self.*;

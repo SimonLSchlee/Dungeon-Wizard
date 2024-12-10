@@ -256,6 +256,11 @@ pub fn reloadFromTileMap(self: *Room, tilemap_idx: u32) Error!void {
     try self.reset();
 }
 
+pub fn resolutionChanged(self: *Room) void {
+    self.fog.resolutionChanged();
+    self.ui_slots.reflowRects();
+}
+
 pub fn queueSpawnThing(self: *Room, proto: *const Thing, pos: V2f) Error!?pool.Id {
     const t = self.things.alloc();
     self.highest_num_things = @max(self.things.num_allocated, self.highest_num_things);

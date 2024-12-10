@@ -485,6 +485,12 @@ pub fn syncPlayerThing(self: *Run, precedence: enum { run, room }) void {
     }
 }
 
+pub fn resolutionChanged(self: *Run) void {
+    if (self.room_exists) {
+        self.room.resolutionChanged();
+    }
+}
+
 pub fn roomUpdate(self: *Run) Error!void {
     const plat = getPlat();
     assert(self.room_exists);

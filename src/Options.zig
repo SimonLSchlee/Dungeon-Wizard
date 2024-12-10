@@ -411,7 +411,7 @@ fn updateDisplay(self: *Options, cmd_buf: *ImmUI.CmdBuf, pos: V2f) Error!bool {
         if (try self.display.dropdown.update(cmd_buf, dropdown_pos, strings_buf.constSlice())) |new_idx| {
             self.display.selected_resolution = self.display.resolutions.get(new_idx);
             updateScreenDims(plat, self.display.selected_resolution);
-            App.get().reinitRenderTextures();
+            App.get().resolutionChanged();
             dirty = true;
         }
         curr_row_pos.y += row_height;
