@@ -142,17 +142,21 @@ pub fn deinit(self: *App) void {
 
 fn menuUpdate(self: *App) Error!void {
     const plat = getPlat();
+    const data = self.data;
+    const ui_scaling = plat.ui_scaling;
     const title_text = "Magic-Using Individual";
+    const title_font = data.fonts.get(.pixeloid);
     const title_opt = draw.TextOpt{
         .center = true,
         .color = .white,
-        .size = 40,
+        .font = title_font,
+        .size = title_font.base_size * utl.as(u32, ui_scaling + 2),
     };
     const title_dims = try plat.measureText(title_text, title_opt);
-    const btn_dims = v2f(190, 90);
-    const title_padding = v2f(50, 50);
-    const btn_spacing: f32 = 20;
-    const bottom_spacing: f32 = 40;
+    const btn_dims = v2f(85, 45).scale(ui_scaling);
+    const title_padding = v2f(25, 25).scale(ui_scaling);
+    const btn_spacing: f32 = 10 * ui_scaling;
+    const bottom_spacing: f32 = 20 * ui_scaling;
     const num_buttons = 3;
     const panel_dims = v2f(
         title_dims.x + title_padding.x * 2,
@@ -182,11 +186,12 @@ fn menuUpdate(self: *App) Error!void {
     const version_text = config.version;
     const version_opt = draw.TextOpt{
         .color = .white,
-        .size = 20,
+        .font = title_font,
+        .size = title_font.base_size * utl.as(u32, ui_scaling),
     };
     self.menu_ui.commands.append(.{
         .label = .{
-            .pos = title_center.add(v2f(title_dims.x * 0.5 + 5, 0)),
+            .pos = title_center.add(v2f(title_dims.x * 0.5 + 5 * ui_scaling, 0)),
             .text = ImmUI.initLabel(version_text),
             .opt = version_opt,
         },
@@ -198,29 +203,29 @@ fn menuUpdate(self: *App) Error!void {
     );
     var curr_btn_pos = btns_topleft;
     if (false) {
-        if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "    New Run\n(Frank 4-slot)", btn_dims)) {
+        if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "    New Run\n(Frank 4-slot)", btn_dims, ui_scaling)) {
             try self.startNewRun(.frank_4_slot);
         }
 
         curr_btn_pos.y += btn_dims.y + btn_spacing;
 
-        if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "      New Run\n(Mandy 3-mana)", btn_dims)) {
+        if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "      New Run\n(Mandy 3-mana)", btn_dims, ui_scaling)) {
             try self.startNewRun(.mandy_3_mana);
         }
         curr_btn_pos.y += btn_dims.y + btn_spacing;
     }
 
-    if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "      New Run\n(Crispin\nCrystal-picker)", btn_dims)) {
+    if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "      New Run\n(Crispin\nCrystal-picker)", btn_dims, ui_scaling)) {
         try self.startNewRun(.crispin_picker);
     }
     curr_btn_pos.y += btn_dims.y + btn_spacing;
 
-    if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "Options", btn_dims)) {
+    if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "Options", btn_dims, ui_scaling)) {
         self.options_open = true;
     }
     curr_btn_pos.y += btn_dims.y + btn_spacing;
 
-    if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "Exit", btn_dims)) {
+    if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "Exit", btn_dims, ui_scaling)) {
         plat.exit();
     }
 }
@@ -228,20 +233,21 @@ fn menuUpdate(self: *App) Error!void {
 fn pauseMenuUpdate(self: *App) Error!void {
     const plat = getPlat();
     const data = self.data;
+    const ui_scaling = plat.ui_scaling;
     const title_font = data.fonts.get(.pixeloid);
     const title_text = "Iiiiits a pause menu";
     const title_opt = draw.TextOpt{
         .center = true,
         .color = .white,
-        .size = title_font.base_size * 3,
+        .size = title_font.base_size * utl.as(u32, ui_scaling + 2),
         .font = title_font,
         .smoothing = .none,
     };
     const title_dims = try plat.measureText(title_text, title_opt);
-    const btn_dims = v2f(140, 60);
-    const title_padding = v2f(30, 30);
-    const btn_spacing: f32 = 20;
-    const bottom_spacing: f32 = 50;
+    const btn_dims = v2f(70, 30).scale(ui_scaling);
+    const title_padding = v2f(15, 15).scale(ui_scaling);
+    const btn_spacing: f32 = 10 * ui_scaling;
+    const bottom_spacing: f32 = 25 * ui_scaling;
     const num_buttons = 5;
     const panel_dims = v2f(
         title_dims.x + title_padding.x * 2,
@@ -275,40 +281,40 @@ fn pauseMenuUpdate(self: *App) Error!void {
     );
     var curr_btn_pos = btns_topleft;
 
-    if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "Resume", btn_dims)) {
+    if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "Resume", btn_dims, ui_scaling)) {
         self.paused = false;
     }
     curr_btn_pos.y += btn_dims.y + btn_spacing;
 
-    if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "Options", btn_dims)) {
+    if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "Options", btn_dims, ui_scaling)) {
         self.options_open = true;
     }
     curr_btn_pos.y += btn_dims.y + btn_spacing;
 
-    if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "New Run", btn_dims)) {
+    if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "New Run", btn_dims, ui_scaling)) {
         self.paused = false;
         try self.startNewRun(.crispin_picker);
     }
     curr_btn_pos.y += btn_dims.y + btn_spacing;
 
-    if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "Abandon\n(Main Menu)", btn_dims)) {
+    if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "Abandon\n(Main Menu)", btn_dims, ui_scaling)) {
         self.paused = false;
         self.run.deinit();
         self.screen = .menu;
     }
     curr_btn_pos.y += btn_dims.y + btn_spacing;
 
-    if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "Abandon\n(Exit)", btn_dims)) {
+    if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "Abandon\n(Exit)", btn_dims, ui_scaling)) {
         self.paused = false;
         plat.exit();
     }
 
-    curr_btn_pos.y += btn_dims.y + btn_spacing + 10;
+    curr_btn_pos.y += btn_dims.y + btn_spacing + 10 * ui_scaling;
     const seed_text = try utl.bufPrintLocal("Run seed: {x:}", .{self.run.seed});
     const seed_opt = draw.TextOpt{
         .center = true,
         .color = .white,
-        .size = title_font.base_size * 2,
+        .size = title_font.base_size * utl.as(u32, ui_scaling),
         .font = title_font,
         .smoothing = .none,
     };

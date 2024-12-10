@@ -190,7 +190,7 @@ pub fn unqSectorTimer(cmd_buf: *ImmUI.CmdBuf, pos: V2f, radius: f32, timer: *con
     } }) catch @panic("Fail to append label cmd");
 }
 
-pub fn textButton(cmd_buf: *ImmUI.CmdBuf, pos: V2f, str: []const u8, dims: V2f) bool {
+pub fn textButton(cmd_buf: *ImmUI.CmdBuf, pos: V2f, str: []const u8, dims: V2f, scaling: f32) bool {
     const plat = getPlat();
     const mouse_pos = plat.getMousePosScreen();
     const hovered = geom.pointIsInRectf(mouse_pos, .{ .pos = pos, .dims = dims });
@@ -201,7 +201,7 @@ pub fn textButton(cmd_buf: *ImmUI.CmdBuf, pos: V2f, str: []const u8, dims: V2f) 
             .dims = dims,
             .opt = .{
                 .fill_color = .orange,
-                .outline = if (hovered) .{ .color = .red, .thickness = 5 } else null,
+                .outline = if (hovered) .{ .color = .red, .thickness = 5 * scaling } else null,
             },
         },
     }) catch @panic("Fail to append rect cmd");
@@ -213,7 +213,7 @@ pub fn textButton(cmd_buf: *ImmUI.CmdBuf, pos: V2f, str: []const u8, dims: V2f) 
             .opt = .{
                 .center = true,
                 .color = .black,
-                .size = font.base_size * 2,
+                .size = font.base_size * utl.as(u32, scaling),
                 .font = font,
                 .smoothing = .none,
             },

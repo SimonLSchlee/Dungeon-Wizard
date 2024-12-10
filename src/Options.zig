@@ -24,17 +24,102 @@ const Options = @This();
 
 const ui_el_text_padding: V2f = v2f(5, 5);
 
+pub const DropdownMenu = struct {
+    selected_idx: usize = 0,
+    is_open: bool = false,
+
+    pub fn update(self: *DropdownMenu, cmd_buf: *ImmUI.CmdBuf, pos: V2f, strings: []const []const u8) Error!?usize {
+        const plat = App.getPlat();
+        const data = App.getData();
+        const font = data.fonts.get(.pixeloid);
+        const text_opt = draw.TextOpt{
+            .font = font,
+            .size = font.base_size * utl.as(u32, plat.ui_scaling),
+            .color = .white,
+        };
+        const ui_scaling = plat.ui_scaling;
+        const mouse_pos = plat.getMousePosScreen();
+        const mouse_clicked = plat.input_buffer.mouseBtnIsJustPressed(.left);
+        const el_padding = el_text_padding.scale(ui_scaling);
+        var ret: ?usize = null;
+
+        var dropdown_el_pos = pos;
+        var dropdown_el_dims = V2f{};
+        for (strings) |str| {
+            const str_dims = try plat.measureText(str, text_opt);
+            if (str_dims.x > dropdown_el_dims.x) {
+                dropdown_el_dims.x = str_dims.x;
+            }
+            if (str_dims.y > dropdown_el_dims.y) {
+                dropdown_el_dims.y = str_dims.y;
+            }
+        }
+        dropdown_el_dims = dropdown_el_dims.add(el_padding.scale(2));
+        // selected
+        cmd_buf.appendAssumeCapacity(.{ .rect = .{
+            .pos = dropdown_el_pos,
+            .dims = dropdown_el_dims,
+            .opt = .{ .fill_color = el_bg_color_selected },
+        } });
+        cmd_buf.appendAssumeCapacity(.{ .label = .{
+            .pos = dropdown_el_pos.add(el_padding),
+            .text = ImmUI.initLabel(strings[self.selected_idx]),
+            .opt = text_opt,
+        } });
+        // open/close dropdown
+        var mouse_clicked_inside_menu = false;
+        if (mouse_clicked and geom.pointIsInRectf(mouse_pos, .{ .pos = dropdown_el_pos, .dims = dropdown_el_dims })) {
+            self.is_open = !self.is_open;
+            mouse_clicked_inside_menu = true;
+        }
+        dropdown_el_pos.y += dropdown_el_dims.y;
+        if (self.is_open) {
+            for (strings, 0..) |el_string, i| {
+                const hovered = geom.pointIsInRectf(mouse_pos, .{ .pos = dropdown_el_pos, .dims = dropdown_el_dims });
+                if (i == self.selected_idx) continue;
+                cmd_buf.appendAssumeCapacity(.{ .rect = .{
+                    .pos = dropdown_el_pos,
+                    .dims = dropdown_el_dims,
+                    .opt = .{
+                        .fill_color = if (hovered) el_bg_color_hovered else el_bg_color,
+                    },
+                } });
+                cmd_buf.appendAssumeCapacity(.{ .label = .{
+                    .pos = dropdown_el_pos.add(el_padding),
+                    .text = ImmUI.initLabel(el_string),
+                    .opt = text_opt,
+                } });
+                if (mouse_clicked and hovered) {
+                    ret = i;
+                    self.is_open = false;
+                    mouse_clicked_inside_menu = true;
+                }
+                dropdown_el_pos.y += dropdown_el_dims.y;
+            }
+        }
+        if (mouse_clicked and !mouse_clicked_inside_menu) {
+            self.is_open = false;
+        }
+        if (ret) |idx| {
+            self.selected_idx = idx;
+        }
+        return ret;
+    }
+};
+
 pub const Display = struct {
+    pub const ResLabel = utl.BoundedString(16);
+    pub const max_resolutions = 24;
     //monitor: i32 = 0, // TODO?
     mode: enum {
         windowed,
         borderless,
         fullscreen,
     } = .windowed,
-    resolutions: std.BoundedArray(V2i, 24) = .{},
-    resolutions_dropdown_open: bool = false,
-    selected_resolution_idx: usize = 0,
+    resolutions_strings: std.BoundedArray(ResLabel, max_resolutions) = .{},
+    resolutions: std.BoundedArray(V2i, max_resolutions) = .{},
     selected_resolution: V2i = .{},
+    dropdown: DropdownMenu = .{},
     //vsync: bool = false, // TODO?
     pub const OptionSerialize = struct {
         mode: void,
@@ -54,7 +139,9 @@ pub const Controls = struct {
         });
     };
     cast_method: CastMethod = .quick_release,
-    cast_method_dropdown_open: bool = false,
+    dropdown: DropdownMenu = .{
+        .selected_idx = @intFromEnum(CastMethod.quick_release),
+    },
     //auto_self_cast: bool = true, // TODO?
     pub const OptionSerialize = struct {
         cast_method: void,
@@ -252,7 +339,10 @@ pub fn initTryLoad(plat: *App.Platform) Options {
         setValByName(plat, Options, &ret, key, val);
     }
     options_file.close();
-
+    // fix up controls
+    {
+        ret.controls.dropdown.selected_idx = @intFromEnum(ret.controls.cast_method);
+    }
     // fix up resolution
     {
         const resolutions = plat.getResolutions(&ret.display.resolutions.buffer);
@@ -271,7 +361,14 @@ pub fn initTryLoad(plat: *App.Platform) Options {
             }
         }
         ret.display.selected_resolution = best;
-        ret.display.selected_resolution_idx = best_idx;
+        ret.display.dropdown.selected_idx = best_idx;
+        for (resolutions) |res| {
+            ret.display.resolutions_strings.append(
+                Display.ResLabel.fromSlice(
+                    utl.bufPrintLocal("{d}x{d}", .{ res.x, res.y }) catch continue,
+                ) catch continue,
+            ) catch break;
+        }
     }
 
     ret.writeToTxt(plat);
@@ -294,80 +391,31 @@ fn updateDisplay(self: *Options, cmd_buf: *ImmUI.CmdBuf, pos: V2f) Error!bool {
         .color = .white,
     };
     const ui_scaling = plat.ui_scaling;
-    const mouse_pos = plat.getMousePosScreen();
-    const mouse_clicked = plat.input_buffer.mouseBtnIsJustPressed(.left);
     const el_padding = el_text_padding.scale(ui_scaling);
     var curr_row_pos = pos;
     const row_height: f32 = utl.as(f32, text_opt.size) + el_padding.y * 2;
-    {
+    { // resolution
         const cast_method_text = "Resolution:";
         const cast_method_text_dims = try plat.measureText(cast_method_text, text_opt);
         cmd_buf.appendAssumeCapacity(.{ .label = .{
-            .pos = curr_row_pos,
+            .pos = curr_row_pos.add(el_padding),
             .text = ImmUI.initLabel(cast_method_text),
             .opt = text_opt,
         } });
 
-        var dropdown_el_pos = pos.add(v2f(cast_method_text_dims.x + 4, 0));
-        var dropdown_el_dims = try plat.measureText("10000x10000", text_opt);
-        dropdown_el_dims = dropdown_el_dims.add(el_padding.scale(2));
-        // selected
-        cmd_buf.appendAssumeCapacity(.{ .rect = .{
-            .pos = dropdown_el_pos,
-            .dims = dropdown_el_dims,
-            .opt = .{ .fill_color = el_bg_color_selected },
-        } });
-        const selected_res_str = try utl.bufPrintLocal("{d}x{d}", .{ self.display.selected_resolution.x, self.display.selected_resolution.y });
-        cmd_buf.appendAssumeCapacity(.{ .label = .{
-            .pos = dropdown_el_pos.add(el_padding),
-            .text = ImmUI.initLabel(selected_res_str),
-            .opt = text_opt,
-        } });
-        // open/close dropdown
-        var mouse_clicked_inside_menu = false;
-        if (mouse_clicked and geom.pointIsInRectf(mouse_pos, .{ .pos = dropdown_el_pos, .dims = dropdown_el_dims })) {
-            self.display.resolutions_dropdown_open = !self.display.resolutions_dropdown_open;
-            mouse_clicked_inside_menu = true;
+        const dropdown_pos = pos.add(v2f(cast_method_text_dims.x + 8 * ui_scaling, 0));
+        var strings_buf = std.BoundedArray([]const u8, Display.max_resolutions){};
+        for (self.display.resolutions_strings.constSlice()) |*str| {
+            strings_buf.appendAssumeCapacity(str.constSlice());
         }
-        dropdown_el_pos.y += dropdown_el_dims.y;
-        var selection = self.display.selected_resolution;
-        var selection_idx = self.display.selected_resolution_idx;
-        if (self.display.resolutions_dropdown_open) {
-            for (self.display.resolutions.constSlice(), 0..) |res, i| {
-                const hovered = geom.pointIsInRectf(mouse_pos, .{ .pos = dropdown_el_pos, .dims = dropdown_el_dims });
-                if (i == self.display.selected_resolution_idx) continue;
-                cmd_buf.appendAssumeCapacity(.{ .rect = .{
-                    .pos = dropdown_el_pos,
-                    .dims = dropdown_el_dims,
-                    .opt = .{
-                        .fill_color = if (hovered) el_bg_color_hovered else el_bg_color,
-                    },
-                } });
-                const res_str = try utl.bufPrintLocal("{d}x{d}", .{ res.x, res.y });
-                cmd_buf.appendAssumeCapacity(.{ .label = .{
-                    .pos = dropdown_el_pos.add(el_padding),
-                    .text = ImmUI.initLabel(res_str),
-                    .opt = text_opt,
-                } });
-                if (mouse_clicked and hovered) {
-                    dirty = true;
-                    selection = res;
-                    selection_idx = i;
-                    self.display.resolutions_dropdown_open = false;
-                    mouse_clicked_inside_menu = true;
-                    updateScreenDims(plat, selection);
-                    App.get().reinitRenderTextures();
-                }
-                dropdown_el_pos.y += dropdown_el_dims.y;
-            }
+        if (try self.display.dropdown.update(cmd_buf, dropdown_pos, strings_buf.constSlice())) |new_idx| {
+            self.display.selected_resolution = self.display.resolutions.get(new_idx);
+            updateScreenDims(plat, self.display.selected_resolution);
+            App.get().reinitRenderTextures();
+            dirty = true;
         }
-        if (mouse_clicked and !mouse_clicked_inside_menu) {
-            self.display.resolutions_dropdown_open = false;
-        }
-        self.display.selected_resolution_idx = selection_idx;
-        self.display.selected_resolution = selection;
+        curr_row_pos.y += row_height;
     }
-    curr_row_pos.y += row_height;
 
     return dirty;
 }
@@ -383,83 +431,26 @@ fn updateControls(self: *Options, cmd_buf: *ImmUI.CmdBuf, pos: V2f) Error!bool {
         .color = .white,
     };
     const ui_scaling = plat.ui_scaling;
-    const mouse_pos = plat.getMousePosScreen();
-    const mouse_clicked = plat.input_buffer.mouseBtnIsJustPressed(.left);
     const el_padding = el_text_padding.scale(ui_scaling);
     var curr_row_pos = pos;
     const row_height: f32 = utl.as(f32, text_opt.size) + el_padding.y * 2;
-    {
+
+    { // cast method
         const cast_method_text = "Cast Method:";
         const cast_method_text_dims = try plat.measureText(cast_method_text, text_opt);
         cmd_buf.appendAssumeCapacity(.{ .label = .{
-            .pos = curr_row_pos,
+            .pos = curr_row_pos.add(el_padding),
             .text = ImmUI.initLabel(cast_method_text),
             .opt = text_opt,
         } });
 
-        var dropdown_el_pos = pos.add(v2f(cast_method_text_dims.x + 4, 0));
-        var dropdown_el_dims = V2f{};
-        for (Controls.CastMethod.strings.values) |str| {
-            const str_dims = try plat.measureText(str, text_opt);
-            if (str_dims.x > dropdown_el_dims.x) {
-                dropdown_el_dims.x = str_dims.x;
-            }
-            if (str_dims.y > dropdown_el_dims.y) {
-                dropdown_el_dims.y = str_dims.y;
-            }
+        const dropdown_pos = pos.add(v2f(cast_method_text_dims.x + 8 * ui_scaling, 0));
+        if (try self.controls.dropdown.update(cmd_buf, dropdown_pos, &Controls.CastMethod.strings.values)) |new_idx| {
+            self.controls.cast_method = @enumFromInt(new_idx);
+            dirty = true;
         }
-        dropdown_el_dims = dropdown_el_dims.add(el_padding.scale(2));
-        // selected
-        cmd_buf.appendAssumeCapacity(.{ .rect = .{
-            .pos = dropdown_el_pos,
-            .dims = dropdown_el_dims,
-            .opt = .{ .fill_color = el_bg_color_selected },
-        } });
-        cmd_buf.appendAssumeCapacity(.{ .label = .{
-            .pos = dropdown_el_pos.add(el_padding),
-            .text = ImmUI.initLabel(Controls.CastMethod.strings.get(self.controls.cast_method)),
-            .opt = text_opt,
-        } });
-        // open/close dropdown
-        var mouse_clicked_inside_menu = false;
-        if (mouse_clicked and geom.pointIsInRectf(mouse_pos, .{ .pos = dropdown_el_pos, .dims = dropdown_el_dims })) {
-            self.controls.cast_method_dropdown_open = !self.controls.cast_method_dropdown_open;
-            mouse_clicked_inside_menu = true;
-        }
-        dropdown_el_pos.y += dropdown_el_dims.y;
-        var selection = self.controls.cast_method;
-        if (self.controls.cast_method_dropdown_open) {
-            inline for (std.meta.fields(Controls.CastMethod)) |f| {
-                const hovered = geom.pointIsInRectf(mouse_pos, .{ .pos = dropdown_el_pos, .dims = dropdown_el_dims });
-                const cast_method: Controls.CastMethod = @enumFromInt(f.value);
-                if (cast_method == self.controls.cast_method) comptime continue;
-                cmd_buf.appendAssumeCapacity(.{ .rect = .{
-                    .pos = dropdown_el_pos,
-                    .dims = dropdown_el_dims,
-                    .opt = .{
-                        .fill_color = if (hovered) el_bg_color_hovered else el_bg_color,
-                    },
-                } });
-                cmd_buf.appendAssumeCapacity(.{ .label = .{
-                    .pos = dropdown_el_pos.add(el_padding),
-                    .text = ImmUI.initLabel(Controls.CastMethod.strings.get(cast_method)),
-                    .opt = text_opt,
-                } });
-                if (mouse_clicked and hovered) {
-                    dirty = true;
-                    selection = cast_method;
-                    self.controls.cast_method_dropdown_open = false;
-                    mouse_clicked_inside_menu = true;
-                }
-                dropdown_el_pos.y += dropdown_el_dims.y;
-            }
-        }
-        if (mouse_clicked and !mouse_clicked_inside_menu) {
-            self.controls.cast_method_dropdown_open = false;
-        }
-        self.controls.cast_method = selection;
+        curr_row_pos.y += row_height;
     }
-    curr_row_pos.y += row_height;
 
     return dirty;
 }
@@ -503,7 +494,7 @@ pub fn update(self: *Options, cmd_buf: *ImmUI.CmdBuf) Error!enum { dont_close, c
         const kind: Kind = @enumFromInt(i);
         const enum_name = utl.enumToString(Kind, kind);
         const text = try utl.bufPrintLocal("{c}{s}", .{ std.ascii.toUpper(enum_name[0]), enum_name[1..] });
-        if (menuUI.textButton(cmd_buf, selected_curr_pos, text, selected_btn_dims)) {
+        if (menuUI.textButton(cmd_buf, selected_curr_pos, text, selected_btn_dims, ui_scaling)) {
             self.kind_selected = kind;
         }
         selected_curr_pos.x += selected_btn_dims.x + selected_x_spacing;
@@ -519,7 +510,7 @@ pub fn update(self: *Options, cmd_buf: *ImmUI.CmdBuf) Error!enum { dont_close, c
 
     const back_btn_pos = kind_section_pos.add(v2f(0, kind_section_dims.y));
     const back_btn_dims = v2f(60, top_bot_parts_height).scale(ui_scaling);
-    if (menuUI.textButton(cmd_buf, back_btn_pos, "Back", back_btn_dims)) {
+    if (menuUI.textButton(cmd_buf, back_btn_pos, "Back", back_btn_dims, ui_scaling)) {
         return .close;
     }
     return .dont_close;

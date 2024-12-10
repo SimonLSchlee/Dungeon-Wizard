@@ -624,11 +624,11 @@ pub fn itemsUpdate(self: *Run) Error!void {
 
         var curr_pos = menu_pos.add(menu_padding);
         const use_pressed = if (can_use) blk: {
-            const ret = menuUI.textButton(&self.imm_ui.commands, curr_pos, "Use", btn_dims);
+            const ret = menuUI.textButton(&self.imm_ui.commands, curr_pos, "Use", btn_dims, ui_scaling);
             curr_pos.y += btn_dims.y + menu_padding.y;
             break :blk ret;
         } else false;
-        const discard_pressed = menuUI.textButton(&self.imm_ui.commands, curr_pos, "Discard", btn_dims);
+        const discard_pressed = menuUI.textButton(&self.imm_ui.commands, curr_pos, "Discard", btn_dims, ui_scaling);
 
         if (use_pressed and !discard_pressed) {
             try item.useInRun(&self.player_thing, self);
@@ -726,7 +726,7 @@ pub fn rewardSpellChoiceUI(self: *Run, idx: usize) Error!void {
         modal_topleft.x + (modal_dims.x - btn_dims.x) * 0.5,
         modal_topleft.y + modal_dims.y - 10 - btn_dims.y * 0.5,
     );
-    if (menuUI.textButton(&self.imm_ui.commands, btn_topleft, "Back", btn_dims)) {
+    if (menuUI.textButton(&self.imm_ui.commands, btn_topleft, "Back", btn_dims, ui_scaling)) {
         self.reward_ui.?.selected_spell_choice_idx = null;
     }
 }
@@ -880,7 +880,7 @@ pub fn rewardUpdate(self: *Run) Error!void {
     if (reward_ui.rewards.len == 0) {
         skip_btn_text = "Continue";
     }
-    if (menuUI.textButton(&self.imm_ui.commands, skip_btn_topleft, skip_btn_text, skip_btn_dims)) {
+    if (menuUI.textButton(&self.imm_ui.commands, skip_btn_topleft, skip_btn_text, skip_btn_dims, ui_scaling)) {
         self.screen = .room;
         assert(self.room_exists);
         self.room.took_reward = true;
