@@ -779,9 +779,9 @@ pub const Slots = struct {
                 });
                 if (caster.controller == .player) {
                     if (caster.controller.player.mana_regen) |regen| {
-                        const bar_max_dims = v2f(self.mana_rect.dims.x - 10, 5);
+                        const bar_max_dims = v2f(self.mana_rect.dims.x - 9 * ui_scaling, 2 * ui_scaling);
                         try self.immui.commands.append(.{ .rect = .{
-                            .pos = self.mana_rect.pos.add(v2f(5, self.mana_rect.dims.y - 8)),
+                            .pos = self.mana_rect.pos.add(v2f(7 * ui_scaling, self.mana_rect.dims.y - 2 * ui_scaling)),
                             .dims = v2f(regen.timer.remapTo0_1() * bar_max_dims.x, bar_max_dims.y),
                             .opt = .{
                                 .fill_color = draw.Coloru.rgb(161, 133, 238).toColorf(),
