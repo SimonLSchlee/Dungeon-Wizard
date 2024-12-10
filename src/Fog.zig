@@ -149,7 +149,7 @@ pub fn addVisibleCircle(self: *Fog, room_rect: geom.Rectf, pos: V2f, radius: f32
     assert(radius >= 0);
     const center_coord = posToTileCoord(pos, world_tiles.sz_f);
     const radius_i: i32 = utl.as(i32, @floor(radius / world_tiles.sz_f));
-    const tl_offset = V2i.splat(radius_i);
+    const tl_offset = V2i.splat(radius_i + 1);
     const tl_coord = center_coord.sub(tl_offset);
     const br_coord = center_coord.add(tl_offset);
     //std.debug.print("{any}\n", .{bl_coord.sub(tl_coord)});
