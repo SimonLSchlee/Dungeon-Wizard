@@ -44,8 +44,6 @@ pub inline fn getData() *Data {
     return get().data;
 }
 
-_arena: std.heap.ArenaAllocator = undefined,
-arena: std.mem.Allocator = undefined,
 data: *Data = undefined,
 options: Options = undefined,
 curr_tick: i64 = 0,
@@ -62,6 +60,14 @@ menu_ui: struct {
 game_render_texture: Platform.RenderTexture2D = undefined,
 ui_render_texture: Platform.RenderTexture2D = undefined,
 
+pub fn reinitRenderTextures(self: *App) void {
+    const plat = getPlat();
+    plat.destroyRenderTexture(self.game_render_texture);
+    plat.destroyRenderTexture(self.ui_render_texture);
+    self.game_render_texture = plat.createRenderTexture("app_game", plat.game_canvas_dims);
+    self.ui_render_texture = plat.createRenderTexture("app_ui", plat.screen_dims);
+}
+
 export fn appInit(plat: *Platform) *anyopaque {
     // everything depends on plat global
     _plat = plat;
@@ -72,12 +78,9 @@ export fn appInit(plat: *Platform) *anyopaque {
 
     var app = plat.heap.create(App) catch @panic("Out of memory");
     app.* = .{
-        .options = Options.initTryLoad(),
+        .options = Options.initTryLoad(plat),
         .data = Data.init() catch @panic("Failed to init data"),
     };
-    // TODO unused rn
-    app._arena = std.heap.ArenaAllocator.init(plat.heap);
-    app.arena = app._arena.allocator();
 
     // populate _app here, Room.init() uses it
     _app = app;
@@ -96,8 +99,6 @@ pub fn staticAppInit(plat: *Platform) *anyopaque {
 pub export fn appReload(app_ptr: *anyopaque, plat: *Platform) void {
     _plat = plat;
     const app: *App = @ptrCast(@alignCast(app_ptr));
-    // allocator has a pointer to ArenaAllocater that needs re-setting
-    app.arena = app._arena.allocator();
     app.data.reload() catch @panic("Failed to reload data");
     _app = app;
 }
@@ -152,7 +153,7 @@ fn menuUpdate(self: *App) Error!void {
     const title_padding = v2f(50, 50);
     const btn_spacing: f32 = 20;
     const bottom_spacing: f32 = 40;
-    const num_buttons = 4;
+    const num_buttons = 3;
     const panel_dims = v2f(
         title_dims.x + title_padding.x * 2,
         title_dims.y + title_padding.y * 2 + btn_dims.y * num_buttons + btn_spacing * (num_buttons - 1) + bottom_spacing,
@@ -241,7 +242,7 @@ fn pauseMenuUpdate(self: *App) Error!void {
     const title_padding = v2f(30, 30);
     const btn_spacing: f32 = 20;
     const bottom_spacing: f32 = 50;
-    const num_buttons = 4;
+    const num_buttons = 5;
     const panel_dims = v2f(
         title_dims.x + title_padding.x * 2,
         title_dims.y + title_padding.y * 2 + btn_dims.y * num_buttons + btn_spacing * (num_buttons - 1) + bottom_spacing,

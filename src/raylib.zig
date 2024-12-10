@@ -26,6 +26,7 @@ const v2f = V2f.v2f;
 const V2i = @import("V2i.zig");
 const v2i = V2i.v2i;
 const DateTime = @import("DateTime.zig");
+const Options = @import("Options.zig");
 
 const builtin = @import("builtin");
 const config = @import("config");
@@ -86,69 +87,28 @@ pub fn centerGameRect(self: *Platform, screen_rect_pos: V2f, screen_rect_dims: V
     self.game_canvas_screen_topleft_offset = screen_rect_pos.add(screen_rect_dims.sub(self.game_canvas_dims_f.scale(self.game_scaling)).scale(0.5));
 }
 
-pub fn updateScreenDims(self: *Platform, dims: V2i) void {
-    self.screen_dims = dims;
-    self.screen_dims_f = dims.toV2f();
-    // get ui scale - fit inside or equal screen dims
-    var ui_scaling: i32 = 0;
-    for (0..100) |_| {
-        const ui_dims = core.min_resolution.scale(ui_scaling + 1);
-        if (ui_dims.x > dims.x or ui_dims.y > dims.y) {
-            break;
-        }
-        ui_scaling += 1;
-    }
-    self.ui_scaling = u.as(f32, ui_scaling);
-    // get game scale
-    if (false) {
-        // cover screen
-        var game_scaling: i32 = 1;
-        for (0..100) |_| {
-            const game_dims = core.min_resolution.scale(game_scaling);
-            if (game_dims.x >= dims.x and game_dims.y >= dims.y) {
-                self.game_canvas_dims = game_dims;
-                break;
-            }
-            const game_dims_wide = core.min_wide_resolution.scale(game_scaling);
-            if (game_dims_wide.x >= dims.x and game_dims_wide.y >= dims.y) {
-                self.game_canvas_dims = game_dims_wide;
-                break;
-            }
-            game_scaling += 1;
-        }
-        self.game_scaling = u.as(f32, game_scaling);
-    } else {
-        // fit into screen
-        var game_scaling: i32 = 0;
-        for (0..100) |_| {
-            const game_dims = core.min_resolution.scale(game_scaling + 1);
-            if (game_dims.x > dims.x and game_dims.y > dims.y) {
-                self.game_canvas_dims = core.min_resolution;
-                break;
-            }
-            const game_dims_wide = core.min_wide_resolution.scale(game_scaling + 1);
-            if (game_dims_wide.x > dims.x and game_dims_wide.y > dims.y) {
-                self.game_canvas_dims = core.min_wide_resolution;
-                break;
-            }
-            game_scaling += 1;
-        }
-        self.game_scaling = u.as(f32, game_scaling);
-    }
-    self.game_canvas_dims_f = self.game_canvas_dims.toV2f();
-    self.game_canvas_screen_topleft_offset = self.screen_dims_f.sub(self.game_canvas_dims_f.scale(self.game_scaling)).scale(0.5);
-    self.log.info("Scaling\n\tScreen: {}x{}\n\tGame: {}x{} scaled by {d}, offset by {d}", .{
-        self.screen_dims.x,      self.screen_dims.y,
-        self.game_canvas_dims.x, self.game_canvas_dims.y,
-        self.game_scaling,       self.game_canvas_screen_topleft_offset,
-    });
+pub fn setWindowSize(_: *Platform, dims: V2i) void {
+    r.SetWindowSize(@intCast(dims.x), @intCast(dims.y));
+}
+
+pub fn setWindowPosition(_: *Platform, pos: V2i) void {
+    r.SetWindowPosition(@intCast(pos.x), @intCast(pos.y));
+}
+
+pub fn getMonitorIdxAndDims(_: *Platform) struct { monitor: i32, dims: V2i } {
+    const m = r.GetCurrentMonitor();
+    const dims = v2i(r.GetMonitorWidth(m), r.GetMonitorHeight(m));
+    return .{
+        .monitor = m,
+        .dims = dims,
+    };
 }
 
 pub fn getResolutions(self: *Platform, buf: []V2i) []V2i {
-    const m = r.GetCurrentMonitor();
-    const m_res = v2i(r.GetMonitorWidth(m), r.GetMonitorHeight(m));
-    var idx = 0;
-    for (0..100) |i| {
+    const m_info = self.getMonitorIdxAndDims();
+    const m_res = m_info.dims;
+    var idx: usize = 0;
+    for (1..100) |i| {
         const dims = core.min_resolution.scale(u.as(i32, i));
         if (dims.x > m_res.x) {
             if (idx < buf.len) {
@@ -160,10 +120,25 @@ pub fn getResolutions(self: *Platform, buf: []V2i) []V2i {
             break;
         }
         // ignore really small resolutions relative to monitor
-        if (dims.x >= m_res.x / 3) {
-            buf[idx] = dims;
-            idx += 1;
+        //if (dims.x >= @divFloor(m_res.x, 3)) {
+        buf[idx] = dims;
+        idx += 1;
+        //}
+        const wide_dims = core.min_wide_resolution.scale(u.as(i32, i));
+        if (wide_dims.x > m_res.x) {
+            if (idx < buf.len) {
+                buf[idx] = m_res;
+                idx += 1;
+            } else {
+                self.log.warn("Not enough space for monitor resolution! Didn't append {}x{}", .{ m_res.x, m_res.y });
+            }
+            break;
         }
+        // ignore really small resolutions relative to monitor
+        //if (dims.x >= @divFloor(m_res.x, 3)) {
+        buf[idx] = wide_dims;
+        idx += 1;
+        //}
     }
     return buf[0..idx];
 }
@@ -226,12 +201,16 @@ pub fn init(title: []const u8) Error!*Platform {
     r.SetTraceLogCallback(raylibTraceLog);
     const title_z = try std.fmt.allocPrintZ(ret.heap, "{s}", .{title});
     //r.SetConfigFlags(r.FLAG_WINDOW_RESIZABLE);
-    const dims = v2i(1352, 878); //core.min_resolution.scale(1); //.add(v2i(32, 32));
-    r.InitWindow(@intCast(dims.x), @intCast(dims.y), title_z);
+
+    // v2i(1352, 878)
+    // core.min_resolution.scale(1); //.add(v2i(32, 32));
+    r.InitWindow(@intCast(core.min_resolution.x), @intCast(core.min_resolution.y), title_z);
+    const options = Options.initTryLoad(ret);
+    const option_dims = options.display.selected_resolution;
+    Options.updateScreenDims(ret, option_dims);
     // show raylib init INFO, then just warnings
     r.SetTraceLogLevel(r.LOG_WARNING);
 
-    ret.updateScreenDims(dims);
     ret.default_font = try ret.loadFont("Roboto-Regular.ttf"); // NOTE uses str_fmt_buf initialized above
 
     r.InitAudioDevice();

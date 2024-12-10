@@ -70,7 +70,7 @@ controls: Controls = .{},
 display: Display = .{},
 kind_selected: Kind = .controls,
 
-pub fn serialize(data: anytype, prefix: []const u8, file: std.fs.File) void {
+pub fn serialize(data: anytype, prefix: []const u8, file: std.fs.File, _: *Platform) void {
     const T = @TypeOf(data);
     inline for (std.meta.fields(T.OptionSerialize)) |s_field| {
         const field = utl.typeFieldByName(T, s_field.name);
@@ -101,23 +101,23 @@ pub fn serialize(data: anytype, prefix: []const u8, file: std.fs.File) void {
     }
 }
 
-pub fn writeToTxt(self: Options) void {
+pub fn writeToTxt(self: *const Options, plat: *Platform) void {
     const options_file = std.fs.cwd().createFile("options.txt", .{}) catch {
-        Log.warn("WARNING: Failed to open options.txt for writing\n", .{});
+        plat.log.warn("WARNING: Failed to open options.txt for writing\n", .{});
         return;
     };
     defer options_file.close();
-    serialize(self.controls, "controls", options_file);
-    serialize(self.display, "display", options_file);
+    serialize(self.controls, "controls", options_file, plat);
+    serialize(self.display, "display", options_file, plat);
 }
 
-pub fn initEmpty() Options {
+pub fn initEmpty(plat: *Platform) Options {
     const ret = Options{};
-    ret.writeToTxt();
+    ret.writeToTxt(plat);
     return ret;
 }
 
-fn setValByName(T: type, data: *T, key: []const u8, val: []const u8) void {
+fn setValByName(plat: *Platform, T: type, data: *T, key: []const u8, val: []const u8) void {
     // check if we're at the leaf of the key  (key could be like controls.foo.bar, we do the actual setting at bar)
     switch (@typeInfo(T)) {
         .@"struct", .@"union" => {
@@ -127,11 +127,11 @@ fn setValByName(T: type, data: *T, key: []const u8, val: []const u8) void {
                     const rest_of_key = key[i + 1 ..];
                     inline for (std.meta.fields(T)) |field| {
                         if (std.mem.eql(u8, first_part_of_key, field.name)) {
-                            setValByName(field.type, &@field(data, field.name), rest_of_key, val);
+                            setValByName(plat, field.type, &@field(data, field.name), rest_of_key, val);
                             return;
                         }
                     } else {
-                        Log.warn("{s}: Couldn't find key: \"{s}\"", .{ @src().fn_name, key });
+                        plat.log.warn("{s}: Couldn't find key: \"{s}\"", .{ @src().fn_name, key });
                     }
                     return;
                 }
@@ -145,38 +145,102 @@ fn setValByName(T: type, data: *T, key: []const u8, val: []const u8) void {
             if (std.meta.stringToEnum(T, val)) |v| {
                 data.* = v;
             } else {
-                Log.warn("{s}: Couldn't parse enum. key: \"{s}\", val: \"{s}\", type \"{s}\"", .{ @src().fn_name, key, val, @typeName(T) });
+                plat.log.warn("{s}: Couldn't parse enum. key: \"{s}\", val: \"{s}\", type \"{s}\"", .{ @src().fn_name, key, val, @typeName(T) });
             }
         },
         .@"struct" => {
             if (comptime std.mem.eql(u8, utl.typeBaseName(T), "V2i")) {
                 var v = V2i{};
                 _ = V2i.parse(val, &v) catch {
-                    Log.warn("{s}: Couldn't parse V2i key: \"{s}\", val: \"{s}\"", .{ @src().fn_name, key, val });
+                    plat.log.warn("{s}: Couldn't parse V2i key: \"{s}\", val: \"{s}\"", .{ @src().fn_name, key, val });
                 };
                 data.* = v;
                 return;
             } else {
                 inline for (std.meta.fields(T)) |f| {
                     if (std.mem.eql(u8, f.name, key)) {
-                        setValByName(f.type, &@field(data, f.name), "", val);
+                        setValByName(plat, f.type, &@field(data, f.name), "", val);
                         break;
                     }
+                } else {
+                    plat.log.warn("{s}: Couldn't parse key: \"{s}\", struct type \"{s}\"\n", .{ @src().fn_name, key, @typeName(T) });
                 }
-                //Log.warn("{s}: Couldn't parse key: \"{s}\", struct type \"{s}\"\n", .{ @src().fn_name, key, @typeName(T) });
             }
         },
         else => {
-            Log.warn("{s}: Couldn't parse key: \"{s}\", type \"{s}\"", .{ @src().fn_name, key, @typeName(T) });
+            plat.log.warn("{s}: Couldn't parse key: \"{s}\", type \"{s}\"", .{ @src().fn_name, key, @typeName(T) });
         },
     }
 }
 
-pub fn initTryLoad() Options {
-    const plat = App.getPlat();
+pub fn updateScreenDims(plat: *Platform, dims: V2i) void {
+    plat.screen_dims = dims;
+    plat.screen_dims_f = dims.toV2f();
+    // get ui scale - fit inside or equal screen dims
+    var ui_scaling: i32 = 0;
+    for (0..100) |_| {
+        const ui_dims = core.min_resolution.scale(ui_scaling + 1);
+        if (ui_dims.x > dims.x or ui_dims.y > dims.y) {
+            break;
+        }
+        ui_scaling += 1;
+    }
+    plat.ui_scaling = utl.as(f32, ui_scaling);
+    // get game scale
+    if (false) {
+        // cover screen
+        var game_scaling: i32 = 1;
+        for (0..100) |_| {
+            const game_dims = core.min_resolution.scale(game_scaling);
+            if (game_dims.x >= dims.x and game_dims.y >= dims.y) {
+                plat.game_canvas_dims = game_dims;
+                break;
+            }
+            const game_dims_wide = core.min_wide_resolution.scale(game_scaling);
+            if (game_dims_wide.x >= dims.x and game_dims_wide.y >= dims.y) {
+                plat.game_canvas_dims = game_dims_wide;
+                break;
+            }
+            game_scaling += 1;
+        }
+        plat.game_scaling = utl.as(f32, game_scaling);
+    } else {
+        // fit into screen
+        var game_scaling: i32 = 0;
+        for (0..100) |_| {
+            const game_dims = core.min_resolution.scale(game_scaling + 1);
+            if (game_dims.x > dims.x and game_dims.y > dims.y) {
+                plat.game_canvas_dims = core.min_resolution;
+                break;
+            }
+            const game_dims_wide = core.min_wide_resolution.scale(game_scaling + 1);
+            if (game_dims_wide.x > dims.x and game_dims_wide.y > dims.y) {
+                plat.game_canvas_dims = core.min_wide_resolution;
+                break;
+            }
+            game_scaling += 1;
+        }
+        plat.game_scaling = utl.as(f32, game_scaling);
+    }
+    plat.game_canvas_dims_f = plat.game_canvas_dims.toV2f();
+    plat.game_canvas_screen_topleft_offset = plat.screen_dims_f.sub(plat.game_canvas_dims_f.scale(plat.game_scaling)).scale(0.5);
+    plat.log.info("Scaling\n\tScreen: {}x{}\n\tGame: {}x{} scaled by {d}, offset by {d}", .{
+        plat.screen_dims.x,      plat.screen_dims.y,
+        plat.game_canvas_dims.x, plat.game_canvas_dims.y,
+        plat.game_scaling,       plat.game_canvas_screen_topleft_offset,
+    });
+
+    const m_info = plat.getMonitorIdxAndDims();
+    const m_dims = m_info.dims;
+    plat.setWindowSize(dims);
+    plat.setWindowPosition(m_dims.sub(dims).toV2f().scale(0.5).toV2i());
+}
+
+// this may be called when getPlat() doesn't work yet!
+pub fn initTryLoad(plat: *App.Platform) Options {
     var ret = Options{};
-    const options_file = std.fs.cwd().openFile("options.txt", .{}) catch return initEmpty();
-    const str = options_file.readToEndAlloc(plat.heap, 1024 * 1024) catch return initEmpty();
+    const options_file = std.fs.cwd().openFile("options.txt", .{}) catch return initEmpty(plat);
+    const str = options_file.readToEndAlloc(plat.heap, 1024 * 1024) catch return initEmpty(plat);
     defer plat.heap.free(str);
     var line_it = std.mem.tokenizeScalar(u8, str, '\n');
     while (line_it.next()) |line_untrimmed| {
@@ -185,10 +249,32 @@ pub fn initTryLoad() Options {
         var equals_it = std.mem.tokenizeScalar(u8, line, '=');
         const key = equals_it.next() orelse continue;
         const val = equals_it.next() orelse continue;
-        setValByName(Options, &ret, key, val);
+        setValByName(plat, Options, &ret, key, val);
     }
     options_file.close();
-    ret.writeToTxt();
+
+    // fix up resolution
+    {
+        const resolutions = plat.getResolutions(&ret.display.resolutions.buffer);
+        assert(resolutions.len > 0);
+        ret.display.resolutions.resize(resolutions.len) catch unreachable;
+
+        var best = resolutions[0];
+        var best_idx: usize = 0;
+        var best_diff = ret.display.selected_resolution.sub(resolutions[0]).mLen();
+        for (resolutions[1..], 1..) |res, i| {
+            const diff = ret.display.selected_resolution.sub(res).mLen();
+            if (diff < best_diff) {
+                best = res;
+                best_idx = i;
+                best_diff = diff;
+            }
+        }
+        ret.display.selected_resolution = best;
+        ret.display.selected_resolution_idx = best_idx;
+    }
+
+    ret.writeToTxt(plat);
     return ret;
 }
 
@@ -199,10 +285,90 @@ const el_bg_color_selected = Colorf.rgb(0.4, 0.4, 0.4);
 
 fn updateDisplay(self: *Options, cmd_buf: *ImmUI.CmdBuf, pos: V2f) Error!bool {
     var dirty: bool = false;
-    _ = self;
-    _ = cmd_buf;
-    _ = pos;
-    dirty = false;
+    const plat = App.getPlat();
+    const data = App.getData();
+    const font = data.fonts.get(.pixeloid);
+    const text_opt = draw.TextOpt{
+        .font = font,
+        .size = font.base_size * utl.as(u32, plat.ui_scaling),
+        .color = .white,
+    };
+    const ui_scaling = plat.ui_scaling;
+    const mouse_pos = plat.getMousePosScreen();
+    const mouse_clicked = plat.input_buffer.mouseBtnIsJustPressed(.left);
+    const el_padding = el_text_padding.scale(ui_scaling);
+    var curr_row_pos = pos;
+    const row_height: f32 = utl.as(f32, text_opt.size) + el_padding.y * 2;
+    {
+        const cast_method_text = "Resolution:";
+        const cast_method_text_dims = try plat.measureText(cast_method_text, text_opt);
+        cmd_buf.appendAssumeCapacity(.{ .label = .{
+            .pos = curr_row_pos,
+            .text = ImmUI.initLabel(cast_method_text),
+            .opt = text_opt,
+        } });
+
+        var dropdown_el_pos = pos.add(v2f(cast_method_text_dims.x + 4, 0));
+        var dropdown_el_dims = try plat.measureText("10000x10000", text_opt);
+        dropdown_el_dims = dropdown_el_dims.add(el_padding.scale(2));
+        // selected
+        cmd_buf.appendAssumeCapacity(.{ .rect = .{
+            .pos = dropdown_el_pos,
+            .dims = dropdown_el_dims,
+            .opt = .{ .fill_color = el_bg_color_selected },
+        } });
+        const selected_res_str = try utl.bufPrintLocal("{d}x{d}", .{ self.display.selected_resolution.x, self.display.selected_resolution.y });
+        cmd_buf.appendAssumeCapacity(.{ .label = .{
+            .pos = dropdown_el_pos.add(el_padding),
+            .text = ImmUI.initLabel(selected_res_str),
+            .opt = text_opt,
+        } });
+        // open/close dropdown
+        var mouse_clicked_inside_menu = false;
+        if (mouse_clicked and geom.pointIsInRectf(mouse_pos, .{ .pos = dropdown_el_pos, .dims = dropdown_el_dims })) {
+            self.display.resolutions_dropdown_open = !self.display.resolutions_dropdown_open;
+            mouse_clicked_inside_menu = true;
+        }
+        dropdown_el_pos.y += dropdown_el_dims.y;
+        var selection = self.display.selected_resolution;
+        var selection_idx = self.display.selected_resolution_idx;
+        if (self.display.resolutions_dropdown_open) {
+            for (self.display.resolutions.constSlice(), 0..) |res, i| {
+                const hovered = geom.pointIsInRectf(mouse_pos, .{ .pos = dropdown_el_pos, .dims = dropdown_el_dims });
+                if (i == self.display.selected_resolution_idx) continue;
+                cmd_buf.appendAssumeCapacity(.{ .rect = .{
+                    .pos = dropdown_el_pos,
+                    .dims = dropdown_el_dims,
+                    .opt = .{
+                        .fill_color = if (hovered) el_bg_color_hovered else el_bg_color,
+                    },
+                } });
+                const res_str = try utl.bufPrintLocal("{d}x{d}", .{ res.x, res.y });
+                cmd_buf.appendAssumeCapacity(.{ .label = .{
+                    .pos = dropdown_el_pos.add(el_padding),
+                    .text = ImmUI.initLabel(res_str),
+                    .opt = text_opt,
+                } });
+                if (mouse_clicked and hovered) {
+                    dirty = true;
+                    selection = res;
+                    selection_idx = i;
+                    self.display.resolutions_dropdown_open = false;
+                    mouse_clicked_inside_menu = true;
+                    updateScreenDims(plat, selection);
+                    App.get().reinitRenderTextures();
+                }
+                dropdown_el_pos.y += dropdown_el_dims.y;
+            }
+        }
+        if (mouse_clicked and !mouse_clicked_inside_menu) {
+            self.display.resolutions_dropdown_open = false;
+        }
+        self.display.selected_resolution_idx = selection_idx;
+        self.display.selected_resolution = selection;
+    }
+    curr_row_pos.y += row_height;
+
     return dirty;
 }
 
@@ -299,7 +465,7 @@ fn updateControls(self: *Options, cmd_buf: *ImmUI.CmdBuf, pos: V2f) Error!bool {
 }
 
 pub const kind_rect_dims = v2f(300, 260);
-pub const full_panel_padding = v2f(10, 10);
+pub const full_panel_padding = v2f(20, 20);
 pub const top_bot_parts_height = 30;
 pub const full_panel_dims = kind_rect_dims.add(v2f(0, top_bot_parts_height * 2)).add(full_panel_padding.scale(2));
 
@@ -319,14 +485,14 @@ pub fn update(self: *Options, cmd_buf: *ImmUI.CmdBuf) Error!enum { dont_close, c
             .dims = panel_dims,
             .opt = .{
                 .fill_color = Colorf.rgb(0.1, 0.1, 0.1),
-                .edge_radius = 0.2,
+                .edge_radius = 0.1,
             },
         },
     });
     const padding = full_panel_padding.scale(ui_scaling);
     const selected_btn_dims = v2f(
         80,
-        utl.as(f32, font.base_size),
+        utl.as(f32, font.base_size) + 10,
     ).scale(ui_scaling);
     const selected_info = @typeInfo(Kind).@"enum";
     const num_selected_f = utl.as(f32, selected_info.fields.len);
@@ -348,7 +514,7 @@ pub fn update(self: *Options, cmd_buf: *ImmUI.CmdBuf) Error!enum { dont_close, c
         .controls => try self.updateControls(cmd_buf, kind_section_pos),
         .display => try self.updateDisplay(cmd_buf, kind_section_pos),
     }) {
-        self.writeToTxt();
+        self.writeToTxt(plat);
     }
 
     const back_btn_pos = kind_section_pos.add(v2f(0, kind_section_dims.y));
