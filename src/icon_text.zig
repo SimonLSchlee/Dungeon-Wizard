@@ -108,22 +108,34 @@ pub const Icon = enum(u8) {
 };
 
 pub const Fmt = packed struct(u8) {
-    pub const Tint = enum(u3) {
+    pub const Tint = enum(u4) {
         white,
         red,
+        green,
+        blue,
+        cyan,
+        magenta,
+        yellow,
         orange,
+        purple,
 
         pub const colors = std.EnumArray(Tint, Colorf).init(.{
             .white = .white,
             .red = .red,
+            .green = .green,
+            .blue = .blue,
+            .cyan = .cyan,
+            .magenta = .magenta,
+            .yellow = .yellow,
             .orange = .orange,
+            .purple = .purple,
         });
         pub fn toColor(tint: Tint) Colorf {
             return colors.get(tint);
         }
     };
     tint: Tint = .white,
-    _: u5 = 0,
+    _: u4 = 0,
 
     pub const codepoint_start: u21 = Icon.codepoint_end;
     pub const codepoint_end: u21 = codepoint_start + @typeInfo(Tint).@"enum".fields.len;

@@ -26,6 +26,7 @@ const menuUI = @import("menuUI.zig");
 const gameUI = @import("gameUI.zig");
 const Item = @import("Item.zig");
 const ImmUI = @import("ImmUI.zig");
+const icon_text = @import("icon_text.zig");
 const Shop = @This();
 
 const max_num_spells = 4;
@@ -112,9 +113,8 @@ pub fn canBuy(run: *const Run, product: *const Product) bool {
 }
 
 fn unqProductSlot(cmd_buf: *ImmUI.CmdBuf, tooltip_buf: *ImmUI.CmdBuf, slot: *ProductSlot, run: *const Run) Error!bool {
-    const data = App.get().data;
     const plat = getPlat();
-    const ui_scaling: f32 = plat.ui_scaling + 1;
+    const ui_scaling: f32 = plat.ui_scaling;
     var ret: bool = false;
 
     const mouse_pos = plat.getMousePosScreen();
@@ -129,7 +129,7 @@ fn unqProductSlot(cmd_buf: *ImmUI.CmdBuf, tooltip_buf: *ImmUI.CmdBuf, slot: *Pro
     // background rect
     if (can_buy and hovered) {
         // TODO animate
-        slot_contents_pos = slot_contents_pos.add(v2f(0, -5));
+        slot_contents_pos = slot_contents_pos.add(v2f(0, -3 * ui_scaling));
     }
     cmd_buf.append(.{ .rect = .{
         .pos = slot.rect.pos,
@@ -159,23 +159,17 @@ fn unqProductSlot(cmd_buf: *ImmUI.CmdBuf, tooltip_buf: *ImmUI.CmdBuf, slot: *Pro
                 }
             },
         }
-        const price_font = data.fonts.get(.pixeloid);
-        const price_text_opt = draw.TextOpt{
-            .color = if (can_buy) .yellow else .red,
-            .size = price_font.base_size * utl.as(u32, ui_scaling),
-            .smoothing = .none,
-            .font = price_font,
-            .border = .{ .dist = ui_scaling },
-        };
-        const price_str = try utl.bufPrintLocal("${}", .{product.price.gold});
-        const price_str_dims = try plat.measureText(price_str, price_text_opt);
+        const price_str = try utl.bufPrintLocal(
+            "{any}{any}{}",
+            .{
+                icon_text.Icon.coin,
+                icon_text.Fmt{ .tint = if (can_buy) .yellow else .red },
+                product.price.gold,
+            },
+        );
+        const price_str_dims = icon_text.measureIconText(price_str).scale(ui_scaling);
         const price_pos = slot.rect.pos.add(slot.rect.dims).sub(price_str_dims.add(V2f.splat(slot_margin)));
-
-        try cmd_buf.append(.{ .label = .{
-            .pos = price_pos,
-            .text = ImmUI.initLabel(price_str),
-            .opt = price_text_opt,
-        } });
+        try icon_text.unqRenderIconText(cmd_buf, price_str, price_pos, ui_scaling);
     }
 
     return ret;
@@ -184,7 +178,7 @@ fn unqProductSlot(cmd_buf: *ImmUI.CmdBuf, tooltip_buf: *ImmUI.CmdBuf, slot: *Pro
 pub fn update(self: *Shop, run: *Run) Error!?Product {
     const plat = getPlat();
     const data = App.get().data;
-    const ui_scaling: f32 = plat.ui_scaling + 1;
+    const ui_scaling: f32 = plat.ui_scaling;
     var ret: ?Product = null;
 
     try run.imm_ui.commands.append(.{ .clear = .{
@@ -193,20 +187,22 @@ pub fn update(self: *Shop, run: *Run) Error!?Product {
 
     const title_center_pos = v2f(
         plat.screen_dims_f.x * 0.5,
-        60,
+        30 * ui_scaling,
     );
+    const title_font = data.fonts.get(.pixeloid);
     try run.imm_ui.commands.append(.{ .label = .{
         .pos = title_center_pos,
         .text = ImmUI.initLabel("Shoppy Woppy"),
         .opt = .{
             .center = true,
             .color = .white,
-            .size = 45,
+            .font = title_font,
+            .size = title_font.base_size * utl.as(u32, ui_scaling + 2),
         },
     } });
 
-    const price_font = data.fonts.get(.pixeloid);
-    const price_font_size = utl.as(f32, price_font.base_size) * ui_scaling;
+    const price_font = data.fonts.get(.seven_x_five);
+    const price_font_size = utl.as(f32, price_font.base_size) * (ui_scaling);
 
     // spells
     const spell_dims = Spell.card_dims.scale(ui_scaling);
