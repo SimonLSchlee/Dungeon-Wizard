@@ -230,7 +230,7 @@ pub fn gobbowProto() Thing {
     ret.controller.ai_actor.actions.getPtr(.projectile_attack_1).* = (.{
         .kind = .{ .projectile_attack = .{
             .projectile = .arrow,
-            .range = 135,
+            .range = 110,
             .LOS_thiccness = 5,
         } },
         .cooldown = utl.TickCounter.initStopped(60),
@@ -250,7 +250,7 @@ pub fn sharpboiProto() Thing {
             .melee_attack = .{
                 .lunge_accel = .{
                     .accel = 2.5,
-                    .max_speed = 2.5,
+                    .max_speed = 2.4,
                     .friction = 0,
                 },
                 .hitbox = .{
@@ -262,7 +262,7 @@ pub fn sharpboiProto() Thing {
                     .deactivate_on_hit = true,
                 },
                 .hit_to_side_force = 1.25,
-                .range = 55,
+                .range = 50,
                 .LOS_thiccness = ret.coll_radius * 0.5,
             },
         },
@@ -278,7 +278,7 @@ pub fn acolyteProto() Thing {
         .accel = 0.0047 * TileMap.tile_sz_f,
         .max_speed = 0.0188 * TileMap.tile_sz_f,
     };
-    ret.controller.ai_actor.flee_range = 125;
+    ret.controller.ai_actor.flee_range = 120;
     ret.controller.ai_actor.actions.getPtr(.spell_cast_summon_1).* = (.{
         .kind = .{ .spell_cast = .{
             .spell = Spell.getProto(.summon_bat),
@@ -303,7 +303,7 @@ pub fn gobbomberProto() Thing {
     ret.accel_params = .{
         .max_speed = 0.0125 * TileMap.tile_sz_f,
     };
-    ret.controller.ai_actor.flee_range = 100;
+    ret.controller.ai_actor.flee_range = 90;
     ret.controller.ai_actor.actions.getPtr(.ability_1).* = .{
         .kind = .{ .shield_up = .{
             .amount = 8,
@@ -313,7 +313,7 @@ pub fn gobbomberProto() Thing {
     ret.controller.ai_actor.actions.getPtr(.projectile_attack_1).* = .{
         .kind = .{ .projectile_attack = .{
             .projectile = .bomb,
-            .range = 100,
+            .range = 95,
             .LOS_thiccness = 5,
         } },
         .cooldown = utl.TickCounter.initStopped(90),
@@ -341,6 +341,7 @@ pub fn creatureProto(creature_kind: Kind, sprite_kind: sprites.CreatureAnim.Kind
         .renderer = .{ .creature = .{
             .draw_color = .yellow,
             .draw_radius = Thing.SizeCategory.draw_radii.get(size_cat),
+            .hp_bar_width = Thing.SizeCategory.hp_bar_width.get(size_cat),
         } },
         .animator = .{ .kind = .{ .creature = .{ .kind = sprite_kind } } },
         .hurtbox = .{

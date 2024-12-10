@@ -72,6 +72,12 @@ pub const SizeCategory = enum {
         .medium = @round(0.375 * TileMap.tile_sz_f),
         .big = @round(0.45 * TileMap.tile_sz_f),
     });
+    pub const hp_bar_width = std.EnumArray(SizeCategory, f32).init(.{
+        .none = 0,
+        .smol = draw_radii.get(.smol) * 2.5,
+        .medium = draw_radii.get(.medium) * 2.75,
+        .big = draw_radii.get(.big) * 2.5,
+    });
 };
 
 pub const Pool = pool.BoundedPool(Thing, Room.max_things_in_room);
@@ -1058,6 +1064,7 @@ pub const ShapeRenderer = struct {
 pub const CreatureRenderer = struct {
     draw_radius: f32 = 10,
     draw_color: Colorf = Colorf.red,
+    hp_bar_width: f32 = 20,
 
     pub fn renderUnder(self: *const Thing, room: *const Room) Error!void {
         assert(self.spawn_state == .spawned);
@@ -1135,7 +1142,7 @@ pub const CreatureRenderer = struct {
         const renderer = &self.renderer.creature;
 
         const hp_height = 3;
-        const hp_width = @round(renderer.draw_radius * 2.5);
+        const hp_width = @round(renderer.hp_bar_width);
         const hp_y_offset = if (self.selectable) |s| s.height + 10 else @round(renderer.draw_radius * 3.5);
         const hp_offset = v2f(-hp_width * 0.5, -hp_y_offset).round();
         const hp_topleft = self.pos.add(hp_offset).round();
