@@ -1118,6 +1118,8 @@ pub const CreatureRenderer = struct {
             .src_dims = frame.size.toV2f(),
             .uniform_scaling = core.game_sprite_scaling,
             .tint = tint,
+            //.round_to_pixel = true,
+            .round_to_pixel = if (self.player_input != null) false else true,
         };
         plat.texturef(self.pos, frame.texture, opt);
 
@@ -1144,12 +1146,10 @@ pub const CreatureRenderer = struct {
         const hp_height = 3;
         const hp_width = @round(renderer.hp_bar_width);
         const hp_y_offset = if (self.selectable) |s| s.height + 10 else @round(renderer.draw_radius * 3.5);
-        const hp_offset = v2f(-hp_width * 0.5, -hp_y_offset).round();
+        const hp_offset = v2f(-hp_width * 0.5, -hp_y_offset);
         const hp_topleft = self.pos.add(hp_offset).round();
-        const shields_y_offset = @round(hp_y_offset - hp_height);
         const shields_height = 3;
-        const shields_offset = v2f(-hp_width * 0.5, -shields_y_offset).round();
-        const shields_topleft = self.pos.add(shields_offset).round();
+        const shields_topleft = hp_topleft.add(v2f(0, hp_height));
 
         if (self.isAliveCreature()) {
             if (self.hp) |hp| {
@@ -1159,7 +1159,7 @@ pub const CreatureRenderer = struct {
                     v2f(hp_width, hp_height),
                     .{
                         .fill_color = Colorf.black,
-                        .round_to_pixel = true,
+                        //.round_to_pixel = true,
                         .smoothing = .none,
                     },
                 );
@@ -1168,7 +1168,7 @@ pub const CreatureRenderer = struct {
                     v2f(curr_width, hp_height),
                     .{
                         .fill_color = HP.faction_colors.get(self.faction),
-                        .round_to_pixel = true,
+                        //.round_to_pixel = true,
                         .smoothing = .none,
                     },
                 );
@@ -1176,13 +1176,13 @@ pub const CreatureRenderer = struct {
                     const line_hp_inc: f32 = if (hp.max < 100) 10 else 50;
                     var i: f32 = line_hp_inc;
                     while (i < hp.curr) {
-                        const line_x = @ceil(curr_width * (i / hp.curr));
+                        const line_x = curr_width * (i / hp.curr);
                         const top = hp_topleft.add(v2f(line_x, 0));
                         const bot = hp_topleft.add(v2f(line_x, hp_height));
                         plat.linef(top, bot, .{
                             .thickness = 1,
                             .color = Colorf.black.fade(0.5),
-                            .round_to_pixel = true,
+                            //.round_to_pixel = true,
                             .smoothing = .none,
                         });
                         i += line_hp_inc;
@@ -1232,7 +1232,8 @@ pub const CreatureRenderer = struct {
                         opt.smoothing = .none;
                         opt.origin = .topleft;
                         opt.src_dims = cropped_dims;
-                        const mana_topleft = hp_topleft.sub(v2f(0, cropped_dims.y + 1)).round();
+                        opt.round_to_pixel = if (self.player_input != null) false else true;
+                        const mana_topleft = hp_topleft.sub(v2f(0, cropped_dims.y + 1)); //.round();
                         var curr_pos = mana_topleft;
                         for (0..utl.as(usize, mana.curr)) |_| {
                             plat.texturef(curr_pos, rf.texture, opt);
@@ -1516,7 +1517,7 @@ pub fn moveAndCollide(self: *Thing, room: *Room) void {
             self.last_coll = coll;
             // push out
             if (coll.pen_dist > 0) {
-                self.pos = coll.pos.add(coll.normal.scale(self.coll_radius + 1));
+                self.pos = coll.pos.add(coll.normal.scale(self.coll_radius + 0.1));
             }
             switch (coll.kind) {
                 .thing => |id| {

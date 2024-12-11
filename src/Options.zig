@@ -309,8 +309,9 @@ pub fn updateScreenDims(plat: *Platform, dims: V2i) void {
                 }
             }
         }
-        plat.game_canvas_dims = best_game_dims;
-        plat.game_scaling = utl.as(f32, best_scaling);
+        plat.game_canvas_dims = best_game_dims.scale(best_scaling);
+        plat.game_scaling = 1; //utl.as(f32, best_scaling);
+        plat.game_zoom_levels = utl.as(f32, best_scaling);
     }
     plat.game_canvas_dims_f = plat.game_canvas_dims.toV2f();
     plat.game_canvas_screen_topleft_offset = plat.screen_dims_f.sub(plat.game_canvas_dims_f.scale(plat.game_scaling)).scale(0.5);

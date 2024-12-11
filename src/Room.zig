@@ -219,7 +219,7 @@ pub fn reset(self: *Room) Error!void {
     self.fog.clearAll();
     self.camera = .{
         .offset = plat.game_canvas_dims_f.scale(0.5),
-        .zoom = 1,
+        .zoom = plat.game_zoom_levels,
     };
     self.curr_tick = 0;
     self.rng = std.Random.DefaultPrng.init(self.init_params.seed);
@@ -259,6 +259,7 @@ pub fn reloadFromTileMap(self: *Room, tilemap_idx: u32) Error!void {
 pub fn resolutionChanged(self: *Room) void {
     const plat = getPlat();
     self.camera.offset = plat.game_canvas_dims_f.scale(0.5);
+    self.camera.zoom = plat.game_zoom_levels;
     self.fog.resolutionChanged();
     self.ui_slots.reflowRects();
 }
@@ -489,6 +490,7 @@ pub fn update(self: *Room) Error!void {
         // fog and camera
         self.fog.clearVisible();
         if (self.getPlayer()) |player| {
+            //self.camera.pos = self.camera.pos.add(player.pos.sub(self.camera.pos).scale(0.1));
             self.camera.pos = player.pos;
             try self.fog.addVisibleCircle(
                 self.tilemap.getRoomRect(),
@@ -504,6 +506,12 @@ pub fn update(self: *Room) Error!void {
                 try self.fog.addVisiblePoly(self.tilemap.getRoomRect(), &points);
             }
         }
+    }
+    const wheel = plat.mouseWheelY();
+    if (wheel > 0) {
+        self.camera.zoom = @min(self.camera.zoom + 1, plat.game_zoom_levels);
+    } else if (wheel < 0) {
+        self.camera.zoom = @max(self.camera.zoom - 1, 1);
     }
 
     for (self.free_queue.constSlice()) |id| {
@@ -537,9 +545,6 @@ pub fn render(self: *const Room, ui_render_texture: Platform.RenderTexture2D, ga
 
     plat.startCamera2D(self.camera, .{ .round_to_pixel = true });
     try self.tilemap.renderUnderObjects();
-    plat.endCamera2D();
-
-    plat.startCamera2D(self.camera, .{});
     // exit
     for (self.init_params.exits.constSlice()) |exit| {
         try exit.render(self);
@@ -589,16 +594,21 @@ pub fn render(self: *const Room, ui_render_texture: Platform.RenderTexture2D, ga
             try thing.renderUnder(self);
         }
         for (thing_arr.constSlice()) |thing| {
-            try thing.render(self);
+            if (thing.player_input != null) {
+                plat.endCamera2D();
+                plat.startCamera2D(self.camera, .{ .round_to_pixel = false });
+                try thing.render(self);
+                plat.endCamera2D();
+                plat.startCamera2D(self.camera, .{ .round_to_pixel = true });
+            } else {
+                try thing.render(self);
+            }
         }
-        plat.endCamera2D();
-        plat.startCamera2D(self.camera, .{ .round_to_pixel = true });
+
         try self.tilemap.renderOverObjects(self.camera, thing_arr.constSlice());
         for (thing_arr.constSlice()) |thing| {
             try thing.renderOver(self);
         }
-        plat.endCamera2D();
-        plat.startCamera2D(self.camera, .{});
         for (self.init_params.exits.constSlice()) |exit| {
             try exit.renderOver(self);
         }

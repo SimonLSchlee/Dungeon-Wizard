@@ -209,6 +209,7 @@ pub const TextureOpt = struct {
     scaled_dims: ?V2f = null, // x y absolute scaled dims, applied before uniform_scaling
     uniform_scaling: f32 = 1.0,
     rot_rads: f32 = 0,
+    round_to_pixel: bool = false,
 };
 
 pub const Camera2D = struct {

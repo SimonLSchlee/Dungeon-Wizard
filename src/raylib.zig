@@ -69,6 +69,7 @@ default_font: Font = undefined,
 screen_dims: V2i = .{},
 screen_dims_f: V2f = .{},
 // set when resolution changes
+game_zoom_levels: f32 = 1,
 game_scaling: f32 = 1,
 game_canvas_dims: V2i = core.min_resolution,
 game_canvas_dims_f: V2f = core.min_resolution.toV2f(),
@@ -836,6 +837,10 @@ pub fn texturef(_: *Platform, pos: V2f, tex: Texture2D, opt: draw.TextureOpt) vo
         .width = src.width * opt.uniform_scaling,
         .height = src.height * opt.uniform_scaling,
     };
+    if (opt.round_to_pixel) {
+        dest.x = @round(dest.x);
+        dest.y = @round(dest.y);
+    }
     if (opt.scaled_dims) |d| {
         dest.width = d.x;
         dest.height = d.y;
@@ -854,8 +859,6 @@ pub fn texturef(_: *Platform, pos: V2f, tex: Texture2D, opt: draw.TextureOpt) vo
     };
     const r_filter = switch (opt.smoothing) {
         .none => blk: {
-            dest.x = @round(dest.x);
-            dest.y = @round(dest.y);
             break :blk r.TEXTURE_FILTER_POINT;
         },
         .bilinear => r.TEXTURE_FILTER_BILINEAR,
@@ -931,6 +934,10 @@ pub fn endRenderToTexture(_: *Platform) void {
 
 pub fn mousePosf(_: *Platform) V2f {
     return zVec(r.GetMousePosition());
+}
+
+pub fn mouseWheelY(_: *Platform) f32 {
+    return r.GetMouseWheelMoveV().y;
 }
 
 const mouse_button_map = std.EnumArray(MouseButton, c_int).init(.{

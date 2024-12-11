@@ -51,7 +51,7 @@ pub fn init() Error!Fog {
     const plat = getPlat();
     return .{
         .visited = Map.init(plat.heap),
-        .render_tex = plat.createRenderTexture("fog", plat.screen_dims),
+        .render_tex = plat.createRenderTexture("fog", plat.game_canvas_dims),
     };
 }
 
@@ -64,14 +64,14 @@ pub fn deinit(self: *Fog) void {
 pub fn resolutionChanged(self: *Fog) void {
     const plat = getPlat();
     plat.destroyRenderTexture(self.render_tex);
-    self.render_tex = plat.createRenderTexture("fog", plat.screen_dims);
+    self.render_tex = plat.createRenderTexture("fog", plat.game_canvas_dims);
 }
 
 pub fn clone(self: *const Fog) Error!Fog {
     const plat = getPlat();
     var ret = self.*;
     ret.visited = try self.visited.clone();
-    ret.render_tex = plat.createRenderTexture("fog", plat.screen_dims);
+    ret.render_tex = plat.createRenderTexture("fog", plat.game_canvas_dims);
     return ret;
 }
 
@@ -177,7 +177,7 @@ pub fn renderToTexture(self: *const Fog, camera: draw.Camera2D) Error!void {
     plat.startRenderToTexture(self.render_tex);
     plat.clear(Colorf.blank);
     plat.setBlend(.render_tex_alpha);
-    plat.startCamera2D(camera, .{});
+    plat.startCamera2D(camera, .{ .round_to_pixel = true });
 
     // TODO this works like the tilemap grid drawing for now, needs changing for blurring etc
     const inv_zoom = 1 / camera.zoom;
