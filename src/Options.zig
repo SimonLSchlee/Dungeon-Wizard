@@ -21,6 +21,7 @@ const Data = @import("Data.zig");
 const menuUI = @import("menuUI.zig");
 const ImmUI = @import("ImmUI.zig");
 const player = @import("player.zig");
+const icon_text = @import("icon_text.zig");
 const Options = @This();
 
 const ui_el_text_padding: V2f = v2f(5, 5);
@@ -162,11 +163,54 @@ pub const Controls = struct {
             keyboard_key,
             // controller button, axis etc...
         };
-        pub const Data = union(InputBinding.Kind) {
+        pub const KindData = union(InputBinding.Kind) {
+            pub const max_input_data_chars = 8;
             mouse_button: core.MouseButton,
             keyboard_key: core.Key,
+            pub const key_strings = blk: {
+                //var buf: [8]u8 = undefined;
+                var ret = std.EnumArray(core.Key, []const u8).initDefault("<>", .{
+                    .backtick = "`",
+                    .space = "spacebar",
+                    .apostrophe = "'",
+                    .comma = ",",
+                    .minus = "-",
+                    .period = ".",
+                    .semicolon = ";",
+                    .equals = "=",
+                    .slash = "/",
+                    .backslash = "\\",
+                    .escape = "escape",
+                });
+                //TODO glyphs
+                ret.getPtr(.left).* = "left";
+                ret.getPtr(.right).* = "right";
+                ret.getPtr(.up).* = "up";
+                ret.getPtr(.down).* = "down";
+                for (0..12) |i| {
+                    const k: core.Key = @enumFromInt(@intFromEnum(core.Key.f1) + i);
+                    ret.getPtr(k).* = std.fmt.comptimePrint("f{}", .{i + 1});
+                }
+                for ('a'..('z' + 1)) |char| {
+                    const k = std.meta.stringToEnum(core.Key, &.{char}).?;
+                    ret.getPtr(k).* = std.fmt.comptimePrint("{c}", .{utl.as(u8, char)});
+                }
+                for (core.Key.numbers, '0'..('9' + 1)) |k, char| {
+                    ret.getPtr(k).* = std.fmt.comptimePrint("{c}", .{utl.as(u8, char)});
+                }
+                break :blk ret;
+            };
+            pub fn getIconText(self: InputBinding.KindData) []const u8 {
+                return switch (self) {
+                    .keyboard_key => |key| key_strings.get(key),
+                    .mouse_button => |btn| switch (btn) {
+                        .left => "LMB",
+                        .right => "RMB",
+                    },
+                };
+            }
         };
-        pub const InputsArray = std.BoundedArray(InputBinding.Data, max_input_bindings);
+        pub const InputsArray = std.BoundedArray(InputBinding.KindData, max_input_bindings);
         pub const Command = union(enum) {
             action: player.Action.Id,
             pause,
@@ -185,14 +229,14 @@ pub const Controls = struct {
         // TODO needed?
         //idx: usize = 0,
 
-        pub fn init(name: []const u8, inputs: []const InputBinding.Data, cmd: InputBinding.Command) InputBinding {
+        pub fn init(name: []const u8, inputs: []const InputBinding.KindData, cmd: InputBinding.Command) InputBinding {
             return .{
                 .slot_name = Label.fromSlice(name) catch unreachable,
                 .inputs = InputsArray.fromSlice(inputs) catch unreachable,
                 .command = cmd,
             };
         }
-        pub fn initAction(name: []const u8, inputs: []const InputBinding.Data, action_id: player.Action.Id) InputBinding {
+        pub fn initAction(name: []const u8, inputs: []const InputBinding.KindData, action_id: player.Action.Id) InputBinding {
             return InputBinding.init(name, inputs, .{ .action = action_id });
         }
     };
@@ -311,11 +355,44 @@ pub fn writeToTxt(self: *const Options, plat: *Platform) void {
     serialize(self.controls, "controls", options_file, plat);
     serialize(self.display, "display", options_file, plat);
 }
+pub fn fixupUI(self: *Options, plat: *Platform) void {
+    // fix up controls
+    {
+        self.controls.dropdown.selected_idx = @intFromEnum(self.controls.cast_method);
+    }
+    // fix up resolution
+    {
+        const resolutions = plat.getResolutions(&self.display.resolutions.buffer);
+        assert(resolutions.len > 0);
+        self.display.resolutions.resize(resolutions.len) catch unreachable;
 
-pub fn initEmpty(plat: *Platform) Options {
+        var best = resolutions[0];
+        var best_idx: usize = 0;
+        var best_diff = self.display.selected_resolution.sub(resolutions[0]).mLen();
+        for (resolutions[1..], 1..) |res, i| {
+            const diff = self.display.selected_resolution.sub(res).mLen();
+            if (diff < best_diff) {
+                best = res;
+                best_idx = i;
+                best_diff = diff;
+            }
+        }
+        self.display.selected_resolution = best;
+        self.display.dropdown.selected_idx = best_idx;
+        for (resolutions) |res| {
+            self.display.resolutions_strings.append(
+                Display.ResLabel.fromSlice(
+                    utl.bufPrintLocal("{d}x{d}", .{ res.x, res.y }) catch continue,
+                ) catch continue,
+            ) catch break;
+        }
+    }
+}
+
+pub fn initDefault(plat: *Platform) Options {
     var ret = Options{};
     ret.controls.init();
-    ret.writeToTxt(plat);
+    ret.fixupUI(plat);
     return ret;
 }
 
@@ -444,9 +521,10 @@ pub fn updateScreenDims(plat: *Platform, dims: V2i) void {
 
 // this may be called when getPlat() doesn't work yet!
 pub fn initTryLoad(plat: *App.Platform) Options {
-    var ret = Options{};
-    const options_file = std.fs.cwd().openFile("options.txt", .{}) catch return initEmpty(plat);
-    const str = options_file.readToEndAlloc(plat.heap, 1024 * 1024) catch return initEmpty(plat);
+    var ret = initDefault(plat);
+    defer ret.writeToTxt(plat);
+    const options_file = std.fs.cwd().openFile("options.txt", .{}) catch return ret;
+    const str = options_file.readToEndAlloc(plat.heap, 1024 * 1024) catch return ret;
     defer plat.heap.free(str);
     var line_it = std.mem.tokenizeScalar(u8, str, '\n');
     while (line_it.next()) |line_untrimmed| {
@@ -458,39 +536,9 @@ pub fn initTryLoad(plat: *App.Platform) Options {
         setValByName(plat, Options, &ret, key, val);
     }
     options_file.close();
-    // fix up controls
-    {
-        ret.controls.dropdown.selected_idx = @intFromEnum(ret.controls.cast_method);
-    }
-    // fix up resolution
-    {
-        const resolutions = plat.getResolutions(&ret.display.resolutions.buffer);
-        assert(resolutions.len > 0);
-        ret.display.resolutions.resize(resolutions.len) catch unreachable;
+    // TODO yuck, maybe fix (de)serialization instead of this hack
+    ret.fixupUI(plat);
 
-        var best = resolutions[0];
-        var best_idx: usize = 0;
-        var best_diff = ret.display.selected_resolution.sub(resolutions[0]).mLen();
-        for (resolutions[1..], 1..) |res, i| {
-            const diff = ret.display.selected_resolution.sub(res).mLen();
-            if (diff < best_diff) {
-                best = res;
-                best_idx = i;
-                best_diff = diff;
-            }
-        }
-        ret.display.selected_resolution = best;
-        ret.display.dropdown.selected_idx = best_idx;
-        for (resolutions) |res| {
-            ret.display.resolutions_strings.append(
-                Display.ResLabel.fromSlice(
-                    utl.bufPrintLocal("{d}x{d}", .{ res.x, res.y }) catch continue,
-                ) catch continue,
-            ) catch break;
-        }
-    }
-
-    ret.writeToTxt(plat);
     return ret;
 }
 
@@ -569,6 +617,32 @@ fn updateControls(self: *Options, cmd_buf: *ImmUI.CmdBuf, pos: V2f) Error!bool {
             dirty = true;
         }
         curr_row_pos.y += row_height;
+    }
+    // bindings
+    {
+        if (false) {
+            cmd_buf.appendAssumeCapacity(.{ .label = .{
+                .pos = curr_row_pos.add(el_padding),
+                .text = ImmUI.initLabel("Bindings"),
+                .opt = text_opt,
+            } });
+            curr_row_pos.y += row_height;
+        }
+        for (self.controls.input_bindings.constSlice()) |binding| {
+            cmd_buf.appendAssumeCapacity(.{ .label = .{
+                .pos = curr_row_pos.add(el_padding),
+                .text = ImmUI.initLabel(binding.slot_name.constSlice()),
+                .opt = text_opt,
+            } });
+            var icon_pos = curr_row_pos.add(el_padding).add(v2f(100 * ui_scaling, 0));
+            for (binding.inputs.constSlice()) |d| {
+                const text = d.getIconText();
+                const text_sz = icon_text.measureIconText(text);
+                try icon_text.unqRenderIconText(cmd_buf, text, icon_pos, ui_scaling + 1);
+                icon_pos.x += text_sz.x + 2 * ui_scaling;
+            }
+            curr_row_pos.y += row_height;
+        }
     }
 
     return dirty;

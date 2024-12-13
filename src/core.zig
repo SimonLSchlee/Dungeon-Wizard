@@ -22,7 +22,7 @@ pub const Error = error{
 };
 
 pub const Key = enum(u32) {
-    const numbers = [_]Key{ .zero, .one, .two, .three, .four, .five, .six, .seven, .eight, .nine };
+    pub const numbers = [_]Key{ .zero, .one, .two, .three, .four, .five, .six, .seven, .eight, .nine };
 
     backtick,
     space,
