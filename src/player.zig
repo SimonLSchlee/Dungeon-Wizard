@@ -56,6 +56,12 @@ pub const Action = struct {
         item: Item,
         discard: struct {}, // @hasField etc doesn't work with void, so empty struct
     };
+    // identifies an Action (in context - e.g. a player action, a particular NPC's action, not a universal lookup (yet))
+    pub const Id = struct {
+        kind: Action.Kind,
+        slot_idx: ?usize = null,
+    };
+    // an Action that isn't being done yet. Just point to it, and the params used to run it
     pub const Buffered = struct {
         action: KindData,
         params: ?Spell.Params = null,

@@ -20,6 +20,7 @@ const Run = @import("Run.zig");
 const Data = @import("Data.zig");
 const menuUI = @import("menuUI.zig");
 const ImmUI = @import("ImmUI.zig");
+const player = @import("player.zig");
 const Options = @This();
 
 const ui_el_text_padding: V2f = v2f(5, 5);
@@ -143,9 +144,122 @@ pub const Controls = struct {
         .selected_idx = @intFromEnum(CastMethod.quick_release),
     },
     //auto_self_cast: bool = true, // TODO?
+    input_bindings: std.BoundedArray(InputBinding, 32) = .{},
+    // serialized e.g.:
+    // controls.input_bindings[0].keyboard_key = .q
+
     pub const OptionSerialize = struct {
         cast_method: void,
     };
+
+    // generic binding for mouse/keyboard controls
+    // may have a ui button associated, or not
+    pub const InputBinding = struct {
+        pub const max_input_bindings = 2;
+        pub const Label = utl.BoundedString(16);
+        pub const Kind = enum {
+            mouse_button,
+            keyboard_key,
+            // controller button, axis etc...
+        };
+        pub const Data = union(InputBinding.Kind) {
+            mouse_button: core.MouseButton,
+            keyboard_key: core.Key,
+        };
+        pub const InputsArray = std.BoundedArray(InputBinding.Data, max_input_bindings);
+        pub const Command = union(enum) {
+            action: player.Action.Id,
+            pause,
+            pause_menu,
+            show_deck,
+            // etc..?
+        };
+        // what the player sees in Options
+        slot_name: Label, // Spell 1, Spell 2, Attack, Move...
+        // the player can change the binding(s) anytime
+        inputs: InputsArray,
+        // what does this input actually map to?
+        // this way we can identify it elsewhere in the code (and save the index for later)
+        command: InputBinding.Command,
+        // mapping to this InputSlot, so an ActionSlot can find its input
+        // TODO needed?
+        //idx: usize = 0,
+
+        pub fn init(name: []const u8, inputs: []const InputBinding.Data, cmd: InputBinding.Command) InputBinding {
+            return .{
+                .slot_name = Label.fromSlice(name) catch unreachable,
+                .inputs = InputsArray.fromSlice(inputs) catch unreachable,
+                .command = cmd,
+            };
+        }
+        pub fn initAction(name: []const u8, inputs: []const InputBinding.Data, action_id: player.Action.Id) InputBinding {
+            return InputBinding.init(name, inputs, .{ .action = action_id });
+        }
+    };
+
+    pub fn makeDefaultInputBindings(buf: []InputBinding) []InputBinding {
+        var input_bindings = std.ArrayListUnmanaged(InputBinding).initBuffer(buf);
+        input_bindings.appendSliceAssumeCapacity(&.{
+            //InputBinding.initAction(
+            //    "Move",
+            //    &.{.{ .mouse_button = .right }},
+            //    .{ .kind = .move },
+            //),
+            //InputBinding.initAction(
+            //    "Attack",
+            //    &.{ .{ .mouse_button = .right }, .{ .keyboard_key = .a } },
+            //    .{ .kind = .attack },
+            //),
+            InputBinding.initAction(
+                "Discard",
+                &.{.{ .keyboard_key = .d }},
+                .{ .kind = .discard },
+            ),
+        });
+        const spell_default_keys = &[_]core.Key{ .q, .w, .e, .r };
+        for (spell_default_keys, 0..) |key, i| {
+            input_bindings.appendAssumeCapacity(
+                InputBinding.initAction(
+                    utl.bufPrintLocal("Spell {}", .{i + 1}) catch unreachable,
+                    &.{.{ .keyboard_key = key }},
+                    .{ .kind = .spell, .slot_idx = i },
+                ),
+            );
+        }
+        const item_default_keys = &[_]core.Key{ .one, .two, .three, .four };
+        for (item_default_keys, 0..) |key, i| {
+            input_bindings.appendAssumeCapacity(
+                InputBinding.initAction(
+                    utl.bufPrintLocal("Item {}", .{i + 1}) catch unreachable,
+                    &.{.{ .keyboard_key = key }},
+                    .{ .kind = .item, .slot_idx = i },
+                ),
+            );
+        }
+        input_bindings.appendSliceAssumeCapacity(&.{
+            InputBinding.init(
+                "Pause/Unpause",
+                &.{.{ .keyboard_key = .space }},
+                .pause,
+            ),
+            InputBinding.init(
+                "Open Menu",
+                &.{.{ .keyboard_key = .escape }},
+                .pause_menu,
+            ),
+            InputBinding.init(
+                "Show Deck",
+                &.{.{ .keyboard_key = .n }},
+                .show_deck,
+            ),
+        });
+        return input_bindings.items;
+    }
+
+    pub fn init(self: *Controls) void {
+        const inputs = Controls.makeDefaultInputBindings(&self.input_bindings.buffer);
+        self.input_bindings.resize(inputs.len) catch unreachable;
+    }
 };
 
 pub const Kind = enum {
@@ -199,7 +313,8 @@ pub fn writeToTxt(self: *const Options, plat: *Platform) void {
 }
 
 pub fn initEmpty(plat: *Platform) Options {
-    const ret = Options{};
+    var ret = Options{};
+    ret.controls.init();
     ret.writeToTxt(plat);
     return ret;
 }
