@@ -206,6 +206,7 @@ pub const MiscIcon = enum {
     hourglass_down,
     cards,
     gold_stacks,
+    knife,
 };
 
 pub const TileMapIdxBuf = std.BoundedArray(usize, 16);
