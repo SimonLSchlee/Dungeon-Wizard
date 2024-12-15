@@ -125,6 +125,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
 
     const herring = Thing{
         .kind = .projectile,
+        .dir = caster.dir,
         .accel_params = .{
             .accel = 99,
             .max_speed = 3.75,
