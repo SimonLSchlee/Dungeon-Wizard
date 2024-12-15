@@ -45,7 +45,7 @@ fn gobbowArrow() Thing {
         .accel_params = .{
             .accel = 2,
             .friction = 0,
-            .max_speed = 2,
+            .max_speed = 2.2,
         },
         .coll_mask = Thing.Collision.Mask.initMany(&.{.tile}),
         .controller = .{ .projectile = .{
