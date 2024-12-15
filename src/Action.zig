@@ -24,6 +24,7 @@ const Item = @import("Item.zig");
 const gameUI = @import("gameUI.zig");
 const sprites = @import("sprites.zig");
 const projectiles = @import("projectiles.zig");
+const TileMap = @import("TileMap.zig");
 const Action = @This();
 
 // Loosely defined, an Action is a behavior that occurs over a predictable timespan
@@ -281,8 +282,9 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                                 const predicted_target_pos = target.pos.add(target.vel.scale(ticks_til_hit));
                                 switch (atk.projectile) {
                                     .arrow => {
+                                        const not_too_fast = target.vel.length() < 0.022 * TileMap.tile_sz_f;
                                         // make sure we can actually still get past nearby walls with this new angle!
-                                        if (room.tilemap.isLOSBetweenThicc(self.pos, predicted_target_pos, atk.LOS_thiccness)) {
+                                        if (not_too_fast and room.tilemap.isLOSBetweenThicc(self.pos, predicted_target_pos, atk.LOS_thiccness)) {
                                             atk.target_pos = predicted_target_pos;
                                             self.dir = predicted_target_pos.sub(self.pos).normalizedChecked() orelse self.dir;
                                         } else if (room.tilemap.isLOSBetweenThicc(self.pos, target.pos, atk.LOS_thiccness)) {
@@ -292,8 +294,18 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                                         }
                                     },
                                     .bomb => {
-                                        atk.target_pos = predicted_target_pos;
-                                        self.dir = predicted_target_pos.sub(self.pos).normalizedChecked() orelse self.dir;
+                                        const not_too_fast = target.vel.length() < 0.020 * TileMap.tile_sz_f;
+                                        if (not_too_fast) {
+                                            atk.target_pos = predicted_target_pos;
+                                            self.dir = predicted_target_pos.sub(self.pos).normalizedChecked() orelse self.dir;
+                                        } else {
+                                            atk.target_pos = target.pos;
+                                            self.dir = target.pos.sub(self.pos).normalizedChecked() orelse self.dir;
+                                        }
+                                        if (atk.target_pos.dist(self.pos) <= projectile.hitbox.?.radius + 10) {
+                                            self.dir = target.pos.sub(self.pos).normalizedChecked() orelse self.dir;
+                                            atk.target_pos = self.pos.add(self.dir.scale(projectile.hitbox.?.radius + 5));
+                                        }
                                     },
                                 }
                             }
