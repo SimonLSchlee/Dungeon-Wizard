@@ -99,6 +99,7 @@ pub const Projectile = struct {
                 }
             },
             .end => {
+                self.shadow_radius_x = 0;
                 self.vel = .{};
                 self.renderer.vfx.draw_normal = false;
                 self.renderer.vfx.draw_over = true;
@@ -144,6 +145,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
                 .draw_normal = true,
                 .rotate_to_dir = true,
                 .flip_x_to_dir = true,
+                .rel_pos = v2f(0, -14),
             },
         },
         .animator = .{
@@ -154,8 +156,9 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             },
             .curr_anim = .loop,
         },
+        .shadow_radius_x = 7,
     };
-    _ = try room.queueSpawnThing(&herring, caster.pos);
+    _ = try room.queueSpawnThing(&herring, caster.pos.add(caster.dir.scale(10)));
 }
 
 pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {

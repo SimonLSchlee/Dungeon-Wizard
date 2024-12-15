@@ -772,6 +772,7 @@ pub const VFXRenderer = struct {
     draw_over: bool = false,
     rotate_to_dir: bool = false,
     flip_x_to_dir: bool = false,
+    rel_pos: V2f = .{},
 
     pub fn _render(self: *const Thing, renderer: *const VFXRenderer, _: *const Room) void {
         const plat = App.getPlat();
@@ -789,7 +790,7 @@ pub const VFXRenderer = struct {
         if (opt.flip_x and renderer.rotate_to_dir and self.dir.x < 0) {
             opt.rot_rads += utl.pi;
         }
-        plat.texturef(self.pos, frame.texture, opt);
+        plat.texturef(self.pos.add(renderer.rel_pos), frame.texture, opt);
     }
     pub fn renderUnder(self: *const Thing, room: *const Room) Error!void {
         _ = room;
