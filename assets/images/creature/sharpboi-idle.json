@@ -1,6 +1,6 @@
 { "frames": [
    {
-    "filename": "idle-E 0",
+    "filename": "idle-E  0",
     "frame": { "x": 0, "y": 0, "w": 16, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -9,7 +9,7 @@
     "duration": 750
    },
    {
-    "filename": "idle-E 1",
+    "filename": "idle-E  1",
     "frame": { "x": 16, "y": 0, "w": 16, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -18,7 +18,7 @@
     "duration": 750
    },
    {
-    "filename": "idle-W 0",
+    "filename": "idle-W  0",
     "frame": { "x": 0, "y": 32, "w": 16, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -27,7 +27,7 @@
     "duration": 750
    },
    {
-    "filename": "idle-W 1",
+    "filename": "idle-W  1",
     "frame": { "x": 16, "y": 32, "w": 16, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -48,11 +48,13 @@
    { "name": "idle-W", "from": 2, "to": 3, "direction": "forward", "color": "#000000ff" }
   ],
   "layers": [
-   { "name": "data", "opacity": 255, "blendMode": "normal", "cels": [{ "frame": 4, "data": "pivot-y=25" }] },
+   { "name": "data", "opacity": 255, "blendMode": "normal", "cels": [{ "frame": 4, "data": "pivot-y=26" }] },
    { "name": "legs", "opacity": 255, "blendMode": "normal" },
    { "name": "body", "opacity": 255, "blendMode": "normal" },
    { "name": "head", "opacity": 255, "blendMode": "normal" },
    { "name": "arms n spear", "opacity": 255, "blendMode": "normal" }
+  ],
+  "slices": [
   ]
  }
 }

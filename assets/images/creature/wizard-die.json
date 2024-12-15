@@ -87,7 +87,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 2000
+    "duration": 1200
    },
    {
     "filename": "die-W  0",
