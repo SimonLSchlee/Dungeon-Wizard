@@ -835,7 +835,7 @@ pub const SpawnerRenderer = struct {
         const renderer = &self.renderer.spawner;
         const plat = App.getPlat();
         const anim = App.get().data.getCreatureAnim(renderer.creature_kind, .idle).?;
-        const frame = anim.getRenderFrame(V2f.right, 0);
+        const frame = anim.getRenderFrame(self.dir, 0);
         const tint: Colorf = renderer.sprite_tint;
         const opt = draw.TextureOpt{
             .origin = frame.origin,
@@ -971,6 +971,7 @@ pub const SpawnerController = struct {
         const proto: Thing = App.get().data.creature_protos.get(creature_kind);
         return .{
             .kind = .spawner,
+            .dir = proto.dir,
             .controller = .{
                 .spawner = .{
                     .creature_kind = creature_kind,

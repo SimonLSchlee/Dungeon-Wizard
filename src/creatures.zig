@@ -324,6 +324,7 @@ pub fn gobbomberProto() Thing {
 
 pub fn dummyProto() Thing {
     var ret = creatureProto(.dummy, .dummy, .enemy, null, 25, .medium, 20);
+    ret.dir = V2f.left;
     ret.enemy_difficulty = 1.5;
     return ret;
 }
