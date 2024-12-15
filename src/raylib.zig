@@ -105,45 +105,6 @@ pub fn getMonitorIdxAndDims(_: *Platform) struct { monitor: i32, dims: V2i } {
     };
 }
 
-pub fn getResolutions(self: *Platform, buf: []V2i) []V2i {
-    const m_info = self.getMonitorIdxAndDims();
-    const m_res = m_info.dims;
-    var idx: usize = 0;
-    for (1..100) |i| {
-        const dims = core.min_resolution.scale(u.as(i32, i));
-        if (dims.x > m_res.x) {
-            if (idx < buf.len) {
-                buf[idx] = m_res;
-                idx += 1;
-            } else {
-                self.log.warn("Not enough space for monitor resolution! Didn't append {}x{}", .{ m_res.x, m_res.y });
-            }
-            break;
-        }
-        // ignore really small resolutions relative to monitor
-        //if (dims.x >= @divFloor(m_res.x, 3)) {
-        buf[idx] = dims;
-        idx += 1;
-        //}
-        const wide_dims = core.min_wide_resolution.scale(u.as(i32, i));
-        if (wide_dims.x > m_res.x) {
-            if (idx < buf.len) {
-                buf[idx] = m_res;
-                idx += 1;
-            } else {
-                self.log.warn("Not enough space for monitor resolution! Didn't append {}x{}", .{ m_res.x, m_res.y });
-            }
-            break;
-        }
-        // ignore really small resolutions relative to monitor
-        //if (dims.x >= @divFloor(m_res.x, 3)) {
-        buf[idx] = wide_dims;
-        idx += 1;
-        //}
-    }
-    return buf[0..idx];
-}
-
 pub fn toggleFullscreen(_: *Platform) void {
     r.ToggleFullscreen();
 }

@@ -111,7 +111,7 @@ pub const DropdownMenu = struct {
 
 pub const Display = struct {
     pub const ResLabel = utl.BoundedString(16);
-    pub const max_resolutions = 24;
+    pub const max_resolutions = 10;
     //monitor: i32 = 0, // TODO?
     mode: enum {
         windowed,
@@ -355,44 +355,69 @@ pub fn writeToTxt(self: *const Options, plat: *Platform) void {
     serialize(self.controls, "controls", options_file, plat);
     serialize(self.display, "display", options_file, plat);
 }
-pub fn fixupUI(self: *Options, plat: *Platform) void {
-    // fix up controls
-    {
-        self.controls.dropdown.selected_idx = @intFromEnum(self.controls.cast_method);
-    }
-    // fix up resolution
-    {
-        const resolutions = plat.getResolutions(&self.display.resolutions.buffer);
-        assert(resolutions.len > 0);
-        self.display.resolutions.resize(resolutions.len) catch unreachable;
 
-        var best = resolutions[0];
-        var best_idx: usize = 0;
-        var best_diff = self.display.selected_resolution.sub(resolutions[0]).mLen();
-        for (resolutions[1..], 1..) |res, i| {
-            const diff = self.display.selected_resolution.sub(res).mLen();
-            if (diff < best_diff) {
-                best = res;
-                best_idx = i;
-                best_diff = diff;
+pub fn initDefault(plat: *Platform) Options {
+    var ret = Options{};
+
+    // display
+    {
+        const m_info = plat.getMonitorIdxAndDims();
+        const m_res = m_info.dims;
+        var idx: usize = 0;
+        for (1..100) |i| {
+            const dims_4x3 = core.min_resolution.scale(utl.as(i32, i));
+            const dims_16x9 = core.min_wide_resolution.scale(utl.as(i32, i));
+            var done = false;
+            for (&[_]V2i{ dims_4x3, dims_16x9 }) |dims| {
+                if (dims.x > m_res.x) {
+                    done = true;
+                    continue;
+                }
+                if (ret.display.resolutions.len >= ret.display.resolutions.buffer.len) {
+                    // if full, treat as a circular buffer and overwrite smaller ones
+                    if (idx >= ret.display.resolutions.buffer.len) {
+                        idx = 0;
+                    }
+                    ret.display.resolutions.buffer[idx] = dims;
+                    idx += 1;
+                } else {
+                    ret.display.resolutions.appendAssumeCapacity(dims);
+                }
             }
+            if (done) break;
         }
-        self.display.selected_resolution = best;
-        self.display.dropdown.selected_idx = best_idx;
-        for (resolutions) |res| {
-            self.display.resolutions_strings.append(
+
+        if (ret.display.resolutions.len >= ret.display.resolutions.buffer.len) {
+            // if full, treat as a circular buffer and overwrite smaller ones
+            if (idx >= ret.display.resolutions.buffer.len) {
+                idx = 0;
+            }
+            ret.display.resolutions.buffer[idx] = m_res;
+            idx += 1;
+        } else {
+            ret.display.resolutions.appendAssumeCapacity(m_res);
+        }
+        // sort em
+        const Sort = struct {
+            pub fn cmp(_: void, lhs: V2i, rhs: V2i) bool {
+                return lhs.x < rhs.x;
+            }
+        };
+        std.sort.pdq(V2i, ret.display.resolutions.slice(), {}, Sort.cmp);
+        // just pick the first one by default
+        ret.display.selected_resolution = ret.display.resolutions.get(0);
+
+        for (ret.display.resolutions.constSlice()) |res| {
+            ret.display.resolutions_strings.append(
                 Display.ResLabel.fromSlice(
                     utl.bufPrintLocal("{d}x{d}", .{ res.x, res.y }) catch continue,
                 ) catch continue,
             ) catch break;
         }
     }
-}
 
-pub fn initDefault(plat: *Platform) Options {
-    var ret = Options{};
     ret.controls.init();
-    ret.fixupUI(plat);
+
     return ret;
 }
 
@@ -536,8 +561,27 @@ pub fn initTryLoad(plat: *App.Platform) Options {
         setValByName(plat, Options, &ret, key, val);
     }
     options_file.close();
-    // TODO yuck, maybe fix (de)serialization instead of this hack
-    ret.fixupUI(plat);
+
+    // fix up controls
+    {
+        ret.controls.dropdown.selected_idx = @intFromEnum(ret.controls.cast_method);
+    }
+    // fix up selected resolution
+    {
+        var best = ret.display.resolutions.get(0);
+        var best_idx: usize = 0;
+        var best_diff = ret.display.selected_resolution.sub(best).mLen();
+        for (ret.display.resolutions.constSlice()[1..], 1..) |res, i| {
+            const diff = ret.display.selected_resolution.sub(res).mLen();
+            if (diff < best_diff) {
+                best = res;
+                best_idx = i;
+                best_diff = diff;
+            }
+        }
+        ret.display.selected_resolution = best;
+        ret.display.dropdown.selected_idx = best_idx;
+    }
 
     return ret;
 }
