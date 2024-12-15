@@ -901,7 +901,8 @@ pub fn getSlotCooldownTicks(self: *const Spell) i32 {
 pub fn makeProto(kind: Kind, the_rest: Spell) Spell {
     var ret = the_rest;
     ret.kind = @unionInit(KindData, @tagName(kind), .{});
-    ret.cast_secs = cast_time_to_secs.get(ret.cast_time);
+    //ret.cast_secs = cast_time_to_secs.get(ret.cast_time);
+    ret.cast_secs = cast_time_to_secs.get(.fast);
     ret.cast_ticks = utl.as(i32, core.fups_per_sec_f * ret.cast_secs);
     ret.after_cast_slot_cooldown_ticks = utl.as(i32, core.fups_per_sec_f * ret.after_cast_slot_cooldown_secs);
     return ret;
