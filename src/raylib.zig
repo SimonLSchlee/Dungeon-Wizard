@@ -681,6 +681,37 @@ pub fn sectorf(_: *Platform, center: V2f, radius: f32, start_ang_rads: f32, end_
     }
 }
 
+pub fn ellipsef(_: *Platform, center: V2f, radii: V2f, opt: draw.PolyOpt) void {
+    var center_r = center;
+    if (opt.round_to_pixel) {
+        center_r = center_r.round();
+    }
+
+    switch (opt.smoothing) {
+        .bilinear => r.rlEnableSmoothLines(),
+        .none => r.rlDisableSmoothLines(),
+    }
+
+    if (opt.fill_color) |color| {
+        r.DrawEllipse(
+            u.as(c_int, center_r.x),
+            u.as(c_int, center_r.y),
+            radii.x,
+            radii.y,
+            cColorf(color),
+        );
+    }
+    if (opt.outline) |outline| {
+        r.DrawEllipseLines(
+            u.as(c_int, center_r.x),
+            u.as(c_int, center_r.y),
+            radii.x,
+            radii.y,
+            cColorf(outline.color),
+        );
+    }
+}
+
 pub fn trianglef(_: *Platform, points: [3]V2f, opt: draw.PolyOpt) void {
     var points_r = points;
     if (opt.round_to_pixel) {

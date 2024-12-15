@@ -152,6 +152,7 @@ selectable: ?struct {
 statuses: StatusEffect.StatusArray = StatusEffect.proto_array,
 enemy_difficulty: f32 = 0,
 find_path_timer: utl.TickCounter = utl.TickCounter.init(6),
+shadow_radius_x: f32 = 0,
 
 pub const Faction = enum {
     object,
@@ -790,6 +791,10 @@ pub const VFXRenderer = struct {
         }
         plat.texturef(self.pos, frame.texture, opt);
     }
+    pub fn renderUnder(self: *const Thing, room: *const Room) Error!void {
+        _ = room;
+        self.renderShadow();
+    }
 
     pub fn render(self: *const Thing, room: *const Room) Error!void {
         const renderer = &self.renderer.vfx;
@@ -879,6 +884,7 @@ pub const ManaPickupController = struct {
                 }
             },
             .collected => {
+                renderer.sprite_tint = Colorf.white; // it could be fading, brighten it back to full
                 renderer.draw_normal = false;
                 renderer.draw_over = true;
                 if (animator.play(.end, .{}).contains(.end)) {
@@ -910,6 +916,7 @@ pub const ManaPickupController = struct {
                 },
                 .curr_anim = .loop,
             },
+            .shadow_radius_x = 6,
         };
         var rnd = room.rng.random();
         for (0..num) |_| {
@@ -1061,6 +1068,17 @@ pub const ShapeRenderer = struct {
     }
 };
 
+pub fn renderShadow(self: *const Thing) void {
+    const plat = getPlat();
+    if (self.shadow_radius_x > 0) {
+        plat.ellipsef(self.pos, v2f(self.shadow_radius_x, self.shadow_radius_x * 0.5), .{
+            .fill_color = Colorf.black.fade(0.5),
+            .round_to_pixel = true,
+            .smoothing = .none,
+        });
+    }
+}
+
 pub const CreatureRenderer = struct {
     draw_radius: f32 = 10,
     draw_color: Colorf = Colorf.red,
@@ -1083,6 +1101,9 @@ pub const CreatureRenderer = struct {
                 const arrow_end = self.pos.add(self.dir.scale(renderer.draw_radius + 2.5));
                 plat.arrowf(arrow_start, arrow_end, .{ .thickness = 2.5, .color = renderer.draw_color });
             }
+        }
+        if (self.isAliveCreature() or self.player_input != null) {
+            self.renderShadow();
         }
     }
 

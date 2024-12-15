@@ -353,5 +353,6 @@ pub fn creatureProto(creature_kind: Kind, sprite_kind: sprites.CreatureAnim.Kind
         },
         .hp = Thing.HP.init(hp),
         .faction = faction,
+        .shadow_radius_x = Thing.SizeCategory.draw_radii.get(size_cat),
     };
 }
