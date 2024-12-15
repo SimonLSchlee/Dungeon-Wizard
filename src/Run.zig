@@ -477,10 +477,14 @@ pub fn syncPlayerThing(self: *Run, precedence: enum { run, room }) void {
     const room = &self.room;
     switch (precedence) {
         .room => {
-            self.player_thing.hp = room.getConstPlayer().?.hp.?;
+            if (room.getConstPlayer()) |p| {
+                self.player_thing.hp = p.hp.?;
+            }
         },
         .run => {
-            room.getPlayer().?.hp = self.player_thing.hp.?;
+            if (room.getPlayer()) |p| {
+                p.hp = self.player_thing.hp.?;
+            }
         },
     }
 }
