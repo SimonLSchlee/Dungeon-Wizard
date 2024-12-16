@@ -601,11 +601,11 @@ pub fn rectf(self: *Platform, topleft: V2f, dims: V2f, opt: draw.PolyOpt) void {
     }
 }
 
-pub fn circlef(_: *Platform, center: V2f, radius: f32, opt: draw.PolyOpt) void {
+pub fn circlef(self: *Platform, center: V2f, radius: f32, opt: draw.PolyOpt) void {
     var center_r = center;
     const radius_r = radius;
     if (opt.round_to_pixel) {
-        center_r = center_r.round();
+        center_r = center_r.scale(self.curr_cam.zoom).round().scale(1 / self.curr_cam.zoom);
         //radius_r = @round(radius);
     }
 
@@ -646,10 +646,23 @@ pub fn sectorf(_: *Platform, center: V2f, radius: f32, start_ang_rads: f32, end_
     }
 }
 
-pub fn ellipsef(_: *Platform, center: V2f, radii: V2f, opt: draw.PolyOpt) void {
+pub fn ellipsef(self: *Platform, center: V2f, radii: V2f, opt: draw.PolyOpt) void {
+    var pt_buf = std.BoundedArray(V2f, 38){};
     var center_r = center;
     if (opt.round_to_pixel) {
-        center_r = center_r.round();
+        center_r = center_r.scale(self.curr_cam.zoom).round().scale(1 / self.curr_cam.zoom);
+    }
+    // raylib's ellipse drawing, for SOME reason, doesn't get rounded properly, so use a triangle fan + line strip
+    pt_buf.appendAssumeCapacity(center_r);
+    var i: f32 = 0;
+    while (i <= 360) {
+        const rads = -u.degreesToRadians(i);
+        const pt = center_r.add(v2f(
+            @cos(rads) * radii.x,
+            @sin(rads) * radii.y,
+        ));
+        pt_buf.appendAssumeCapacity(pt);
+        i += 10;
     }
 
     switch (opt.smoothing) {
@@ -658,22 +671,10 @@ pub fn ellipsef(_: *Platform, center: V2f, radii: V2f, opt: draw.PolyOpt) void {
     }
 
     if (opt.fill_color) |color| {
-        r.DrawEllipse(
-            u.as(c_int, center_r.x),
-            u.as(c_int, center_r.y),
-            radii.x,
-            radii.y,
-            cColorf(color),
-        );
+        r.DrawTriangleFan(@ptrCast(pt_buf.constSlice()), u.as(c_int, pt_buf.len), cColorf(color));
     }
     if (opt.outline) |outline| {
-        r.DrawEllipseLines(
-            u.as(c_int, center_r.x),
-            u.as(c_int, center_r.y),
-            radii.x,
-            radii.y,
-            cColorf(outline.color),
-        );
+        r.DrawLineStrip(@ptrCast(pt_buf.constSlice()[1..]), u.as(c_int, pt_buf.len - 1), cColorf(outline.color));
     }
 }
 

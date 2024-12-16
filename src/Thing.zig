@@ -1081,8 +1081,8 @@ pub fn renderShadow(self: *const Thing) void {
     if (self.shadow_radius_x > 0) {
         plat.ellipsef(self.pos, v2f(self.shadow_radius_x, self.shadow_radius_x * 0.5), .{
             .fill_color = Colorf.black.fade(0.5),
-            .round_to_pixel = true,
             .smoothing = .none,
+            .round_to_pixel = true,
         });
     }
 }
@@ -1120,7 +1120,7 @@ pub const CreatureRenderer = struct {
                 plat.circlef(self.pos, renderer.draw_radius, .{
                     .fill_color = null,
                     .smoothing = .none,
-                    .round_to_pixel = false,
+                    .round_to_pixel = true,
                     .outline = .{ .color = renderer.draw_color },
                 });
                 const arrow_start = self.pos.add(self.dir.scale(renderer.draw_radius));
