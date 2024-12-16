@@ -595,11 +595,7 @@ pub fn render(self: *const Room, ui_render_texture: Platform.RenderTexture2D, ga
         }
         for (thing_arr.constSlice()) |thing| {
             if (thing.player_input != null) {
-                plat.endCamera2D();
-                plat.startCamera2D(self.camera, .{ .round_to_pixel = false });
                 try thing.render(self);
-                plat.endCamera2D();
-                plat.startCamera2D(self.camera, .{ .round_to_pixel = true });
             } else {
                 try thing.render(self);
             }

@@ -593,7 +593,7 @@ fn renderTile(self: *const TileMap, pos: V2f, tile: TileLayer.Tile) void {
         .src_dims = tileset.tile_dims.toV2f(),
         .src_pos = src_px_coord.toV2f(),
         .uniform_scaling = core.game_sprite_scaling,
-        .round_to_pixel = true,
+        .round_to_pixel = false,
     };
     plat.texturef(pos, tileset.texture, opt);
 }

@@ -77,6 +77,7 @@ game_canvas_screen_topleft_offset: V2f = .{},
 // ui canvas size == screen size
 ui_scaling: f32 = 1,
 
+curr_cam: draw.Camera2D = .{},
 accumulated_update_ns: i64 = 0,
 prev_frame_time_ns: i64 = 0,
 input_buffer: core.InputBuffer = .{},
@@ -506,12 +507,15 @@ pub fn textf(self: *Platform, pos: V2f, comptime fmt: []const u8, args: anytype,
     } else cVec(pos);
     const r_filter = switch (opt.smoothing) {
         .none => blk: {
-            draw_pos.x = @round(draw_pos.x);
-            draw_pos.y = @round(draw_pos.y);
             break :blk r.TEXTURE_FILTER_POINT;
         },
         .bilinear => r.TEXTURE_FILTER_BILINEAR,
     };
+    if (opt.round_to_pixel) {
+        const inv = 1 / self.curr_cam.zoom;
+        draw_pos.x = @round(draw_pos.x * self.curr_cam.zoom) * inv;
+        draw_pos.y = @round(draw_pos.y * self.curr_cam.zoom) * inv;
+    }
     r.SetTextureFilter(font.r_font.texture, r_filter);
     // outline
     if (opt.border) |border| {
@@ -563,11 +567,11 @@ pub fn linef(_: *Platform, start: V2f, end: V2f, opt: draw.LineOpt) void {
     r.DrawLineEx(cVec(start_r), cVec(end_r), opt.thickness, cColorf(opt.color));
 }
 
-pub fn rectf(_: *Platform, topleft: V2f, dims: V2f, opt: draw.PolyOpt) void {
+pub fn rectf(self: *Platform, topleft: V2f, dims: V2f, opt: draw.PolyOpt) void {
     var topleft_r = topleft;
     var dims_r = dims;
     if (opt.round_to_pixel) {
-        topleft_r = topleft_r.round();
+        topleft_r = topleft_r.scale(self.curr_cam.zoom).round().scale(1 / self.curr_cam.zoom);
         dims_r = dims_r.round();
     }
     const rec: r.Rectangle = .{
@@ -809,7 +813,7 @@ pub fn destroyRenderTexture(_: *Platform, tex: RenderTexture2D) void {
     r.UnloadRenderTexture(tex.r_render_tex);
 }
 
-pub fn texturef(_: *Platform, pos: V2f, tex: Texture2D, opt: draw.TextureOpt) void {
+pub fn texturef(self: *Platform, pos: V2f, tex: Texture2D, opt: draw.TextureOpt) void {
     @setRuntimeSafety(core.rt_safe_blocks);
     var src = r.Rectangle{
         .width = @floatFromInt(tex.dims.x),
@@ -823,16 +827,17 @@ pub fn texturef(_: *Platform, pos: V2f, tex: Texture2D, opt: draw.TextureOpt) vo
         src.width = d.x;
         src.height = d.y;
     }
+    var pos_r = pos;
+    if (opt.round_to_pixel) {
+        pos_r = pos.scale(self.curr_cam.zoom).round().scale(1 / self.curr_cam.zoom);
+    }
     var dest = r.Rectangle{
-        .x = pos.x,
-        .y = pos.y,
+        .x = pos_r.x,
+        .y = pos_r.y,
         .width = src.width * opt.uniform_scaling,
         .height = src.height * opt.uniform_scaling,
     };
-    if (opt.round_to_pixel) {
-        dest.x = @round(dest.x);
-        dest.y = @round(dest.y);
-    }
+
     if (opt.scaled_dims) |d| {
         dest.width = d.x;
         dest.height = d.y;
@@ -881,16 +886,18 @@ fn cCam(cam: draw.Camera2D) r.Camera2D {
 }
 
 pub fn startCamera2D(self: *Platform, cam: draw.Camera2D, opt: draw.CameraOpt) void {
-    _ = self;
     var cam_r = cam;
     if (opt.round_to_pixel) {
-        cam_r.pos = cam.pos.round();
+        cam_r.pos = cam_r.pos.scale(cam.zoom).round().scale(1 / cam.zoom);
+        //cam_r.pos = cam.pos.round();
         cam_r.offset = cam.offset.round();
     }
+    self.curr_cam = cam_r;
     r.BeginMode2D(cCam(cam_r));
 }
 
-pub fn endCamera2D(_: *Platform) void {
+pub fn endCamera2D(self: *Platform) void {
+    self.curr_cam = .{};
     r.EndMode2D();
 }
 

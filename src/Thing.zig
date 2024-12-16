@@ -1081,6 +1081,24 @@ pub fn renderShadow(self: *const Thing) void {
     }
 }
 
+pub fn renderBarWithLines(pos: V2f, dims: V2f, line_inc_amount: f32, bar_amount: f32, color: Colorf) void {
+    const plat = getPlat();
+    plat.rectf(pos, dims, .{ .fill_color = color });
+
+    var i: f32 = line_inc_amount;
+    var err: f32 = 0;
+    while (i < bar_amount) {
+        const raw_x = dims.x * (i / bar_amount);
+        const line_x = @floor(raw_x + err);
+        err += raw_x - line_x;
+        const top = pos.add(v2f(line_x, 0));
+        plat.rectf(top, v2f(1, dims.y), .{
+            .fill_color = Colorf.black.fade(0.5),
+        });
+        i += line_inc_amount;
+    }
+}
+
 pub const CreatureRenderer = struct {
     draw_radius: f32 = 10,
     draw_color: Colorf = Colorf.red,
@@ -1141,8 +1159,7 @@ pub const CreatureRenderer = struct {
             .src_dims = frame.size.toV2f(),
             .uniform_scaling = core.game_sprite_scaling,
             .tint = tint,
-            //.round_to_pixel = true,
-            .round_to_pixel = if (self.player_input != null) false else true,
+            .round_to_pixel = true,
         };
         plat.texturef(self.pos, frame.texture, opt);
 
@@ -1170,7 +1187,7 @@ pub const CreatureRenderer = struct {
         const hp_width = @round(renderer.hp_bar_width);
         const hp_y_offset = if (self.selectable) |s| s.height + 10 else @round(renderer.draw_radius * 3.5);
         const hp_offset = v2f(-hp_width * 0.5, -hp_y_offset);
-        const hp_topleft = self.pos.add(hp_offset).round();
+        const hp_topleft = self.pos.add(hp_offset); //.round();
         const shields_height = 3;
         const shields_topleft = hp_topleft.add(v2f(0, hp_height));
 
@@ -1183,69 +1200,33 @@ pub const CreatureRenderer = struct {
                     .{
                         .fill_color = Colorf.black,
                         //.round_to_pixel = true,
-                        .smoothing = .none,
                     },
                 );
-                plat.rectf(
+                const line_inc: f32 = if (hp.max < 100) 10 else 50;
+                renderBarWithLines(
                     hp_topleft,
                     v2f(curr_width, hp_height),
-                    .{
-                        .fill_color = HP.faction_colors.get(self.faction),
-                        //.round_to_pixel = true,
-                        .smoothing = .none,
-                    },
+                    line_inc,
+                    hp.curr,
+                    HP.faction_colors.get(self.faction),
                 );
-                { // lines
-                    const line_hp_inc: f32 = if (hp.max < 100) 10 else 50;
-                    var i: f32 = line_hp_inc;
-                    while (i < hp.curr) {
-                        const line_x = curr_width * (i / hp.curr);
-                        const top = hp_topleft.add(v2f(line_x, 0));
-                        const bot = hp_topleft.add(v2f(line_x, hp_height));
-                        plat.linef(top, bot, .{
-                            .thickness = 1,
-                            .color = Colorf.black.fade(0.5),
-                            //.round_to_pixel = true,
-                            .smoothing = .none,
-                        });
-                        i += line_hp_inc;
-                    }
-                }
                 var total_shield_amount: f32 = 0;
                 var curr_shield_amount: f32 = 0;
                 for (hp.shields.constSlice()) |shield| {
                     total_shield_amount += shield.max;
                     curr_shield_amount += shield.curr;
                 }
+                const shields_width = hp_width * curr_shield_amount / total_shield_amount;
                 if (total_shield_amount > 0) {
                     const shield_color = Colorf.rgb(0.7, 0.7, 0.4);
-                    var curr_pos = shields_topleft;
-                    for (hp.shields.constSlice()) |shield| {
-                        const shield_width = @round(hp_width * shield.curr / total_shield_amount);
-                        plat.rectf(curr_pos, v2f(shield_width, shields_height), .{
-                            .fill_color = shield_color,
-                            .smoothing = .bilinear,
-                            .round_to_pixel = true,
-                        });
-                        curr_pos.x += shield_width;
-                    }
-                    { // lines
-                        const curr_shield_width = @round(utl.remapClampf(0, total_shield_amount, 0, hp_width, curr_shield_amount));
-                        const line_shield_inc: f32 = if (total_shield_amount < 100) 10 else 50;
-                        var i: f32 = line_shield_inc;
-                        while (i < curr_shield_amount) {
-                            const line_x = @ceil(curr_shield_width * (i / curr_shield_amount));
-                            const top = shields_topleft.add(v2f(line_x, 0));
-                            const bot = shields_topleft.add(v2f(line_x, shields_height));
-                            plat.linef(top, bot, .{
-                                .thickness = 1,
-                                .color = Colorf.black.fade(0.5),
-                                .smoothing = .bilinear,
-                                .round_to_pixel = true,
-                            });
-                            i += line_shield_inc;
-                        }
-                    }
+                    const line_shield_inc: f32 = if (total_shield_amount < 100) 10 else 50;
+                    renderBarWithLines(
+                        shields_topleft,
+                        v2f(shields_width, hp_height),
+                        line_shield_inc,
+                        curr_shield_amount,
+                        shield_color,
+                    );
                 }
                 if (self.mana) |mana| {
                     const data = App.getData();
@@ -1255,7 +1236,7 @@ pub const CreatureRenderer = struct {
                         opt.smoothing = .none;
                         opt.origin = .topleft;
                         opt.src_dims = cropped_dims;
-                        opt.round_to_pixel = if (self.player_input != null) false else true;
+                        opt.round_to_pixel = true;
                         const mana_topleft = hp_topleft.sub(v2f(0, cropped_dims.y + 1)); //.round();
                         var curr_pos = mana_topleft;
                         for (0..utl.as(usize, mana.curr)) |_| {
