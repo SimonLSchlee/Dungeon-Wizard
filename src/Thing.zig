@@ -770,9 +770,11 @@ pub const VFXRenderer = struct {
     sprite_tint: Colorf = .white,
     draw_normal: bool = true,
     draw_over: bool = false,
+    draw_under: bool = false,
     rotate_to_dir: bool = false,
     flip_x_to_dir: bool = false,
     rel_pos: V2f = .{},
+    scale: f32 = core.game_sprite_scaling,
 
     pub fn _render(self: *const Thing, renderer: *const VFXRenderer, _: *const Room) void {
         const plat = App.getPlat();
@@ -782,7 +784,7 @@ pub const VFXRenderer = struct {
             .origin = frame.origin,
             .src_pos = frame.pos.toV2f(),
             .src_dims = frame.size.toV2f(),
-            .uniform_scaling = core.game_sprite_scaling,
+            .uniform_scaling = renderer.scale,
             .tint = tint,
             .flip_x = renderer.flip_x_to_dir and self.dir.x < 0,
             .rot_rads = if (renderer.rotate_to_dir) self.dir.toAngleRadians() else 0,
@@ -792,8 +794,12 @@ pub const VFXRenderer = struct {
         }
         plat.texturef(self.pos.add(renderer.rel_pos), frame.texture, opt);
     }
+
     pub fn renderUnder(self: *const Thing, room: *const Room) Error!void {
-        _ = room;
+        const renderer = &self.renderer.vfx;
+        if (renderer.draw_under) {
+            _render(self, renderer, room);
+        }
         self.renderShadow();
     }
 

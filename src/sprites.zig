@@ -161,6 +161,7 @@ pub const VFXAnim = struct {
         herring,
         mana_pickup,
         swirlies,
+        expose_circle,
     };
     pub const AnimNameIdxMapping = std.EnumArray(AnimName, ?usize);
     pub const IdxMapping = std.EnumArray(SheetName, AnimNameIdxMapping);
@@ -200,7 +201,7 @@ pub const AnimName = enum {
     basic_loop,
     basic_cast,
     basic_fizzle,
-    // trailblaze, herring, pickup, swirlies
+    // trailblaze, herring, pickup, swirlies, expose
     loop,
     end,
 };

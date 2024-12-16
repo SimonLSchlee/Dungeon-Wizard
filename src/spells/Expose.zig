@@ -33,6 +33,7 @@ pub const enum_name = "expose";
 pub const Controllers = [_]type{Projectile};
 
 const base_radius = 20;
+const base_color = Colorf.rgb(0.4, 0.2, 0.6);
 
 pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
@@ -70,6 +71,7 @@ pub const Projectile = struct {
         const spell_controller = &self.controller.spell;
         const spell = spell_controller.spell;
         const expose = spell.kind.expose;
+        _ = expose;
         const params = spell_controller.params;
         _ = params;
         const projectile: *Projectile = &spell_controller.controller.expose_projectile;
@@ -78,19 +80,24 @@ pub const Projectile = struct {
         switch (projectile.state) {
             .expanding => {
                 if (!projectile.timer.running) {
-                    projectile.timer = utl.TickCounter.init(45);
+                    projectile.timer = utl.TickCounter.init(60);
                     projectile.state = .fading;
                     self.hitbox.?.active = true;
-                    self.renderer.shape.kind.circle.radius = expose.radius;
+                    self.renderer.vfx.scale = core.game_sprite_scaling * 0.5;
+                    self.renderer.vfx.sprite_tint = Colorf.white;
+                    self.animator.?.curr_anim = .end;
                 } else {
-                    self.renderer.shape.kind.circle.radius = expose.radius * projectile.timer.remapTo0_1();
+                    const f = projectile.timer.remapTo0_1();
+                    self.renderer.vfx.scale = f * core.game_sprite_scaling * 0.5;
                 }
             },
             .fading => {
                 if (!projectile.timer.running) {
                     self.deferFree(room);
+                } else {
+                    const f = projectile.timer.remapTo0_1();
+                    self.renderer.vfx.sprite_tint = Colorf.white.lerp(base_color, f).fade(1 - f);
                 }
-                self.renderer.shape.poly_opt.fill_color = spell.color.fade(1 - projectile.timer.remapTo0_1());
             },
         }
     }
@@ -118,12 +125,17 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             .mask = Thing.Faction.opposing_masks.get(caster.faction),
             .radius = expose.radius,
         },
-        .renderer = .{ .shape = .{
-            .kind = .{ .circle = .{ .radius = 5 } },
+        .renderer = .{ .vfx = .{
             .draw_normal = false,
             .draw_under = true,
-            .poly_opt = .{ .fill_color = proto.color },
+            .rotate_to_dir = true,
+            .sprite_tint = base_color,
+            .scale = 0,
         } },
+        .animator = .{
+            .kind = .{ .vfx = .{ .sheet_name = .expose_circle } },
+            .curr_anim = .loop,
+        },
     };
     _ = try room.queueSpawnThing(&hit_circle, target_pos);
 }
