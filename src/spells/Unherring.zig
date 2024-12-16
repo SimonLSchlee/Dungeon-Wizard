@@ -99,16 +99,7 @@ pub const Projectile = struct {
                 }
             },
             .end => {
-                self.shadow_radius_x = 0;
-                self.vel = .{};
-                self.renderer.vfx.draw_normal = false;
-                self.renderer.vfx.draw_over = true;
-                if (animator.play(.end, .{}).contains(.end)) {
-                    self.deferFree(room);
-                }
-                if (animator.curr_anim_frame == 1) {
-                    self.renderer.vfx.rotate_to_dir = false;
-                }
+                self.deferFree(room);
             },
         }
     }

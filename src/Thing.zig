@@ -227,6 +227,8 @@ pub const HP = struct {
             .swirlies,
             .loop,
             0.8,
+            1,
+            true,
             .green,
             true,
         );
@@ -251,7 +253,7 @@ pub const HP = struct {
         }) catch unreachable;
     }
 
-    pub fn doDamage(self: *HP, amount: f32, thing: *Thing, room: *Room) void {
+    pub fn doDamage(self: *HP, kind: Damage.Kind, amount: f32, thing: *Thing, room: *Room) void {
         if (amount <= 0) return;
         var damage_left = amount;
         // damage hits the outermost shield, continuing inwards until it hits the actual current hp
@@ -274,6 +276,8 @@ pub const HP = struct {
         if (str.len > 0) {
             TextVFXController.spawn(thing, str, .red, 1, room) catch {};
         }
+        Thing.LoopVFXController.spawnExplodeHit(thing, kind, amount, room);
+
         assert(final_damage_amount > 0);
         self.curr -= final_damage_amount;
         self.total_damage_done += final_damage_amount;
@@ -513,7 +517,7 @@ pub const HurtBox = struct {
             }
             if (self.hp) |*hp| {
                 const pre_damage_done = hp.total_damage_done;
-                hp.doDamage(damage, self, room);
+                hp.doDamage(effect.damage_kind, damage, self, room);
                 const post_damage_done = hp.total_damage_done;
                 if (room.init_params.mode == .crispin_picker and self.isEnemy()) {
                     const total_manas = @max(@ceil(self.enemy_difficulty * 2.5), 1);
@@ -583,6 +587,8 @@ pub const LoopVFXController = struct {
     anim_to_loop: sprites.AnimName = .loop,
     tint: Colorf = .white,
     timer: utl.TickCounter = utl.TickCounter.init(core.secsToTicks(2)),
+    fade_secs: f32 = 1,
+    loop: bool = true,
     state: enum {
         loop,
         fade,
@@ -592,12 +598,12 @@ pub const LoopVFXController = struct {
         assert(self.spawn_state == .spawned);
         const controller = &self.controller.loop_vfx;
 
-        _ = self.animator.?.play(controller.anim_to_loop, .{ .loop = true });
+        const events = self.animator.?.play(controller.anim_to_loop, .{ .loop = controller.loop });
 
         switch (controller.state) {
             .loop => {
-                if (controller.timer.tick(false)) {
-                    controller.timer = utl.TickCounter.init(core.secsToTicks(1));
+                if (controller.timer.tick(false) or (!controller.loop and events.contains(.end))) {
+                    controller.timer = utl.TickCounter.init(core.secsToTicks(controller.fade_secs));
                     controller.state = .fade;
                 }
             },
@@ -609,18 +615,21 @@ pub const LoopVFXController = struct {
             },
         }
     }
-    pub fn proto(spritesheet: sprites.VFXAnim.SheetName, anim: sprites.AnimName, lifetime_secs: f32, tint: Colorf, draw_over: bool) Thing {
+    pub fn proto(spritesheet: sprites.VFXAnim.SheetName, anim: sprites.AnimName, lifetime_secs: f32, fade_secs: f32, loop: bool, tint: Colorf, draw_over: bool) Thing {
         return Thing{
             .kind = .vfx,
             .controller = .{ .loop_vfx = .{
                 .anim_to_loop = anim,
-                .timer = utl.TickCounter.init(core.secsToTicks(@max(lifetime_secs - 1, 0))),
+                .timer = utl.TickCounter.init(core.secsToTicks(@max(lifetime_secs, 0))),
                 .tint = tint,
+                .fade_secs = @max(fade_secs, 0),
+                .loop = loop,
             } },
             .renderer = .{
                 .vfx = .{
                     .draw_normal = !draw_over,
                     .draw_over = draw_over,
+                    .sprite_tint = tint,
                 },
             },
             .animator = .{
@@ -632,6 +641,21 @@ pub const LoopVFXController = struct {
                 .curr_anim = anim,
             },
         };
+    }
+    pub fn spawnExplodeHit(thing: *Thing, kind: Damage.Kind, amount: f32, room: *Room) void {
+        const rfloat = room.rng.random().float(f32);
+        const rdir = V2f.fromAngleRadians(rfloat * utl.tau);
+        const center_pos = if (thing.selectable) |s| thing.pos.add(v2f(0, -s.height * 0.5)) else thing.pos;
+        const radius = (if (thing.selectable) |s| s.radius else thing.coll_radius) * 0.75;
+        const rpos = center_pos.add(rdir.scale(radius));
+
+        const anim: sprites.AnimName = switch (kind) {
+            //.water => .water,
+            .magic => if (amount < 8) .magic_smol else .magic_big,
+            else => if (amount < 8) .physical_smol else .physical_big,
+        };
+        const p = proto(.explode_hit, anim, 99, 0, false, .white, true);
+        _ = room.queueSpawnThing(&p, rpos) catch {};
     }
 };
 

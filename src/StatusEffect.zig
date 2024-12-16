@@ -206,7 +206,7 @@ cooldown: utl.TickCounter = utl.TickCounter.init(core.fups_per_sec * 1),
 cd_type: CdType = .no_cd,
 color: Colorf = .white,
 // should put in a union maybe
-timer: utl.TickCounter = .{},
+timer: utl.TickCounter = utl.TickCounter.init(core.secsToTicks(1)),
 prev_pos: V2f = .{},
 max_stacks: i32 = 9999,
 

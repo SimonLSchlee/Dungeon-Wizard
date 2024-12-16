@@ -54,6 +54,7 @@ pub const proto = Spell.makeProto(
 
 hit_effect: Thing.HitEffect = .{
     .damage = 7,
+    .damage_kind = .magic,
     .status_stacks = StatusEffect.StacksArray.initDefault(0, .{ .exposed = 5 }),
 },
 radius: f32 = base_radius,
