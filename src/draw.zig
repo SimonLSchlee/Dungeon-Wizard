@@ -172,7 +172,7 @@ pub const TextOpt = struct {
         color: Colorf = .black,
         dist: f32 = 1,
     } = null,
-    round_to_pixel: bool = false,
+    round_to_pixel: bool = true,
 };
 
 pub const LineOpt = struct {
