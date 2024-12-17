@@ -712,8 +712,9 @@ pub const Slots = struct {
         } else {
             self.pause_slot.selection_kind = null;
         }
-        {
+        { // hp and mana
             const ui_scaling: f32 = plat.ui_scaling;
+            const icon_scaling = ui_scaling * 2;
             const data = App.get().data;
             const hp_mana_rect_opt = draw.PolyOpt{
                 .edge_radius = 0.2,
@@ -735,11 +736,12 @@ pub const Slots = struct {
                 const cropped_dims = data.text_icons.sprite_dims_cropped.?.get(.heart);
 
                 if (data.text_icons.getRenderFrame(.heart)) |rf| {
-                    const heart_pos = self.hp_rect.pos.sub(v2f(cropped_dims.x * 0.5 * (ui_scaling + 2), 0));
-                    var opt = rf.toTextureOpt(ui_scaling + 2);
+                    const heart_pos = self.hp_rect.pos.sub(v2f(cropped_dims.x * 0.5 * (icon_scaling), 0));
+                    var opt = rf.toTextureOpt(icon_scaling);
                     opt.src_dims = cropped_dims;
                     opt.tint = .red;
                     opt.origin = .topleft;
+                    opt.round_to_pixel = true;
                     try self.immui.commands.append(.{ .texture = .{
                         .pos = heart_pos,
                         .texture = rf.texture,
@@ -764,10 +766,11 @@ pub const Slots = struct {
             if (caster.mana) |mana| {
                 const cropped_dims = data.text_icons.sprite_dims_cropped.?.get(.mana_crystal);
                 if (data.text_icons.getRenderFrame(.mana_crystal)) |rf| {
-                    const mana_crystal_pos = self.mana_rect.pos.sub(v2f(cropped_dims.x * 0.5 * (ui_scaling + 2), 0));
-                    var opt = rf.toTextureOpt(ui_scaling + 2);
+                    const mana_crystal_pos = self.mana_rect.pos.sub(v2f(cropped_dims.x * 0.5 * (icon_scaling), 0));
+                    var opt = rf.toTextureOpt(icon_scaling);
                     opt.src_dims = cropped_dims;
                     opt.origin = .topleft;
+                    opt.round_to_pixel = true;
                     try self.immui.commands.append(.{ .texture = .{
                         .pos = mana_crystal_pos,
                         .texture = rf.texture,
