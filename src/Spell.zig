@@ -874,9 +874,9 @@ pub const CastTime = enum {
 };
 
 pub const cast_time_to_secs = std.EnumArray(CastTime, f32).init(.{
-    .slow = 1.334,
+    .slow = 1.2,
     .medium = 1.0,
-    .fast = 0.667,
+    .fast = 0.8,
 });
 
 kind: KindData = undefined,
