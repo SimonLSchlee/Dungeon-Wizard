@@ -338,6 +338,7 @@ pub const Slots = struct {
     pub const discard_key = core.Key.d;
 
     ui_bg_rect: geom.Rectf = .{},
+    casting_bar_rect: geom.Rectf = .{},
     spells: std.BoundedArray(Slot, max_spell_slots) = .{},
     items: std.BoundedArray(Slot, max_item_slots) = .{},
     select_state: ?struct {
@@ -505,6 +506,16 @@ pub const Slots = struct {
             .pos = bg_rect_pos,
             .dims = bg_rect_dims,
         };
+        // casting rect in center just above
+        const casting_bar_dims = v2f(100, 5).scale(ui_scaling);
+        self.casting_bar_rect = .{
+            .pos = v2f(
+                plat.screen_dims_f.sub(casting_bar_dims).scale(0.5).x,
+                self.ui_bg_rect.pos.y - casting_bar_dims.y - 10 * ui_scaling,
+            ),
+            .dims = casting_bar_dims,
+        };
+
         plat.centerGameRect(.{}, self.getGameScreenRect());
     }
 
@@ -712,7 +723,7 @@ pub const Slots = struct {
         } else {
             self.pause_slot.selection_kind = null;
         }
-        { // hp and mana
+        { // hp and mana and casting bar
             const ui_scaling: f32 = plat.ui_scaling;
             const icon_scaling = ui_scaling * 2;
             const data = App.get().data;
@@ -797,6 +808,31 @@ pub const Slots = struct {
                         } });
                     }
                 }
+            }
+            switch (caster.controller) {
+                .player => |c| {
+                    if (c.action_casting != null) {
+                        const pad = V2f.splat(1 * ui_scaling);
+                        const curr_x = c.cast_counter.remapTo0_1() * self.casting_bar_rect.dims.x;
+                        try self.immui.commands.append(.{ .rect = .{
+                            .pos = self.casting_bar_rect.pos,
+                            .dims = self.casting_bar_rect.dims,
+                            .opt = .{
+                                .fill_color = .black,
+                                .edge_radius = 0.8,
+                            },
+                        } });
+                        try self.immui.commands.append(.{ .rect = .{
+                            .pos = self.casting_bar_rect.pos.add(pad),
+                            .dims = v2f(curr_x, self.casting_bar_rect.dims.y).sub(pad.scale(2)),
+                            .opt = .{
+                                .fill_color = .lightgray,
+                                .edge_radius = 0.8,
+                            },
+                        } });
+                    }
+                },
+                else => {},
             }
         }
     }
