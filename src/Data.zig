@@ -655,7 +655,7 @@ pub fn loadSpriteSheets(self: *Data) Error!void {
     self.spell_tags_icons = try @TypeOf(self.spell_tags_icons).initCropped(try loadSpriteSheetFromJsonPath("images/ui", "spell-tags-icons.json"), .magenta);
     self.text_icons = try @TypeOf(self.text_icons).initCropped(try loadSpriteSheetFromJsonPath("images/ui", "small_text_icons.json"), .magenta);
     self.card_sprites = try @TypeOf(self.card_sprites).init(try loadSpriteSheetFromJsonPath("images/ui", "card.json"));
-    self.card_mana_cost = try @TypeOf(self.card_mana_cost).init(try loadSpriteSheetFromJsonPath("images/ui", "card-mana-cost.json"));
+    self.card_mana_cost = try @TypeOf(self.card_mana_cost).initCropped(try loadSpriteSheetFromJsonPath("images/ui", "card-mana-cost.json"), .magenta);
 }
 
 pub fn loadTileSetFromJsonString(tileset: *TileSet, json_string: []u8, assets_rel_path: []const u8) Error!void {

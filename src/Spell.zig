@@ -47,6 +47,7 @@ pub const card_tags_topleft_offset = v2f(5, 66);
 pub const card_tags_dims = v2f(61, 29);
 pub const card_tag_icon_dims = v2f(7, 7);
 pub const card_title_center_offset = v2f(36, 56);
+pub const card_hourglass_offset = v2f(48, 1);
 
 var desc_buf: [2048]u8 = undefined;
 
@@ -527,6 +528,7 @@ pub const ManaCost = union(enum) {
         X,
         unknown,
         crystal,
+        hourglass,
     };
     number: u8,
     X,
@@ -868,15 +870,15 @@ pub const Keyword = enum {
 };
 
 pub const CastTime = enum {
-    slow,
-    medium,
     fast,
+    medium,
+    slow,
 };
 
 pub const cast_time_to_secs = std.EnumArray(CastTime, f32).init(.{
-    .slow = 1.2,
+    .fast = 0.6,
     .medium = 1.0,
-    .fast = 0.8,
+    .slow = 2.0,
 });
 
 kind: KindData = undefined,
@@ -901,8 +903,8 @@ pub fn getSlotCooldownTicks(self: *const Spell) i32 {
 pub fn makeProto(kind: Kind, the_rest: Spell) Spell {
     var ret = the_rest;
     ret.kind = @unionInit(KindData, @tagName(kind), .{});
-    //ret.cast_secs = cast_time_to_secs.get(ret.cast_time);
-    ret.cast_secs = cast_time_to_secs.get(.fast);
+    ret.cast_secs = cast_time_to_secs.get(ret.cast_time);
+    //ret.cast_secs = cast_time_to_secs.get(.fast);
     ret.cast_ticks = utl.as(i32, core.fups_per_sec_f * ret.cast_secs);
     ret.after_cast_slot_cooldown_ticks = utl.as(i32, core.fups_per_sec_f * ret.after_cast_slot_cooldown_secs);
     return ret;
@@ -1108,6 +1110,26 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caste
                 .tint = tint,
             },
         } });
+    }
+    // hourglasses
+    const hourglass_right_topleft = pos.add(card_hourglass_offset.scale(scaling));
+    if (data.card_mana_cost.getRenderFrame(.hourglass)) |rf| {
+        const cropped_dims = data.card_mana_cost.sprite_dims_cropped.?.get(.hourglass);
+        var opt = rf.toTextureOpt(scaling);
+        opt.src_dims = cropped_dims;
+        opt.origin = .topleft;
+        const num: usize = @intFromEnum(self.cast_time) + 1;
+        for (0..num) |i| {
+            const hourglass_pos = hourglass_right_topleft.sub(v2f(
+                utl.as(f32, i) * (cropped_dims.x + 1) * scaling,
+                0,
+            ));
+            cmd_buf.appendAssumeCapacity(.{ .texture = .{
+                .pos = hourglass_pos,
+                .texture = rf.texture,
+                .opt = opt,
+            } });
+        }
     }
     {
         const tags = self.getNewTags() catch |e| blk: {
