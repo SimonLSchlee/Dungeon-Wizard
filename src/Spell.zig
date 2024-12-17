@@ -1037,6 +1037,7 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caste
                 .src_dims = rf.size.toV2f(),
                 .src_pos = rf.pos.toV2f(),
                 .uniform_scaling = scaling,
+                .round_to_pixel = true,
             },
         } });
     }
@@ -1063,6 +1064,7 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caste
                 .src_dims = rf.size.toV2f(),
                 .src_pos = rf.pos.toV2f(),
                 .uniform_scaling = scaling,
+                .round_to_pixel = true,
             },
         } });
     }
@@ -1094,6 +1096,7 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caste
                 .src_dims = rf.size.toV2f(),
                 .src_pos = rf.pos.toV2f(),
                 .uniform_scaling = scaling,
+                .round_to_pixel = true,
             },
         } });
     }
@@ -1108,6 +1111,7 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caste
                 .src_pos = rf.pos.toV2f(),
                 .uniform_scaling = scaling,
                 .tint = tint,
+                .round_to_pixel = true,
             },
         } });
     }
@@ -1118,6 +1122,7 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caste
         var opt = rf.toTextureOpt(scaling);
         opt.src_dims = cropped_dims;
         opt.origin = .topleft;
+        opt.round_to_pixel = true;
         const num: usize = @intFromEnum(self.cast_time) + 1;
         for (0..num) |i| {
             const hourglass_pos = hourglass_right_topleft.sub(v2f(
@@ -1154,6 +1159,7 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caste
                     .opt = .{
                         .fill_color = .black,
                         .edge_radius = 0.3,
+                        .round_to_pixel = true,
                     },
                 },
             });
@@ -1177,6 +1183,7 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caste
                     .src_pos = rf.pos.toV2f(),
                     .uniform_scaling = scaling,
                     .tint = Colorf.black.fade(0.5),
+                    .round_to_pixel = true,
                 },
             } });
         }

@@ -59,6 +59,7 @@ pub const RenderIconInfo = union(enum) {
                         .src_dims = frame.size.toV2f(),
                         .uniform_scaling = scaling,
                         .tint = tint,
+                        .round_to_pixel = true,
                     },
                 } }) catch @panic("Fail to append texture cmd");
             },
