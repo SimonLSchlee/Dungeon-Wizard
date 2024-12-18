@@ -157,6 +157,7 @@ rng: std.Random.DefaultPrng = undefined,
 places: Place.Array = .{},
 curr_place_idx: usize = 0,
 player_thing: Thing = undefined,
+ui_slots: gameUI.Slots = .{},
 mode: Mode = undefined,
 deck: Spell.SpellArray = .{},
 slots: gameUI.RunSlots = .{},
@@ -173,6 +174,8 @@ imm_ui: struct {
 tooltip_ui: struct {
     commands: ImmUI.CmdBuf = .{},
 } = .{},
+ui_clicked: bool = false,
+ui_hovered: bool = false,
 
 pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
     const plat = getPlat();
@@ -191,6 +194,7 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
     run.room_buf_head = 0;
     run.room_buf_tail = 0;
 
+    //run.ui_slots.init(init_params.run_slots);
     // TODO elsewhererre?
     run.slots.discard_button = mode == .mandy_3_mana;
     run.slots.items.clear();
@@ -333,6 +337,7 @@ pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
                 .mode = self.mode,
             };
             try self.room.init(&params);
+            self.ui_slots.init(&self.room, self.slots);
             self.room_exists = true;
             // TODO hacky
             // update once to clear fog
@@ -401,7 +406,7 @@ pub fn canPickupProduct(self: *const Run, product: *const Shop.Product) bool {
         },
         .item => |_| {
             if (self.room_exists) {
-                if (self.room.ui_slots.getNextEmptyItemSlot() == null) return false;
+                if (self.ui_slots.getNextEmptyItemSlot() == null) return false;
             } else {
                 for (self.slots.items.constSlice()) |slot| {
                     if (slot.item == null) break;
@@ -449,12 +454,11 @@ fn loadNextPlace(self: *Run) void {
 // TODO aaghhghghghg
 // just put gameUI in Run bruv
 pub fn syncItems(self: *Run, precedence: enum { run, room }) void {
-    assert(self.room_exists);
-    const room = &self.room;
+    //assert(self.room_exists);
     switch (precedence) {
         .room => {
             self.slots.items = .{};
-            for (room.ui_slots.items.constSlice()) |slot| {
+            for (self.ui_slots.items.constSlice()) |slot| {
                 const item: ?Item = if (slot.kind) |k| k.action.item else null;
                 self.slots.items.append(.{
                     .item = item,
@@ -463,9 +467,9 @@ pub fn syncItems(self: *Run, precedence: enum { run, room }) void {
         },
         .run => {
             for (self.slots.items.constSlice(), 0..) |slot, i| {
-                room.ui_slots.clearSlotByActionKind(i, .item);
+                self.ui_slots.clearSlotByActionKind(i, .item);
                 if (slot.item) |*item| {
-                    room.ui_slots.items.buffer[i].kind = .{ .action = .{ .item = item.* } };
+                    self.ui_slots.items.buffer[i].kind = .{ .action = .{ .item = item.* } };
                 }
             }
         },
@@ -493,6 +497,7 @@ pub fn resolutionChanged(self: *Run) void {
     if (self.room_exists) {
         self.room.resolutionChanged();
     }
+    self.ui_slots.reflowRects();
 }
 
 pub fn roomUpdate(self: *Run) Error!void {
@@ -545,6 +550,13 @@ pub fn roomUpdate(self: *Run) Error!void {
         try room.clone(&self.room_buf[self.room_buf_head]);
         self.room_buf_head = next_head;
         self.room_buf_size += 1;
+    }
+
+    // update spell slots, and player input
+    {
+        if (room.getPlayer()) |thing| {
+            try thing.player_input.?.update(self, thing);
+        }
     }
     try room.update();
 
@@ -669,7 +681,7 @@ pub fn rewardSpellChoiceUI(self: *Run, idx: usize) Error!void {
     var modal_dims = plat.screen_dims_f.scale(0.8);
     var modal_topleft = plat.screen_dims_f.sub(modal_dims).scale(0.5);
     if (self.room_exists) {
-        const game_rect_dims = self.room.ui_slots.getGameScreenRect();
+        const game_rect_dims = self.ui_slots.getGameScreenRect();
         modal_dims = v2f(game_rect_dims.x * 0.8, game_rect_dims.y * 0.94);
         modal_topleft = game_rect_dims.sub(modal_dims).scale(0.5);
     }
@@ -766,7 +778,7 @@ pub fn rewardUpdate(self: *Run) Error!void {
     var modal_dims = plat.screen_dims_f.scale(0.6);
     var modal_topleft = plat.screen_dims_f.sub(modal_dims).scale(0.5);
     if (self.room_exists) {
-        const game_rect_dims = self.room.ui_slots.getGameScreenRect();
+        const game_rect_dims = self.ui_slots.getGameScreenRect();
         modal_dims = v2f(game_rect_dims.x * 0.6, game_rect_dims.y * 0.9);
         modal_topleft = game_rect_dims.sub(modal_dims).scale(0.5);
     }
@@ -957,6 +969,9 @@ pub fn deadUpdate(self: *Run) Error!void {
 pub fn update(self: *Run) Error!void {
     const plat = App.getPlat();
 
+    self.ui_clicked = false;
+    self.ui_hovered = false;
+
     self.imm_ui.commands.clear();
     self.tooltip_ui.commands.clear();
 
@@ -1095,7 +1110,7 @@ pub fn render(self: *Run, ui_render_texture: Platform.RenderTexture2D, game_rend
         plat.startRenderToTexture(ui_render_texture);
         plat.setBlend(.render_tex_alpha);
         if (!self.room.edit_mode) {
-            try self.room.ui_slots.render(&self.room);
+            try self.ui_slots.render(&self.room);
         }
         plat.endRenderToTexture();
     }

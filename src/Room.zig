@@ -144,7 +144,6 @@ things: Thing.Pool = undefined,
 spawn_queue: ThingBoundedArray = .{},
 free_queue: ThingBoundedArray = .{},
 player_id: ?pool.Id = null,
-ui_slots: gameUI.Slots = .{},
 draw_pile: Spell.SpellArray = .{},
 discard_pile: Spell.SpellArray = .{},
 mislay_pile: Spell.SpellArray = .{},
@@ -169,8 +168,6 @@ moused_over_thing: ?struct {
     faction_mask: Thing.Faction.Mask,
 } = null,
 edit_mode: bool = false,
-ui_clicked: bool = false,
-ui_hovered: bool = false,
 next_pool_id: u32 = 0, // i hate this, can we change it?
 highest_num_things: usize = 0,
 rng: std.Random.DefaultPrng = undefined,
@@ -206,7 +203,6 @@ fn clearThings(self: *Room) void {
     self.spawn_queue.len = 0;
     self.free_queue.len = 0;
     self.player_id = null;
-    self.ui_slots = .{};
     self.draw_pile = .{};
     self.discard_pile = .{};
     self.mislay_pile = .{};
@@ -242,8 +238,6 @@ pub fn reset(self: *Room) Error!void {
             _ = try self.queueSpawnCreatureByKind(spawn.kind, spawn.pos);
         }
     }
-
-    self.ui_slots.init(self, self.init_params.run_slots);
 }
 
 pub fn clone(self: *const Room, out: *Room) Error!void {
@@ -261,7 +255,6 @@ pub fn resolutionChanged(self: *Room) void {
     self.camera.offset = plat.game_canvas_dims_f.scale(0.5);
     self.camera.zoom = plat.game_zoom_levels;
     self.fog.resolutionChanged();
-    self.ui_slots.reflowRects();
 }
 
 pub fn queueSpawnThing(self: *Room, proto: *const Thing, pos: V2f) Error!?pool.Id {
@@ -397,8 +390,6 @@ pub fn getMousedOverThing(self: *Room, faction_mask: Thing.Faction.Mask) ?*Thing
 
 pub fn update(self: *Room) Error!void {
     const plat = getPlat();
-    self.ui_clicked = false;
-    self.ui_hovered = false;
     self.moused_over_thing = null;
 
     if (self.advance_one_frame) {
@@ -439,13 +430,6 @@ pub fn update(self: *Room) Error!void {
         thing.spawn_state = .spawned;
     }
     self.spawn_queue.len = 0;
-
-    // update spell slots, and player input
-    {
-        if (self.getPlayer()) |player| {
-            try @TypeOf(player.player_input.?).update(player, self);
-        }
-    }
 
     if (!self.edit_mode and !self.paused) {
         // waves spawning
@@ -562,7 +546,7 @@ pub fn render(self: *const Room, ui_render_texture: Platform.RenderTexture2D, ga
     // spell targeting, movement
     if (!self.edit_mode) {
         if (self.getConstPlayer()) |player| {
-            try @TypeOf(player.player_input.?).render(player, self);
+            try player.player_input.?.render(self, player);
         }
     }
 

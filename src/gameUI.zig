@@ -19,6 +19,7 @@ const App = @import("App.zig");
 const getPlat = App.getPlat;
 const Data = @import("Data.zig");
 const Room = @import("Room.zig");
+const Run = @import("Run.zig");
 const Thing = @import("Thing.zig");
 const Spell = @import("Spell.zig");
 const Options = @import("Options.zig");
@@ -690,8 +691,9 @@ pub const Slots = struct {
         }
     }
 
-    pub fn update(self: *Slots, room: *Room, caster: *const Thing) Error!void {
+    pub fn update(self: *Slots, run: *Run, caster: *const Thing) Error!void {
         const plat = getPlat();
+        const room = &run.room;
         self.tooltip_immui.commands.clear();
         self.immui.commands.clear();
         // big rect, check ui clicked
@@ -705,8 +707,8 @@ pub const Slots = struct {
         const mouse_pos = plat.getMousePosScreen();
         const hovered = geom.pointIsInRectf(mouse_pos, self.ui_bg_rect);
         const clicked = hovered and (plat.input_buffer.mouseBtnIsJustPressed(.left) or plat.input_buffer.mouseBtnIsJustPressed(.right));
-        room.ui_hovered = hovered;
-        room.ui_clicked = clicked;
+        run.ui_hovered = hovered;
+        run.ui_clicked = clicked;
 
         try self.unqActionSlots(room, caster, self.spells.slice(), .spell);
         try self.unqActionSlots(room, caster, self.items.slice(), .item);

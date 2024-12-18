@@ -72,22 +72,22 @@ pub const Action = struct {
 pub const Input = struct {
     move_press_ui_timer: utl.TickCounter = utl.TickCounter.initStopped(60),
     move_release_ui_timer: utl.TickCounter = utl.TickCounter.initStopped(60),
+    selected_action: ?Action.KindData = null,
 
-    pub fn update(self: *Thing, room: *Room) Error!void {
-        assert(self.spawn_state == .spawned);
+    pub fn update(input: *Input, run: *Run, self: *Thing) Error!void {
         const plat = App.getPlat();
-        const input = &self.player_input.?;
+        const room = &run.room;
         const controller = &self.controller.player;
-        const ui_slots = &room.ui_slots;
+        const ui_slots = &run.ui_slots;
         const mouse_pos = plat.getMousePosWorld(room.camera);
 
-        try ui_slots.update(room, self);
+        try ui_slots.update(run, self);
         if (!room.paused) {
             ui_slots.updateTimerAndDrawSpell(room);
         }
 
         if (self.mana) |*mana| {
-            if (room.init_params.mode == .mandy_3_mana) {
+            if (run.mode == .mandy_3_mana) {
                 // automatically discard when out of mana
                 if (mana.curr == 0 and controller.action_buffered == null) {
                     ui_slots.selectSlot(.action, .discard, .quick_release, 0);
@@ -114,13 +114,14 @@ pub const Input = struct {
             _ = input.move_release_ui_timer.tick(false);
         }
 
+        input.selected_action = null;
         if (ui_slots.getSelectedActionSlot()) |slot| {
             assert(slot.kind != null);
             assert(std.meta.activeTag(slot.kind.?) == .action);
             const action = slot.kind.?.action;
             const cast_method = ui_slots.selected_method;
             const do_cast = switch (cast_method) {
-                .left_click => !room.ui_clicked and plat.input_buffer.mouseBtnIsJustPressed(.left),
+                .left_click => !run.ui_clicked and plat.input_buffer.mouseBtnIsJustPressed(.left),
                 .quick_press => true,
                 .quick_release => !plat.input_buffer.keyIsDown(slot.key),
             };
@@ -156,6 +157,78 @@ pub const Input = struct {
                 } else if (cast_method == .quick_press or cast_method == .quick_release) {
                     ui_slots.unselectSlot();
                     controller.action_buffered = null;
+                } else {
+                    input.selected_action = action;
+                }
+            } else {
+                input.selected_action = action;
+            }
+        }
+
+        if (!room.paused) {
+            if (controller.action_buffered) |buffered| {
+                if (controller.action_casting == null) {
+                    const slot_idx = utl.as(usize, buffered.slot_idx);
+
+                    switch (buffered.action) {
+                        .spell => |spell| {
+                            ui_slots.clearSlotByActionKind(slot_idx, .spell);
+                            if (spell.mislay) {
+                                room.mislaySpell(spell);
+                            } else {
+                                room.discardSpell(spell);
+                            }
+                            if (self.mana) |*mana| {
+                                if (spell.mana_cost.getActualCost(self)) |cost| {
+                                    assert(mana.curr >= cost);
+                                    mana.curr -= cost;
+                                }
+                            }
+                            if (self.statuses.get(.quickdraw).stacks > 0) {
+                                ui_slots.setActionSlotCooldown(slot_idx, .spell, 0);
+                                self.statuses.getPtr(.quickdraw).addStacks(self, -1);
+                            } else if (spell.draw_immediate) {
+                                ui_slots.setActionSlotCooldown(slot_idx, .spell, 0);
+                            } else if (room.init_params.mode == .mandy_3_mana) {
+                                // mandy doesn't set cooldowns on the slots until full discard
+                                ui_slots.setActionSlotCooldown(slot_idx, .spell, null);
+                            } else {
+                                // otherwise normal cooldown
+                                ui_slots.setActionSlotCooldown(slot_idx, .spell, spell.getSlotCooldownTicks());
+                            }
+                            controller.cast_counter = utl.TickCounter.init(spell.cast_ticks);
+                        },
+                        .item => {
+                            ui_slots.clearSlotByActionKind(slot_idx, .item);
+                        },
+                        else => {},
+                    }
+                    controller.action_casting = buffered;
+                    controller.action_buffered = null;
+                    // make sure selected action is still valid! It may be selected but not buffered, bypassing the canUse check in gameUI.Slots
+                    ui_slots.cancelSelectedActionSlotIfInvalid(room, self);
+                }
+            }
+            if (controller.action_casting) |action| {
+                if (action.action == .discard) {
+                    // how long to wait if discarding...
+                    const discard_secs = if (self.mana) |*mana| blk: {
+                        const max_extra_mana_cooldown_secs: f32 = 1.33;
+                        const per_mana_secs = max_extra_mana_cooldown_secs / utl.as(f32, mana.max);
+                        const num_secs: f32 = 0.66 + per_mana_secs * utl.as(f32, mana.curr);
+                        break :blk num_secs;
+                    } else 3;
+                    const num_ticks = core.secsToTicks(discard_secs);
+                    for (ui_slots.getSlotsByActionKindConst(.spell)) |*slot| {
+                        if (slot.kind) |k| {
+                            const spell = k.action.spell;
+                            room.discardSpell(spell);
+                        }
+                        ui_slots.clearSlotByActionKind(slot.idx, .spell);
+                        ui_slots.setActionSlotCooldown(slot.idx, .spell, num_ticks);
+                    }
+                    ui_slots.setActionSlotCooldown(0, .discard, num_ticks);
+                    ui_slots.unselectSlot();
                 }
             }
         }
@@ -167,16 +240,13 @@ pub const Input = struct {
         }
     }
 
-    pub fn render(self: *const Thing, room: *const Room) Error!void {
+    pub fn render(input: *const Input, room: *const Room, self: *const Thing) Error!void {
         const plat = getPlat();
-        const input = &self.player_input.?;
-        const ui_slots = &room.ui_slots;
         const controller = &self.controller.player;
 
         var params: ?Spell.Params = null;
         const action_with_targeting: ?Action.KindData = blk: {
-            if (ui_slots.getSelectedActionSlot()) |slot| {
-                const action = slot.kind.?.action;
+            if (input.selected_action) |action| {
                 if (actionHasTargeting(action)) {
                     break :blk action;
                 }
@@ -266,50 +336,6 @@ pub const Controller = struct {
             }
         }
 
-        if (controller.action_buffered) |buffered| {
-            if (controller.action_casting == null) {
-                const slot_idx = utl.as(usize, buffered.slot_idx);
-
-                switch (buffered.action) {
-                    .spell => |spell| {
-                        room.ui_slots.clearSlotByActionKind(slot_idx, .spell);
-                        if (spell.mislay) {
-                            room.mislaySpell(spell);
-                        } else {
-                            room.discardSpell(spell);
-                        }
-                        if (self.mana) |*mana| {
-                            if (spell.mana_cost.getActualCost(self)) |cost| {
-                                assert(mana.curr >= cost);
-                                mana.curr -= cost;
-                            }
-                        }
-                        if (self.statuses.get(.quickdraw).stacks > 0) {
-                            room.ui_slots.setActionSlotCooldown(slot_idx, .spell, 0);
-                            self.statuses.getPtr(.quickdraw).addStacks(self, -1);
-                        } else if (spell.draw_immediate) {
-                            room.ui_slots.setActionSlotCooldown(slot_idx, .spell, 0);
-                        } else if (room.init_params.mode == .mandy_3_mana) {
-                            // mandy doesn't set cooldowns on the slots until full discard
-                            room.ui_slots.setActionSlotCooldown(slot_idx, .spell, null);
-                        } else {
-                            // otherwise normal cooldown
-                            room.ui_slots.setActionSlotCooldown(slot_idx, .spell, spell.getSlotCooldownTicks());
-                        }
-                        controller.cast_counter = utl.TickCounter.init(spell.cast_ticks);
-                    },
-                    .item => {
-                        room.ui_slots.clearSlotByActionKind(slot_idx, .item);
-                    },
-                    else => {},
-                }
-                controller.action_casting = buffered;
-                controller.action_buffered = null;
-                // make sure selected action is still valid! It may be selected but not buffered, bypassing the canUse check in gameUI.Slots
-                room.ui_slots.cancelSelectedActionSlotIfInvalid(room, self);
-            }
-        }
-
         {
             const p = self.followPathGetNextPoint(5);
             const input_dir = p.sub(self.pos).normalizedOrZero();
@@ -376,26 +402,7 @@ pub const Controller = struct {
                             .spell => |spell| {
                                 try spell.cast(self, room, s.params.?);
                             },
-                            .discard => { // discard all cards
-                                const ui_slots = &room.ui_slots;
-                                // how long to wait if discarding...
-                                const discard_secs = if (self.mana) |*mana| blk: {
-                                    const max_extra_mana_cooldown_secs: f32 = 1.33;
-                                    const per_mana_secs = max_extra_mana_cooldown_secs / utl.as(f32, mana.max);
-                                    const num_secs: f32 = 0.66 + per_mana_secs * utl.as(f32, mana.curr);
-                                    break :blk num_secs;
-                                } else 3;
-                                const num_ticks = core.secsToTicks(discard_secs);
-                                for (ui_slots.getSlotsByActionKindConst(.spell)) |*slot| {
-                                    if (slot.kind) |k| {
-                                        const spell = k.action.spell;
-                                        room.discardSpell(spell);
-                                    }
-                                    ui_slots.clearSlotByActionKind(slot.idx, .spell);
-                                    ui_slots.setActionSlotCooldown(slot.idx, .spell, num_ticks);
-                                }
-                                ui_slots.setActionSlotCooldown(0, .discard, num_ticks);
-                                ui_slots.unselectSlot();
+                            .discard => { // discard all cards (happens in Input though)
                                 // mana mandy gets all her mana back
                                 if (self.mana) |*mana| {
                                     if (room.init_params.mode == .mandy_3_mana) {
