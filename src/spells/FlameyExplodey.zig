@@ -60,10 +60,12 @@ pub const proto = Spell.makeProto(
 
 explode_hit_effect: Thing.HitEffect = .{
     .damage = 6,
+    .damage_kind = .fire,
     .status_stacks = StatusEffect.StacksArray.initDefault(0, .{ .lit = 1 }),
 },
 ball_hit_effect: Thing.HitEffect = .{
     .damage = 4,
+    .damage_kind = .fire,
 },
 ball_radius: f32 = base_ball_radius,
 explode_radius: f32 = base_explode_radius,

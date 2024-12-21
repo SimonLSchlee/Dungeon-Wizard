@@ -52,6 +52,7 @@ pub const proto = Spell.makeProto(
 
 explode_hit_effect: Thing.HitEffect = .{
     .damage = 6,
+    .damage_kind = .fire,
     .status_stacks = StatusEffect.StacksArray.initDefault(0, .{ .lit = 1 }),
     .force = .{ .from_center = 2 },
 },

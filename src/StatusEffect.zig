@@ -287,6 +287,7 @@ pub fn update(status: *StatusEffect, thing: *Thing, room: *Room) Error!void {
             if (thing.hurtbox) |*hurtbox| {
                 const lit_effect = Thing.HitEffect{
                     .damage = utl.as(f32, status.stacks),
+                    .damage_kind = .fire,
                     .can_be_blocked = false,
                 };
                 hurtbox.hit(thing, room, lit_effect, null);

@@ -56,6 +56,7 @@ pub const proto = Spell.makeProto(
 
 hit_effect: Thing.HitEffect = .{
     .damage = 5,
+    .damage_kind = .fire,
     .status_stacks = StatusEffect.StacksArray.initDefault(0, .{ .lit = 1 }),
 },
 ball_radius: f32 = base_ball_radius,

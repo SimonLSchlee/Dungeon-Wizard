@@ -652,6 +652,7 @@ pub const LoopVFXController = struct {
         const anim: sprites.AnimName = switch (kind) {
             //.water => .water,
             .magic => if (amount < 8) .magic_smol else .magic_big,
+            .fire => .fire_smol,
             else => if (amount < 8) .physical_smol else .physical_big,
         };
         const p = proto(.explode_hit, anim, 99, 0, false, .white, true);

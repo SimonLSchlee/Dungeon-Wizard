@@ -213,6 +213,7 @@ pub const AnimName = enum {
     water,
     magic_smol,
     magic_big,
+    fire_smol,
 };
 
 pub const AnimEnum = enum {

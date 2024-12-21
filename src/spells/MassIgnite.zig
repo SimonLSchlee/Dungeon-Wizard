@@ -55,6 +55,7 @@ hit_effect: Thing.HitEffect = .{
 },
 bonus_hit_effect: Thing.HitEffect = .{
     .damage = 3,
+    .damage_kind = .fire,
     .status_stacks = StatusEffect.StacksArray.initDefault(0, .{
         .stunned = 2,
         .lit = 1,
