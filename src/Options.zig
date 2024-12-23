@@ -300,6 +300,15 @@ pub const Controls = struct {
         return input_bindings.items;
     }
 
+    pub fn getBindingByCommand(self: *Controls, cmd: InputBinding.Command) ?*InputBinding {
+        for (self.input_bindings.slice()) |*binding| {
+            if (binding.command.eql(cmd)) {
+                return binding;
+            }
+        }
+        return null;
+    }
+
     pub fn init(self: *Controls) void {
         const inputs = Controls.makeDefaultInputBindings(&self.input_bindings.buffer);
         self.input_bindings.resize(inputs.len) catch unreachable;
