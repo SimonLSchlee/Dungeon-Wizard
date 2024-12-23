@@ -72,28 +72,22 @@ pub fn getItemsRects() std.BoundedArray(geom.Rectf, max_item_slots) {
 
 // unq == update and queue (render)
 // Handle all updating and rendering of a generic action Slot, returning a CastMethod if it was activated
-pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, room: *Room) Error!?Options.Controls.CastMethod {
+pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, run: *Run) Error!?Options.Controls.CastMethod {
     const data = App.get().data;
     const plat = getPlat();
     const ui_scaling: f32 = plat.ui_scaling;
+    const room = &run.room;
 
     var ret: ?Options.Controls.CastMethod = null;
     const mouse_pos = plat.getMousePosScreen();
     const hovered = geom.pointIsInRectf(mouse_pos, slot.rect);
     const clicked = hovered and plat.input_buffer.mouseBtnIsJustPressed(.left);
     const slot_enabled = Slots.slotIsEnabled(slot, caster);
-    const can_activate_slot = Slots.canActivateSlot(slot, room, caster);
+    const can_activate_slot = Slots.canActivateSlot(slot, run, caster);
     const bg_color = slot_bg_color;
     var slot_contents_pos = slot.rect.pos;
     var border_color = Colorf.darkgray;
     var key_color = Colorf.gray;
-
-    if (hovered) {
-        _ = slot.hover_timer.tick(false);
-    } else {
-        slot.hover_timer.restart();
-    }
-    slot.is_long_hovered = (hovered and !slot.hover_timer.running);
 
     // background rect
     if (can_activate_slot and hovered) {
@@ -201,7 +195,7 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, slot: *Sl
             },
         }
         // tooltip
-        if (slot.is_long_hovered) {
+        if (slot.long_hover.update(hovered)) {
             const tooltip_scaling: f32 = plat.ui_scaling;
             const tooltip_pos = slot.rect.pos.add(v2f(slot.rect.dims.x, 0));
             switch (kind_data) {
@@ -268,20 +262,6 @@ pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, slot: *Sl
     return ret;
 }
 
-// Run slots (just items, and some additional data)
-// Used to populate Slots but also state in Run
-pub const RunSlots = struct {
-    pub const ItemSlot = struct {
-        item: ?Item,
-        rect: geom.Rectf = .{},
-        long_hover: menuUI.LongHover = .{},
-    };
-    num_spell_slots: usize = 4, // populated from deck
-    items: std.BoundedArray(ItemSlot, max_item_slots) = .{},
-    item_menu_open: ?usize = null,
-    discard_button: bool = false,
-};
-
 // game slots
 pub const Slots = struct {
     pub const SelectionKind = enum {
@@ -311,7 +291,7 @@ pub const Slots = struct {
         kind: ?KindData = null,
         cooldown_timer: ?utl.TickCounter = null,
         hover_timer: utl.TickCounter = utl.TickCounter.init(15),
-        is_long_hovered: bool = false,
+        long_hover: menuUI.LongHover = .{},
         selection_kind: ?SelectionKind = null,
         rect: geom.Rectf = .{},
     };
@@ -342,6 +322,7 @@ pub const Slots = struct {
     casting_bar_rect: geom.Rectf = .{},
     spells: std.BoundedArray(Slot, max_spell_slots) = .{},
     items: std.BoundedArray(Slot, max_item_slots) = .{},
+    item_menu_open: ?usize = null,
     select_state: ?struct {
         select_kind: SelectionKind,
         slot_kind: Slot.Kind,
@@ -360,36 +341,33 @@ pub const Slots = struct {
         commands: ImmUI.CmdBuf = .{},
     } = .{},
 
-    pub fn init(self: *Slots, room: *Room, run_slots: RunSlots) void {
-        assert(run_slots.num_spell_slots <= max_spell_slots);
+    pub fn init(self: *Slots, num_spell_slots: usize, items: []const ?Item, discard_button: bool) void {
+        assert(num_spell_slots <= max_spell_slots);
 
         self.* = .{};
-        for (0..run_slots.num_spell_slots) |i| {
-            var slot = Slot{
+        for (0..num_spell_slots) |i| {
+            const slot = Slot{
                 .idx = i,
                 .key = spell_idx_to_key[i],
                 .key_str = Slot.KeyStr.fromSlice(&spell_idx_to_key_str[i]) catch unreachable,
-                .cooldown_timer = utl.TickCounter.init(90),
+                .cooldown_timer = null,
             };
-            if (room.drawSpell()) |spell| {
-                slot.kind = .{ .action = .{ .spell = spell } };
-            }
             self.spells.append(slot) catch unreachable;
         }
 
-        for (run_slots.items.constSlice(), 0..) |item_slot, i| {
+        for (items, 0..) |maybe_item, i| {
             var slot = Slot{
                 .idx = i,
                 .key = item_idx_to_key[i],
                 .key_str = Slot.KeyStr.fromSlice(&item_idx_to_key_str[i]) catch unreachable,
             };
-            if (item_slot.item) |item| {
+            if (maybe_item) |item| {
                 slot.kind = .{ .action = .{ .item = item } };
             }
             self.items.append(slot) catch unreachable;
         }
 
-        if (run_slots.discard_button) {
+        if (discard_button) {
             self.discard_slot = .{
                 .idx = 0,
                 .key = discard_key,
@@ -405,6 +383,16 @@ pub const Slots = struct {
             .kind = .pause,
         };
         self.reflowRects();
+    }
+
+    pub fn beginRoom(self: *Slots, room: *Room) void {
+        for (self.spells.slice()) |*slot| {
+            slot.kind = null;
+            slot.cooldown_timer = null;
+            if (room.drawSpell()) |spell| {
+                slot.kind = .{ .action = .{ .spell = spell } };
+            }
+        }
     }
 
     pub fn reflowRects(self: *Slots) void {
@@ -553,18 +541,21 @@ pub const Slots = struct {
         return slot.kind != null and caster.isAliveCreature() and (if (slot.cooldown_timer) |timer| !timer.running else true);
     }
 
-    pub fn canActivateSlot(slot: *const Slot, room: *const Room, caster: *const Thing) bool {
+    pub fn canActivateSlot(slot: *const Slot, run: *const Run, caster: *const Thing) bool {
+        const room = &run.room;
         return slotIsEnabled(slot, caster) and switch (slot.kind.?) {
-            .pause => true,
-            .action => |a| switch (a) {
+            .pause => run.room_exists,
+            .action => |a| if (run.room_exists) switch (a) {
                 inline else => |k| !std.meta.hasMethod(@TypeOf(k), "canUse") or k.canUse(room, caster),
+            } else switch (a) {
+                inline else => |k| !std.meta.hasMethod(@TypeOf(k), "canUseInRun") or k.canUseInRun(caster, run),
             },
         };
     }
 
-    pub fn cancelSelectedActionSlotIfInvalid(self: *Slots, room: *const Room, caster: *const Thing) void {
+    pub fn cancelSelectedActionSlotIfInvalid(self: *Slots, run: *const Run, caster: *const Thing) void {
         if (self.getSelectedActionSlot()) |*slot| {
-            if (!canActivateSlot(slot, room, caster)) {
+            if (!canActivateSlot(slot, run, caster)) {
                 self.unselectSlot();
             }
         }
@@ -683,9 +674,9 @@ pub const Slots = struct {
         }
     }
 
-    fn unqActionSlots(self: *Slots, room: *Room, caster: *const Thing, slots: []Slot, action_kind: player.Action.Kind) Error!void {
+    fn unqActionSlots(self: *Slots, run: *Run, caster: *const Thing, slots: []Slot, action_kind: player.Action.Kind) Error!void {
         for (slots, 0..) |*slot, i| {
-            if (try unqSlot(&self.immui.commands, &self.tooltip_immui.commands, slot, caster, room)) |cast_method| {
+            if (try unqSlot(&self.immui.commands, &self.tooltip_immui.commands, slot, caster, run)) |cast_method| {
                 self.selectSlot(.action, action_kind, cast_method, i);
             }
         }
@@ -710,14 +701,14 @@ pub const Slots = struct {
         run.ui_hovered = hovered;
         run.ui_clicked = clicked;
 
-        try self.unqActionSlots(room, caster, self.spells.slice(), .spell);
-        try self.unqActionSlots(room, caster, self.items.slice(), .item);
+        try self.unqActionSlots(run, caster, self.spells.slice(), .spell);
+        try self.unqActionSlots(run, caster, self.items.slice(), .item);
         if (self.discard_slot) |*d| {
-            if (try unqSlot(&self.immui.commands, &self.tooltip_immui.commands, d, caster, room)) |_| {
+            if (try unqSlot(&self.immui.commands, &self.tooltip_immui.commands, d, caster, run)) |_| {
                 self.selectSlot(.action, .discard, .quick_release, 0);
             }
         }
-        if (try unqSlot(&self.immui.commands, &self.tooltip_immui.commands, &self.pause_slot, caster, room)) |_| {
+        if (try unqSlot(&self.immui.commands, &self.tooltip_immui.commands, &self.pause_slot, caster, run)) |_| {
             room.paused = !room.paused;
         }
         if (room.paused) {

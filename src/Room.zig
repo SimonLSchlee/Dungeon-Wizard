@@ -40,7 +40,6 @@ pub const InitParams = struct {
     seed: u64,
     deck: Spell.SpellArray,
     exits: std.BoundedArray(gameUI.ExitDoor, 4),
-    run_slots: gameUI.RunSlots,
     mode: Run.Mode,
 };
 

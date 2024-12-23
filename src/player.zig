@@ -206,7 +206,7 @@ pub const Input = struct {
                     controller.action_casting = buffered;
                     controller.action_buffered = null;
                     // make sure selected action is still valid! It may be selected but not buffered, bypassing the canUse check in gameUI.Slots
-                    ui_slots.cancelSelectedActionSlotIfInvalid(room, self);
+                    ui_slots.cancelSelectedActionSlotIfInvalid(run, self);
                 }
             }
             if (controller.action_casting) |action| {

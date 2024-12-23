@@ -160,7 +160,6 @@ player_thing: Thing = undefined,
 ui_slots: gameUI.Slots = .{},
 mode: Mode = undefined,
 deck: Spell.SpellArray = .{},
-slots: gameUI.RunSlots = .{},
 load_timer: u.TickCounter = u.TickCounter.init(20),
 load_state: enum {
     none,
@@ -194,18 +193,11 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
     run.room_buf_head = 0;
     run.room_buf_tail = 0;
 
-    //run.ui_slots.init(init_params.run_slots);
-    // TODO elsewhererre?
-    run.slots.discard_button = mode == .mandy_3_mana;
-    run.slots.items.clear();
-    run.slots.items.appendAssumeCapacity(.{
-        .item = Item.getProto(.pot_hp),
-    });
-    for (0..3) |_| {
-        run.slots.items.appendAssumeCapacity(.{
-            .item = null,
-        });
-    }
+    run.ui_slots.init(
+        4,
+        &.{ Item.getProto(.pot_hp), null, null, null },
+        mode == .mandy_3_mana,
+    );
 
     // init places
     var places = Place.Array{};
@@ -333,11 +325,10 @@ pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
                 .seed = self.rng.random().int(u64),
                 .exits = exit_doors,
                 .player = self.player_thing,
-                .run_slots = self.slots,
                 .mode = self.mode,
             };
             try self.room.init(&params);
-            self.ui_slots.init(&self.room, self.slots);
+            self.ui_slots.beginRoom(&self.room);
             self.room_exists = true;
             // TODO hacky
             // update once to clear fog
@@ -405,15 +396,7 @@ pub fn canPickupProduct(self: *const Run, product: *const Shop.Product) bool {
             if (self.deck.len >= self.deck.buffer.len) return false;
         },
         .item => |_| {
-            if (self.room_exists) {
-                if (self.ui_slots.getNextEmptyItemSlot() == null) return false;
-            } else {
-                for (self.slots.items.constSlice()) |slot| {
-                    if (slot.item == null) break;
-                } else {
-                    return false;
-                }
-            }
+            if (self.ui_slots.getNextEmptyItemSlot() == null) return false;
         },
     }
     return true;
@@ -432,48 +415,14 @@ pub fn pickupProduct(self: *Run, product: *const Shop.Product) void {
             }
         },
         .item => |item| {
-            for (self.slots.items.slice()) |*item_slot| {
-                if (item_slot.item == null) {
-                    item_slot.item = item;
-                    break;
-                }
-            } else {
-                unreachable;
-            }
-            if (self.room_exists) {
-                self.syncItems(.run);
-            }
+            const slot = self.ui_slots.getNextEmptyItemSlot().?;
+            self.ui_slots.items.buffer[slot.idx].kind = .{ .action = .{ .item = item } };
         },
     }
 }
 
 fn loadNextPlace(self: *Run) void {
     self.load_state = .fade_out;
-}
-
-// TODO aaghhghghghg
-// just put gameUI in Run bruv
-pub fn syncItems(self: *Run, precedence: enum { run, room }) void {
-    //assert(self.room_exists);
-    switch (precedence) {
-        .room => {
-            self.slots.items = .{};
-            for (self.ui_slots.items.constSlice()) |slot| {
-                const item: ?Item = if (slot.kind) |k| k.action.item else null;
-                self.slots.items.append(.{
-                    .item = item,
-                }) catch unreachable;
-            }
-        },
-        .run => {
-            for (self.slots.items.constSlice(), 0..) |slot, i| {
-                self.ui_slots.clearSlotByActionKind(i, .item);
-                if (slot.item) |*item| {
-                    self.ui_slots.items.buffer[i].kind = .{ .action = .{ .item = item.* } };
-                }
-            }
-        },
-    }
 }
 
 pub fn syncPlayerThing(self: *Run, precedence: enum { run, room }) void {
@@ -560,7 +509,6 @@ pub fn roomUpdate(self: *Run) Error!void {
     }
     try room.update();
 
-    self.syncItems(.room);
     self.syncPlayerThing(.room);
 
     switch (room.progress_state) {
@@ -590,10 +538,9 @@ pub fn itemsUpdate(self: *Run) Error!void {
     const ui_scaling: f32 = plat.ui_scaling;
     const mouse_pos = plat.getMousePosScreen();
     const slot_bg_color = Colorf.rgb(0.07, 0.05, 0.05);
-    const items_rects = gameUI.getItemsRects();
 
-    for (self.slots.items.slice(), 0..) |slot, i| {
-        const rect = items_rects.get(i);
+    for (self.ui_slots.items.slice()) |slot| {
+        const rect = slot.rect;
         self.imm_ui.commands.append(.{ .rect = .{
             .pos = rect.pos,
             .dims = rect.dims,
@@ -601,36 +548,37 @@ pub fn itemsUpdate(self: *Run) Error!void {
                 .fill_color = slot_bg_color,
             },
         } }) catch @panic("Fail to append rect cmd");
-        if (slot.item) |item| {
+        if (slot.kind) |kind| {
+            const item = kind.action.item;
             try item.unqRenderIcon(&self.imm_ui.commands, rect.pos, ui_scaling);
         }
     }
 
-    for (self.slots.items.slice(), 0..) |*slot, i| {
-        const rect = items_rects.get(i);
+    for (self.ui_slots.items.slice()) |*slot| {
+        const rect = slot.rect;
         const hovered = geom.pointIsInRectf(mouse_pos, rect);
         const clicked_somewhere = (plat.input_buffer.mouseBtnIsJustPressed(.left) or plat.input_buffer.mouseBtnIsJustPressed(.right));
         const clicked_on = hovered and clicked_somewhere;
-        const menu_is_open = if (self.slots.item_menu_open) |idx| idx == i else false;
+        const menu_is_open = if (self.ui_slots.item_menu_open) |idx| idx == slot.idx else false;
 
-        if (slot.item) |item| {
+        if (slot.kind) |kind| {
+            const item = kind.action.item;
             if (slot.long_hover.update(hovered)) {
                 try item.unqRenderTooltip(&self.tooltip_ui.commands, rect.pos.add(v2f(rect.dims.x, 0)), ui_scaling);
             }
             if (clicked_on) {
-                self.slots.item_menu_open = i;
+                self.ui_slots.item_menu_open = slot.idx;
             }
         } else if (menu_is_open) {
-            self.slots.item_menu_open = null;
+            self.ui_slots.item_menu_open = null;
         }
     }
-    if (self.slots.item_menu_open) |idx| {
+    if (self.ui_slots.item_menu_open) |idx| {
         self.tooltip_ui.commands.clear(); // TODO - rethink??
-        assert(idx < self.slots.items.len);
-        const slot: *gameUI.RunSlots.ItemSlot = &self.slots.items.buffer[idx];
-        assert(slot.item != null);
-        const item = &slot.item.?;
-        const slot_rect: geom.Rectf = items_rects.get(idx);
+        assert(idx < self.ui_slots.items.len);
+        const slot: *gameUI.Slots.Slot = &self.ui_slots.items.buffer[idx];
+        const item = &slot.kind.?.action.item;
+        const slot_rect: geom.Rectf = slot.rect;
         const btn_dims = v2f(100, 75);
         const can_use = item.canUseInRun(&self.player_thing, self);
         const menu_padding = V2f.splat(4);
@@ -654,19 +602,18 @@ pub fn itemsUpdate(self: *Run) Error!void {
 
         if (use_pressed and !discard_pressed) {
             try item.useInRun(&self.player_thing, self);
-            slot.item = null;
+            slot.kind = null;
         } else if (discard_pressed) {
-            slot.item = null;
+            slot.kind = null;
         } else {
             const hovered = geom.pointIsInRectf(mouse_pos, slot_rect);
             const clicked_somewhere = (plat.input_buffer.mouseBtnIsJustPressed(.left) or plat.input_buffer.mouseBtnIsJustPressed(.right));
             const clicked_on_slot = hovered and clicked_somewhere;
             if (clicked_somewhere and !use_pressed and !discard_pressed and !clicked_on_slot) {
-                self.slots.item_menu_open = null;
+                self.ui_slots.item_menu_open = null;
             }
         }
         if (self.room_exists) {
-            self.syncItems(.run);
             self.syncPlayerThing(.run);
         }
     }
@@ -988,10 +935,6 @@ pub fn update(self: *Run) Error!void {
         if (plat.input_buffer.keyIsJustPressed(.l)) {
             self.loadNextPlace();
         }
-    }
-    // TODO hack to stop stack getting too massive on run + room init
-    if (self.curr_tick == 0) {
-        //try self.startRun();
     }
 
     switch (self.load_state) {
