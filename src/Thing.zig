@@ -1347,10 +1347,16 @@ inline fn canAct(self: *const Thing) bool {
 
 pub fn update(self: *Thing, room: *Room) Error!void {
     _ = self.find_path_timer.tick(false);
+    const is_prompt = self.statuses.get(.promptitude).stacks > 0;
     if (self.canAct()) {
+        const old_max_speed = self.accel_params.max_speed;
+        if (is_prompt) {
+            self.accel_params.max_speed = old_max_speed * 2;
+        }
         try updateController(self, room);
-        if (self.statuses.get(.promptitude).stacks > 0) {
+        if (is_prompt) {
             try updateController(self, room);
+            self.accel_params.max_speed = old_max_speed;
         }
     } else if (self.isDeadCreature()) {
         if (self.animator.?.play(.die, .{}).contains(.end)) {
@@ -1361,9 +1367,6 @@ pub fn update(self: *Thing, room: *Room) Error!void {
         self.updateVel(.{}, .{});
     }
     self.moveAndCollide(room);
-    if (self.statuses.get(.promptitude).stacks > 0) {
-        self.moveAndCollide(room);
-    }
     if (self.hitbox) |*hitbox| {
         hitbox.update(self, room);
     }
