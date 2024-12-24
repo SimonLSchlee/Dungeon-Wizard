@@ -136,6 +136,7 @@ renderer: union(enum) {
 } = .none,
 animator: ?sprites.Animator = null,
 path: std.BoundedArray(V2f, 32) = .{},
+pathing_layer: TileMap.PathLayer = .normal,
 hitbox: ?HitBox = null,
 hurtbox: ?HurtBox = null,
 hp: ?HP = null,
@@ -935,7 +936,7 @@ pub const ManaPickupController = struct {
         var proto = Thing{
             .kind = .pickup,
             .coll_radius = radius,
-            .coll_mask = Collision.Mask.initOne(.tile),
+            .coll_mask = Collision.Mask.initMany(&.{ .wall, .spikes }),
             .controller = .{ .mana_pickup = .{} },
             .renderer = .{
                 .vfx = .{},
@@ -1544,8 +1545,8 @@ pub fn moveAndCollide(self: *Thing, room: *Room) void {
         if (self.coll_mask.contains(.creature)) {
             _coll = Collision.getNextCircleCollisionWithThings(self.pos, self.coll_radius, self.coll_mask, &.{self.id}, room);
         }
-        if (_coll == null and self.coll_mask.contains(.tile)) {
-            _coll = Collision.getCircleCollisionWithTiles(self.pos, self.coll_radius, &room.tilemap);
+        if (_coll == null) {
+            _coll = Collision.getCircleCollisionWithTiles(self.coll_mask, self.pos, self.coll_radius, &room.tilemap);
         }
 
         if (_coll) |coll| {
@@ -1605,7 +1606,14 @@ pub fn findPath(self: *Thing, room: *Room, goal: V2f) Error!void {
     if (self.player_input == null and self.find_path_timer.running) {
         return;
     }
-    self.path = try room.tilemap.findPathThetaStar(getPlat().heap, self.pos, goal, self.coll_radius, &self.dbg.coords_searched);
+    self.path = try room.tilemap.findPathThetaStar(
+        getPlat().heap,
+        self.pathing_layer,
+        self.pos,
+        goal,
+        self.coll_radius,
+        &self.dbg.coords_searched,
+    );
     self.find_path_timer.restart();
     if (self.path.len == 0) {
         self.path.append(self.pos) catch unreachable;
@@ -1680,7 +1688,7 @@ pub fn debugDrawPath(self: *const Thing, room: *const Room) Error!void {
     const inv_zoom = 1 / room.camera.zoom;
     const line_thickness = inv_zoom;
     for (0..self.path.len - 1) |i| {
-        plat.arrowf(self.path.buffer[i], self.path.buffer[i + 1], line_thickness, Colorf.green);
+        plat.arrowf(self.path.buffer[i], self.path.buffer[i + 1], .{ .thickness = line_thickness, .color = Colorf.green });
         //p.linef(self.path.buffer[i], self.path.buffer[i + 1], .{ .thickness = line_thickness, .color = Colorf.green });
     }
 }

@@ -160,6 +160,7 @@ pub fn slimeProto() Thing {
 
 pub fn batProto() Thing {
     var ret = creatureProto(.bat, .bat, .enemy, .{ .aggro = .{} }, 4, .smol, 17);
+    ret.pathing_layer = .flying;
     ret.accel_params = .{
         .max_speed = 0.0192 * TileMap.tile_sz_f,
     };
@@ -336,7 +337,7 @@ pub fn creatureProto(creature_kind: Kind, sprite_kind: sprites.CreatureAnim.Kind
         .spawn_state = .instance,
         .vision_range = 80,
         .coll_radius = Thing.SizeCategory.coll_radii.get(size_cat),
-        .coll_mask = Thing.Collision.Mask.initMany(&.{ .creature, .tile }),
+        .coll_mask = Thing.Collision.Mask.initMany(&.{ .creature, .wall }),
         .coll_layer = Thing.Collision.Mask.initMany(&.{.creature}),
         .controller = if (ai) |a| .{ .ai_actor = .{ .ai = a } } else .default,
         .renderer = .{ .creature = .{

@@ -51,14 +51,50 @@ pub const neighbor_dirs_coords = std.EnumArray(NeighborDir, V2i).init(.{
     .W = v2i(-1, 0),
 });
 
-pub const Tile = struct {
-    coord: V2i,
-    passable: bool = true,
+// pathing/collision braindump (written while adding spike pits)
+//
+// cases NOW
+// 1. Normal moving creatures, projectiles... collide with walls, NOT spikes
+// 2. Non-flying Things which are "on" spikes (center inside tile) get hit, go flying out of spikes
+// 3. Mana crystals collide with both walls and spikes (bounce off same)
+// 4. Non-flying things path around spikes, flying Things path over
+// cases FUTURE
+// 5. Low walls allow LOS, but otherwise act like regular walls
+// 6. Path around lava, but don't get hit and go flying. mana crystals go through
+// ???
+// - collision mask/layers
+//   - determines what actually COLLIDES and stops movement - goal being they never overlap
+//   - everything collides with wall/low wall, only mana crystals collide with spikes
+// - pathing mask/layers
+//   - determines what we are allowed to pathfind on (and its cost?)
+//   - flying creatures will path over spikes, lava... other Things will avoid them
+//   - path layers must be a superset of coll layers - you can't path through things you collide with!
+//   - Things dont need path layers? Maybe? They specify a mask of what they can path over
+//
+
+// layers we may want to differentiate for pathing
+pub const PathLayer = enum {
+    normal,
+    flying,
+
+    pub const Mask = std.EnumSet(PathLayer);
+    pub const ConnIds = std.EnumArray(PathLayer, ?u8);
 };
 
 pub const GameTile = struct {
     coord: V2i,
-    passable: bool = true,
+    // default tile is empty (no wall) and fully pathable
+    coll_layers: Thing.Collision.Mask = Thing.Collision.Mask.initEmpty(),
+    path_layers: PathLayer.Mask = PathLayer.Mask.initFull(),
+    path_conn_ids: PathLayer.ConnIds = PathLayer.ConnIds.initFill(null),
+    // TODO
+    // blocks_LOS: bool = false,
+    pub fn canPath(self: *const GameTile, mask: PathLayer.Mask) bool {
+        return mask.intersectWith(self.path_layers).count() > 0;
+    }
+    pub fn collides(self: *const GameTile, mask: Thing.Collision.Mask) bool {
+        return mask.intersectWith(self.coll_layers).count() > 0;
+    }
 };
 
 pub const TileIndex = u32;
@@ -175,18 +211,18 @@ pub fn tileCoordToRect(coord: V2i) geom.Rectf {
     };
 }
 
-pub fn getTileNeighborsPassable(self: *const TileMap, coord: V2i) std.EnumArray(NeighborDir, bool) {
+pub fn getTileNeighborsPassable(self: *const TileMap, mask: Thing.Collision.Mask, coord: V2i) std.EnumArray(NeighborDir, bool) {
     var ret: std.EnumArray(NeighborDir, bool) = undefined;
     for (neighbor_dirs) |nd| {
         const neighbor_coord = coord.add(neighbor_dirs_coords.get(nd));
         const tile = self.gameTileCoordToConstGameTile(neighbor_coord);
-        const passable = if (tile) |t| t.passable else true;
+        const passable = if (tile) |t| !t.collides(mask) else true;
         ret.set(nd, passable);
     }
     return ret;
 }
 
-pub fn findPathAStar(self: *const TileMap, allocator: std.mem.Allocator, start: V2f, goal: V2f) Error!std.BoundedArray(V2f, 32) {
+pub fn __unused__findPathAStar(self: *const TileMap, allocator: std.mem.Allocator, start: V2f, goal: V2f) Error!std.BoundedArray(V2f, 32) {
     const AStar = struct {
         const PqEl = struct {
             p: V2i,
@@ -289,28 +325,117 @@ pub fn findPathAStar(self: *const TileMap, allocator: std.mem.Allocator, start: 
     return ret;
 }
 
-pub fn tileCoordIsPassable(self: *const TileMap, coord: V2i) bool {
+pub fn updateConnectedComponents(self: *TileMap) Error!void {
+    const plat = getPlat();
+    const path_layers = utl.enumValueList(PathLayer);
+    assert(path_layers.len == 2);
+    assert(path_layers[0] == .normal);
+    assert(path_layers[1] == .flying);
+
+    for (self.game_tiles.slice()) |*t| {
+        t.path_conn_ids = PathLayer.ConnIds.initFill(null);
+    }
+
+    var queue = std.ArrayList(V2i).init(plat.heap);
+    defer queue.deinit();
+    var seen = std.AutoArrayHashMap(V2i, void).init(plat.heap);
+    defer seen.deinit();
+
+    // TODO flying not getting connected!!!
+    for (path_layers) |layer| {
+        const path_mask = PathLayer.Mask.initOne(layer);
+        var curr_id: u8 = 0;
+
+        for (self.game_tiles.slice()) |*tile| {
+            if (!tile.path_layers.contains(layer)) continue;
+            // already part of a connected component
+            if (tile.path_conn_ids.get(layer) != null) continue;
+
+            queue.clearRetainingCapacity();
+            seen.clearRetainingCapacity();
+            try queue.append(tile.coord);
+            try seen.put(tile.coord, {});
+
+            while (queue.items.len > 0) {
+                const curr = queue.orderedRemove(0);
+                if (self.gameTileCoordToGameTile(curr)) |curr_tile| {
+                    assert(curr_tile.path_conn_ids.get(layer) == null);
+                    curr_tile.path_conn_ids.getPtr(layer).* = curr_id;
+                }
+                for (neighbor_dirs) |dir| {
+                    const dir_v = neighbor_dirs_coords.get(dir);
+                    const next = curr.add(dir_v);
+                    if (!self.tileCoordIsPathable(path_mask, next)) continue;
+                    if (seen.get(next)) |_| continue;
+                    try seen.put(next, {});
+                    try queue.append(next);
+                }
+            }
+            curr_id += 1;
+        }
+    }
+}
+
+pub fn getClosestConnectedPos(self: *const TileMap, layer: PathLayer, conn_id: u8, point: V2f, radius: f32) Error!?V2f {
+    const plat = getPlat();
+    const max_dim = self.getRoomRect().dims.max();
+    const max_dist_away_squared = max_dim * max_dim;
+    const Pair = struct { coord: V2i, pos: V2f };
+    var queue = std.ArrayList(Pair).init(plat.heap);
+    defer queue.deinit();
+    var seen = std.AutoArrayHashMap(V2i, void).init(plat.heap);
+    defer seen.deinit();
+    var best_dist = std.math.inf(f32);
+    var best_pair: ?Pair = null;
+
+    const pt_coord = posToTileCoord(point);
+    try queue.append(.{ .coord = pt_coord, .pos = point });
+    try seen.put(pt_coord, {});
+
+    while (queue.items.len > 0) {
+        const curr_pair: Pair = queue.orderedRemove(0);
+        if (self.gameTileCoordToConstGameTile(curr_pair.coord)) |curr_tile| {
+            if (curr_tile.path_conn_ids.get(layer)) |curr_conn_id| {
+                if (curr_conn_id == conn_id) {
+                    const dist = curr_pair.pos.dist(point);
+                    if (dist < best_dist) {
+                        best_dist = dist;
+                        best_pair = curr_pair;
+                    }
+                    continue; // dont explore neighbors, this is the perimeter!
+                }
+            }
+        }
+        for (neighbor_dirs) |dir| {
+            const dir_v = neighbor_dirs_coords.get(dir);
+            const next_coord = curr_pair.coord.add(dir_v);
+            if (seen.get(next_coord)) |_| continue;
+            try seen.put(next_coord, {});
+            const center_pos = tileCoordToCenterPos(next_coord);
+            const point_to_pos = center_pos.sub(point);
+            if (point_to_pos.lengthSquared() > max_dist_away_squared) continue;
+            const dir_from_point = point_to_pos.normalizedChecked() orelse V2f.right;
+            const closest_pos = center_pos.sub(dir_from_point.scale(tile_sz_f * 0.5 - radius));
+            try queue.append(.{
+                .coord = next_coord,
+                .pos = closest_pos,
+            });
+        }
+    }
+    if (best_pair) |p| {
+        return p.pos;
+    }
+    return null;
+}
+
+pub fn tileCoordIsPathable(self: *const TileMap, mask: PathLayer.Mask, coord: V2i) bool {
     if (self.gameTileCoordToConstGameTile(coord)) |tile| {
-        return tile.passable;
+        return tile.canPath(mask);
     }
-    return true;
+    return false;
 }
 
-pub fn isLOSBetweenThicc(self: *const TileMap, a: V2f, b: V2f, thickness: f32) bool {
-    const a_to_b = a.sub(b);
-    const n = a_to_b.rot90CW().normalizedOrZero();
-    if (n.isZero()) {
-        return self.isLOSBetween(a, b);
-    }
-    const offset = n.scale(thickness * 0.5);
-    const a_right = a.add(offset);
-    const b_right = b.add(offset);
-    const a_left = a.sub(offset);
-    const b_left = b.sub(offset);
-    return self.isLOSBetween(a_right, b_right) and self.isLOSBetween(a_left, b_left);
-}
-
-pub fn raycastLOS(self: *const TileMap, _a: V2f, _b: V2f) ?V2i {
+pub fn raycast(self: *const TileMap, _a: V2f, _b: V2f, path_mask: ?PathLayer.Mask, coll_mask: ?Thing.Collision.Mask) ?V2i {
     const a_coord = posToTileCoord(_a);
     const b_coord = posToTileCoord(_b);
     const a = _a.scale(1 / tile_sz_f);
@@ -350,7 +475,15 @@ pub fn raycastLOS(self: *const TileMap, _a: V2f, _b: V2f) ?V2i {
     //std.debug.print("d: {}, {}\n", .{ dx, dy });
     while (true) {
         //std.debug.print("curr: {}, {}\n", .{ curr.x, curr.y });
-        if (!self.tileCoordIsPassable(curr)) return curr;
+        // TODO tileCoolrdBlocksLOS
+        if (self.gameTileCoordToConstGameTile(curr)) |tile| {
+            if (path_mask) |mask| {
+                if (!tile.canPath(mask)) return curr;
+            }
+            if (coll_mask) |mask| {
+                if (tile.collides(mask)) return curr;
+            }
+        }
         if (curr.eql(b_coord)) break;
         //std.debug.print("e: {}\n", .{err});
 
@@ -366,11 +499,37 @@ pub fn raycastLOS(self: *const TileMap, _a: V2f, _b: V2f) ?V2i {
     return null;
 }
 
-pub fn isLOSBetween(self: *const TileMap, _a: V2f, _b: V2f) bool {
+pub fn raycastBothThicc(self: *const TileMap, a: V2f, b: V2f, thickness: f32, path_mask: ?PathLayer.Mask, coll_mask: ?Thing.Collision.Mask) bool {
+    const a_to_b = a.sub(b);
+    const n = a_to_b.rot90CW().normalizedOrZero();
+    if (n.isZero()) {
+        return self.isLOSBetween(a, b);
+    }
+    const offset = n.scale(thickness * 0.5);
+    const a_right = a.add(offset);
+    const b_right = b.add(offset);
+    const a_left = a.sub(offset);
+    const b_left = b.sub(offset);
+    return self.raycast(a_right, b_right, path_mask, coll_mask) == null and self.raycast(a_left, b_left, path_mask, coll_mask) == null;
+}
+
+pub inline fn raycastLOS(self: *const TileMap, a: V2f, b: V2f) ?V2i {
+    return self.raycast(a, b, null, comptime Thing.Collision.Mask.initOne(.wall));
+}
+
+pub inline fn isLOSBetweenThicc(self: *const TileMap, a: V2f, b: V2f, thickness: f32) bool {
+    return self.raycastBothThicc(a, b, thickness, null, comptime Thing.Collision.Mask.initOne(.wall));
+}
+
+pub inline fn isLOSBetween(self: *const TileMap, _a: V2f, _b: V2f) bool {
     return self.raycastLOS(_a, _b) == null;
 }
 
-pub fn findPathThetaStar(self: *const TileMap, allocator: std.mem.Allocator, start: V2f, goal: V2f, radius: f32, coords_searched: *std.BoundedArray(V2i, 128)) Error!std.BoundedArray(V2f, 32) {
+pub inline fn isStraightPathBetween(self: *const TileMap, _a: V2f, _b: V2f, radius: f32, mask: PathLayer.Mask) bool {
+    return self.raycastBothThicc(_a, _b, radius * 2, mask, null);
+}
+
+pub fn findPathThetaStar(self: *const TileMap, allocator: std.mem.Allocator, layer: PathLayer, start: V2f, desired_goal: V2f, radius: f32, coords_searched: *std.BoundedArray(V2i, 128)) Error!std.BoundedArray(V2f, 32) {
     const ThetaStar = struct {
         const PqEl = struct {
             p: V2i,
@@ -387,14 +546,39 @@ pub fn findPathThetaStar(self: *const TileMap, allocator: std.mem.Allocator, sta
             best_g: f32,
         };
     };
+    const path_mask = PathLayer.Mask.initMany(&.{layer});
     const start_coord = posToTileCoord(start);
-    const goal_coord = posToTileCoord(goal);
+    var actual_goal = desired_goal;
+    var goal_coord = posToTileCoord(actual_goal);
+    var ret = std.BoundedArray(V2f, 32){};
 
     if (self.gameTileCoordToConstGameTile(goal_coord)) |goal_tile| {
-        if (!goal_tile.passable) {
-            return .{};
+        if (self.gameTileCoordToConstGameTile(start_coord)) |start_tile| {
+            if (!start_tile.path_layers.contains(layer)) {
+                return ret;
+            }
+            const conn_id = start_tile.path_conn_ids.get(layer).?;
+            if (!goal_tile.path_layers.contains(layer) or goal_tile.path_conn_ids.get(layer) != conn_id) {
+                if (try self.getClosestConnectedPos(layer, conn_id, desired_goal, radius)) |closest| {
+                    actual_goal = closest;
+                } else {
+                    return ret;
+                }
+                goal_coord = posToTileCoord(actual_goal);
+            }
+        } else {
+            return ret;
         }
+    } else {
+        return ret;
     }
+
+    if (start_coord.eql(goal_coord)) {
+        ret.appendAssumeCapacity(start);
+        ret.appendAssumeCapacity(actual_goal);
+        return ret;
+    }
+
     var path_arr = std.ArrayList(V2f).init(allocator);
     defer path_arr.deinit();
     var queue = std.PriorityQueue(ThetaStar.PqEl, void, ThetaStar.PqEl.lessThan).init(allocator, {});
@@ -405,7 +589,7 @@ pub fn findPathThetaStar(self: *const TileMap, allocator: std.mem.Allocator, sta
     try queue.add(.{
         .p = start_coord,
         .g = 0,
-        .f = start.sub(goal).length(),
+        .f = start.sub(actual_goal).length(),
     });
     try seen.put(
         start_coord,
@@ -440,23 +624,17 @@ pub fn findPathThetaStar(self: *const TileMap, allocator: std.mem.Allocator, sta
         for (neighbor_dirs) |dir| {
             const dir_v = neighbor_dirs_coords.get(dir);
             const next_coord = curr.p.add(dir_v);
-            if (!self.tileCoordIsPassable(next_coord)) continue;
+            if (!self.tileCoordIsPathable(path_mask, next_coord)) continue;
             const entry = try seen.getOrPut(next_coord);
             if (entry.found_existing and entry.value_ptr.visited) continue;
-            const next_pos = if (next_coord.eql(goal_coord)) goal else tileCoordToCenterPos(next_coord);
+            const next_pos = if (next_coord.eql(goal_coord)) actual_goal else tileCoordToCenterPos(next_coord);
 
             var this_move_cost = tile_sz_f;
             var prev = curr.p;
             var prev_g = curr.g;
             if (parent_stuff) |parent| {
                 const parent_to_next = next_pos.sub(parent.pos);
-                const n = parent_to_next.rot90CW().normalized();
-                const offset = n.scale(radius);
-                const a_right = parent.pos.add(offset);
-                const b_right = next_pos.add(offset);
-                const a_left = parent.pos.sub(offset);
-                const b_left = next_pos.sub(offset);
-                if (self.isLOSBetween(a_right, b_right) and self.isLOSBetween(a_left, b_left)) {
+                if (self.isStraightPathBetween(parent.pos, next_pos, radius, path_mask)) {
                     this_move_cost = parent_to_next.length();
                     prev = parent.coord;
                     prev_g = parent.seen.best_g;
@@ -466,7 +644,7 @@ pub fn findPathThetaStar(self: *const TileMap, allocator: std.mem.Allocator, sta
             const next = ThetaStar.PqEl{
                 .p = next_coord,
                 .g = next_g,
-                .f = next_g + next_pos.sub(goal).length(),
+                .f = next_g + next_pos.sub(actual_goal).length(),
             };
             //std.debug.print("neighbor {}, {}\n", .{ next.p.x, next.p.y });
 
@@ -487,13 +665,7 @@ pub fn findPathThetaStar(self: *const TileMap, allocator: std.mem.Allocator, sta
         }
     }
     // backtrack to get path
-    var ret = std.BoundedArray(V2f, 32){};
     if (seen.get(goal_coord) == null) {
-        return ret;
-    }
-    if (start_coord.eql(goal_coord)) {
-        ret.append(start) catch unreachable;
-        ret.append(goal) catch unreachable;
         return ret;
     }
     {
@@ -503,7 +675,7 @@ pub fn findPathThetaStar(self: *const TileMap, allocator: std.mem.Allocator, sta
             curr = seen.get(curr).?.prev.?;
         }
         try path_arr.append(start);
-        path_arr.items[0] = goal;
+        path_arr.items[0] = actual_goal;
     }
     std.mem.reverse(V2f, path_arr.items);
 
@@ -530,7 +702,7 @@ pub fn debugDrawPath(_: *const TileMap, camera: draw.Camera2D, path: []const V2i
 pub fn debugDrawGrid(_: *const TileMap, camera: draw.Camera2D) void {
     const plat = getPlat();
     const inv_zoom = 1 / camera.zoom;
-    const camera_dims = plat.game_canvas_dims.scale(inv_zoom);
+    const camera_dims = plat.game_canvas_dims_f.scale(inv_zoom);
     const line_thickness = inv_zoom;
     // add 2 to grid dims to make sure it covers the screen
     const grid_dims = camera_dims.scale(1 / tile_sz_f).toV2i().add(v2i(2, 2));
@@ -554,8 +726,21 @@ pub fn debugDrawGrid(_: *const TileMap, camera: draw.Camera2D) void {
 pub fn debugDraw(self: *const TileMap, camera: draw.Camera2D) void {
     const plat = getPlat();
     for (self.game_tiles.constSlice()) |game_tile| {
-        const color = if (game_tile.passable) continue else Colorf.red.fade(0.3);
-        plat.rectf(tileCoordToPos(game_tile.coord), tile_dims, .{ .fill_color = color });
+        var color: Colorf = undefined;
+        if (game_tile.coll_layers.contains(.spikes)) {
+            if (game_tile.coll_layers.contains(.wall)) {
+                color = Colorf.green;
+            } else {
+                color = Colorf.red;
+            }
+        } else if (game_tile.coll_layers.contains(.wall)) {
+            color = Colorf.blue;
+        } else {
+            color = Colorf.blank;
+        }
+        const tl_pos = tileCoordToPos(game_tile.coord);
+        plat.rectf(tl_pos, tile_dims, .{ .fill_color = color.fade(0.3) });
+        plat.textf(tl_pos.add(v2f(1, 1)), "{?}", .{game_tile.path_conn_ids.get(.normal)}, .{ .color = .white, .size = 10 }) catch {};
     }
     self.debugDrawGrid(camera);
 }

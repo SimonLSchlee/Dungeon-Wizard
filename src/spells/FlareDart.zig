@@ -46,7 +46,7 @@ pub const proto = Spell.makeProto(
             .fixed_range = true,
             .max_range = base_range,
             .ray_to_mouse = .{
-                .ends_at_coll_mask = Collision.Mask.initMany(&.{.tile}),
+                .ends_at_coll_mask = Collision.Mask.initMany(&.{.wall}),
                 .thickness = base_ball_radius * 2, // TODO use radius below?
                 .cast_orig_dist = 10,
             },
@@ -94,7 +94,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
         .dir = target_dir,
         .vel = target_dir.scale(flare_dart.max_speed),
         .coll_radius = flare_dart.ball_radius,
-        .coll_mask = Thing.Collision.Mask.initMany(&.{.tile}),
+        .coll_mask = Thing.Collision.Mask.initMany(&.{.wall}),
         .controller = .{ .spell = .{
             .spell = self.*,
             .params = params,

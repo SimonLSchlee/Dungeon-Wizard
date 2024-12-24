@@ -422,6 +422,7 @@ pub const ActorController = struct {
                     const flee_from_pos = thing.pos;
                     controller.hiding_places = try getHidingPlaces(
                         room,
+                        TileMap.PathLayer.Mask.initOne(self.pathing_layer),
                         self.pos,
                         flee_from_pos,
                         flee.min_dist,
@@ -465,7 +466,7 @@ pub const ActorController = struct {
 };
 
 pub const HidingPlacesArray = std.BoundedArray(struct { pos: V2f, fleer_dist: f32, flee_from_dist: f32 }, 32);
-pub fn getHidingPlaces(room: *const Room, fleer_pos: V2f, flee_from_pos: V2f, min_flee_dist: f32, max_flee_dist: f32) Error!HidingPlacesArray {
+pub fn getHidingPlaces(room: *const Room, mask: TileMap.PathLayer.Mask, fleer_pos: V2f, flee_from_pos: V2f, min_flee_dist: f32, max_flee_dist: f32) Error!HidingPlacesArray {
     const plat = getPlat();
     const tilemap = &room.tilemap;
     const start_coord = TileMap.posToTileCoord(fleer_pos);
@@ -490,8 +491,8 @@ pub fn getHidingPlaces(room: *const Room, fleer_pos: V2f, flee_from_pos: V2f, mi
             const dir_v = TileMap.neighbor_dirs_coords.get(dir);
             const next = curr.add(dir_v);
             //std.debug.print("neighbor {}, {}\n", .{ next.p.x, next.p.y });
-            if (tilemap.gameTileCoordToConstGameTile(next)) |tile| {
-                if (!tile.passable) continue;
+            if (!tilemap.tileCoordIsPathable(mask, next)) {
+                continue;
             }
             if (seen.get(next)) |_| continue;
             try seen.put(next, {});

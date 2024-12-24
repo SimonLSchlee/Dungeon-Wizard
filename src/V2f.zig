@@ -202,6 +202,10 @@ pub fn ceil(self: Self) Self {
     return v2f(@ceil(self.x), @ceil(self.y));
 }
 
+pub fn max(self: Self) f32 {
+    return @max(self.x, self.y);
+}
+
 pub fn format(self: Self, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
     _ = options;
     const vec_fmt = "({" ++ fmt ++ "}, {" ++ fmt ++ "})";

@@ -300,3 +300,13 @@ pub fn typeBaseName(T: type) []const u8 {
     }
     return name;
 }
+
+pub fn enumValueList(T: type) []const T {
+    const info = expectTypeInfo(T, .@"enum");
+    comptime var list: [info.fields.len]T = undefined;
+    inline for (info.fields, 0..) |f, i| {
+        list[i] = @enumFromInt(f.value);
+    }
+    const const_list = comptime list;
+    return &const_list;
+}

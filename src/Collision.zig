@@ -24,7 +24,8 @@ const Collision = @This();
 
 pub const Layer = enum {
     creature,
-    tile,
+    wall,
+    spikes,
 };
 pub const Mask = std.EnumSet(Layer);
 
@@ -84,7 +85,7 @@ pub fn getRayCircleCollision(ray_pos: V2f, ray_v: V2f, circle_pos: V2f, radius: 
 
 pub fn getNextSweptCircleCollision(ray_pos: V2f, ray_v: V2f, radius: f32, mask: Mask, ignore_ids: []const Thing.Id, room: *const Room) ?Collision {
     const creature_coll: ?Collision = if (mask.contains(.creature)) getNextSweptCircleCollisionWithThings(ray_pos, ray_v, radius, mask, ignore_ids, room) else null;
-    const tile_coll: ?Collision = if (mask.contains(.tile)) getNextSweptCircleCollisionWithTiles(ray_pos, ray_v, radius, &room.tilemap) else null;
+    const tile_coll: ?Collision = getNextSweptCircleCollisionWithTiles(mask, ray_pos, ray_v, radius, &room.tilemap);
     // take the min dist
     if (creature_coll) |ccoll| {
         if (tile_coll) |tcoll| {
@@ -213,13 +214,13 @@ pub fn getPointCollisionInTile(point: V2f, tile: TileMap.GameTile, passable_neig
     };
 }
 
-pub fn getCircleCollisionWithTiles(pos: V2f, radius: f32, tilemap: *const TileMap) ?Collision {
+pub fn getCircleCollisionWithTiles(mask: Thing.Collision.Mask, pos: V2f, radius: f32, tilemap: *const TileMap) ?Collision {
     var coll: ?Collision = null;
 
     for (tilemap.game_tiles.constSlice()) |tile| outer_blk: {
-        if (tile.passable) continue;
+        if (!tile.collides(mask)) continue;
 
-        const passable_neighbors = tilemap.getTileNeighborsPassable(tile.coord);
+        const passable_neighbors = tilemap.getTileNeighborsPassable(mask, tile.coord);
         const center = TileMap.tileCoordToCenterPos(tile.coord);
         if (getPointCollisionInTile(pos, tile, passable_neighbors)) |c| {
             return c;
@@ -309,7 +310,7 @@ pub fn getCircleCollisionWithTiles(pos: V2f, radius: f32, tilemap: *const TileMa
     return coll;
 }
 
-pub fn getNextSweptCircleCollisionWithTiles(ray_pos: V2f, ray_v: V2f, radius: f32, tilemap: *const TileMap) ?Collision {
+pub fn getNextSweptCircleCollisionWithTiles(mask: Thing.Collision.Mask, ray_pos: V2f, ray_v: V2f, radius: f32, tilemap: *const TileMap) ?Collision {
     assert(radius > 0.001);
     assert(ray_v.lengthSquared() > 0.001);
     const ray_v_n = ray_v.normalized();
@@ -317,9 +318,9 @@ pub fn getNextSweptCircleCollisionWithTiles(ray_pos: V2f, ray_v: V2f, radius: f3
     var best_dist = std.math.inf(f32);
 
     for (tilemap.game_tiles.constSlice()) |tile| {
-        if (tile.passable) continue;
+        if (!tile.collides(mask)) continue;
 
-        const passable_neighbors = tilemap.getTileNeighborsPassable(tile.coord);
+        const passable_neighbors = tilemap.getTileNeighborsPassable(mask, tile.coord);
         const all_corners_cw = TileMap.tileTopLeftToCornersCW(TileMap.tileCoordToPos(tile.coord));
         const all_edges_cw: [4][2]V2f = blk: {
             var ret: [4][2]V2f = undefined;

@@ -46,7 +46,8 @@ pub const TileSet = struct {
         });
     };
     pub const TileProperties = struct {
-        coll: GameTileCorner.Map = GameTileCorner.Map.initFill(false),
+        colls: GameTileCorner.Map = GameTileCorner.Map.initFill(false),
+        spikes: GameTileCorner.Map = GameTileCorner.Map.initFill(false),
     };
 
     name: NameBuf = .{}, // filename without extension (.tsj)
@@ -702,13 +703,16 @@ pub fn loadTileSetFromJsonString(tileset: *TileSet, json_string: []u8, assets_re
             for (props.items) |p| {
                 const prop_name = p.object.get("name").?.string;
                 const val = p.object.get("value").?.string;
-                if (std.mem.eql(u8, prop_name, "colls")) {
-                    var prop_it = std.mem.tokenizeScalar(u8, val, ',');
-                    var c_i: usize = 0;
-                    while (prop_it.next()) |c| {
-                        const coll_bool: bool = if (c[0] == '0') false else true;
-                        prop.coll.getPtr(@enumFromInt(c_i)).* = coll_bool;
-                        c_i += 1;
+                const type_info = @typeInfo(TileSet.TileProperties);
+                inline for (type_info.@"struct".fields) |f| {
+                    if (std.mem.eql(u8, prop_name, f.name)) {
+                        var prop_it = std.mem.tokenizeScalar(u8, val, ',');
+                        var c_i: usize = 0;
+                        while (prop_it.next()) |c| {
+                            const set: bool = if (c[0] == '0') false else true;
+                            @field(prop, f.name).getPtr(@enumFromInt(c_i)).* = set;
+                            c_i += 1;
+                        }
                     }
                 }
             }
@@ -915,13 +919,19 @@ pub fn loadTileMaps(self: *Data) Error!void {
                     break :blk null;
                 };
                 if (props) |*tile_props| {
-                    var it = tile_props.coll.iterator();
-                    while (it.next()) |e| {
-                        const is_coll = e.value.*;
-                        const dir = TileSet.GameTileCorner.dir_map.get(e.key);
+                    inline for (std.meta.fields(TileSet.GameTileCorner)) |f| {
+                        const corner: TileSet.GameTileCorner = @enumFromInt(f.value);
+                        const dir = TileSet.GameTileCorner.dir_map.get(corner);
                         const game_tile_coord = tile_coord.add(dir);
                         if (tilemap.gameTileCoordToGameTile(game_tile_coord)) |game_tile| {
-                            game_tile.passable = !is_coll;
+                            if (tile_props.colls.get(corner)) {
+                                game_tile.coll_layers.insert(.wall);
+                                game_tile.path_layers = TileMap.PathLayer.Mask.initEmpty();
+                            }
+                            if (tile_props.spikes.get(corner)) {
+                                game_tile.coll_layers.insert(.spikes);
+                                game_tile.path_layers.remove(.normal);
+                            }
                         }
                     }
                 }
@@ -932,6 +942,7 @@ pub fn loadTileMaps(self: *Data) Error!void {
                 }
             }
         }
+        try tilemap.updateConnectedComponents();
         Log.info("Loaded tilemap: {s}", .{tilemap.name.constSlice()});
     }
 }
