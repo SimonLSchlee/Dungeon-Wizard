@@ -376,7 +376,7 @@ pub fn updateConnectedComponents(self: *TileMap) Error!void {
     }
 }
 
-pub fn getClosestConnectedPos(self: *const TileMap, layer: PathLayer, conn_id: u8, point: V2f, radius: f32) Error!?V2f {
+pub fn getClosestPathablePos(self: *const TileMap, layer: PathLayer, conn_id: ?u8, point: V2f, radius: f32) Error!?V2f {
     const plat = getPlat();
     const max_dim = self.getRoomRect().dims.max();
     const max_dist_away_squared = max_dim * max_dim;
@@ -396,7 +396,7 @@ pub fn getClosestConnectedPos(self: *const TileMap, layer: PathLayer, conn_id: u
         const curr_pair: Pair = queue.orderedRemove(0);
         if (self.gameTileCoordToConstGameTile(curr_pair.coord)) |curr_tile| {
             if (curr_tile.path_conn_ids.get(layer)) |curr_conn_id| {
-                if (curr_conn_id == conn_id) {
+                if (conn_id == null or curr_conn_id == conn_id.?) {
                     const dist = curr_pair.pos.dist(point);
                     if (dist < best_dist) {
                         best_dist = dist;
@@ -559,7 +559,7 @@ pub fn findPathThetaStar(self: *const TileMap, allocator: std.mem.Allocator, lay
             }
             const conn_id = start_tile.path_conn_ids.get(layer).?;
             if (!goal_tile.path_layers.contains(layer) or goal_tile.path_conn_ids.get(layer) != conn_id) {
-                if (try self.getClosestConnectedPos(layer, conn_id, desired_goal, radius)) |closest| {
+                if (try self.getClosestPathablePos(layer, conn_id, desired_goal, radius)) |closest| {
                     actual_goal = closest;
                 } else {
                     return ret;

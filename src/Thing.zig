@@ -128,7 +128,7 @@ controller: union(enum) {
     loop_vfx: LoopVFXController,
 } = .default,
 renderer: union(enum) {
-    none: void,
+    none: struct {},
     creature: CreatureRenderer,
     shape: ShapeRenderer,
     spawner: SpawnerRenderer,
@@ -154,6 +154,11 @@ statuses: StatusEffect.StatusArray = StatusEffect.proto_array,
 enemy_difficulty: f32 = 0,
 find_path_timer: utl.TickCounter = utl.TickCounter.init(6),
 shadow_radius_x: f32 = 0,
+hit_airborne: ?struct {
+    landing_pos: V2f,
+    z_vel: f32 = 0,
+    z_accel: f32 = 0,
+} = null,
 
 pub const Faction = enum {
     object,
@@ -1135,6 +1140,7 @@ pub const CreatureRenderer = struct {
     draw_radius: f32 = 10,
     draw_color: Colorf = Colorf.red,
     hp_bar_width: f32 = 20,
+    rel_pos: V2f = .{},
 
     pub fn renderUnder(self: *const Thing, room: *const Room) Error!void {
         assert(self.spawn_state == .spawned);
@@ -1162,6 +1168,7 @@ pub const CreatureRenderer = struct {
     pub fn render(self: *const Thing, room: *const Room) Error!void {
         assert(self.spawn_state == .spawned);
         const plat = getPlat();
+        const renderer = &self.renderer.creature;
 
         if (debug.show_selectable) {
             if (self.selectable) |s| {
@@ -1193,7 +1200,7 @@ pub const CreatureRenderer = struct {
             .tint = tint,
             .round_to_pixel = true,
         };
-        plat.texturef(self.pos, frame.texture, opt);
+        plat.texturef(self.pos.add(renderer.rel_pos), frame.texture, opt);
 
         const protected = self.statuses.get(.protected);
         if (self.isAliveCreature() and protected.stacks > 0) {
@@ -1340,7 +1347,7 @@ fn updateController(self: *Thing, room: *Room) Error!void {
 
 inline fn canAct(self: *const Thing) bool {
     if (self.creature_kind != null) {
-        return self.isAliveCreature() and self.statuses.get(.frozen).stacks == 0 and self.statuses.get(.stunned).stacks == 0;
+        return self.isAliveCreature() and self.statuses.get(.frozen).stacks == 0 and self.statuses.get(.stunned).stacks == 0 and self.hit_airborne == null;
     }
     return self.isActive();
 }
@@ -1363,10 +1370,48 @@ pub fn update(self: *Thing, room: *Room) Error!void {
             self.deferFree(room);
         }
         return;
+    } else if (self.hit_airborne) |*s| {
+        s.z_vel += s.z_accel;
+        var done = false;
+        switch (self.renderer) {
+            inline else => |*r| if (@hasField(@TypeOf(r.*), "rel_pos")) {
+                r.rel_pos.y += -s.z_vel;
+                if (r.rel_pos.y >= 0) {
+                    done = true;
+                    r.rel_pos.y = 0;
+                }
+            },
+        }
+        done = done or self.pos.dist(s.landing_pos) < self.vel.length() * 1.5;
+        if (done) {
+            self.hit_airborne = null;
+        }
     } else {
         self.updateVel(.{}, .{});
     }
     self.moveAndCollide(room);
+    if (self.hurtbox) |*hurtbox| {
+        if (self.hit_airborne == null) {
+            const tile_coord = TileMap.posToTileCoord(self.pos);
+            if (room.tilemap.gameTileCoordToConstGameTile(tile_coord)) |tile| {
+                if (tile.coll_layers.contains(.spikes)) {
+                    hurtbox.hit(self, room, .{ .damage = 8 }, null);
+                    const flight_ticks = core.secsToTicks(0.5);
+                    const max_y: f32 = 40;
+                    const v0: f32 = 2 * max_y / utl.as(f32, flight_ticks);
+                    const g = -2 * v0 / utl.as(f32, flight_ticks);
+                    const landing_pos = try room.tilemap.getClosestPathablePos(self.pathing_layer, null, self.pos, self.coll_radius) orelse self.pos;
+                    self.hit_airborne = .{
+                        .landing_pos = landing_pos,
+                        .z_accel = g,
+                        .z_vel = v0,
+                    };
+                    const speed = landing_pos.dist(self.pos) / utl.as(f32, flight_ticks);
+                    self.vel = landing_pos.sub(self.pos).normalizedOrZero().scale(speed);
+                }
+            }
+        }
+    }
     if (self.hitbox) |*hitbox| {
         hitbox.update(self, room);
     }
