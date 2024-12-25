@@ -220,6 +220,7 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                 // deactivate hitbox
                 self.hitbox.?.active = false;
                 if (melee.lunge_accel) |accel_params| {
+                    self.dashing = false;
                     self.coll_mask.insert(.creature);
                     self.coll_layer.insert(.creature);
                     self.updateVel(.{}, .{ .friction = accel_params.max_speed });
@@ -245,6 +246,7 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                 }
 
                 if (melee.lunge_accel) |accel_params| {
+                    self.dashing = true;
                     self.coll_mask.remove(.creature);
                     self.coll_layer.remove(.creature);
                     self.updateVel(self.dir, accel_params);

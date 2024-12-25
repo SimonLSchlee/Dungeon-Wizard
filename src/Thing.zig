@@ -159,6 +159,7 @@ hit_airborne: ?struct {
     z_vel: f32 = 0,
     z_accel: f32 = 0,
 } = null,
+dashing: bool = false,
 
 pub const Faction = enum {
     object,
@@ -1391,7 +1392,7 @@ pub fn update(self: *Thing, room: *Room) Error!void {
     }
     self.moveAndCollide(room);
     if (self.hurtbox) |*hurtbox| {
-        if (self.hit_airborne == null) {
+        if (self.pathing_layer == .normal and self.hit_airborne == null and self.dashing == false) {
             const tile_coord = TileMap.posToTileCoord(self.pos);
             if (room.tilemap.gameTileCoordToConstGameTile(tile_coord)) |tile| {
                 if (tile.coll_layers.contains(.spikes)) {
