@@ -37,6 +37,102 @@ pub const max_item_slots = 8;
 
 pub const bottom_screen_margin: f32 = 6;
 
+pub const UISlot = struct {
+    command: Options.Controls.InputBinding.Command,
+    key_rect_pos: V2f = .{},
+    cooldown_timer: ?utl.TickCounter = null,
+    hover_timer: utl.TickCounter = utl.TickCounter.init(15),
+    long_hover: menuUI.LongHover = .{},
+    rect: geom.Rectf = .{},
+    clicked: bool = false,
+    hovered: bool = false,
+
+    pub fn init(command: Options.Controls.InputBinding.Command) UISlot {
+        return .{
+            .command = command,
+        };
+    }
+
+    pub fn unqRectHoverClick(slot: *UISlot, cmd_buf: *ImmUI.CmdBuf, enabled: bool, poly_opt: ?draw.PolyOpt) Error!bool {
+        const plat = getPlat();
+        const mouse_pos = plat.getMousePosScreen();
+        slot.hovered = geom.pointIsInRectf(mouse_pos, slot.rect);
+        slot.clicked = slot.hovered and plat.input_buffer.mouseBtnIsJustPressed(.left);
+
+        _ = slot.long_hover.update(slot.hovered);
+
+        cmd_buf.append(.{ .rect = .{
+            .pos = slot.rect.pos,
+            .dims = slot.rect.dims,
+            .opt = if (poly_opt) |opt| opt else .{
+                .fill_color = slot_bg_color,
+                .edge_radius = 0.2,
+            },
+        } }) catch @panic("Fail to append rect cmd");
+
+        return enabled and slot.hovered and slot.clicked and geom.pointIsInRectf(mouse_pos, slot.rect);
+    }
+
+    pub fn unqCooldownTimer(slot: *UISlot, cmd_buf: *ImmUI.CmdBuf) Error!void {
+        if (slot.cooldown_timer) |*timer| {
+            if (timer.running) {
+                menuUI.unqSectorTimer(
+                    cmd_buf,
+                    slot.rect.pos.add(slot.rect.dims.scale(0.5)),
+                    slot.rect.dims.x * 0.5 * 0.7,
+                    timer,
+                    .{ .fill_color = .blue },
+                );
+            }
+        }
+    }
+
+    pub fn unqHotKey(slot: *UISlot, cmd_buf: *ImmUI.CmdBuf, enabled: bool) Error!bool {
+        const maybe_binding = App.get().options.controls.getBindingByCommand(slot.command);
+        var ret = false;
+
+        if (maybe_binding) |binding| {
+            const data = App.get().data;
+            const plat = getPlat();
+            const ui_scaling: f32 = plat.ui_scaling;
+
+            if (binding.inputs.len == 0) return false;
+            for (binding.inputs.constSlice()) |b| switch (b) {
+                .mouse_button => |btn| ret = ret or plat.input_buffer.mouseBtnIsJustPressed(btn),
+                .keyboard_key => |key| ret = ret or plat.input_buffer.keyIsJustPressed(key),
+            };
+            const first_binding = binding.inputs.buffer[0];
+            const key_color = if (enabled) Colorf.white else Colorf.gray;
+
+            // hotkey
+            const font = data.fonts.get(.pixeloid);
+            const key_text_opt = draw.TextOpt{
+                .color = key_color,
+                .size = font.base_size * utl.as(u32, ui_scaling),
+                .font = font,
+                .smoothing = .none,
+            };
+            const key_str = try utl.bufPrintLocal("[{s}]", .{first_binding.getIconText()});
+            const str_sz = try plat.measureText(key_str, key_text_opt);
+            cmd_buf.append(.{ .rect = .{
+                .pos = slot.key_rect_pos,
+                .dims = str_sz.add(V2f.splat(4).scale(ui_scaling)),
+                .opt = .{
+                    .fill_color = Colorf.black.fade(0.7),
+                    .edge_radius = 0.25,
+                },
+            } }) catch @panic("Fail to append label cmd");
+            cmd_buf.append(.{ .label = .{
+                .pos = slot.key_rect_pos.add(v2f(2, 2).scale(ui_scaling)),
+                .text = ImmUI.initLabel(key_str),
+                .opt = key_text_opt,
+            } }) catch @panic("Fail to append label cmd");
+        }
+
+        return ret;
+    }
+};
+
 pub fn getItemsRects() std.BoundedArray(geom.Rectf, max_item_slots) {
     const plat = getPlat();
     const ui_scaling = plat.ui_scaling;
@@ -331,7 +427,7 @@ pub const Slots = struct {
     } = null,
     selected_method: Options.Controls.CastMethod = .left_click,
     discard_slot: ?Slot = null,
-    pause_slot: Slot = undefined, // Slots are for player.Action's
+    pause_slot: UISlot = UISlot.init(.pause),
     mana_rect: geom.Rectf = .{},
     hp_rect: geom.Rectf = .{},
     immui: struct {
@@ -376,12 +472,6 @@ pub const Slots = struct {
             };
         }
 
-        self.pause_slot = .{
-            .idx = 0,
-            .key_str = Slot.KeyStr.fromSlice("[SPC]") catch unreachable,
-            .key = .space,
-            .kind = .pause,
-        };
         self.reflowRects();
     }
 
@@ -592,14 +682,7 @@ pub const Slots = struct {
         self.unselectSlot();
         switch (slot_kind) {
             .pause => {
-                assert(idx == 0);
-                self.select_state = .{
-                    .slot_idx = idx,
-                    .select_kind = .selected,
-                    .slot_kind = .pause,
-                    .action_kind = undefined,
-                };
-                self.pause_slot.selection_kind = .selected;
+                // REMOVED
             },
             .action => {
                 switch (action_kind.?) {
@@ -626,7 +709,7 @@ pub const Slots = struct {
             s.select_kind = .buffered;
             switch (s.slot_kind) {
                 .pause => {
-                    self.pause_slot.selection_kind = .buffered;
+                    // REMOVED
                 },
                 .action => {
                     const slots = self.getSlotsByActionKind(s.action_kind.?);
@@ -640,7 +723,7 @@ pub const Slots = struct {
         if (self.select_state) |*s| {
             switch (s.slot_kind) {
                 .pause => {
-                    self.pause_slot.selection_kind = null;
+                    // REMOVED
                 },
                 .action => {
                     const slots = self.getSlotsByActionKind(s.action_kind.?);
@@ -682,6 +765,52 @@ pub const Slots = struct {
         }
     }
 
+    pub fn unqCommandUISlot(slot: *UISlot, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, run: *Run, selected: bool) Error!bool {
+        const plat = App.getPlat();
+        const data = App.getData();
+        const ui_scaling: f32 = plat.ui_scaling;
+        var activation: bool = false;
+        var opt = draw.PolyOpt{
+            .fill_color = slot_bg_color,
+            .edge_radius = 0.2,
+        };
+        if (selected) {
+            opt.outline = .{
+                .color = .orange,
+                .thickness = 3,
+            };
+        }
+        if (try slot.unqRectHoverClick(cmd_buf, true, opt)) {
+            activation = true;
+        }
+
+        const tooltip_scaling: f32 = plat.ui_scaling;
+        const tooltip_pos = slot.rect.pos.add(v2f(slot.rect.dims.x, 0));
+        var slot_contents_pos = slot.rect.pos;
+        if (slot.hovered) slot_contents_pos = slot_contents_pos.add(v2f(0, -5));
+
+        switch (slot.command) {
+            .pause => {
+                assert(run.room_exists);
+                const room = &run.room;
+                const sprite_name = if (room.paused) Data.MiscIcon.hourglass_down else Data.MiscIcon.hourglass_up;
+                const info = sprites.RenderIconInfo{ .frame = data.misc_icons.getRenderFrame(sprite_name).? };
+                try info.unqRender(cmd_buf, slot_contents_pos, ui_scaling);
+                if (slot.long_hover.is) {
+                    const tt = Tooltip{
+                        .title = Tooltip.Title.fromSlice("Pause") catch unreachable,
+                    };
+                    try tt.unqRender(tooltip_cmd_buf, tooltip_pos, tooltip_scaling);
+                }
+            },
+            else => {},
+        }
+        if (try slot.unqHotKey(cmd_buf, true)) {
+            activation = true;
+        }
+        return activation;
+    }
+
     pub fn update(self: *Slots, run: *Run, caster: *const Thing) Error!void {
         const plat = getPlat();
         const room = &run.room;
@@ -708,14 +837,10 @@ pub const Slots = struct {
                 self.selectSlot(.action, .discard, .quick_release, 0);
             }
         }
-        if (try unqSlot(&self.immui.commands, &self.tooltip_immui.commands, &self.pause_slot, caster, run)) |_| {
+        if (try unqCommandUISlot(&self.pause_slot, &self.immui.commands, &self.tooltip_immui.commands, run, run.room.paused)) {
             room.paused = !room.paused;
         }
-        if (room.paused) {
-            self.pause_slot.selection_kind = .selected;
-        } else {
-            self.pause_slot.selection_kind = null;
-        }
+
         { // hp and mana and casting bar
             const ui_scaling: f32 = plat.ui_scaling;
             const icon_scaling = ui_scaling * 2;

@@ -171,7 +171,7 @@ pub const Controls = struct {
                 //var buf: [8]u8 = undefined;
                 var ret = std.EnumArray(core.Key, []const u8).initDefault("<>", .{
                     .backtick = "`",
-                    .space = "spacebar",
+                    .space = "SPC",
                     .apostrophe = "'",
                     .comma = ",",
                     .minus = "-",
@@ -180,7 +180,7 @@ pub const Controls = struct {
                     .equals = "=",
                     .slash = "/",
                     .backslash = "\\",
-                    .escape = "escape",
+                    .escape = "ESC",
                 });
                 //TODO glyphs
                 ret.getPtr(.left).* = "left";
@@ -217,6 +217,14 @@ pub const Controls = struct {
             pause_menu,
             show_deck,
             // etc..?
+            pub fn eql(self: Command, other: Command) bool {
+                const my_tag = std.meta.activeTag(self);
+                if (my_tag != std.meta.activeTag(other)) return false;
+                if (my_tag == .action) {
+                    return (self.action.eql(other.action));
+                }
+                return true;
+            }
         };
         // what the player sees in Options
         slot_name: Label, // Spell 1, Spell 2, Attack, Move...

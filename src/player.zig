@@ -60,6 +60,11 @@ pub const Action = struct {
     pub const Id = struct {
         kind: Action.Kind,
         slot_idx: ?usize = null,
+        pub fn eql(self: Id, other: Id) bool {
+            if (self.kind != other.kind) return false;
+            if (self.slot_idx != other.slot_idx) return false;
+            return true;
+        }
     };
     // an Action that isn't being done yet. Just point to it, and the params used to run it
     pub const Buffered = struct {
