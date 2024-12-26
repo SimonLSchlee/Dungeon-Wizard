@@ -121,18 +121,6 @@
                 }, 
                 {
                  "height":0,
-                 "id":2,
-                 "name":"exit",
-                 "point":true,
-                 "rotation":0,
-                 "type":"",
-                 "visible":true,
-                 "width":0,
-                 "x":56.5,
-                 "y":69.75
-                }, 
-                {
-                 "height":0,
                  "id":3,
                  "name":"spawn",
                  "point":true,

@@ -116,20 +116,8 @@
                  "type":"",
                  "visible":true,
                  "width":0,
-                 "x":104.25,
-                 "y":92.25
-                }, 
-                {
-                 "height":0,
-                 "id":2,
-                 "name":"exit",
-                 "point":true,
-                 "rotation":0,
-                 "type":"",
-                 "visible":true,
-                 "width":0,
-                 "x":85.9166666666667,
-                 "y":176.25
+                 "x":49.9166666666667,
+                 "y":68.25
                 }, 
                 {
                  "height":0,
@@ -140,8 +128,8 @@
                  "type":"",
                  "visible":true,
                  "width":0,
-                 "x":135,
-                 "y":72
+                 "x":157.666666666667,
+                 "y":110.666666666667
                 }, 
                 {
                  "height":0,
@@ -152,8 +140,8 @@
                  "type":"",
                  "visible":true,
                  "width":0,
-                 "x":152.75,
-                 "y":121
+                 "x":137.083333333333,
+                 "y":158.666666666667
                 }, 
                 {
                  "height":0,
@@ -176,8 +164,8 @@
                  "type":"",
                  "visible":true,
                  "width":0,
-                 "x":135.310606060606,
-                 "y":154.962121212122
+                 "x":103.977272727273,
+                 "y":172.295454545455
                 }, 
                 {
                  "height":0,
@@ -188,8 +176,8 @@
                  "type":"",
                  "visible":true,
                  "width":0,
-                 "x":73.25,
-                 "y":71
+                 "x":103.583333333333,
+                 "y":88.6666666666667
                 }, 
                 {
                  "height":0,
@@ -212,8 +200,20 @@
                  "type":"",
                  "visible":true,
                  "width":0,
-                 "x":119.75,
-                 "y":176
+                 "x":159.75,
+                 "y":69.6666666666666
+                }, 
+                {
+                 "height":0,
+                 "id":12,
+                 "name":"spawn",
+                 "point":true,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":0,
+                 "x":142.666666666667,
+                 "y":69
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -247,7 +247,7 @@
          "y":0
         }],
  "nextlayerid":7,
- "nextobjectid":12,
+ "nextobjectid":13,
  "orientation":"orthogonal",
  "properties":[
         {

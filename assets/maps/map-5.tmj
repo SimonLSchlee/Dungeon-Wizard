@@ -91,20 +91,8 @@
                  "type":"",
                  "visible":true,
                  "width":0,
-                 "x":89,
-                 "y":183
-                }, 
-                {
-                 "height":0,
-                 "id":2,
-                 "name":"exit",
-                 "point":true,
-                 "rotation":0,
-                 "type":"",
-                 "visible":true,
-                 "width":0,
-                 "x":71.25,
-                 "y":71.75
+                 "x":51,
+                 "y":67.75
                 }, 
                 {
                  "height":0,
@@ -116,7 +104,7 @@
                  "visible":true,
                  "width":0,
                  "x":87.5,
-                 "y":91.75
+                 "y":77.75
                 }, 
                 {
                  "height":0,
@@ -187,8 +175,32 @@
                  "type":"",
                  "visible":true,
                  "width":0,
-                 "x":105,
-                 "y":71.75
+                 "x":129,
+                 "y":68
+                }, 
+                {
+                 "height":0,
+                 "id":12,
+                 "name":"spawn",
+                 "point":true,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":0,
+                 "x":87,
+                 "y":186
+                }, 
+                {
+                 "height":0,
+                 "id":13,
+                 "name":"spawn",
+                 "point":true,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":0,
+                 "x":87.25,
+                 "y":150.25
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -222,7 +234,7 @@
          "y":0
         }],
  "nextlayerid":6,
- "nextobjectid":11,
+ "nextobjectid":14,
  "orientation":"orthogonal",
  "properties":[
         {
@@ -241,6 +253,10 @@
         {
          "firstgid":1025,
          "source":"tilesets\/walls1.tsj"
+        }, 
+        {
+         "firstgid":2049,
+         "source":"tilesets\/door.tsj"
         }],
  "tilewidth":16,
  "type":"map",
