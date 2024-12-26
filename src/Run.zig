@@ -31,6 +31,7 @@ const player = @import("player.zig");
 const ImmUI = @import("ImmUI.zig");
 const sprites = @import("sprites.zig");
 const Tooltip = @import("Tooltip.zig");
+const TileMap = @import("TileMap.zig");
 const icon_text = @import("icon_text.zig");
 
 pub const Mode = enum {
@@ -317,13 +318,11 @@ pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
         .room => |r| {
             const room_indices = data.room_kind_tilemaps.get(r.kind);
             const room_idx = room_indices.get(r.idx);
-            const exit_doors = self.makeExitDoors(room_idx);
             const params: Room.InitParams = .{
                 .deck = self.deck,
                 .waves_params = r.waves_params,
                 .tilemap_idx = u.as(u32, room_idx),
                 .seed = self.rng.random().int(u64),
-                .exits = exit_doors,
                 .player = self.player_thing,
                 .mode = self.mode,
             };
@@ -341,18 +340,6 @@ pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
             self.screen = .shop;
         },
     }
-}
-
-const TileMap = @import("TileMap.zig");
-
-pub fn makeExitDoors(_: *Run, tilemap_idx: usize) std.BoundedArray(gameUI.ExitDoor, 4) {
-    const data = App.get().data;
-    const tilemap = &data.tilemaps.items[tilemap_idx];
-    var ret = std.BoundedArray(gameUI.ExitDoor, 4){};
-    for (tilemap.exits.constSlice()) |pos| {
-        ret.append(.{ .pos = pos }) catch unreachable;
-    }
-    return ret;
 }
 
 pub fn makeRewards(self: *Run, difficulty: f32) void {

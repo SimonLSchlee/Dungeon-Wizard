@@ -831,44 +831,69 @@ pub fn loadTileMapFromJsonString(tilemap: *TileMap, json_string: []u8) Error!voi
                 }
                 try tilemap.tile_layers.append(tile_layer);
             } else if (std.mem.eql(u8, kind, "objectgroup")) {
-                above_objects = true;
+                //const group_name = layer.get("name").?.string;
                 const objects = layer.get("objects").?.array;
+                above_objects = true;
+                // track one exit object and popular with "door" tile object and "exit" point.
+                // they can be grouped into layers for multiple exits
+                var exit_door: ?TileMap.ExitDoor = null;
                 for (objects.items) |_obj| {
                     const obj = _obj.object;
-                    if (!obj.get("visible").?.bool) continue;
-                    if (obj.get("point").?.bool) {
-                        const obj_name = obj.get("name").?.string;
+                    const obj_pos = v2f(
+                        u.as(f32, switch (obj.get("x").?) {
+                            .float => |f| f,
+                            .integer => |i| u.as(f64, i),
+                            else => return Error.ParseFail,
+                        }),
+                        u.as(f32, switch (obj.get("y").?) {
+                            .float => |f| f,
+                            .integer => |i| u.as(f64, i),
+                            else => return Error.ParseFail,
+                        }),
+                    ).scale(core.game_sprite_scaling).sub(TileMap.tile_dims_2);
+                    const obj_name = obj.get("name").?.string;
+
+                    if (obj.get("point")) |p| {
+                        assert(p.bool == true);
+                        if (!obj.get("visible").?.bool) continue;
+
                         // TODO clean up arrgh
                         // transform map pixel pos to game tile pixel pos
-                        const pos = v2f(
-                            u.as(f32, switch (obj.get("x").?) {
-                                .float => |f| f,
-                                .integer => |i| u.as(f64, i),
-                                else => return Error.ParseFail,
-                            }),
-                            u.as(f32, switch (obj.get("y").?) {
-                                .float => |f| f,
-                                .integer => |i| u.as(f64, i),
-                                else => return Error.ParseFail,
-                            }),
-                        ).scale(core.game_sprite_scaling).sub(TileMap.tile_dims_2);
                         if (startsWith(u8, obj_name, "creature")) {
                             var it = std.mem.tokenizeScalar(u8, obj_name, ':');
                             _ = it.next() orelse return Error.ParseFail;
                             const creature_kind_str = it.next() orelse return Error.ParseFail;
                             try tilemap.creatures.append(.{
                                 .kind = std.meta.stringToEnum(Thing.CreatureKind, creature_kind_str) orelse return Error.ParseFail,
-                                .pos = pos,
+                                .pos = obj_pos,
                             });
                         } else if (startsWith(u8, obj_name, "exit")) {
-                            try tilemap.exits.append(pos);
+                            if (exit_door) |*d| {
+                                d.pos = obj_pos;
+                            } else {
+                                exit_door = .{
+                                    .pos = obj_pos,
+                                    .door_pos = obj_pos,
+                                };
+                            }
                         } else if (startsWith(u8, obj_name, "spawn")) {
-                            try tilemap.wave_spawns.append(pos);
+                            try tilemap.wave_spawns.append(obj_pos);
+                        }
+                    } else if (startsWith(u8, obj_name, "exitdoor")) {
+                        if (exit_door) |*d| {
+                            d.door_pos = obj_pos;
+                        } else {
+                            exit_door = .{
+                                .pos = obj_pos,
+                                .door_pos = obj_pos,
+                            };
                         }
                     } else {
-                        // ??
-                        @panic("unimplemented");
+                        Log.err("Invalid map object found: \"{s}\"", .{obj_name});
                     }
+                }
+                if (exit_door) |exit| {
+                    try tilemap.exits.append(exit);
                 }
             }
         }

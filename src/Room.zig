@@ -39,7 +39,6 @@ pub const InitParams = struct {
     waves_params: WavesParams,
     seed: u64,
     deck: Spell.SpellArray,
-    exits: std.BoundedArray(gameUI.ExitDoor, 4),
     mode: Run.Mode,
 };
 
@@ -154,11 +153,12 @@ waves: WavesArray = .{},
 wave_timer: u.TickCounter = undefined,
 curr_wave: i32 = 0,
 num_enemies_alive: i32 = 0,
+exits: std.BoundedArray(TileMap.ExitDoor, TileMap.max_map_exits) = .{},
 progress_state: union(enum) {
     none,
     lost,
     won,
-    exited: gameUI.ExitDoor,
+    exited: TileMap.ExitDoor,
 } = .none,
 took_reward: bool = false,
 // reinit stuff, never needs saving or copying, probably?:
@@ -237,6 +237,7 @@ pub fn reset(self: *Room) Error!void {
             _ = try self.queueSpawnCreatureByKind(spawn.kind, spawn.pos);
         }
     }
+    self.exits = tilemap.exits;
 }
 
 pub fn clone(self: *const Room, out: *Room) Error!void {
@@ -451,7 +452,7 @@ pub fn update(self: *Room) Error!void {
                     }
                 },
                 .won => {
-                    for (self.init_params.exits.slice()) |*exit| {
+                    for (self.exits.slice()) |*exit| {
                         if (try exit.updateSelected(self)) {
                             self.progress_state = .{ .exited = exit.* };
                         }
@@ -528,9 +529,10 @@ pub fn render(self: *const Room, ui_render_texture: Platform.RenderTexture2D, ga
 
     plat.startCamera2D(self.camera, .{ .round_to_pixel = true });
     try self.tilemap.renderUnderObjects();
+
     // exit
-    for (self.init_params.exits.constSlice()) |exit| {
-        try exit.render(self);
+    for (self.exits.constSlice()) |exit| {
+        try exit.renderUnder(self);
     }
 
     // waves
@@ -588,7 +590,7 @@ pub fn render(self: *const Room, ui_render_texture: Platform.RenderTexture2D, ga
         for (thing_arr.constSlice()) |thing| {
             try thing.renderOver(self);
         }
-        for (self.init_params.exits.constSlice()) |exit| {
+        for (self.exits.constSlice()) |exit| {
             try exit.renderOver(self);
         }
     }
