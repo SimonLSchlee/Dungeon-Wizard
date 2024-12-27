@@ -134,8 +134,13 @@ fn startNewRun(self: *App, mode: Run.Mode) Error!void {
     _ = try Run.initRandom(&self.run, mode);
     try self.run.startRun();
     self.screen = .run;
-    //const plat = getPlat();
-    //plat.playSound(self.data.music.get(.dungongnu));
+    if (false) {
+        const Ref = struct {
+            var dungongnu = Data.Ref(Data.Sound).init("dungongnu");
+        };
+        const plat = getPlat();
+        plat.playSound(Ref.dungongnu.get().sound);
+    }
 }
 
 pub fn deinit(self: *App) void {

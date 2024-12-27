@@ -448,11 +448,6 @@ pub const FontName = enum {
 };
 pub const FontArr = std.EnumArray(FontName, Platform.Font);
 
-pub const MusicName = enum {
-    dungongnu,
-};
-pub const MusicArr = std.EnumArray(MusicName, Platform.Sound);
-
 pub const RoomKind = enum {
     testu,
     first,
@@ -551,7 +546,6 @@ spell_tags_icons: EnumSpriteSheet(Spell.Tag.SpriteEnum),
 text_icons: EnumSpriteSheet(icon_text.Icon),
 card_sprites: EnumSpriteSheet(Spell.CardSpriteEnum),
 card_mana_cost: EnumSpriteSheet(Spell.ManaCost.SpriteEnum),
-music: MusicArr,
 shaders: ShaderArr,
 fonts: FontArr,
 // roooms
@@ -612,17 +606,23 @@ pub fn loadSounds(self: *Data) Error!void {
     for (self.sounds.slice()) |*s| {
         s.deinit();
     }
-    const list = [_][]const u8{
+    const sound_list = [_][]const u8{
         "thwack.wav",
         "casting.wav",
         "cast-end.wav",
     };
-    for (list) |s_filename| {
+    for (sound_list) |s_filename| {
         const sound = Sound{
             .sound = try plat.loadSound(s_filename),
         };
         _ = self.putAsset(Sound, &sound, filenameToAssetName(s_filename));
     }
+    // TODO music and sounds... yea
+    const music_filename = "dungongnu.wav";
+    const music = Sound{
+        .sound = try plat.loadMusic(music_filename),
+    };
+    _ = self.putAsset(Sound, &music, filenameToAssetName(music_filename));
 }
 
 pub fn loadSpriteSheetFromJsonString(data: *Data, sheet_filename: []const u8, json_string: []u8, assets_rel_dir_path: []const u8) Error!*SpriteSheet {
@@ -1212,15 +1212,9 @@ pub fn loadFonts(self: *Data) Error!void {
     self.fonts.getPtr(.seven_x_five).* = try plat.loadPixelFont("7x5.ttf", 8);
 }
 
-pub fn loadMusic(self: *Data) Error!void {
-    const plat = App.getPlat();
-    self.music.getPtr(.dungongnu).* = try plat.loadMusic("dungongnu.wav");
-}
-
 pub fn reload(self: *Data) Error!void {
     self.loadSpriteSheets() catch |err| Log.warn("failed to load all sprites: {any}", .{err});
     self.loadSounds() catch |err| Log.warn("failed to load all sounds: {any}", .{err});
-    self.loadMusic() catch |err| Log.warn("failed to load all music: {any}", .{err});
     inline for (@typeInfo(creatures.Kind).@"enum".fields) |f| {
         const kind: creatures.Kind = @enumFromInt(f.value);
         self.creature_protos.getPtr(kind).* = creatures.proto_fns.get(kind)();
