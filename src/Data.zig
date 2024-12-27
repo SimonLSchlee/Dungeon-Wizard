@@ -435,11 +435,13 @@ pub const MiscIcon = enum {
 
 pub const TileMapIdxBuf = std.BoundedArray(usize, 16);
 
-pub const ShaderName = enum {
-    tile_foreground_fade,
-    fog_blur,
+pub const Shader = struct {
+    data_ref: Ref(Shader) = .{},
+    shader: Platform.Shader,
+    pub fn deinit(self: Shader) void {
+        App.getPlat().unloadShader(self.shader);
+    }
 };
-pub const ShaderArr = std.EnumArray(ShaderName, Platform.Shader);
 
 pub const FontName = enum {
     alagard,
@@ -532,6 +534,7 @@ spritesheets: AssetArray(SpriteSheet, 128),
 tilesets: AssetArray(TileSet, 8),
 tilemaps: AssetArray(TileMap, 32),
 sounds: AssetArray(Sound, 128),
+shaders: AssetArray(Shader, 8),
 // old stuff
 creature_protos: std.EnumArray(Thing.CreatureKind, Thing),
 creature_sprite_sheets: AllCreatureSpriteSheetArrays,
@@ -546,7 +549,6 @@ spell_tags_icons: EnumSpriteSheet(Spell.Tag.SpriteEnum),
 text_icons: EnumSpriteSheet(icon_text.Icon),
 card_sprites: EnumSpriteSheet(Spell.CardSpriteEnum),
 card_mana_cost: EnumSpriteSheet(Spell.ManaCost.SpriteEnum),
-shaders: ShaderArr,
 fonts: FontArr,
 // roooms
 room_kind_tilemaps: std.EnumArray(RoomKind, TileMapIdxBuf),
@@ -557,6 +559,7 @@ pub fn init() Error!*Data {
     data.vfx_anims = @TypeOf(data.vfx_anims).init(plat.heap);
 
     // TODO default init these
+    data.shaders.clear();
     data.sounds.clear();
     data.spritesheets.clear();
     data.tilemaps.clear();
@@ -606,6 +609,8 @@ pub fn loadSounds(self: *Data) Error!void {
     for (self.sounds.slice()) |*s| {
         s.deinit();
     }
+    self.sounds.clear();
+
     const sound_list = [_][]const u8{
         "thwack.wav",
         "casting.wav",
@@ -1197,10 +1202,24 @@ pub fn reloadTileMaps(self: *Data) Error!void {
 
 pub fn loadShaders(self: *Data) Error!void {
     const plat = App.getPlat();
-    // TODO deinit?
+    for (self.shaders.slice()) |*s| {
+        s.deinit();
+    }
+    self.shaders.clear();
 
-    self.shaders.getPtr(.tile_foreground_fade).* = try plat.loadShader(null, "tile_foreground_fade.fs");
-    self.shaders.getPtr(.fog_blur).* = try plat.loadShader(null, "fog_blur.fs");
+    const list = [_]struct {
+        vs: ?[]const u8 = null,
+        fs: ?[]const u8 = null,
+    }{
+        .{ .fs = "tile_foreground_fade.fs" },
+        .{ .fs = "fog_blur.fs" },
+    };
+    for (list) |s| {
+        const shader = Shader{
+            .shader = try plat.loadShader(s.vs, s.fs),
+        };
+        _ = self.putAsset(Shader, &shader, filenameToAssetName(s.fs orelse s.vs.?));
+    }
 }
 
 pub fn loadFonts(self: *Data) Error!void {

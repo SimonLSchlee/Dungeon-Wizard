@@ -1787,7 +1787,7 @@ pub fn getApproxVisibleCircle(self: *const Thing) struct { pos: V2f, radius: f32
     };
     if (self.selectable) |s| {
         ret.pos = self.pos.add(v2f(0, -(s.height - s.radius) * 0.5));
-        ret.radius = (s.height) * 0.5;
+        ret.radius = (s.height) * 0.7;
     } else if (self.hitbox) |h| {
         ret.pos = self.pos.add(h.rel_pos);
         ret.radius = @max(h.radius, self.coll_radius);

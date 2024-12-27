@@ -1053,6 +1053,11 @@ pub fn loadShader(self: *Platform, vert_path: ?[]const u8, frag_path: ?[]const u
     return ret;
 }
 
+pub fn unloadShader(self: *Platform, shader: Shader) void {
+    _ = self;
+    r.UnloadShader(shader.r_shader);
+}
+
 fn getShaderUniformKind(T: type) c_int {
     const type_info = @typeInfo(T);
     switch (type_info) {

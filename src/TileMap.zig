@@ -806,8 +806,10 @@ pub fn renderUnderObjects(self: *const TileMap) Error!void {
 
 pub fn renderOverObjects(self: *const TileMap, cam: draw.Camera2D, things: []const *const Thing) Error!void {
     const plat = App.getPlat();
-    const data = App.get().data;
-    const shader = data.shaders.get(.tile_foreground_fade);
+    const Ref = struct {
+        var shader = Data.Ref(Data.Shader).init("tile_foreground_fade");
+    };
+    const shader = Ref.shader.get();
     var num_circles: usize = 0;
     for (things, 0..) |t, i| {
         if (num_circles >= 128) break; // MAX_CIRCLES in shader
@@ -817,15 +819,15 @@ pub fn renderOverObjects(self: *const TileMap, cam: draw.Camera2D, things: []con
         pos.y = plat.game_canvas_dims_f.y - pos.y;
         const radius = visible_circle.radius;
         const pos_name = try utl.bufPrintLocal("circles[{}].pos", .{i});
-        try plat.setShaderValue(shader, pos_name, pos);
+        try plat.setShaderValue(shader.shader, pos_name, pos);
         const radius_name = try utl.bufPrintLocal("circles[{}].radius", .{i});
-        try plat.setShaderValue(shader, radius_name, radius);
+        try plat.setShaderValue(shader.shader, radius_name, radius);
         num_circles += 1;
     }
-    plat.setShaderValuesScalar(shader, .{
+    plat.setShaderValuesScalar(shader.shader, .{
         .numCircles = num_circles,
     });
-    plat.setShader(shader);
+    plat.setShader(shader.shader);
     for (self.tile_layers.constSlice()) |*layer| {
         if (!layer.above_objects) continue;
         self.renderLayer(layer);
