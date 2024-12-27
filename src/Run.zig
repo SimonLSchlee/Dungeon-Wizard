@@ -318,7 +318,7 @@ pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
         .room => |r| {
             const room_indices = data.room_kind_tilemaps.get(r.kind);
             const room_idx = room_indices.get(r.idx);
-            const tilemap_ref = Data.Ref(TileMap).initFromAsset(data.getByIdx(TileMap, room_idx).?);
+            const tilemap_ref = data.getByIdx(TileMap, room_idx).?.data_ref;
             const params: Room.InitParams = .{
                 .deck = self.deck,
                 .waves_params = r.waves_params,
@@ -454,7 +454,7 @@ pub fn roomUpdate(self: *Run) Error!void {
                 if (n < test_rooms.len) {
                     const data = App.getData();
                     const tilemap_idx = test_rooms.get(n);
-                    const ref = Data.Ref(TileMap).initFromAsset(data.getByIdx(TileMap, tilemap_idx).?);
+                    const ref = data.getByIdx(TileMap, tilemap_idx).?.data_ref;
                     try room.reloadFromTileMap(ref);
                 }
             }

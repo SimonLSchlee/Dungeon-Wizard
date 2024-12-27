@@ -105,21 +105,17 @@ pub const TileLayer = struct {
     above_objects: bool = false,
     tiles: std.BoundedArray(TileLayer.Tile, max_map_tiles) = .{},
 };
-pub const TileSetReference = struct {
-    name: Data.TileSet.NameBuf,
-    data_idx: usize = 0,
+pub const TileSetRef = struct {
+    ref: Data.Ref(Data.TileSet),
     first_gid: usize = 1,
 };
 
-pub const NameBuf = utl.BoundedString(64);
-
-name: Data.AssetName = .{},
-id: usize = 0,
+data_ref: Data.Ref(TileMap) = .{},
 
 kind: Data.RoomKind = .testu,
 game_tiles: std.BoundedArray(GameTile, max_map_tiles) = .{},
 tile_layers: std.BoundedArray(TileLayer, max_map_layers) = .{},
-tilesets: std.BoundedArray(TileSetReference, max_map_tilesets) = .{},
+tilesets: std.BoundedArray(TileSetRef, max_map_tilesets) = .{},
 creatures: std.BoundedArray(struct { kind: Thing.CreatureKind, pos: V2f }, max_map_creatures) = .{},
 exits: std.BoundedArray(ExitDoor, max_map_exits) = .{},
 wave_spawns: std.BoundedArray(V2f, max_map_spawns) = .{},
@@ -127,14 +123,14 @@ dims_tiles: V2i = .{},
 dims_game: V2i = .{},
 rect_dims: V2f = .{},
 
-pub fn tileIdxToTileSetRef(self: *const TileMap, tile_idx: usize) ?TileSetReference {
+pub fn tileIdxToTileSetRef(self: *const TileMap, tile_idx: usize) ?*const TileSetRef {
     if (tile_idx == 0) return null;
     assert(self.tilesets.len > 0);
 
-    var tileset_ref = self.tilesets.get(self.tilesets.len - 1);
+    var tileset_ref = &self.tilesets.buffer[self.tilesets.len - 1];
     for (0..self.tilesets.len - 1) |i| {
-        const curr_ts_ref = self.tilesets.get(i);
-        const next_ts_ref = self.tilesets.get(i + 1);
+        const curr_ts_ref = &self.tilesets.buffer[i];
+        const next_ts_ref = &self.tilesets.buffer[i + 1];
         if (tile_idx >= curr_ts_ref.first_gid and tile_idx < next_ts_ref.first_gid) {
             tileset_ref = curr_ts_ref;
             break;
@@ -761,14 +757,12 @@ pub fn getRoomRect(self: *const TileMap) geom.Rectf {
 
 fn renderTile(self: *const TileMap, pos: V2f, tile: TileLayer.Tile) void {
     const plat = getPlat();
-    const data = App.get().data;
     const ref = self.tileIdxToTileSetRef(tile.idx) orelse {
         Log.err("unknown tileset ref!", .{});
         return;
     };
-    assert(ref.data_idx < data.tilesets.len);
-    const tileset = &data.tilesets.buffer[ref.data_idx];
     assert(tile.idx >= ref.first_gid);
+    const tileset = ref.ref.getConst();
     const tileset_tile_idx = tile.idx - ref.first_gid;
     assert(tileset_tile_idx < tileset.tiles.len);
     const tileset_tile_idxi = utl.as(i32, tileset_tile_idx);

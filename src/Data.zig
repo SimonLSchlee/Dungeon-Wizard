@@ -80,8 +80,8 @@ pub fn Ref(AssetType: type) type {
     return struct {
         const Self = @This();
         const Type = AssetType;
-        name: AssetName,
-        data_index: ?usize = null,
+        name: AssetName = .{},
+        idx: ?usize = null,
 
         pub fn init(name: []const u8) Self {
             return .{
@@ -89,27 +89,34 @@ pub fn Ref(AssetType: type) type {
             };
         }
 
-        pub fn initFromAsset(asset: anytype) Self {
-            return Ref(Type){
-                .name = asset.name, // TODO this probably breaks on reload
-                .data_index = asset.id,
-            };
-        }
-
-        pub fn get(self: *Self) *Self.Type {
+        pub fn tryGet(self: *Self) ?*Self.Type {
             const data = App.getData();
-            if (self.data_index) |idx| {
+            if (self.idx) |idx| {
                 if (data.getByIdx(Self.Type, idx)) |asset| {
-                    if (streq(self.name.constSlice(), asset.name.constSlice())) {
+                    if (streq(self.name.constSlice(), asset.data_ref.name.constSlice())) {
                         return asset;
                     }
                 }
             }
             if (data.getByName(Self.Type, self.name.constSlice())) |asset| {
-                self.data_index = asset.id;
+                self.idx = asset.data_ref.idx;
                 return asset;
             }
+            return null;
+        }
+
+        pub fn get(self: *Self) *Self.Type {
+            if (self.tryGet()) |ret| return ret;
+            const data = App.getData();
             return data.getDefaultOrCrash(Self.Type);
+        }
+
+        pub fn tryGetConst(self: *const Self) ?*const Self.Type {
+            return @constCast(self).tryGet();
+        }
+
+        pub fn getConst(self: *const Self) *const Self.Type {
+            return @constCast(self).get();
         }
     };
 }
@@ -119,7 +126,7 @@ pub fn getByName(data: *Data, AssetType: type, name: []const u8) ?*AssetType {
     const field = &@field(data, field_name);
     // TODO hashmap for fast lookup
     for (field.slice()) |*asset| {
-        if (std.mem.eql(u8, asset.name.constSlice(), name)) {
+        if (std.mem.eql(u8, asset.data_ref.name.constSlice(), name)) {
             return asset;
         }
     }
@@ -154,8 +161,66 @@ pub fn AssetArray(AssetType: type, max_num: usize) type {
     return std.BoundedArray(AssetType, max_num);
 }
 
+pub fn allocAsset(data: *Data, AssetType: type, name: []const u8) *AssetType {
+    const field_name = comptime assetTypeToBufferFieldName(AssetType);
+    const field = &@field(data, field_name);
+
+    var new_asset: *AssetType = undefined;
+    var ref = Ref(AssetType).init(name);
+    if (data.getByName(AssetType, name)) |existing| {
+        Log.warn("Overwriting existing asset \"{s}\" named \"{s}\".", .{ @typeName(AssetType), name });
+        ref.idx = existing.data_ref.idx;
+        new_asset = existing;
+    } else {
+        ref.idx = field.len;
+        new_asset = field.addOne() catch {
+            Log.fatal("Ran out of room for \"{s}\" ({})", .{ @typeName(AssetType), field.buffer.len });
+            @panic("Ran out of room in array");
+        };
+    }
+    new_asset.data_ref = ref;
+    return new_asset;
+}
+
+pub fn putAsset(data: *Data, AssetType: type, asset: *const AssetType, name: []const u8) *AssetType {
+    const new_asset = data.allocAsset(AssetType, name);
+    const ref = new_asset.data_ref;
+    new_asset.* = asset.*;
+    new_asset.data_ref = ref;
+
+    return new_asset;
+}
+
+pub const asset_extensions = [_][]const u8{
+    // images
+    "png",
+    // sounds + music
+    "wav",
+    // json (tilemaps, tilesets, spritesheet metadata)
+    "tmj",
+    "tj",
+    "tsj",
+    "json",
+    // fonts
+    "ttf",
+    // shaders
+    "fs",
+    "vs",
+};
+
+pub fn filenameToAssetName(filename: []const u8) []const u8 {
+    assert(filename.len > 0);
+    inline for (asset_extensions) |ext| {
+        if (std.mem.endsWith(u8, filename, "." ++ ext)) {
+            const end = filename.len - (ext.len + 1);
+            return filename[0..end];
+        }
+    }
+    Log.warn("No valid asset extension \"{s}\", using name as-is", .{filename});
+    return filename;
+}
+
 pub const TileSet = struct {
-    pub const NameBuf = u.BoundedString(64);
     pub const GameTileCorner = enum(u4) {
         NW,
         NE,
@@ -176,8 +241,8 @@ pub const TileSet = struct {
         spikes: GameTileCorner.Map = GameTileCorner.Map.initFill(false),
     };
 
-    name: AssetName = .{}, // filename without extension (.tsj)
-    id: usize = 0,
+    // name is filename without extension (.tsj)
+    data_ref: Ref(TileSet) = .{},
 
     texture: Platform.Texture2D = undefined,
     tile_dims: V2i = .{},
@@ -191,15 +256,13 @@ pub const TileSet = struct {
 };
 
 pub const DirectionalSpriteAnim = struct {
-    name: AssetName = .{}, // e.g. "wizard-move", with 4 directions "E","S","W","N"
-    id: usize = 0,
+    data_ref: Ref(DirectionalSpriteAnim) = .{}, // e.g. "wizard-move", with 4 directions "E","S","W","N"
 
     anims: std.BoundedArray(Ref(SpriteAnim), sprites.max_anim_dirs),
 };
 
 pub const SpriteAnim = struct {
-    name: AssetName = .{}, // spritesheet name dash tag name e.g. "wizard-move-W" or "door-open"
-    id: usize = 0,
+    data_ref: Ref(SpriteAnim) = .{}, // spritesheet name dash tag name e.g. "wizard-move-W" or "door-open"
 
     sheet: Ref(SpriteSheet),
     tag_idx: usize,
@@ -237,8 +300,7 @@ pub const SpriteSheet = struct {
         }
     };
 
-    name: AssetName = .{}, // filename without extension (.png)
-    id: usize = 0,
+    data_ref: Ref(SpriteSheet) = .{}, // filename without extension (.png)
 
     texture: Platform.Texture2D = undefined,
     crop_color: ?Colorf = null,
@@ -277,13 +339,13 @@ fn EnumSpriteSheet(EnumType: type) type {
     return struct {
         pub const SpriteFrameIndexArray = std.EnumArray(EnumType, ?i32);
 
-        sprite_sheet: SpriteSheet = undefined,
+        sprite_sheet: Ref(SpriteSheet) = undefined,
         sprite_indices: SpriteFrameIndexArray = undefined,
         sprite_dims_cropped: ?std.EnumArray(EnumType, V2f) = null,
 
-        pub fn init(sprite_sheet: SpriteSheet) Error!@This() {
+        pub fn init(sprite_sheet: *SpriteSheet) Error!@This() {
             var ret = @This(){
-                .sprite_sheet = sprite_sheet,
+                .sprite_sheet = sprite_sheet.data_ref,
                 .sprite_indices = SpriteFrameIndexArray.initFill(null),
             };
             tags: for (sprite_sheet.tags) |t| {
@@ -297,7 +359,7 @@ fn EnumSpriteSheet(EnumType: type) type {
             }
             return ret;
         }
-        pub fn initCropped(sprite_sheet: SpriteSheet, crop_color: draw.Coloru) Error!@This() {
+        pub fn initCropped(sprite_sheet: *SpriteSheet, crop_color: draw.Coloru) Error!@This() {
             const plat = App.getPlat();
             var ret = try @This().init(sprite_sheet);
             ret.sprite_dims_cropped = std.EnumArray(EnumType, V2f).initFill(.{});
@@ -336,7 +398,7 @@ fn EnumSpriteSheet(EnumType: type) type {
         }
         pub fn getRenderFrame(self: @This(), kind: EnumType) ?sprites.RenderFrame {
             if (self.sprite_indices.get(kind)) |idx| {
-                const sheet = self.sprite_sheet;
+                const sheet = self.sprite_sheet.getConst();
                 const frame = sheet.frames[u.as(usize, idx)];
                 return .{
                     .pos = frame.pos,
@@ -443,8 +505,14 @@ pub fn FileWalkerIterator(assets_rel_dir: []const u8, file_suffix: []const u8) t
             }
             return null;
         }
-
-        pub fn next(self: *@This()) Error!?struct { basename: []const u8, owned_string: []u8 } {
+        pub const NextEntry = struct {
+            basename: []const u8,
+            owned_string: []u8,
+            pub fn deinit(self: NextEntry, allocator: std.mem.Allocator) void {
+                allocator.free(self.owned_string);
+            }
+        };
+        pub fn next(self: *@This()) Error!?NextEntry {
             while (self.walker.next() catch return Error.FileSystemFail) |entry| {
                 if (!std.mem.endsWith(u8, entry.basename, file_suffix)) continue;
                 const file = self.dir.openFile(entry.basename, .{}) catch return Error.FileSystemFail;
@@ -498,7 +566,6 @@ pub fn init() Error!*Data {
     data.tilemaps.clear();
     data.tilesets.clear();
 
-    try data.reload();
     return data;
 }
 
@@ -511,7 +578,7 @@ pub fn getVFXAnim(self: *Data, sheet_name: sprites.VFXAnim.SheetName, anim_name:
 
 pub fn getVFXSpriteSheet(self: *Data, sheet_name: sprites.VFXAnim.SheetName, anim_name: sprites.AnimName) ?SpriteSheet {
     if (self.vfx_sprite_sheet_mappings.getPtr(sheet_name).get(anim_name)) |idx| {
-        return self.vfx_sprite_sheets.items[idx];
+        return self.spritesheets.buffer[idx];
     }
     return null;
 }
@@ -551,7 +618,7 @@ pub fn loadSounds(self: *Data) Error!void {
     }
 }
 
-pub fn loadSpriteSheetFromJsonString(sheet_filename: []const u8, json_string: []u8, assets_rel_dir_path: []const u8) Error!SpriteSheet {
+pub fn loadSpriteSheetFromJsonString(data: *Data, sheet_filename: []const u8, json_string: []u8, assets_rel_dir_path: []const u8) Error!*SpriteSheet {
     const plat = App.getPlat();
     //std.debug.print("{s}\n", .{s});
     var scanner = std.json.Scanner.initCompleteInput(plat.heap, json_string);
@@ -563,9 +630,6 @@ pub fn loadSpriteSheetFromJsonString(sheet_filename: []const u8, json_string: []
     const image_path = try u.bufPrintLocal("{s}/{s}", .{ assets_rel_dir_path, image_filename });
 
     var sheet = SpriteSheet{};
-    var it_dot = std.mem.tokenizeScalar(u8, sheet_filename, '.');
-    const sheet_name = it_dot.next().?;
-    sheet.name = try @TypeOf(sheet.name).fromSlice(sheet_name);
     const tex = try plat.loadTexture(image_path);
     assert(tex.r_tex.height > 0);
     sheet.texture = tex;
@@ -610,8 +674,8 @@ pub fn loadSpriteSheetFromJsonString(sheet_filename: []const u8, json_string: []
         for (layers.array.items) |layer| {
             if (layer.object.get("cels")) |cels| {
                 for (cels.array.items) |cel| {
-                    if (cel.object.get("data")) |data| {
-                        var it_data = std.mem.tokenizeScalar(u8, data.string, ',');
+                    if (cel.object.get("data")) |cel_data| {
+                        var it_data = std.mem.tokenizeScalar(u8, cel_data.string, ',');
                         while (it_data.next()) |item| {
                             var it_eq = std.mem.tokenizeScalar(u8, item, '=');
                             const key = it_eq.next().?;
@@ -639,18 +703,18 @@ pub fn loadSpriteSheetFromJsonString(sheet_filename: []const u8, json_string: []
         }
     }
     sheet.meta = try sheet_meta.toOwnedSlice();
-
-    return sheet;
+    var it_dot = std.mem.tokenizeScalar(u8, sheet_filename, '.');
+    const sheet_name = it_dot.next().?;
+    return data.putAsset(SpriteSheet, &sheet, sheet_name);
 }
 
-pub fn loadSpriteSheetFromJsonPath(assets_rel_dir: []const u8, json_file_name: []const u8) Error!SpriteSheet {
+pub fn loadSpriteSheetFromJsonPath(data: *Data, assets_rel_dir: []const u8, json_file_name: []const u8) Error!*SpriteSheet {
     const plat = App.getPlat();
     const path = try u.bufPrintLocal("{s}/{s}/{s}", .{ plat.assets_path, assets_rel_dir, json_file_name });
     const icons_json = std.fs.cwd().openFile(path, .{}) catch return Error.FileSystemFail;
     const str = icons_json.readToEndAlloc(plat.heap, 8 * 1024 * 1024) catch return Error.FileSystemFail;
     defer plat.heap.free(str);
-    const sheet = try loadSpriteSheetFromJsonString(json_file_name, str, assets_rel_dir);
-    return sheet;
+    return try data.loadSpriteSheetFromJsonString(json_file_name, str, assets_rel_dir);
 }
 
 pub fn loadCreatureSpriteSheets(self: *Data) Error!void {
@@ -665,18 +729,18 @@ pub fn loadCreatureSpriteSheets(self: *Data) Error!void {
     while (try file_it.next()) |s| {
         defer plat.heap.free(s.owned_string);
 
-        const sheet = try loadSpriteSheetFromJsonString(s.basename, s.owned_string, "images/creature");
+        const sheet = try self.loadSpriteSheetFromJsonString(s.basename, s.owned_string, "images/creature");
 
-        var it_dash = std.mem.tokenizeScalar(u8, sheet.name.constSlice(), '-');
+        var it_dash = std.mem.tokenizeScalar(u8, sheet.data_ref.name.constSlice(), '-');
         const creature_name = it_dash.next().?;
         const creature_kind = std.meta.stringToEnum(sprites.CreatureAnim.Kind, creature_name).?;
         const anim_name = it_dash.next().?;
         const anim_kind = std.meta.stringToEnum(sprites.AnimName, anim_name).?;
-        self.creature_sprite_sheets.getPtr(creature_kind).getPtr(anim_kind).* = sheet;
+        self.creature_sprite_sheets.getPtr(creature_kind).getPtr(anim_kind).* = sheet.*;
         if (anim_kind == .idle) {
             const none_sheet = self.creature_sprite_sheets.getPtr(creature_kind).getPtr(.none);
             if (none_sheet.* == null) {
-                none_sheet.* = sheet;
+                none_sheet.* = sheet.*;
             }
         }
 
@@ -754,11 +818,9 @@ pub fn loadVFXSpriteSheets(self: *Data) Error!void {
     while (try file_it.next()) |s| {
         defer plat.heap.free(s.owned_string);
 
-        const sheet = try loadSpriteSheetFromJsonString(s.basename, s.owned_string, "images/vfx");
-        const sheet_idx = self.vfx_sprite_sheets.items.len;
-        try self.vfx_sprite_sheets.append(sheet);
+        const sheet = try self.loadSpriteSheetFromJsonString(s.basename, s.owned_string, "images/vfx");
 
-        if (std.meta.stringToEnum(sprites.VFXAnim.SheetName, sheet.name.constSlice())) |vfx_sheet_name| {
+        if (std.meta.stringToEnum(sprites.VFXAnim.SheetName, sheet.data_ref.name.constSlice())) |vfx_sheet_name| {
             // sprite sheet to vfx anims
             for (sheet.tags) |tag| {
                 if (std.meta.stringToEnum(sprites.AnimName, tag.name.constSlice())) |vfx_anim_name| {
@@ -795,14 +857,14 @@ pub fn loadVFXSpriteSheets(self: *Data) Error!void {
                     }
                     const anim_idx = self.vfx_anims.items.len;
                     try self.vfx_anims.append(anim);
-                    self.vfx_sprite_sheet_mappings.getPtr(vfx_sheet_name).getPtr(vfx_anim_name).* = sheet_idx;
+                    self.vfx_sprite_sheet_mappings.getPtr(vfx_sheet_name).getPtr(vfx_anim_name).* = sheet.data_ref.idx;
                     self.vfx_anim_mappings.getPtr(vfx_sheet_name).getPtr(vfx_anim_name).* = anim_idx;
                 } else {
                     Log.warn("Unknown vfx anim skipped: {s}", .{tag.name.constSlice()});
                 }
             }
         } else {
-            Log.warn("Unknown vfx spritesheet skipped: {s}", .{sheet.name.constSlice()});
+            Log.warn("Unknown vfx spritesheet skipped: {s}", .{sheet.data_ref.name.constSlice()});
         }
     }
 }
@@ -810,16 +872,16 @@ pub fn loadVFXSpriteSheets(self: *Data) Error!void {
 pub fn loadSpriteSheets(self: *Data) Error!void {
     try self.loadCreatureSpriteSheets();
     try self.loadVFXSpriteSheets();
-    self.item_icons = try @TypeOf(self.item_icons).init(try loadSpriteSheetFromJsonPath("images/ui", "item_icons.json"));
-    self.misc_icons = try @TypeOf(self.misc_icons).init(try loadSpriteSheetFromJsonPath("images/ui", "misc-icons.json"));
-    self.spell_icons = try @TypeOf(self.spell_icons).init(try loadSpriteSheetFromJsonPath("images/ui", "spell-icons.json"));
-    self.spell_tags_icons = try @TypeOf(self.spell_tags_icons).initCropped(try loadSpriteSheetFromJsonPath("images/ui", "spell-tags-icons.json"), .magenta);
-    self.text_icons = try @TypeOf(self.text_icons).initCropped(try loadSpriteSheetFromJsonPath("images/ui", "small_text_icons.json"), .magenta);
-    self.card_sprites = try @TypeOf(self.card_sprites).init(try loadSpriteSheetFromJsonPath("images/ui", "card.json"));
-    self.card_mana_cost = try @TypeOf(self.card_mana_cost).initCropped(try loadSpriteSheetFromJsonPath("images/ui", "card-mana-cost.json"), .magenta);
+    self.item_icons = try @TypeOf(self.item_icons).init(try self.loadSpriteSheetFromJsonPath("images/ui", "item_icons.json"));
+    self.misc_icons = try @TypeOf(self.misc_icons).init(try self.loadSpriteSheetFromJsonPath("images/ui", "misc-icons.json"));
+    self.spell_icons = try @TypeOf(self.spell_icons).init(try self.loadSpriteSheetFromJsonPath("images/ui", "spell-icons.json"));
+    self.spell_tags_icons = try @TypeOf(self.spell_tags_icons).initCropped(try self.loadSpriteSheetFromJsonPath("images/ui", "spell-tags-icons.json"), .magenta);
+    self.text_icons = try @TypeOf(self.text_icons).initCropped(try self.loadSpriteSheetFromJsonPath("images/ui", "small_text_icons.json"), .magenta);
+    self.card_sprites = try @TypeOf(self.card_sprites).init(try self.loadSpriteSheetFromJsonPath("images/ui", "card.json"));
+    self.card_mana_cost = try @TypeOf(self.card_mana_cost).initCropped(try self.loadSpriteSheetFromJsonPath("images/ui", "card-mana-cost.json"), .magenta);
 }
 
-pub fn loadTileSetFromJsonString(tileset: *TileSet, json_string: []u8, assets_rel_path: []const u8) Error!void {
+pub fn loadTileSetFromJsonString(data: *Data, filename: []const u8, json_string: []u8, assets_rel_path: []const u8) Error!*TileSet {
     const plat = App.getPlat();
     //std.debug.print("{s}\n", .{s});
     var scanner = std.json.Scanner.initCompleteInput(plat.heap, json_string);
@@ -830,7 +892,6 @@ pub fn loadTileSetFromJsonString(tileset: *TileSet, json_string: []u8, assets_re
     const image_filename = tree.get("image").?.string;
     const image_path = try u.bufPrintLocal("{s}/{s}", .{ assets_rel_path, image_filename });
 
-    const name = tree.get("name").?.string;
     const tile_dims = V2i.iToV2i(
         i64,
         tree.get("tilewidth").?.integer,
@@ -844,10 +905,14 @@ pub fn loadTileSetFromJsonString(tileset: *TileSet, json_string: []u8, assets_re
     const columns = tree.get("columns").?.integer;
     const sheet_dims = V2i.iToV2i(i64, columns, @divExact(image_dims.y, tile_dims.y));
 
+    const tileset_name = filenameToAssetName(filename);
+    const tileset: *TileSet = data.allocAsset(TileSet, tileset_name);
+    const ref = tileset.data_ref;
     tileset.* = .{
-        .name = try TileSet.NameBuf.fromSlice(name),
+        .data_ref = ref,
         .sheet_dims = sheet_dims,
         .tile_dims = tile_dims,
+        // TODO spritesheet
         .texture = try plat.loadTexture(image_path),
     };
     assert(tileset.texture.dims.x == image_dims.x);
@@ -880,6 +945,8 @@ pub fn loadTileSetFromJsonString(tileset: *TileSet, json_string: []u8, assets_re
             tileset.tiles.buffer[idx] = prop;
         }
     }
+
+    return tileset;
 }
 
 pub fn reloadTileSets(self: *Data) Error!void {
@@ -893,17 +960,14 @@ pub fn reloadTileSets(self: *Data) Error!void {
     var file_it = try FileWalkerIterator("maps/tilesets", ".tsj").init(plat.heap);
     defer file_it.deinit();
 
-    while (try file_it.nextFileAsOwnedString()) |str| {
-        defer plat.heap.free(str);
-        const id = self.tilesets.len;
-        const tileset = try self.tilesets.addOne();
-        try loadTileSetFromJsonString(tileset, str, "maps/tilesets");
-        tileset.id = id;
-        Log.info("Loaded tileset: {s}", .{tileset.name.constSlice()});
+    while (try file_it.next()) |e| {
+        defer e.deinit(plat.heap);
+        const tileset = try self.loadTileSetFromJsonString(e.basename, e.owned_string, "maps/tilesets");
+        Log.info("Loaded tileset: {s}", .{tileset.data_ref.name.constSlice()});
     }
 }
 
-pub fn loadTileMapFromJsonString(tilemap: *TileMap, json_string: []u8) Error!void {
+pub fn loadTileMapFromJsonString(data: *Data, filename: []const u8, json_string: []u8) Error!*TileMap {
     const plat = App.getPlat();
     //std.debug.print("{s}\n", .{s});
     var scanner = std.json.Scanner.initCompleteInput(plat.heap, json_string);
@@ -925,11 +989,16 @@ pub fn loadTileMapFromJsonString(tilemap: *TileMap, json_string: []u8) Error!voi
     );
     const game_dims = map_dims.sub(v2i(1, 1));
 
+    const tilemap_name = filenameToAssetName(filename);
+    const tilemap: *TileMap = data.allocAsset(TileMap, tilemap_name);
+    const ref = tilemap.data_ref;
     tilemap.* = .{
+        .data_ref = ref,
         .dims_tiles = map_dims,
         .dims_game = game_dims,
         .rect_dims = map_dims.toV2f().scale(TileMap.tile_sz_f),
     };
+
     var game_tile_coord: V2i = .{};
     for (0..u.as(usize, tilemap.dims_game.x * tilemap.dims_game.y)) |_| {
         tilemap.game_tiles.append(.{ .coord = game_tile_coord }) catch unreachable;
@@ -943,11 +1012,7 @@ pub fn loadTileMapFromJsonString(tilemap: *TileMap, json_string: []u8) Error!voi
         const props = _props.array;
         for (props.items) |p| {
             const p_name = p.object.get("name").?.string;
-            if (std.mem.eql(u8, p_name, "name")) {
-                const name = p.object.get("value").?.string;
-                tilemap.name = try TileMap.NameBuf.fromSlice(name);
-                continue;
-            } else if (std.mem.eql(u8, p_name, "room_kind")) {
+            if (std.mem.eql(u8, p_name, "room_kind")) {
                 const kind_str = p.object.get("value").?.string;
                 tilemap.kind = std.meta.stringToEnum(RoomKind, kind_str).?;
                 continue;
@@ -963,7 +1028,7 @@ pub fn loadTileMapFromJsonString(tilemap: *TileMap, json_string: []u8) Error!voi
             const tileset_file_name = std.fs.path.basename(tileset_path);
             const tileset_name = tileset_file_name[0..(tileset_file_name.len - 4)];
             try tilemap.tilesets.append(.{
-                .name = try TileSet.NameBuf.fromSlice(tileset_name),
+                .ref = Ref(TileSet).init(tileset_name),
                 .first_gid = u.as(usize, first_gid),
             });
         }
@@ -982,8 +1047,8 @@ pub fn loadTileMapFromJsonString(tilemap: *TileMap, json_string: []u8) Error!voi
                     .above_objects = above_objects,
                 };
                 // TODO x,y,width,height?
-                const data = layer.get("data").?.array;
-                for (data.items) |d| {
+                const layer_data = layer.get("data").?.array;
+                for (layer_data.items) |d| {
                     const tile_gid = d.integer;
                     try tile_layer.tiles.append(.{
                         .idx = u.as(TileMap.TileIndex, tile_gid),
@@ -1058,15 +1123,16 @@ pub fn loadTileMapFromJsonString(tilemap: *TileMap, json_string: []u8) Error!voi
             }
         }
     }
+    return tilemap;
 }
 
-pub fn tileIdxAndTileSetRefToTileProperties(self: *Data, tileset_ref: TileMap.TileSetReference, tile_idx: usize) ?Data.TileSet.TileProperties {
-    assert(tileset_ref.data_idx < self.tilesets.len);
-    const tileset = &self.tilesets.buffer[tileset_ref.data_idx];
-    assert(tile_idx >= tileset_ref.first_gid);
-    const tileset_tile_idx = tile_idx - tileset_ref.first_gid;
-    assert(tileset_tile_idx < tileset.tiles.len);
-    return tileset.tiles.get(tileset_tile_idx);
+pub fn tileIdxAndTileSetRefToTileProperties(_: *Data, tileset_ref: *const TileMap.TileSetRef, tile_idx: usize) ?Data.TileSet.TileProperties {
+    if (tileset_ref.ref.tryGetConst()) |tileset| {
+        assert(tile_idx >= tileset_ref.first_gid);
+        const tileset_tile_idx = tile_idx - tileset_ref.first_gid;
+        assert(tileset_tile_idx < tileset.tiles.len);
+        return tileset.tiles.get(tileset_tile_idx);
+    } else return null;
 }
 
 pub fn reloadTileMaps(self: *Data) Error!void {
@@ -1076,26 +1142,18 @@ pub fn reloadTileMaps(self: *Data) Error!void {
     var file_it = try FileWalkerIterator("maps", ".tmj").init(plat.heap);
     defer file_it.deinit();
 
-    while (try file_it.nextFileAsOwnedString()) |str| {
-        defer plat.heap.free(str);
-        const id = self.tilemaps.len;
-        const tilemap: *TileMap = try self.tilemaps.addOne();
-        try loadTileMapFromJsonString(tilemap, str);
-        tilemap.id = id;
+    while (try file_it.next()) |e| {
+        defer e.deinit(plat.heap);
+        var tilemap = try self.loadTileMapFromJsonString(e.basename, e.owned_string);
         // init tilemap refs
         for (tilemap.tilesets.slice()) |*ts_ref| {
-            for (self.tilesets.slice()) |*ts| {
-                if (std.mem.eql(u8, ts_ref.name.constSlice(), ts.name.constSlice())) {
-                    ts_ref.data_idx = u.as(usize, ts.id);
-                    break;
-                }
-            }
+            _ = ts_ref.ref.get();
         }
         // init game tiles
-        for (tilemap.tile_layers.constSlice()) |layer| {
+        for (tilemap.tile_layers.constSlice()) |*layer| {
             if (layer.above_objects) continue;
             var tile_coord: V2i = .{};
-            for (layer.tiles.constSlice()) |tile| {
+            for (layer.tiles.slice()) |*tile| {
                 var props = blk: {
                     if (tilemap.tileIdxToTileSetRef(tile.idx)) |ref| {
                         break :blk self.tileIdxAndTileSetRefToTileProperties(ref, tile.idx);
@@ -1127,7 +1185,7 @@ pub fn reloadTileMaps(self: *Data) Error!void {
             }
         }
         try tilemap.updateConnectedComponents();
-        Log.info("Loaded tilemap: {s}", .{tilemap.name.constSlice()});
+        Log.info("Loaded tilemap: {s}", .{tilemap.data_ref.name.constSlice()});
     }
 }
 
@@ -1169,7 +1227,7 @@ pub fn reload(self: *Data) Error!void {
         tilemaps.clear();
         for (self.tilemaps.constSlice()) |*tilemap| {
             if (tilemap.kind == kind) {
-                try tilemaps.append(u.as(usize, tilemap.id));
+                try tilemaps.append(tilemap.data_ref.idx.?);
             }
         }
     }

@@ -84,8 +84,11 @@ export fn appInit(plat: *Platform) *anyopaque {
         .data = Data.init() catch @panic("Failed to init data"),
     };
 
-    // populate _app here, Room.init() uses it
+    // populate _app here, Room.init() uses it, and data.reload
     _app = app;
+
+    app.data.reload() catch @panic("Failed to load data");
+
     app.game_render_texture = plat.createRenderTexture("app_game", plat.game_canvas_dims);
     app.ui_render_texture = plat.createRenderTexture("app_ui", plat.screen_dims);
 
