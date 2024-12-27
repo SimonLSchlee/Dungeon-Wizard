@@ -22,6 +22,8 @@ const Data = @import("Data.zig");
 const Thing = @import("Thing.zig");
 const ImmUI = @import("ImmUI.zig");
 
+pub const max_anim_dirs = 8;
+
 pub const RenderFrame = struct {
     pos: V2i,
     size: V2i,

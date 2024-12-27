@@ -318,10 +318,11 @@ pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
         .room => |r| {
             const room_indices = data.room_kind_tilemaps.get(r.kind);
             const room_idx = room_indices.get(r.idx);
+            const tilemap_ref = Data.Ref(TileMap).initFromAsset(data.getByIdx(TileMap, room_idx).?);
             const params: Room.InitParams = .{
                 .deck = self.deck,
                 .waves_params = r.waves_params,
-                .tilemap_idx = u.as(u32, room_idx),
+                .tilemap_ref = tilemap_ref,
                 .seed = self.rng.random().int(u64),
                 .player = self.player_thing,
                 .mode = self.mode,
@@ -451,8 +452,10 @@ pub fn roomUpdate(self: *Run) Error!void {
                 const n: usize = if (num == 0) 9 else num - 1;
                 const test_rooms = app.data.room_kind_tilemaps.getPtr(.testu);
                 if (n < test_rooms.len) {
-                    const tilemap_idx = u.as(u32, test_rooms.get(n));
-                    try room.reloadFromTileMap(tilemap_idx);
+                    const data = App.getData();
+                    const tilemap_idx = test_rooms.get(n);
+                    const ref = Data.Ref(TileMap).initFromAsset(data.getByIdx(TileMap, tilemap_idx).?);
+                    try room.reloadFromTileMap(ref);
                 }
             }
         }

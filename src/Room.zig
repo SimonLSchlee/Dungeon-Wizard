@@ -34,7 +34,7 @@ pub const max_things_in_room = 128;
 pub const ThingBoundedArray = std.BoundedArray(pool.Id, max_things_in_room);
 
 pub const InitParams = struct {
-    tilemap_idx: u32,
+    tilemap_ref: Data.Ref(TileMap),
     player: Thing,
     waves_params: WavesParams,
     seed: u64,
@@ -209,7 +209,6 @@ fn clearThings(self: *Room) void {
 
 pub fn reset(self: *Room) Error!void {
     const plat = getPlat();
-    const data = App.get().data;
     self.clearThings();
     self.fog.clearAll();
     self.camera = .{
@@ -224,7 +223,7 @@ pub fn reset(self: *Room) Error!void {
     self.progress_state = .none;
     self.paused = false;
     self.draw_pile = self.init_params.deck;
-    const tilemap = &data.tilemaps.items[self.init_params.tilemap_idx];
+    const tilemap = self.init_params.tilemap_ref.get();
     self.tilemap = tilemap.*;
 
     makeWaves(tilemap, self.rng.random(), self.init_params.waves_params, &self.waves);
@@ -245,8 +244,8 @@ pub fn clone(self: *const Room, out: *Room) Error!void {
     out.fog = try self.fog.clone();
 }
 
-pub fn reloadFromTileMap(self: *Room, tilemap_idx: u32) Error!void {
-    self.init_params.tilemap_idx = tilemap_idx;
+pub fn reloadFromTileMap(self: *Room, ref: Data.Ref(TileMap)) Error!void {
+    self.init_params.tilemap_ref = ref;
     try self.reset();
 }
 

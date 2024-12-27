@@ -28,6 +28,132 @@ const creatures = @import("creatures.zig");
 const icon_text = @import("icon_text.zig");
 const Data = @This();
 
+// asset classes
+// files:
+// - images -> spritesheets
+//   - really a json and .png
+// - sounds
+// - fonts
+// - shaders
+//   - vertex + frag files
+// - tilesets
+//   - a json and spritesheet^
+// - tile object
+//   - json and spritesheet
+// - tilemaps
+//   - json and tilesets and tile objects
+// - ???
+//
+// other or derived:
+// - anim -> a spritesheet + tag (index?)
+// - ?
+//
+// all in flat arrays, per-type
+// look up an asset with a "Ref" - name + optional index
+// - index takes priority, that's faster (validate in debug mode)
+// - otherwise lookup name (slow), and populate index in passed-in Ref (pointer)
+//
+
+pub const AssetName = u.BoundedString(64);
+
+pub inline fn streq(a: []const u8, b: []const u8) bool {
+    return std.mem.eql(u8, a, b);
+}
+
+pub fn assetTypeToLowerCaseName(AssetType: type) []const u8 {
+    const basename = u.typeBaseName(AssetType);
+    var lower_buf: [basename.len]u8 = undefined;
+    const lowercase = std.ascii.lowerString(&lower_buf, basename);
+
+    return lowercase;
+}
+
+pub fn assetTypeToBufferFieldName(AssetType: type) []const u8 {
+    return assetTypeToLowerCaseName(AssetType) ++ "s";
+}
+
+pub fn assetTypeToDefaultIdxName(AssetType: type) []const u8 {
+    return assetTypeToLowerCaseName(AssetType) ++ "_default";
+}
+
+pub fn Ref(AssetType: type) type {
+    return struct {
+        const Self = @This();
+        const Type = AssetType;
+        name: AssetName,
+        data_index: ?usize = null,
+
+        pub fn init(name: []const u8) Self {
+            return .{
+                .name = AssetName.fromSlice(name) catch unreachable,
+            };
+        }
+
+        pub fn initFromAsset(asset: anytype) Self {
+            return Ref(Type){
+                .name = asset.name, // TODO this probably breaks on reload
+                .data_index = asset.id,
+            };
+        }
+
+        pub fn get(self: *Self) *Self.Type {
+            const data = App.getData();
+            if (self.data_index) |idx| {
+                if (data.getByIdx(Self.Type, idx)) |asset| {
+                    if (streq(self.name.constSlice(), asset.name.constSlice())) {
+                        return asset;
+                    }
+                }
+            }
+            if (data.getByName(Self.Type, self.name.constSlice())) |asset| {
+                self.data_index = asset.id;
+                return asset;
+            }
+            return data.getDefaultOrCrash(Self.Type);
+        }
+    };
+}
+
+pub fn getByName(data: *Data, AssetType: type, name: []const u8) ?*AssetType {
+    const field_name = comptime assetTypeToBufferFieldName(AssetType);
+    const field = &@field(data, field_name);
+    // TODO hashmap for fast lookup
+    for (field.slice()) |*asset| {
+        if (std.mem.eql(u8, asset.name.constSlice(), name)) {
+            return asset;
+        }
+    }
+    return null;
+}
+
+pub fn getByIdx(data: *Data, AssetType: type, idx: usize) ?*AssetType {
+    const field_name = comptime assetTypeToBufferFieldName(AssetType);
+    const field = &@field(data, field_name);
+
+    if (idx < field.len) {
+        const asset = &field.buffer[idx];
+        return asset;
+    }
+
+    return null;
+}
+
+pub fn getDefaultOrCrash(data: *Data, AssetType: type) *AssetType {
+    const field_name = comptime assetTypeToDefaultIdxName(AssetType);
+    if (@hasField(Data, field_name)) {
+        const field = &@field(data, field_name);
+        if (data.getByIdx(AssetType, @field(data, field))) |asset| {
+            return asset;
+        }
+    }
+    Log.fatal("Tried to get nonexistent default asset. Type: \"{s}\"", .{@typeName(AssetType)});
+    @panic("Failed to get asset");
+}
+
+pub fn AssetArray(AssetType: type, max_num: usize) type {
+    return std.BoundedArray(AssetType, max_num);
+}
+
 pub const TileSet = struct {
     pub const NameBuf = u.BoundedString(64);
     pub const GameTileCorner = enum(u4) {
@@ -50,39 +176,40 @@ pub const TileSet = struct {
         spikes: GameTileCorner.Map = GameTileCorner.Map.initFill(false),
     };
 
-    name: NameBuf = .{}, // filename without extension (.tsj)
-    id: i32 = 0,
+    name: AssetName = .{}, // filename without extension (.tsj)
+    id: usize = 0,
+
     texture: Platform.Texture2D = undefined,
     tile_dims: V2i = .{},
     sheet_dims: V2i = .{},
     tiles: std.BoundedArray(TileProperties, TileMap.max_map_tiles) = .{},
+
+    pub fn deinit(self: *TileSet) void {
+        const plat = App.getPlat();
+        plat.unloadTexture(self.texture);
+    }
 };
 
-pub fn EnumToBoundedStringArrayType(E: type) type {
-    var max_len = 0;
-    const info = @typeInfo(E);
-    for (info.@"enum".fields) |f| {
-        if (f.name.len > max_len) {
-            max_len = f.name.len;
-        }
-    }
-    return std.EnumArray(E, u.BoundedString(max_len));
-}
+pub const DirectionalSpriteAnim = struct {
+    name: AssetName = .{}, // e.g. "wizard-move", with 4 directions "E","S","W","N"
+    id: usize = 0,
 
-pub fn enumToBoundedStringArray(E: type) EnumToBoundedStringArrayType(E) {
-    var ret = EnumToBoundedStringArrayType(E).initUndefined();
-    const BoundedArrayType = @TypeOf(ret).Value;
-    const info = @typeInfo(E);
-    for (info.@"enum".fields) |f| {
-        ret.set(@enumFromInt(f.value), BoundedArrayType.init(f.name));
-    }
-    return ret;
-}
+    anims: std.BoundedArray(Ref(SpriteAnim), sprites.max_anim_dirs),
+};
+
+pub const SpriteAnim = struct {
+    name: AssetName = .{}, // spritesheet name dash tag name e.g. "wizard-move-W" or "door-open"
+    id: usize = 0,
+
+    sheet: Ref(SpriteSheet),
+    tag_idx: usize,
+};
 
 pub const SpriteSheet = struct {
     pub const Frame = struct {
         pos: V2i,
         size: V2i,
+        // cropped_size: V2i, // TODO
         duration_ms: i64,
     };
     pub const Tag = struct {
@@ -110,8 +237,11 @@ pub const SpriteSheet = struct {
         }
     };
 
-    name: u.BoundedString(64) = .{}, // filename without extension (.png)
+    name: AssetName = .{}, // filename without extension (.png)
+    id: usize = 0,
+
     texture: Platform.Texture2D = undefined,
+    crop_color: ?Colorf = null,
     frames: []Frame = &.{},
     tags: []Tag = &.{},
     meta: []Meta = &.{},
@@ -121,6 +251,27 @@ pub const CreatureAnimArray = std.EnumArray(sprites.AnimName, ?sprites.CreatureA
 pub const AllCreatureAnimArrays = std.EnumArray(sprites.CreatureAnim.Kind, CreatureAnimArray);
 pub const CreatureSpriteSheetArray = std.EnumArray(sprites.AnimName, ?SpriteSheet);
 pub const AllCreatureSpriteSheetArrays = std.EnumArray(sprites.CreatureAnim.Kind, CreatureSpriteSheetArray);
+
+pub fn EnumToBoundedStringArrayType(E: type) type {
+    var max_len = 0;
+    const info = @typeInfo(E);
+    for (info.@"enum".fields) |f| {
+        if (f.name.len > max_len) {
+            max_len = f.name.len;
+        }
+    }
+    return std.EnumArray(E, u.BoundedString(max_len));
+}
+
+pub fn enumToBoundedStringArray(E: type) EnumToBoundedStringArrayType(E) {
+    var ret = EnumToBoundedStringArrayType(E).initUndefined();
+    const BoundedArrayType = @TypeOf(ret).Value;
+    const info = @typeInfo(E);
+    for (info.@"enum".fields) |f| {
+        ret.set(@enumFromInt(f.value), BoundedArrayType.init(f.name));
+    }
+    return ret;
+}
 
 fn EnumSpriteSheet(EnumType: type) type {
     return struct {
@@ -308,8 +459,13 @@ pub fn FileWalkerIterator(assets_rel_dir: []const u8, file_suffix: []const u8) t
     };
 }
 
-tilesets: std.ArrayList(TileSet),
-tilemaps: std.ArrayList(TileMap),
+// "new" universal asset arrays - all assets of given type stored here
+// directionalspriteanims: std.ArrayList(DirectionalSpriteAnim), // TODO
+// spriteanims: std.ArrayList(SpriteAnim), // TODO
+spritesheets: AssetArray(SpriteSheet, 128),
+tilesets: AssetArray(TileSet, 8),
+tilemaps: AssetArray(TileMap, 32),
+// old stuff
 creature_protos: std.EnumArray(Thing.CreatureKind, Thing),
 creature_sprite_sheets: AllCreatureSpriteSheetArrays,
 creature_anims: AllCreatureAnimArrays,
@@ -336,8 +492,12 @@ pub fn init() Error!*Data {
     const data = plat.heap.create(Data) catch @panic("Out of memory");
     data.vfx_anims = @TypeOf(data.vfx_anims).init(plat.heap);
     data.vfx_sprite_sheets = @TypeOf(data.vfx_sprite_sheets).init(plat.heap);
-    data.tilesets = @TypeOf(data.tilesets).init(plat.heap);
-    data.tilemaps = @TypeOf(data.tilemaps).init(plat.heap);
+
+    // TODO default init these
+    data.spritesheets.clear();
+    data.tilemaps.clear();
+    data.tilesets.clear();
+
     try data.reload();
     return data;
 }
@@ -722,20 +882,20 @@ pub fn loadTileSetFromJsonString(tileset: *TileSet, json_string: []u8, assets_re
     }
 }
 
-pub fn loadTileSets(self: *Data) Error!void {
+pub fn reloadTileSets(self: *Data) Error!void {
     const plat = App.getPlat();
 
-    for (self.tilesets.items) |t| {
-        plat.unloadTexture(t.texture);
+    for (self.tilesets.slice()) |*t| {
+        t.deinit();
     }
-    self.tilesets.clearRetainingCapacity();
+    self.tilesets.clear();
 
     var file_it = try FileWalkerIterator("maps/tilesets", ".tsj").init(plat.heap);
     defer file_it.deinit();
 
     while (try file_it.nextFileAsOwnedString()) |str| {
         defer plat.heap.free(str);
-        const id = u.as(i32, self.tilesets.items.len);
+        const id = self.tilesets.len;
         const tileset = try self.tilesets.addOne();
         try loadTileSetFromJsonString(tileset, str, "maps/tilesets");
         tileset.id = id;
@@ -901,31 +1061,30 @@ pub fn loadTileMapFromJsonString(tilemap: *TileMap, json_string: []u8) Error!voi
 }
 
 pub fn tileIdxAndTileSetRefToTileProperties(self: *Data, tileset_ref: TileMap.TileSetReference, tile_idx: usize) ?Data.TileSet.TileProperties {
-    assert(tileset_ref.data_idx < self.tilesets.items.len);
-    const tileset = &self.tilesets.items[tileset_ref.data_idx];
+    assert(tileset_ref.data_idx < self.tilesets.len);
+    const tileset = &self.tilesets.buffer[tileset_ref.data_idx];
     assert(tile_idx >= tileset_ref.first_gid);
     const tileset_tile_idx = tile_idx - tileset_ref.first_gid;
     assert(tileset_tile_idx < tileset.tiles.len);
     return tileset.tiles.get(tileset_tile_idx);
 }
 
-pub fn loadTileMaps(self: *Data) Error!void {
+pub fn reloadTileMaps(self: *Data) Error!void {
     const plat = App.getPlat();
-
-    self.tilemaps.clearRetainingCapacity();
+    self.tilemaps.clear();
 
     var file_it = try FileWalkerIterator("maps", ".tmj").init(plat.heap);
     defer file_it.deinit();
 
     while (try file_it.nextFileAsOwnedString()) |str| {
         defer plat.heap.free(str);
-        const id = u.as(i32, self.tilemaps.items.len);
+        const id = self.tilemaps.len;
         const tilemap: *TileMap = try self.tilemaps.addOne();
         try loadTileMapFromJsonString(tilemap, str);
         tilemap.id = id;
         // init tilemap refs
         for (tilemap.tilesets.slice()) |*ts_ref| {
-            for (self.tilesets.items) |*ts| {
+            for (self.tilesets.slice()) |*ts| {
                 if (std.mem.eql(u8, ts_ref.name.constSlice(), ts.name.constSlice())) {
                     ts_ref.data_idx = u.as(usize, ts.id);
                     break;
@@ -1002,13 +1161,13 @@ pub fn reload(self: *Data) Error!void {
         const kind: creatures.Kind = @enumFromInt(f.value);
         self.creature_protos.getPtr(kind).* = creatures.proto_fns.get(kind)();
     }
-    self.loadTileSets() catch |err| Log.warn("failed to load all tilesets: {any}", .{err});
-    self.loadTileMaps() catch |err| Log.warn("failed to load all tilemaps: {any}", .{err});
+    self.reloadTileSets() catch |err| Log.warn("failed to load all tilesets: {any}", .{err});
+    self.reloadTileMaps() catch |err| Log.warn("failed to load all tilemaps: {any}", .{err});
     inline for (std.meta.fields(RoomKind)) |f| {
         const kind: RoomKind = @enumFromInt(f.value);
         const tilemaps = self.room_kind_tilemaps.getPtr(kind);
         tilemaps.clear();
-        for (self.tilemaps.items) |tilemap| {
+        for (self.tilemaps.constSlice()) |*tilemap| {
             if (tilemap.kind == kind) {
                 try tilemaps.append(u.as(usize, tilemap.id));
             }

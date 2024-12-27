@@ -113,9 +113,10 @@ pub const TileSetReference = struct {
 
 pub const NameBuf = utl.BoundedString(64);
 
-name: NameBuf = .{},
+name: Data.AssetName = .{},
+id: usize = 0,
+
 kind: Data.RoomKind = .testu,
-id: i32 = 0,
 game_tiles: std.BoundedArray(GameTile, max_map_tiles) = .{},
 tile_layers: std.BoundedArray(TileLayer, max_map_layers) = .{},
 tilesets: std.BoundedArray(TileSetReference, max_map_tilesets) = .{},
@@ -765,8 +766,8 @@ fn renderTile(self: *const TileMap, pos: V2f, tile: TileLayer.Tile) void {
         Log.err("unknown tileset ref!", .{});
         return;
     };
-    assert(ref.data_idx < data.tilesets.items.len);
-    const tileset = &data.tilesets.items[ref.data_idx];
+    assert(ref.data_idx < data.tilesets.len);
+    const tileset = &data.tilesets.buffer[ref.data_idx];
     assert(tile.idx >= ref.first_gid);
     const tileset_tile_idx = tile.idx - ref.first_gid;
     assert(tileset_tile_idx < tileset.tiles.len);
@@ -884,11 +885,22 @@ pub const ExitDoor = struct {
 
     pub fn renderUnder(self: *const ExitDoor, room: *const Room) Error!void {
         const plat = App.getPlat();
+        const is_open = room.progress_state == .won;
+        if (false) {
+            const Refs = struct {
+                var open = Data.Ref(Data.SpriteAnim).init("door-open");
+                var closed = Data.Ref(Data.SpriteAnim).init("door-closed");
+            };
+            const anim: *const Data.SpriteAnim = if (is_open) Refs.open.get() else Refs.closed.get();
+            _ = anim;
+            //const opt = rf.toTextureOpt(core.game_sprite_scaling);
+            //plat.texturef(self.door_pos, rf.texture, opt);
+        }
 
         // rim
         plat.circlef(self.pos, ExitDoor.radius, .{ .fill_color = ExitDoor.rim_color });
         // fill
-        if (room.progress_state == .won) {
+        if (is_open) {
             const mouse_pos = plat.getMousePosWorld(room.camera);
             const tick_60 = @mod(room.curr_tick, 360);
             const f = utl.pi * utl.as(f32, tick_60) / 360;
