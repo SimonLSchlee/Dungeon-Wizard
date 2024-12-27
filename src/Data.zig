@@ -309,6 +309,16 @@ pub const SpriteSheet = struct {
     meta: []Meta = &.{},
 };
 
+pub const Sound = struct {
+    data_ref: Ref(Sound) = .{},
+    sound: Platform.Sound,
+
+    pub fn deinit(self: *Sound) void {
+        const plat = App.getPlat();
+        plat.unloadSound(self.sound);
+    }
+};
+
 pub const CreatureAnimArray = std.EnumArray(sprites.AnimName, ?sprites.CreatureAnim);
 pub const AllCreatureAnimArrays = std.EnumArray(sprites.CreatureAnim.Kind, CreatureAnimArray);
 pub const CreatureSpriteSheetArray = std.EnumArray(sprites.AnimName, ?SpriteSheet);
@@ -425,13 +435,6 @@ pub const MiscIcon = enum {
 
 pub const TileMapIdxBuf = std.BoundedArray(usize, 16);
 
-pub const SFX = enum {
-    thwack,
-    spell_casting,
-    spell_cast,
-    spell_fizzle,
-};
-
 pub const ShaderName = enum {
     tile_foreground_fade,
     fog_blur,
@@ -533,11 +536,11 @@ pub fn FileWalkerIterator(assets_rel_dir: []const u8, file_suffix: []const u8) t
 spritesheets: AssetArray(SpriteSheet, 128),
 tilesets: AssetArray(TileSet, 8),
 tilemaps: AssetArray(TileMap, 32),
+sounds: AssetArray(Sound, 128),
 // old stuff
 creature_protos: std.EnumArray(Thing.CreatureKind, Thing),
 creature_sprite_sheets: AllCreatureSpriteSheetArrays,
 creature_anims: AllCreatureAnimArrays,
-vfx_sprite_sheets: std.ArrayList(SpriteSheet),
 vfx_sprite_sheet_mappings: sprites.VFXAnim.IdxMapping,
 vfx_anims: std.ArrayList(sprites.VFXAnim),
 vfx_anim_mappings: sprites.VFXAnim.IdxMapping,
@@ -548,7 +551,6 @@ spell_tags_icons: EnumSpriteSheet(Spell.Tag.SpriteEnum),
 text_icons: EnumSpriteSheet(icon_text.Icon),
 card_sprites: EnumSpriteSheet(Spell.CardSpriteEnum),
 card_mana_cost: EnumSpriteSheet(Spell.ManaCost.SpriteEnum),
-sounds: std.EnumArray(SFX, ?Platform.Sound),
 music: MusicArr,
 shaders: ShaderArr,
 fonts: FontArr,
@@ -559,9 +561,9 @@ pub fn init() Error!*Data {
     const plat = App.getPlat();
     const data = plat.heap.create(Data) catch @panic("Out of memory");
     data.vfx_anims = @TypeOf(data.vfx_anims).init(plat.heap);
-    data.vfx_sprite_sheets = @TypeOf(data.vfx_sprite_sheets).init(plat.heap);
 
     // TODO default init these
+    data.sounds.clear();
     data.spritesheets.clear();
     data.tilemaps.clear();
     data.tilesets.clear();
@@ -607,14 +609,19 @@ pub fn getCreatureAnimSpriteSheetOrDefault(self: *Data, creature_kind: sprites.C
 
 pub fn loadSounds(self: *Data) Error!void {
     const plat = App.getPlat();
-    self.sounds = @TypeOf(self.sounds).initFill(null);
-    const list = [_]struct { SFX, []const u8 }{
-        .{ .thwack, "thwack.wav" },
-        .{ .spell_casting, "casting.wav" },
-        .{ .spell_cast, "cast-end.wav" },
+    for (self.sounds.slice()) |*s| {
+        s.deinit();
+    }
+    const list = [_][]const u8{
+        "thwack.wav",
+        "casting.wav",
+        "cast-end.wav",
     };
-    for (list) |s| {
-        self.sounds.getPtr(s[0]).* = try plat.loadSound(s[1]);
+    for (list) |s_filename| {
+        const sound = Sound{
+            .sound = try plat.loadSound(s_filename),
+        };
+        _ = self.putAsset(Sound, &sound, filenameToAssetName(s_filename));
     }
 }
 
@@ -809,7 +816,6 @@ pub fn loadVFXSpriteSheets(self: *Data) Error!void {
 
     self.vfx_anims.clearRetainingCapacity();
     self.vfx_anim_mappings = @TypeOf(self.vfx_anim_mappings).initFill(sprites.VFXAnim.AnimNameIdxMapping.initFill(null));
-    self.vfx_sprite_sheets.clearRetainingCapacity();
     self.vfx_sprite_sheet_mappings = @TypeOf(self.vfx_sprite_sheet_mappings).initFill(sprites.VFXAnim.AnimNameIdxMapping.initFill(null));
 
     var file_it = try FileWalkerIterator("images/vfx", ".json").init(plat.heap);

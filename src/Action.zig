@@ -241,9 +241,10 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                     }
                 }
                 // play sound
-                if (App.get().data.sounds.get(.thwack)) |s| {
-                    App.getPlat().playSound(s);
-                }
+                const Refs = struct {
+                    var thwack = Data.Ref(Data.Sound).init("thwack");
+                };
+                App.getPlat().playSound(Refs.thwack.get().sound);
 
                 if (melee.lunge_accel) |accel_params| {
                     self.dashing = true;

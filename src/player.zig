@@ -16,6 +16,7 @@ const v2i = V2i.v2i;
 
 const App = @import("App.zig");
 const getPlat = App.getPlat;
+const Data = @import("Data.zig");
 const Run = @import("Run.zig");
 const Thing = @import("Thing.zig");
 const Room = @import("Room.zig");
@@ -379,9 +380,13 @@ pub const Controller = struct {
                 },
                 .action => {
                     assert(controller.action_casting != null);
-
-                    const cast_loop_sound = App.get().data.sounds.get(.spell_casting).?;
-                    const cast_end_sound = App.get().data.sounds.get(.spell_cast).?;
+                    const plat = getPlat();
+                    const Refs = struct {
+                        var casting = Data.Ref(Data.Sound).init("casting");
+                        var cast_end = Data.Ref(Data.Sound).init("cast-end");
+                    };
+                    const cast_loop_sound = Refs.casting.get().sound;
+                    const cast_end_sound = Refs.cast_end.get().sound;
                     const cast_loop_volume = 0.2;
                     const cast_end_volume = 0.4;
                     const s = controller.action_casting.?;
@@ -416,29 +421,29 @@ pub const Controller = struct {
                                 }
                             },
                         }
-                        getPlat().stopSound(cast_loop_sound);
+                        plat.stopSound(cast_loop_sound);
                         controller.action_casting = null;
                         controller.ticks_in_state = 0;
                         continue :state .none;
                     }
-                    getPlat().loopSound(cast_loop_sound);
+                    plat.loopSound(cast_loop_sound);
                     // TODO bit of a hacky wacky
                     const ticks_left = controller.cast_counter.num_ticks - controller.cast_counter.curr_tick;
                     if (ticks_left <= 30) {
                         const vol: f32 = utl.as(f32, ticks_left) / 30.0;
-                        getPlat().setSoundVolume(cast_loop_sound, vol * cast_loop_volume);
+                        plat.setSoundVolume(cast_loop_sound, vol * cast_loop_volume);
                         if (controller.cast_vfx) |id| {
                             if (room.getThingById(id)) |cast| {
                                 cast.controller.cast_vfx.anim_to_play = .basic_cast;
                             }
                         }
                         if (controller.cast_vfx != null) {
-                            getPlat().setSoundVolume(cast_end_sound, cast_end_volume);
-                            getPlat().playSound(cast_end_sound);
+                            plat.setSoundVolume(cast_end_sound, cast_end_volume);
+                            plat.playSound(cast_end_sound);
                         }
                         controller.cast_vfx = null;
                     } else {
-                        getPlat().setSoundVolume(cast_loop_sound, cast_loop_volume);
+                        plat.setSoundVolume(cast_loop_sound, cast_loop_volume);
                     }
                     self.updateVel(.{}, self.accel_params);
                     _ = self.animator.?.play(.cast, .{ .loop = true });

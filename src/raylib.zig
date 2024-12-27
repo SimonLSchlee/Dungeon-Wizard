@@ -771,6 +771,11 @@ pub fn unloadTexture(self: *Platform, texture: Texture2D) void {
     r.UnloadTexture(texture.r_tex);
 }
 
+pub fn unloadSound(self: *Platform, sound: Sound) void {
+    _ = self;
+    r.UnloadSound(sound.r_sound);
+}
+
 pub const ImageBuf = struct {
     dims: V2i,
     data: []Coloru,
