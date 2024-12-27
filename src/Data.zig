@@ -307,6 +307,14 @@ pub const SpriteSheet = struct {
     frames: []Frame = &.{},
     tags: []Tag = &.{},
     meta: []Meta = &.{},
+
+    pub fn deinit(self: SpriteSheet) void {
+        const plat = App.getPlat();
+        plat.unloadTexture(self.texture);
+        plat.heap.free(self.frames);
+        plat.heap.free(self.tags);
+        plat.heap.free(self.meta);
+    }
 };
 
 pub const Sound = struct {
@@ -529,12 +537,12 @@ pub fn FileWalkerIterator(assets_rel_dir: []const u8, file_suffix: []const u8) t
 
 // "new" universal asset arrays - all assets of given type stored here
 // directionalspriteanims: std.ArrayList(DirectionalSpriteAnim), // TODO
-// spriteanims: std.ArrayList(SpriteAnim), // TODO
 spritesheets: AssetArray(SpriteSheet, 128),
 tilesets: AssetArray(TileSet, 8),
 tilemaps: AssetArray(TileMap, 32),
 sounds: AssetArray(Sound, 128),
 shaders: AssetArray(Shader, 8),
+spriteanims: AssetArray(SpriteAnim, 512),
 // old stuff
 creature_protos: std.EnumArray(Thing.CreatureKind, Thing),
 creature_sprite_sheets: AllCreatureSpriteSheetArrays,
@@ -559,11 +567,12 @@ pub fn init() Error!*Data {
     data.vfx_anims = @TypeOf(data.vfx_anims).init(plat.heap);
 
     // TODO default init these
-    data.shaders.clear();
-    data.sounds.clear();
     data.spritesheets.clear();
-    data.tilemaps.clear();
     data.tilesets.clear();
+    data.tilemaps.clear();
+    data.sounds.clear();
+    data.shaders.clear();
+    data.spriteanims.clear();
 
     return data;
 }
@@ -604,7 +613,7 @@ pub fn getCreatureAnimSpriteSheetOrDefault(self: *Data, creature_kind: sprites.C
     return self.creature_sprite_sheets.get(.creature).get(anim_kind);
 }
 
-pub fn loadSounds(self: *Data) Error!void {
+pub fn reloadSounds(self: *Data) Error!void {
     const plat = App.getPlat();
     for (self.sounds.slice()) |*s| {
         s.deinit();
@@ -741,7 +750,7 @@ pub fn loadCreatureSpriteSheets(self: *Data) Error!void {
     while (try file_it.next()) |s| {
         defer plat.heap.free(s.owned_string);
 
-        const sheet = try self.loadSpriteSheetFromJsonString(s.basename, s.owned_string, "images/creature");
+        const sheet = self.getByName(SpriteSheet, filenameToAssetName(s.basename)).?;
 
         var it_dash = std.mem.tokenizeScalar(u8, sheet.data_ref.name.constSlice(), '-');
         const creature_name = it_dash.next().?;
@@ -829,7 +838,7 @@ pub fn loadVFXSpriteSheets(self: *Data) Error!void {
     while (try file_it.next()) |s| {
         defer plat.heap.free(s.owned_string);
 
-        const sheet = try self.loadSpriteSheetFromJsonString(s.basename, s.owned_string, "images/vfx");
+        const sheet = self.getByName(SpriteSheet, filenameToAssetName(s.basename)).?;
 
         if (std.meta.stringToEnum(sprites.VFXAnim.SheetName, sheet.data_ref.name.constSlice())) |vfx_sheet_name| {
             // sprite sheet to vfx anims
@@ -880,16 +889,34 @@ pub fn loadVFXSpriteSheets(self: *Data) Error!void {
     }
 }
 
-pub fn loadSpriteSheets(self: *Data) Error!void {
+pub fn reloadSpriteSheets(self: *Data) Error!void {
+    const plat = App.getPlat();
+    for (self.spritesheets.slice()) |*s| {
+        s.deinit();
+    }
+    self.spritesheets.clear();
+
+    var file_it = try plat.iterateAssets("", &[_][]const u8{".json"});
+    defer file_it.deinit();
+    while (try file_it.next()) |next| {
+        defer next.deinit(file_it);
+        if (self.loadSpriteSheetFromJsonString(next.basename, next.owned_string, next.subdir)) |spritesheet| {
+            Log.info("Loaded tileset: {s}", .{spritesheet.data_ref.name.constSlice()});
+        } else |err| {
+            Log.err("Failed load tileset: {s}. Error: {any}", .{ next.basename, err });
+        }
+    }
+
     try self.loadCreatureSpriteSheets();
     try self.loadVFXSpriteSheets();
-    self.item_icons = try @TypeOf(self.item_icons).init(try self.loadSpriteSheetFromJsonPath("images/ui", "item_icons.json"));
-    self.misc_icons = try @TypeOf(self.misc_icons).init(try self.loadSpriteSheetFromJsonPath("images/ui", "misc-icons.json"));
-    self.spell_icons = try @TypeOf(self.spell_icons).init(try self.loadSpriteSheetFromJsonPath("images/ui", "spell-icons.json"));
-    self.spell_tags_icons = try @TypeOf(self.spell_tags_icons).initCropped(try self.loadSpriteSheetFromJsonPath("images/ui", "spell-tags-icons.json"), .magenta);
-    self.text_icons = try @TypeOf(self.text_icons).initCropped(try self.loadSpriteSheetFromJsonPath("images/ui", "small_text_icons.json"), .magenta);
-    self.card_sprites = try @TypeOf(self.card_sprites).init(try self.loadSpriteSheetFromJsonPath("images/ui", "card.json"));
-    self.card_mana_cost = try @TypeOf(self.card_mana_cost).initCropped(try self.loadSpriteSheetFromJsonPath("images/ui", "card-mana-cost.json"), .magenta);
+
+    self.item_icons = try @TypeOf(self.item_icons).init(self.getByName(SpriteSheet, "item_icons").?);
+    self.misc_icons = try @TypeOf(self.misc_icons).init(self.getByName(SpriteSheet, "misc-icons").?);
+    self.spell_icons = try @TypeOf(self.spell_icons).init(self.getByName(SpriteSheet, "spell-icons").?);
+    self.spell_tags_icons = try @TypeOf(self.spell_tags_icons).initCropped(self.getByName(SpriteSheet, "spell-tags-icons").?, .magenta);
+    self.text_icons = try @TypeOf(self.text_icons).initCropped(self.getByName(SpriteSheet, "small_text_icons").?, .magenta);
+    self.card_sprites = try @TypeOf(self.card_sprites).init(self.getByName(SpriteSheet, "card").?);
+    self.card_mana_cost = try @TypeOf(self.card_mana_cost).initCropped(self.getByName(SpriteSheet, "card-mana-cost").?, .magenta);
 }
 
 pub fn loadTileSetFromJsonString(data: *Data, filename: []const u8, json_string: []u8, assets_rel_path: []const u8) Error!*TileSet {
@@ -1200,7 +1227,7 @@ pub fn reloadTileMaps(self: *Data) Error!void {
     }
 }
 
-pub fn loadShaders(self: *Data) Error!void {
+pub fn reloadShaders(self: *Data) Error!void {
     const plat = App.getPlat();
     for (self.shaders.slice()) |*s| {
         s.deinit();
@@ -1222,6 +1249,20 @@ pub fn loadShaders(self: *Data) Error!void {
     }
 }
 
+pub fn reloadSpriteAnims(self: *Data) Error!void {
+    self.spriteanims.clear();
+    for (self.spritesheets.slice()) |*spritesheet| {
+        for (spritesheet.tags, 0..) |tag, i| {
+            const anim = SpriteAnim{
+                .sheet = spritesheet.data_ref,
+                .tag_idx = i,
+            };
+            const name = try u.bufPrintLocal("{s}-{s}", .{ spritesheet.data_ref.name.constSlice(), tag.name.constSlice() });
+            _ = self.putAsset(SpriteAnim, &anim, name);
+        }
+    }
+}
+
 pub fn loadFonts(self: *Data) Error!void {
     const plat = App.getPlat();
     // TODO deinit?
@@ -1232,8 +1273,8 @@ pub fn loadFonts(self: *Data) Error!void {
 }
 
 pub fn reload(self: *Data) Error!void {
-    self.loadSpriteSheets() catch |err| Log.warn("failed to load all sprites: {any}", .{err});
-    self.loadSounds() catch |err| Log.warn("failed to load all sounds: {any}", .{err});
+    self.reloadSpriteSheets() catch |err| Log.warn("failed to load all sprites: {any}", .{err});
+    self.reloadSounds() catch |err| Log.warn("failed to load all sounds: {any}", .{err});
     inline for (@typeInfo(creatures.Kind).@"enum".fields) |f| {
         const kind: creatures.Kind = @enumFromInt(f.value);
         self.creature_protos.getPtr(kind).* = creatures.proto_fns.get(kind)();
@@ -1250,6 +1291,7 @@ pub fn reload(self: *Data) Error!void {
             }
         }
     }
-    self.loadShaders() catch |err| Log.warn("failed to load all shaders: {any}", .{err});
+    self.reloadShaders() catch |err| Log.warn("failed to load all shaders: {any}", .{err});
     self.loadFonts() catch |err| Log.warn("failed to load all fonts: {any}", .{err});
+    self.reloadSpriteAnims() catch |err| Log.warn("failed to load all spriteanims: {any}", .{err});
 }

@@ -62,7 +62,7 @@ appInit: *const fn (*Platform) *anyopaque = undefined,
 appReload: *const fn (*anyopaque, *Platform) void = undefined,
 appTick: *const fn () void = undefined,
 appRender: *const fn () void = undefined,
-heap: std.mem.Allocator = gpa.allocator(),
+heap: std.mem.Allocator = undefined,
 default_font: Font = undefined,
 
 // screeeeen
@@ -149,6 +149,7 @@ pub fn init(title: []const u8) Error!*Platform {
 
     var ret = try heap.create(Platform);
     ret.* = .{};
+    ret.heap = gpa.allocator();
     ret.log = Log.init(std.fs.cwd(), heap) catch |e| {
         std.debug.print("ERROR: init logger: {any}\n", .{e});
         return Error.FileSystemFail;
@@ -1123,4 +1124,69 @@ pub fn setShader(_: *Platform, shader: Shader) void {
 
 pub fn setDefaultShader(_: *Platform) void {
     r.EndShaderMode();
+}
+
+// iterates over files in a directory, with a given suffix (including dot, e.g. ".json")
+pub const FileWalkerIterator = struct {
+    allocator: std.mem.Allocator,
+    dir: std.fs.Dir,
+    walker: std.fs.Dir.Walker,
+    file_suffixes: ?[]const []const u8,
+
+    pub fn deinit(self: *@This()) void {
+        self.walker.deinit();
+        self.dir.close();
+    }
+
+    pub const NextEntry = struct {
+        subdir: []const u8,
+        basename: []const u8,
+        owned_string: []u8,
+
+        pub fn deinit(entry: NextEntry, it: FileWalkerIterator) void {
+            it.allocator.free(entry.owned_string);
+        }
+    };
+
+    pub fn next(self: *@This()) Error!?NextEntry {
+        while (self.walker.next() catch return Error.FileSystemFail) |entry| {
+            if (entry.kind != .file) continue;
+            if (self.file_suffixes) |suffixes| {
+                for (suffixes) |suf| {
+                    if (std.mem.endsWith(u8, entry.basename, suf)) break;
+                } else {
+                    continue;
+                }
+            }
+            const file = self.dir.openFile(entry.path, .{}) catch return Error.FileSystemFail;
+            const str = file.readToEndAlloc(self.allocator, 8 * 1024 * 1024) catch return Error.FileSystemFail;
+            return .{
+                .subdir = entry.path[0..(entry.path.len - entry.basename.len)],
+                .basename = entry.basename,
+                .owned_string = str,
+            };
+        }
+        return null;
+    }
+};
+
+pub fn iteratePath(plat: *Platform, path: []const u8, file_suffixes: ?[]const []const u8) Error!FileWalkerIterator {
+    var dir = std.fs.cwd().openDir(path, .{ .iterate = true }) catch |err| {
+        plat.log.err("Error opening dir \"{s}\"", .{path});
+        plat.log.errorAndStackTrace(err);
+        return Error.FileSystemFail;
+    };
+    const walker = try dir.walk(plat.heap);
+
+    return .{
+        .allocator = plat.heap,
+        .dir = dir,
+        .walker = walker,
+        .file_suffixes = file_suffixes,
+    };
+}
+
+pub fn iterateAssets(plat: *Platform, subdir: []const u8, file_suffixes: ?[]const []const u8) Error!FileWalkerIterator {
+    const path = try u.bufPrintLocal("{s}/{s}", .{ plat.assets_path, subdir });
+    return plat.iteratePath(path, file_suffixes);
 }
