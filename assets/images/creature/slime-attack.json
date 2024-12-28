@@ -152,14 +152,14 @@
   "size": { "w": 384, "h": 48 },
   "scale": "1",
   "frameTags": [
-   { "name": "attack-E", "from": 1, "to": 8, "direction": "forward", "color": "#000000ff" },
-   { "name": "attack-W", "from": 9, "to": 16, "direction": "forward", "color": "#000000ff" }
+   { "name": "attack-E", "from": 0, "to": 7, "direction": "forward", "color": "#000000ff" },
+   { "name": "attack-W", "from": 8, "to": 15, "direction": "forward", "color": "#000000ff" }
   ],
   "layers": [
    { "name": "fake-bg", "opacity": 255, "blendMode": "normal" },
    { "name": "dark", "opacity": 255, "blendMode": "normal" },
    { "name": "midgreen", "opacity": 255, "blendMode": "overlay" },
-   { "name": "light and data", "opacity": 255, "blendMode": "normal", "cels": [{ "frame": 1, "data": "pivot-y=20,commit=1,hit=3" }] },
+   { "name": "light and data", "opacity": 255, "blendMode": "normal", "cels": [{ "frame": 0, "data": "pivot-y=20,commit=1,hit=3" }] },
    { "name": "whoosh", "opacity": 255, "blendMode": "normal" }
   ],
   "slices": [

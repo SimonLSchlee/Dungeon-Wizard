@@ -100,38 +100,8 @@
         }, 
         {
          "draworder":"topdown",
-         "id":6,
-         "name":"exit-1",
-         "objects":[
-                {
-                 "height":0,
-                 "id":14,
-                 "name":"exit",
-                 "point":true,
-                 "rotation":0,
-                 "type":"",
-                 "visible":true,
-                 "width":0,
-                 "x":132.465,
-                 "y":61.5856545454545
-                }, 
-                {
-                 "id":15,
-                 "name":"door",
-                 "template":"tilesets\/door.tj",
-                 "x":116,
-                 "y":64
-                }],
-         "opacity":1,
-         "type":"objectgroup",
-         "visible":true,
-         "x":0,
-         "y":0
-        }, 
-        {
-         "draworder":"topdown",
          "id":4,
-         "name":"spawns",
+         "name":"objects",
          "objects":[
                 {
                  "height":0,
@@ -168,6 +138,13 @@
                  "width":0,
                  "x":109,
                  "y":135.25
+                }, 
+                {
+                 "id":16,
+                 "name":"exitdoor",
+                 "template":"tilesets\/door.tj",
+                 "x":116,
+                 "y":64
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -176,14 +153,9 @@
          "y":0
         }],
  "nextlayerid":8,
- "nextobjectid":16,
+ "nextobjectid":17,
  "orientation":"orthogonal",
  "properties":[
-        {
-         "name":"name",
-         "type":"string",
-         "value":"map-1"
-        }, 
         {
          "name":"room_kind",
          "type":"string",
