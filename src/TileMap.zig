@@ -882,15 +882,16 @@ pub const ExitDoor = struct {
     pub fn renderUnder(self: *const ExitDoor, room: *const Room) Error!void {
         const plat = App.getPlat();
         const is_open = room.progress_state == .won;
-        if (false) {
+
+        {
             const Refs = struct {
                 var open = Data.Ref(Data.SpriteAnim).init("door-open");
                 var closed = Data.Ref(Data.SpriteAnim).init("door-closed");
             };
-            const anim: *const Data.SpriteAnim = if (is_open) Refs.open.get() else Refs.closed.get();
-            _ = anim;
-            //const opt = rf.toTextureOpt(core.game_sprite_scaling);
-            //plat.texturef(self.door_pos, rf.texture, opt);
+            const anim: *Data.SpriteAnim = if (is_open) Refs.open.get() else Refs.closed.get();
+            const rf = anim.getRenderFrame(0);
+            const opt = rf.toTextureOpt(core.game_sprite_scaling);
+            plat.texturef(self.door_pos, rf.texture, opt);
         }
 
         // rim

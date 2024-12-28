@@ -287,6 +287,18 @@ pub const SpriteAnim = struct {
 
     sheet: Ref(SpriteSheet) = undefined,
     tag_idx: usize = undefined,
+
+    pub fn getRenderFrame(self: *SpriteAnim, frame_idx: usize) sprites.RenderFrame {
+        const sheet = self.sheet.get();
+        const frame = sheet.frames[@min(frame_idx, sheet.frames.len - 1)];
+
+        return .{
+            .pos = frame.pos,
+            .size = frame.size,
+            .texture = sheet.texture,
+            .origin = .center,
+        };
+    }
 };
 
 pub const SpriteSheet = struct {
