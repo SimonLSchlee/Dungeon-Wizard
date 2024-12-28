@@ -104,8 +104,9 @@ pub fn staticAppInit(plat: *Platform) *anyopaque {
 pub export fn appReload(app_ptr: *anyopaque, plat: *Platform) void {
     _plat = plat;
     const app: *App = @ptrCast(@alignCast(app_ptr));
-    app.data.reload() catch @panic("Failed to reload data");
     _app = app;
+    // data reload uses app and plat
+    app.data.reload() catch @panic("Failed to reload data");
 }
 
 pub fn staticAppReload(app_ptr: *anyopaque, plat: *Platform) void {
