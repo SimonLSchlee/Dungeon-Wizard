@@ -108,7 +108,11 @@ pub fn Ref(AssetType: type) type {
         pub fn get(self: *Self) *Self.Type {
             if (self.tryGet()) |ret| return ret;
             const data = App.getData();
-            return data.getDefaultOrCrash(Self.Type);
+            if (data.getDefault(Self.Type)) |default| {
+                return default;
+            }
+            Log.fatal("Tried to get nonexistent default asset \"{s}\". Type: \"{s}\"", .{ self.name.constSlice(), @typeName(AssetType) });
+            @panic("Failed to get asset");
         }
 
         pub fn tryGetConst(self: *const Self) ?*const Self.Type {
@@ -145,7 +149,7 @@ pub fn getByIdx(data: *Data, AssetType: type, idx: usize) ?*AssetType {
     return null;
 }
 
-pub fn getDefaultOrCrash(data: *Data, AssetType: type) *AssetType {
+pub fn getDefault(data: *Data, AssetType: type) ?*AssetType {
     const field_name = comptime assetTypeToDefaultIdxName(AssetType);
     if (@hasField(Data, field_name)) {
         const field = &@field(data, field_name);
@@ -153,8 +157,7 @@ pub fn getDefaultOrCrash(data: *Data, AssetType: type) *AssetType {
             return asset;
         }
     }
-    Log.fatal("Tried to get nonexistent default asset. Type: \"{s}\"", .{@typeName(AssetType)});
-    @panic("Failed to get asset");
+    return null;
 }
 
 pub fn AssetArray(AssetType: type, max_num: usize) type {
@@ -256,50 +259,8 @@ pub const TileSet = struct {
     }
 };
 
-pub const DirectionalSpriteAnim = struct {
-    pub const Dir = enum {
-        E,
-        SE,
-        S,
-        SW,
-        W,
-        NW,
-        N,
-        NE,
-    };
-    const max_dirs = u.enumValueList(Dir).len;
-    const dir_suffixes = blk: {
-        const arr = u.enumValueList(Dir);
-        var ret: [arr.len][]const u8 = undefined;
-        for (arr, 0..) |d, i| {
-            ret[i] = "-" ++ u.enumToString(Dir, d);
-        }
-        break :blk ret;
-    };
-    data_ref: Ref(DirectionalSpriteAnim) = .{}, // e.g. "wizard-move", with 4 directions "E","S","W","N"
-
-    anims_by_dir: std.EnumArray(Dir, ?Ref(SpriteAnim)) = std.EnumArray(Dir, ?Ref(SpriteAnim)).initFill(null),
-    anims_ordered_list: std.BoundedArray(Ref(SpriteAnim), max_dirs) = .{},
-};
-
-pub const SpriteAnim = struct {
-    data_ref: Ref(SpriteAnim) = .{}, // spritesheet name dash tag name e.g. "wizard-move-W" or "door-open"
-
-    sheet: Ref(SpriteSheet) = undefined,
-    tag_idx: usize = undefined,
-
-    pub fn getRenderFrame(self: *SpriteAnim, frame_idx: usize) sprites.RenderFrame {
-        const sheet = self.sheet.get();
-        const frame = sheet.frames[@min(frame_idx, sheet.frames.len - 1)];
-
-        return .{
-            .pos = frame.pos,
-            .size = frame.size,
-            .texture = sheet.texture,
-            .origin = .center,
-        };
-    }
-};
+pub const SpriteAnim = sprites.SpriteAnim;
+pub const DirectionalSpriteAnim = sprites.DirectionalSpriteAnim;
 
 pub const SpriteSheet = struct {
     pub const Frame = struct {
@@ -1123,9 +1084,6 @@ pub fn loadTileMapFromJsonString(data: *Data, filename: []const u8, json_string:
                 //const group_name = layer.get("name").?.string;
                 const objects = layer.get("objects").?.array;
                 above_objects = true;
-                // track one exit object and popular with "door" tile object and "exit" point.
-                // they can be grouped into layers for multiple exits
-                var exit_door: ?TileMap.ExitDoor = null;
                 for (objects.items) |_obj| {
                     const obj = _obj.object;
                     const obj_pos = v2f(
@@ -1157,32 +1115,28 @@ pub fn loadTileMapFromJsonString(data: *Data, filename: []const u8, json_string:
                                 .pos = obj_pos,
                             });
                         } else if (startsWith(u8, obj_name, "exit")) {
-                            if (exit_door) |*d| {
-                                d.pos = obj_pos;
-                            } else {
-                                exit_door = .{
-                                    .pos = obj_pos,
-                                    .door_pos = obj_pos,
-                                };
-                            }
+                            const exit = TileMap.ExitDoor{
+                                .pos = obj_pos,
+                            };
+                            try tilemap.exits.append(exit);
                         } else if (startsWith(u8, obj_name, "spawn")) {
                             try tilemap.wave_spawns.append(obj_pos);
                         }
                     } else if (startsWith(u8, obj_name, "exitdoor")) {
-                        if (exit_door) |*d| {
-                            d.door_pos = obj_pos;
-                        } else {
-                            exit_door = .{
-                                .pos = obj_pos,
-                                .door_pos = obj_pos,
-                            };
-                        }
+                        const door_pos = obj_pos.sub(v2f(0, 32).scale(core.game_sprite_scaling));
+                        const exit_pos = door_pos.add(v2f(16.5, 23.5).scale(core.game_sprite_scaling));
+                        const exit = TileMap.ExitDoor{
+                            .pos = exit_pos,
+                            .door_pos = door_pos,
+                            .door_rect = .{
+                                .pos = door_pos.add(v2f(11, 5).scale(core.game_sprite_scaling)),
+                                .dims = v2f(11, 19).scale(core.game_sprite_scaling),
+                            },
+                        };
+                        try tilemap.exits.append(exit);
                     } else {
                         Log.err("Invalid map object found: \"{s}\"", .{obj_name});
                     }
-                }
-                if (exit_door) |exit| {
-                    try tilemap.exits.append(exit);
                 }
             }
         }
@@ -1279,10 +1233,45 @@ pub fn reloadSpriteAnims(self: *Data) Error!void {
     self.spriteanims.clear();
     for (self.spritesheets.slice()) |*spritesheet| {
         for (spritesheet.tags, 0..) |tag, i| {
-            const anim = SpriteAnim{
+            const from = u.as(usize, tag.from_frame);
+            const to = u.as(usize, tag.to_frame);
+            var ticks_sum: i64 = 0;
+            for (spritesheet.frames[from..(to + 1)]) |frame| {
+                const frame_ticks = u.as(i32, core.ms_to_ticks(frame.duration_ms));
+                ticks_sum += frame_ticks;
+            }
+            var anim = SpriteAnim{
                 .sheet = spritesheet.data_ref,
                 .tag_idx = i,
+                .first_frame_idx = from,
+                .last_frame_idx = to,
+                .num_frames = to - from + 1,
+                .dur_ticks = ticks_sum,
             };
+            meta_blk: for (spritesheet.meta) |m| {
+                const m_name = m.name.constSlice();
+                //std.debug.print("Meta '{s}'\n", .{m_name});
+                if (std.mem.eql(u8, m_name, "pivot-y")) {
+                    const y = m.asf32() catch continue;
+                    const x = u.as(f32, spritesheet.frames[0].size.x) * 0.5;
+                    anim.origin = .{ .offset = v2f(x, y) };
+                    continue;
+                }
+                const event_info = @typeInfo(sprites.AnimEvent.Kind);
+                inline for (event_info.@"enum".fields) |f| {
+                    if (std.mem.eql(u8, m_name, f.name)) {
+                        //std.debug.print("Adding event '{s}' on frame {}\n", .{ f.name, m.data.int });
+                        anim.events.append(.{
+                            .frame = u.as(i32, m.data.int),
+                            .kind = @enumFromInt(f.value),
+                        }) catch {
+                            Log.err("Skipped adding anim event \"{s}\"; buffer full", .{f.name});
+                        };
+                        continue :meta_blk;
+                    }
+                }
+            }
+
             const name = try u.bufPrintLocal("{s}-{s}", .{ spritesheet.data_ref.name.constSlice(), tag.name.constSlice() });
             _ = self.putAsset(SpriteAnim, &anim, name);
             Log.info("Got spriteanim: {s}", .{name});

@@ -373,3 +373,144 @@ pub const Animator = struct {
         }
     }
 };
+
+pub const DirectionalSpriteAnim = struct {
+    pub const Dir = enum {
+        E,
+        SE,
+        S,
+        SW,
+        W,
+        NW,
+        N,
+        NE,
+    };
+    pub const max_dirs = utl.enumValueList(Dir).len;
+    pub const dir_suffixes = blk: {
+        const arr = utl.enumValueList(Dir);
+        var ret: [arr.len][]const u8 = undefined;
+        for (arr, 0..) |d, i| {
+            ret[i] = "-" ++ utl.enumToString(Dir, d);
+        }
+        break :blk ret;
+    };
+    data_ref: Data.Ref(DirectionalSpriteAnim) = .{}, // e.g. "wizard-move", with 4 directions "E","S","W","N"
+
+    anims_by_dir: std.EnumArray(Dir, ?Data.Ref(SpriteAnim)) = std.EnumArray(Dir, ?Data.Ref(SpriteAnim)).initFill(null),
+    anims_ordered_list: std.BoundedArray(Data.Ref(SpriteAnim), max_dirs) = .{},
+};
+
+pub const SpriteAnim = struct {
+    data_ref: Data.Ref(SpriteAnim) = .{}, // spritesheet name dash tag name e.g. "wizard-move-W" or "door-open"
+
+    sheet: Data.Ref(Data.SpriteSheet) = undefined,
+    tag_idx: usize = 0,
+    // idxs into spritesheet.frames[]
+    first_frame_idx: usize = 0,
+    last_frame_idx: usize = 0,
+    // last - first + 1
+    num_frames: usize = 0,
+    // core.fups_per_sec == ticks
+    dur_ticks: i64 = 0,
+    // meta from spritesheet
+    origin: draw.TextureOrigin = .topleft,
+    events: std.BoundedArray(AnimEvent, 4) = .{},
+
+    pub fn getRenderFrame(self: *const SpriteAnim, anim_frame_idx: usize) RenderFrame {
+        const sheet = @constCast(self).sheet.get();
+        const frame = sheet.frames[@min(self.first_frame_idx + anim_frame_idx, self.last_frame_idx)];
+        return .{
+            .pos = frame.pos,
+            .size = frame.size,
+            .texture = sheet.texture,
+            .origin = self.origin,
+        };
+    }
+
+    pub fn getFrameEvents(self: *const SpriteAnim, anim_frame_idx: usize) AnimEvent.Set {
+        var ret = std.EnumSet(AnimEvent.Kind).initEmpty();
+        for (self.events.constSlice()) |e| {
+            if (utl.as(usize, e.frame) == anim_frame_idx) {
+                ret.insert(e.kind);
+            }
+        }
+        return ret;
+    }
+
+    pub fn tickToFrameIdx(self: *const SpriteAnim, curr_tick: i64) usize {
+        const sheet = @constCast(self).sheet.get();
+        const bounded_tick = @mod(curr_tick, self.dur_ticks);
+        var ticks_sum: i64 = 0;
+        for (sheet.frames[self.first_frame_idx..(self.last_frame_idx + 1)], 0..) |frame, i| {
+            const frame_ticks = utl.as(i32, core.ms_to_ticks(frame.duration_ms));
+            const ticks_left = bounded_tick - ticks_sum;
+            if (ticks_left < frame_ticks) {
+                return i;
+            }
+            ticks_sum += frame_ticks;
+        }
+        unreachable;
+    }
+
+    pub inline fn getRenderFrameFromTick(self: *const SpriteAnim, curr_tick: i64) RenderFrame {
+        return self.getRenderFrame(self.tickToFrameIdx(curr_tick));
+    }
+};
+
+pub const SpriteAnimator = struct {
+    pub const PlayParams = struct {
+        reset: bool = false, // always true if new anim played
+        loop: bool = false,
+    };
+
+    anim: Data.Ref(SpriteAnim),
+    curr_anim_frame: usize = 0,
+    tick_in_frame: i32 = 0,
+    anim_tick: i32 = 0,
+
+    pub fn getCurrRenderFrame(self: *const SpriteAnimator) RenderFrame {
+        return self.anim.getConst().getRenderFrameFromTick(self.anim_tick);
+    }
+
+    pub fn play(self: *SpriteAnimator, params: PlayParams) AnimEvent.Set {
+        var ret = std.EnumSet(AnimEvent.Kind).initEmpty();
+
+        if (params.reset) {
+            self.anim_tick = 0;
+            self.tick_in_frame = 0;
+            self.curr_anim_frame = 0;
+        }
+        const maybe_anim: ?*SpriteAnim = self.anim.tryGet();
+        if (maybe_anim == null) {
+            Log.warn("Can't get anim \"{s}\"", .{self.anim.name.constSlice()});
+            ret.insert(.end);
+            return ret;
+        }
+        const anim = maybe_anim.?;
+        const frame: Data.SpriteSheet.Frame = anim.sheet.getConst().frames[anim.first_frame_idx + self.curr_anim_frame];
+        const frame_ticks = utl.as(i32, core.ms_to_ticks(frame.duration_ms));
+
+        if (self.tick_in_frame >= frame_ticks) {
+            // end of anim: last tick of frame, and on last frame
+            if (self.curr_anim_frame >= anim.num_frames - 1) {
+                if (params.loop) {
+                    self.anim_tick = 0;
+                    self.tick_in_frame = 0;
+                    self.curr_anim_frame = 0;
+                }
+                ret.insert(.end);
+                return ret;
+            }
+            self.curr_anim_frame += 1;
+            self.tick_in_frame = 0;
+        }
+        // first tick of a frame; add frame events
+        if (self.tick_in_frame == 0) {
+            ret = anim.getFrameEvents(self.curr_anim_frame);
+        }
+
+        self.anim_tick += 1;
+        self.tick_in_frame += 1;
+        return ret;
+    }
+};

@@ -21,6 +21,7 @@ const getPlat = App.getPlat;
 const Thing = @import("Thing.zig");
 const Room = @import("Room.zig");
 const Data = @import("Data.zig");
+const sprites = @import("sprites.zig");
 const TileMap = @This();
 
 pub const max_map_sz: i64 = 64;
@@ -848,24 +849,32 @@ pub const ExitDoor = struct {
         boss,
     };
 
-    const radius = 12;
+    const radius = 11;
     const select_radius = 14;
     const closed_color = Colorf.rgb(0.4, 0.4, 0.4);
-    const rim_color = Colorf.rgb(0.4, 0.3, 0.4);
-    const open_color_1 = Colorf.rgb(0.2, 0.1, 0.2);
-    const open_color_2 = Colorf.rgb(0.4, 0.1, 0.4);
-    const open_hover_color = Colorf.rgb(0.4, 0.1, 0.4);
+    const open_color_1 = Colorf.rgb(0.95, 0.9, 0.95);
+    const open_color_2 = Colorf.rgb(0.95, 0.95, 0.95);
+    const open_hover_color = Colorf.rgb(0.9, 0.7, 0.9);
     const arrow_hover_color = Colorf.rgb(0.7, 0.5, 0.7);
 
     pos: V2f,
-    door_pos: V2f,
+    door_pos: ?V2f = null,
+    door_rect: ?geom.Rectf = null,
     reward_preview: RewardPreview = .none,
     challenge_preview: ChallengePreview = .none,
     selected: bool = false,
+    hovered: bool = false,
+    exit_arrow_anim: sprites.SpriteAnimator = .{
+        .anim = Data.Ref(sprites.SpriteAnim).init("exit-arrow-loop"),
+    },
 
     pub fn updateSelected(self: *ExitDoor, room: *Room) Error!bool {
-        //const plat = App.getPlat();
+        const plat = App.getPlat();
+
         if (room.getConstPlayer()) |p| {
+            const mouse_pos = plat.getMousePosWorld(room.camera);
+            self.hovered = mouse_pos.dist(self.pos) <= select_radius or if (self.door_rect) |rect| geom.pointIsInRectf(mouse_pos, rect) else false;
+
             if (p.path.len > 0) {
                 const last_path_pos = p.path.buffer[p.path.len - 1];
                 self.selected = last_path_pos.dist(self.pos) <= ExitDoor.radius + 5;
@@ -876,66 +885,34 @@ pub const ExitDoor = struct {
                 }
             }
         }
+
+        if (self.hovered or self.selected or self.exit_arrow_anim.anim_tick != 0) {
+            _ = self.exit_arrow_anim.play(.{ .loop = true });
+        }
+
         return false;
     }
 
     pub fn renderUnder(self: *const ExitDoor, room: *const Room) Error!void {
         const plat = App.getPlat();
-        const is_open = room.progress_state == .won;
+        const is_open = room.progress_state == .won or room.progress_state == .exited;
 
-        {
+        if (self.door_pos) |door_pos| {
             const Refs = struct {
                 var open = Data.Ref(Data.SpriteAnim).init("door-open");
                 var closed = Data.Ref(Data.SpriteAnim).init("door-closed");
             };
             const anim: *Data.SpriteAnim = if (is_open) Refs.open.get() else Refs.closed.get();
             const rf = anim.getRenderFrame(0);
-            const opt = rf.toTextureOpt(core.game_sprite_scaling);
-            plat.texturef(self.door_pos, rf.texture, opt);
+            var opt = rf.toTextureOpt(core.game_sprite_scaling);
+            opt.origin = .topleft;
+            plat.texturef(door_pos, rf.texture, opt);
         }
 
-        // rim
-        plat.circlef(self.pos, ExitDoor.radius, .{ .fill_color = ExitDoor.rim_color });
-        // fill
         if (is_open) {
-            const mouse_pos = plat.getMousePosWorld(room.camera);
-            const tick_60 = @mod(room.curr_tick, 360);
-            const f = utl.pi * utl.as(f32, tick_60) / 360;
-            const t = @sin(f);
-            var opt = draw.PolyOpt{
-                .fill_color = open_color_1.lerp(open_color_2, t),
-                .outline = .{ .color = rim_color },
-            };
-            if (mouse_pos.dist(self.pos) <= select_radius) {
-                opt.fill_color = open_hover_color;
-            }
-            plat.circlef(self.pos.add(v2f(0, 2)), radius - 1, opt);
-        } else {
-            const opt = draw.PolyOpt{
-                .fill_color = closed_color,
-                .outline = .{ .color = rim_color },
-            };
-            plat.circlef(self.pos.add(v2f(0, 2)), radius - 1, opt);
-        }
-    }
-
-    pub fn renderOver(self: *const ExitDoor, room: *const Room) Error!void {
-        const plat = App.getPlat();
-        if (room.progress_state == .won) {
-            const mouse_pos = plat.getMousePosWorld(room.camera);
-            if (self.selected or mouse_pos.dist(self.pos) <= select_radius) {
-                const tick_60 = @mod(room.curr_tick, 60);
-                const f = utl.pi * utl.as(f32, tick_60) / 60;
-                const t = @sin(f);
-                var color = arrow_hover_color;
-                if (self.selected) {
-                    color = Colorf.white;
-                }
-                const range = 10;
-                const base = self.pos.sub(v2f(0, 50 + range * t));
-                const end = base.add(v2f(0, 35));
-                plat.arrowf(base, end, .{ .thickness = 7.5, .color = color });
-            }
+            const rf = self.exit_arrow_anim.getCurrRenderFrame();
+            const opt = rf.toTextureOpt(core.game_sprite_scaling);
+            plat.texturef(self.pos, rf.texture, opt);
         }
     }
 };

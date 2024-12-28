@@ -589,9 +589,6 @@ pub fn render(self: *const Room, ui_render_texture: Platform.RenderTexture2D, ga
         for (thing_arr.constSlice()) |thing| {
             try thing.renderOver(self);
         }
-        for (self.exits.constSlice()) |exit| {
-            try exit.renderOver(self);
-        }
     }
 
     if (debug.show_tilemap_grid) {

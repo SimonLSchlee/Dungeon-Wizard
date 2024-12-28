@@ -26,6 +26,7 @@ pub const show_tilemap_grid = false;
 pub const show_hitboxes = false;
 pub const show_selectable = false;
 pub const show_waves = false;
+pub const show_exit_door = false;
 
 // stats n whatnot
 pub const show_num_enemies = false;
