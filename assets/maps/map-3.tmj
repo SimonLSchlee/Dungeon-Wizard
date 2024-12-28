@@ -193,18 +193,6 @@
                 }, 
                 {
                  "height":0,
-                 "id":10,
-                 "name":"exit",
-                 "point":true,
-                 "rotation":0,
-                 "type":"",
-                 "visible":true,
-                 "width":0,
-                 "x":159.75,
-                 "y":69.6666666666666
-                }, 
-                {
-                 "height":0,
                  "id":12,
                  "name":"spawn",
                  "point":true,
@@ -214,6 +202,13 @@
                  "width":0,
                  "x":142.666666666667,
                  "y":69
+                }, 
+                {
+                 "id":13,
+                 "name":"exitdoor",
+                 "template":"tilesets\/door.tj",
+                 "x":136,
+                 "y":64
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -247,7 +242,7 @@
          "y":0
         }],
  "nextlayerid":7,
- "nextobjectid":13,
+ "nextobjectid":14,
  "orientation":"orthogonal",
  "properties":[
         {
@@ -266,6 +261,10 @@
         {
          "firstgid":1025,
          "source":"tilesets\/walls1.tsj"
+        }, 
+        {
+         "firstgid":2049,
+         "source":"tilesets\/door.tsj"
         }],
  "tilewidth":16,
  "type":"map",

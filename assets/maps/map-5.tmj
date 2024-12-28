@@ -91,8 +91,8 @@
                  "type":"",
                  "visible":true,
                  "width":0,
-                 "x":51,
-                 "y":67.75
+                 "x":87.9090909090909,
+                 "y":66.1136363636364
                 }, 
                 {
                  "height":0,
@@ -168,18 +168,6 @@
                 }, 
                 {
                  "height":0,
-                 "id":10,
-                 "name":"exit",
-                 "point":true,
-                 "rotation":0,
-                 "type":"",
-                 "visible":true,
-                 "width":0,
-                 "x":129,
-                 "y":68
-                }, 
-                {
-                 "height":0,
                  "id":12,
                  "name":"spawn",
                  "point":true,
@@ -201,6 +189,38 @@
                  "width":0,
                  "x":87.25,
                  "y":150.25
+                }, 
+                {
+                 "id":14,
+                 "name":"exitdoor",
+                 "template":"tilesets\/door.tj",
+                 "x":72,
+                 "y":64
+                }, 
+                {
+                 "height":0,
+                 "id":15,
+                 "name":"spawn",
+                 "point":true,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":0,
+                 "x":132,
+                 "y":67.6363636363636
+                },
+            
+                {
+                 "height":0,
+                 "id":16,
+                 "name":"spawn",
+                 "point":true,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":0,
+                 "x":43.2727272727273,
+                 "y":68.1818181818182
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -234,7 +254,7 @@
          "y":0
         }],
  "nextlayerid":6,
- "nextobjectid":14,
+ "nextobjectid":17,
  "orientation":"orthogonal",
  "properties":[
         {

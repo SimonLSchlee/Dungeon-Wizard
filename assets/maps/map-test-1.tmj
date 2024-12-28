@@ -117,18 +117,6 @@
                 }, 
                 {
                  "height":0,
-                 "id":4,
-                 "name":"exit",
-                 "point":true,
-                 "rotation":0,
-                 "type":"",
-                 "visible":true,
-                 "width":0,
-                 "x":134.215066174207,
-                 "y":65.767466912896
-                }, 
-                {
-                 "height":0,
                  "id":11,
                  "name":"creature:sharpboi",
                  "point":true,
@@ -138,6 +126,13 @@
                  "width":0,
                  "x":66.1818181818182,
                  "y":79.0909090909091
+                }, 
+                {
+                 "id":14,
+                 "name":"exitdoor",
+                 "template":"tilesets\/door.tj",
+                 "x":112,
+                 "y":64
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -170,7 +165,7 @@
          "y":0
         }],
  "nextlayerid":7,
- "nextobjectid":14,
+ "nextobjectid":15,
  "orientation":"orthogonal",
  "properties":[
         {
@@ -194,6 +189,10 @@
         {
          "firstgid":1025,
          "source":"tilesets\/walls1.tsj"
+        }, 
+        {
+         "firstgid":2049,
+         "source":"tilesets\/door.tsj"
         }],
  "tilewidth":16,
  "type":"map",
