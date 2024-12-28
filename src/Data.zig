@@ -177,6 +177,7 @@ pub fn allocAsset(data: *Data, AssetType: type, name: []const u8) *AssetType {
             Log.fatal("Ran out of room for \"{s}\" ({})", .{ @typeName(AssetType), field.buffer.len });
             @panic("Ran out of room in array");
         };
+        new_asset.* = .{};
     }
     new_asset.data_ref = ref;
     return new_asset;
@@ -256,16 +257,36 @@ pub const TileSet = struct {
 };
 
 pub const DirectionalSpriteAnim = struct {
+    pub const Dir = enum {
+        E,
+        SE,
+        S,
+        SW,
+        W,
+        NW,
+        N,
+        NE,
+    };
+    const max_dirs = u.enumValueList(Dir).len;
+    const dir_suffixes = blk: {
+        const arr = u.enumValueList(Dir);
+        var ret: [arr.len][]const u8 = undefined;
+        for (arr, 0..) |d, i| {
+            ret[i] = "-" ++ u.enumToString(Dir, d);
+        }
+        break :blk ret;
+    };
     data_ref: Ref(DirectionalSpriteAnim) = .{}, // e.g. "wizard-move", with 4 directions "E","S","W","N"
 
-    anims: std.BoundedArray(Ref(SpriteAnim), sprites.max_anim_dirs),
+    anims_by_dir: std.EnumArray(Dir, ?Ref(SpriteAnim)) = std.EnumArray(Dir, ?Ref(SpriteAnim)).initFill(null),
+    anims_ordered_list: std.BoundedArray(Ref(SpriteAnim), max_dirs) = .{},
 };
 
 pub const SpriteAnim = struct {
     data_ref: Ref(SpriteAnim) = .{}, // spritesheet name dash tag name e.g. "wizard-move-W" or "door-open"
 
-    sheet: Ref(SpriteSheet),
-    tag_idx: usize,
+    sheet: Ref(SpriteSheet) = undefined,
+    tag_idx: usize = undefined,
 };
 
 pub const SpriteSheet = struct {
@@ -319,7 +340,7 @@ pub const SpriteSheet = struct {
 
 pub const Sound = struct {
     data_ref: Ref(Sound) = .{},
-    sound: Platform.Sound,
+    sound: Platform.Sound = undefined,
 
     pub fn deinit(self: *Sound) void {
         const plat = App.getPlat();
@@ -445,7 +466,8 @@ pub const TileMapIdxBuf = std.BoundedArray(usize, 16);
 
 pub const Shader = struct {
     data_ref: Ref(Shader) = .{},
-    shader: Platform.Shader,
+    shader: Platform.Shader = undefined,
+
     pub fn deinit(self: Shader) void {
         App.getPlat().unloadShader(self.shader);
     }
@@ -543,6 +565,7 @@ tilemaps: AssetArray(TileMap, 32),
 sounds: AssetArray(Sound, 128),
 shaders: AssetArray(Shader, 8),
 spriteanims: AssetArray(SpriteAnim, 512),
+directionalspriteanims: AssetArray(DirectionalSpriteAnim, 128),
 // old stuff
 creature_protos: std.EnumArray(Thing.CreatureKind, Thing),
 creature_sprite_sheets: AllCreatureSpriteSheetArrays,
@@ -729,15 +752,6 @@ pub fn loadSpriteSheetFromJsonString(data: *Data, sheet_filename: []const u8, js
     return data.putAsset(SpriteSheet, &sheet, sheet_name);
 }
 
-pub fn loadSpriteSheetFromJsonPath(data: *Data, assets_rel_dir: []const u8, json_file_name: []const u8) Error!*SpriteSheet {
-    const plat = App.getPlat();
-    const path = try u.bufPrintLocal("{s}/{s}/{s}", .{ plat.assets_path, assets_rel_dir, json_file_name });
-    const icons_json = std.fs.cwd().openFile(path, .{}) catch return Error.FileSystemFail;
-    const str = icons_json.readToEndAlloc(plat.heap, 8 * 1024 * 1024) catch return Error.FileSystemFail;
-    defer plat.heap.free(str);
-    return try data.loadSpriteSheetFromJsonString(json_file_name, str, assets_rel_dir);
-}
-
 pub fn loadCreatureSpriteSheets(self: *Data) Error!void {
     const plat = App.getPlat();
 
@@ -901,9 +915,9 @@ pub fn reloadSpriteSheets(self: *Data) Error!void {
     while (try file_it.next()) |next| {
         defer next.deinit(file_it);
         if (self.loadSpriteSheetFromJsonString(next.basename, next.owned_string, next.subdir)) |spritesheet| {
-            Log.info("Loaded tileset: {s}", .{spritesheet.data_ref.name.constSlice()});
+            Log.info("Loaded spritesheet: {s}", .{spritesheet.data_ref.name.constSlice()});
         } else |err| {
-            Log.err("Failed load tileset: {s}. Error: {any}", .{ next.basename, err });
+            Log.err("Failed load spritesheet: {s}. Error: {any}", .{ next.basename, err });
         }
     }
 
@@ -1259,7 +1273,51 @@ pub fn reloadSpriteAnims(self: *Data) Error!void {
             };
             const name = try u.bufPrintLocal("{s}-{s}", .{ spritesheet.data_ref.name.constSlice(), tag.name.constSlice() });
             _ = self.putAsset(SpriteAnim, &anim, name);
+            Log.info("Got spriteanim: {s}", .{name});
         }
+    }
+    self.directionalspriteanims.clear();
+    for (self.spriteanims.slice()) |*spriteanim| {
+        const spriteanim_name = spriteanim.data_ref.name.constSlice();
+        const last_letter = spriteanim_name[spriteanim_name.len - 1 ..];
+        const last_2letters = spriteanim_name[spriteanim_name.len - 2 ..];
+        if (std.meta.stringToEnum(DirectionalSpriteAnim.Dir, last_letter) == null and std.meta.stringToEnum(DirectionalSpriteAnim.Dir, last_2letters) == null) {
+            continue;
+        }
+        var dir: DirectionalSpriteAnim.Dir = undefined;
+        var directional_spriteanim_name: []const u8 = undefined;
+        for (DirectionalSpriteAnim.dir_suffixes, 0..) |dir_suffix, i| {
+            if (std.mem.endsWith(u8, spriteanim_name, dir_suffix)) {
+                directional_spriteanim_name = spriteanim_name[0..(spriteanim_name.len - dir_suffix.len)];
+                dir = @enumFromInt(i);
+                break;
+            }
+        } else continue;
+
+        var dir_spriteanim: *DirectionalSpriteAnim = if (self.getByName(DirectionalSpriteAnim, directional_spriteanim_name)) |a| a else self.allocAsset(DirectionalSpriteAnim, directional_spriteanim_name);
+        const dir_slot = dir_spriteanim.anims_by_dir.getPtr(dir);
+        if (dir_slot.* != null) {
+            Log.warn("Same anim direction found for \"{s}\", dir: \"{any}\"", .{ directional_spriteanim_name, dir });
+        }
+        dir_slot.* = spriteanim.data_ref;
+    }
+    for (self.directionalspriteanims.slice()) |*dir_spriteanim| {
+        assert(dir_spriteanim.anims_ordered_list.len == 0);
+        for (0..DirectionalSpriteAnim.max_dirs) |i| {
+            const dir: DirectionalSpriteAnim.Dir = @enumFromInt(i);
+            const slot = dir_spriteanim.anims_by_dir.getPtr(dir);
+            if (slot.*) |anim_ref| {
+                dir_spriteanim.anims_ordered_list.appendAssumeCapacity(anim_ref);
+            }
+        }
+        Log.info(
+            "Got directionalspriteanim: {s} with {} dir{s}",
+            .{
+                dir_spriteanim.data_ref.name.constSlice(),
+                dir_spriteanim.anims_ordered_list.len,
+                if (dir_spriteanim.anims_ordered_list.len > 1) "s" else "",
+            },
+        );
     }
 }
 
