@@ -871,14 +871,15 @@ pub const ExitDoor = struct {
     pub fn updateSelected(self: *ExitDoor, room: *Room) Error!bool {
         const plat = App.getPlat();
 
-        if (room.getConstPlayer()) |p| {
+        if (room.getPlayer()) |p| {
             const mouse_pos = plat.getMousePosWorld(room.camera);
             self.hovered = mouse_pos.dist(self.pos) <= select_radius or if (self.door_rect) |rect| geom.pointIsInRectf(mouse_pos, rect) else false;
 
             if (p.path.len > 0) {
-                const last_path_pos = p.path.buffer[p.path.len - 1];
+                const last_path_pos = &p.path.buffer[p.path.len - 1];
                 self.selected = last_path_pos.dist(self.pos) <= ExitDoor.radius + 5;
                 if (self.selected) {
+                    last_path_pos.* = self.pos;
                     if (p.pos.dist(self.pos) <= select_radius) {
                         return true;
                     }
