@@ -21,6 +21,7 @@ const Room = @import("../Room.zig");
 const Thing = @import("../Thing.zig");
 const TileMap = @import("../TileMap.zig");
 const StatusEffect = @import("../StatusEffect.zig");
+const Data = @import("../Data.zig");
 
 const Collision = @import("../Collision.zig");
 const Spell = @import("../Spell.zig");
@@ -124,6 +125,7 @@ pub const Projectile = struct {
 
         if (!projectile.exploded) {
             const hitbox = &self.hitbox.?;
+            _ = self.renderer.spriteanim.animator.play(.{ .loop = true });
             if (!hitbox.active or self.pos.dist(target_pos) < self.vel.length() * 2 or self.last_coll != null) {
                 projectile.exploded = true;
                 hitbox.active = true;
@@ -132,9 +134,14 @@ pub const Projectile = struct {
                 hitbox.radius = flamey_explodey.explode_radius;
                 hitbox.effect = flamey_explodey.explode_hit_effect;
                 hitbox.mask = Thing.Faction.Mask.initFull();
-                self.renderer.shape.kind.circle.radius = flamey_explodey.explode_radius;
                 self.vel = .{};
                 try spawnFiresInRadius(room, self.pos, flamey_explodey.explode_radius + 20, 20);
+                self.renderer = .{
+                    .shape = .{
+                        .kind = .{ .circle = .{ .radius = flamey_explodey.explode_radius } },
+                        .poly_opt = .{ .fill_color = Colorf.orange },
+                    },
+                };
             }
         } else {
             self.vel = .{};
@@ -165,9 +172,15 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             },
         } },
         .renderer = .{
-            .shape = .{
-                .kind = .{ .circle = .{ .radius = flamey_explodey.ball_radius } },
-                .poly_opt = .{ .fill_color = Colorf.orange },
+            .spriteanim = .{
+                .draw_over = false,
+                .draw_normal = true,
+                .rotate_to_dir = true,
+                .flip_x_to_dir = true,
+                .rel_pos = v2f(0, -14),
+                .animator = .{
+                    .anim = Data.Ref(Data.SpriteAnim).init("spell-projectile-fire-boom"),
+                },
             },
         },
         .hitbox = .{
@@ -178,6 +191,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             .effect = flamey_explodey.ball_hit_effect,
             .radius = flamey_explodey.ball_radius,
         },
+        .shadow_radius_x = flamey_explodey.ball_radius,
     };
     _ = try room.queueSpawnThing(&ball, params.cast_orig.?);
 }

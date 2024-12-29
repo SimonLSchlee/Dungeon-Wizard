@@ -20,6 +20,7 @@ const getPlat = App.getPlat;
 const Room = @import("../Room.zig");
 const Thing = @import("../Thing.zig");
 const TileMap = @import("../TileMap.zig");
+const Data = @import("../Data.zig");
 
 const Spell = @import("../Spell.zig");
 const TargetKind = Spell.TargetKind;
@@ -70,11 +71,11 @@ pub const Projectile = struct {
         const projectile: *Projectile = &spell_controller.controller.unherring_projectile;
         const target_id = params.thing.?;
         const _target = room.getThingById(target_id);
-        const animator = &self.animator.?;
+        const animator = &self.renderer.spriteanim.animator;
 
         switch (projectile.state) {
             .loop => {
-                _ = animator.play(.loop, .{ .loop = true });
+                _ = animator.play(.{ .loop = true });
                 if (_target) |target| {
                     projectile.target_pos = target.pos;
                     projectile.target_radius = target.coll_radius;
@@ -131,21 +132,16 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             } },
         } },
         .renderer = .{
-            .vfx = .{
+            .spriteanim = .{
                 .draw_over = false,
                 .draw_normal = true,
                 .rotate_to_dir = true,
                 .flip_x_to_dir = true,
                 .rel_pos = v2f(0, -14),
-            },
-        },
-        .animator = .{
-            .kind = .{
-                .vfx = .{
-                    .sheet_name = .herring,
+                .animator = .{
+                    .anim = Data.Ref(Data.SpriteAnim).init("spell-projectile-unherring"),
                 },
             },
-            .curr_anim = .loop,
         },
         .shadow_radius_x = 7,
     };

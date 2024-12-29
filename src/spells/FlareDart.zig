@@ -21,6 +21,7 @@ const Room = @import("../Room.zig");
 const Thing = @import("../Thing.zig");
 const TileMap = @import("../TileMap.zig");
 const StatusEffect = @import("../StatusEffect.zig");
+const Data = @import("../Data.zig");
 
 const Collision = @import("../Collision.zig");
 const Spell = @import("../Spell.zig");
@@ -76,6 +77,7 @@ pub const Projectile = struct {
         _ = target_pos;
         const projectile: *@This() = &spell_controller.controller.flare_dart_projectile;
         _ = projectile;
+        _ = self.renderer.spriteanim.animator.play(.{ .loop = true });
 
         if (self.last_coll != null or !self.hitbox.?.active) {
             self.deferFree(room);
@@ -103,9 +105,15 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             },
         } },
         .renderer = .{
-            .shape = .{
-                .kind = .{ .circle = .{ .radius = flare_dart.ball_radius } },
-                .poly_opt = .{ .fill_color = Colorf.orange },
+            .spriteanim = .{
+                .draw_over = false,
+                .draw_normal = true,
+                .rotate_to_dir = true,
+                .flip_x_to_dir = true,
+                .rel_pos = v2f(0, -14),
+                .animator = .{
+                    .anim = Data.Ref(Data.SpriteAnim).init("spell-projectile-flare-dart"),
+                },
             },
         },
         .hitbox = .{
@@ -116,6 +124,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             .effect = flare_dart.hit_effect,
             .radius = flare_dart.ball_radius,
         },
+        .shadow_radius_x = flare_dart.ball_radius,
     };
     _ = try room.queueSpawnThing(&ball, caster.pos);
 }

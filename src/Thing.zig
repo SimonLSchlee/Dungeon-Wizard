@@ -133,6 +133,7 @@ renderer: union(enum) {
     shape: ShapeRenderer,
     spawner: SpawnerRenderer,
     vfx: VFXRenderer,
+    spriteanim: SpriteAnimRenderer,
 } = .none,
 animator: ?sprites.Animator = null,
 path: std.BoundedArray(V2f, 32) = .{},
@@ -844,6 +845,56 @@ pub const VFXRenderer = struct {
 
     pub fn renderOver(self: *const Thing, room: *const Room) Error!void {
         const renderer = &self.renderer.vfx;
+        if (renderer.draw_over) {
+            _render(self, renderer, room);
+        }
+    }
+};
+
+pub const SpriteAnimRenderer = struct {
+    sprite_tint: Colorf = .white,
+    draw_normal: bool = true,
+    draw_over: bool = false,
+    draw_under: bool = false,
+    rotate_to_dir: bool = false,
+    flip_x_to_dir: bool = false,
+    rel_pos: V2f = .{},
+    scale: f32 = core.game_sprite_scaling,
+    animator: sprites.SpriteAnimator,
+
+    pub fn _render(self: *const Thing, renderer: *const SpriteAnimRenderer, _: *const Room) void {
+        const plat = App.getPlat();
+        const rf = renderer.animator.getCurrRenderFrame();
+        var opt = rf.toTextureOpt(renderer.scale);
+        const tint: Colorf = renderer.sprite_tint;
+
+        opt.tint = tint;
+        opt.flip_x = renderer.flip_x_to_dir and self.dir.x < 0;
+        opt.rot_rads = if (renderer.rotate_to_dir) self.dir.toAngleRadians() else 0;
+
+        if (opt.flip_x and renderer.rotate_to_dir and self.dir.x < 0) {
+            opt.rot_rads += utl.pi;
+        }
+        plat.texturef(self.pos.add(renderer.rel_pos), rf.texture, opt);
+    }
+
+    pub fn renderUnder(self: *const Thing, room: *const Room) Error!void {
+        const renderer = &self.renderer.spriteanim;
+        if (renderer.draw_under) {
+            _render(self, renderer, room);
+        }
+        self.renderShadow();
+    }
+
+    pub fn render(self: *const Thing, room: *const Room) Error!void {
+        const renderer = &self.renderer.spriteanim;
+        if (renderer.draw_normal) {
+            _render(self, renderer, room);
+        }
+    }
+
+    pub fn renderOver(self: *const Thing, room: *const Room) Error!void {
+        const renderer = &self.renderer.spriteanim;
         if (renderer.draw_over) {
             _render(self, renderer, room);
         }
