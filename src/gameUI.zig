@@ -414,7 +414,8 @@ pub const Slots = struct {
     };
     pub const discard_key = core.Key.d;
 
-    ui_bg_rect: geom.Rectf = .{},
+    room_ui_bg_rect: geom.Rectf = .{},
+    run_ui_bg_rect: geom.Rectf = .{},
     casting_bar_rect: geom.Rectf = .{},
     spells: std.BoundedArray(Slot, max_spell_slots) = .{},
     items: std.BoundedArray(Slot, max_item_slots) = .{},
@@ -489,8 +490,10 @@ pub const Slots = struct {
         const plat = getPlat();
         // TODO Options?
         const ui_scaling: f32 = plat.ui_scaling;
+        const spell_item_margin = 10 * ui_scaling;
 
-        // items bottom left
+        // run rect bottom left;
+        // items
         const items_rects = getItemsRects();
         const rightmost_items_x = blk: {
             var best_x = -std.math.inf(f32);
@@ -502,34 +505,13 @@ pub const Slots = struct {
             }
             break :blk best_x;
         };
-        const items_width = rightmost_items_x - items_rects.get(0).dims.x;
+        const items_width = rightmost_items_x + spell_item_margin;
         for (self.items.slice(), 0..) |*slot, i| {
             slot.rect = items_rects.get(i);
             slot.key_rect_pos = slot.rect.pos.sub(V2f.splat(8).scale(ui_scaling));
         }
 
-        // spells anchored to items, or in center if big enough screen
-        const spell_slot_dims = Spell.card_dims.scale(ui_scaling);
-        const spell_slot_spacing = 7 * ui_scaling;
-        const spell_item_margin = 14 * ui_scaling;
-        const spells_dims = v2f(
-            (utl.as(f32, self.spells.len)) * (spell_slot_dims.x + spell_slot_spacing) - spell_slot_spacing,
-            spell_slot_dims.y,
-        );
-        const space_for_spells_center = plat.screen_dims_f.x - items_width * 2 - spell_item_margin * 2;
-        const spells_topleft_x = if (space_for_spells_center > spells_dims.x) (plat.screen_dims_f.x - spells_dims.x) * 0.5 else rightmost_items_x + spell_item_margin;
-        const spells_topleft_y = plat.screen_dims_f.y - bottom_screen_margin * ui_scaling - spell_slot_dims.y;
-        const spells_topleft = v2f(spells_topleft_x, spells_topleft_y);
-        for (self.spells.slice(), 0..) |*slot, i| {
-            const x_off = (spell_slot_dims.x + spell_slot_spacing) * utl.as(f32, i);
-            slot.rect = .{
-                .pos = spells_topleft.add(v2f(x_off, 0)),
-                .dims = spell_slot_dims,
-            };
-            slot.key_rect_pos = slot.rect.pos.sub(V2f.splat(6).scale(ui_scaling));
-        }
-
-        // hp and mana above
+        // hp and mana above items
         const big_hp_txt = "9999/9999";
         const big_mana_txt = "99/99";
         const hp_mana_font = App.getData().fonts.get(.pixeloid);
@@ -543,8 +525,8 @@ pub const Slots = struct {
         const mana_text_max_dims = plat.measureText(big_mana_txt, hp_mana_text_opt) catch v2f(font_sz_f, 70 * ui_scaling);
         const hp_dims = hp_text_max_dims.add(v2f(6 * ui_scaling, 0)).add(hp_mana_padding.scale(2));
         const mana_dims = mana_text_max_dims.add(v2f(6 * ui_scaling, 0)).add(hp_mana_padding.scale(2));
-        const hp_topleft = items_rects.get(0).pos.sub(v2f(0, hp_dims.y + 30 * ui_scaling));
-        const mana_topleft = hp_topleft.add(v2f(hp_dims.x + 8 * ui_scaling, 0));
+        const mana_topleft = items_rects.get(0).pos.sub(v2f(0, hp_dims.y + 34 * ui_scaling));
+        const hp_topleft = mana_topleft.sub(v2f(0, hp_dims.y + 5 * ui_scaling));
         self.hp_rect = .{
             .pos = hp_topleft,
             .dims = hp_dims,
@@ -553,44 +535,70 @@ pub const Slots = struct {
             .pos = mana_topleft,
             .dims = mana_dims,
         };
+        // background rect for "run" elements; items, hp, mana
+        const run_bg_rect_pos = v2f(
+            0,
+            hp_topleft.y - 7 * ui_scaling,
+        );
+        const run_bg_rect_dims = v2f(
+            items_width,
+            plat.screen_dims_f.y - run_bg_rect_pos.y,
+        );
+        self.run_ui_bg_rect = .{
+            .pos = run_bg_rect_pos,
+            .dims = run_bg_rect_dims,
+        };
+
+        // spells anchored to run rect, or in center if big enough screen
+        const spell_slot_dims = Spell.card_dims.scale(ui_scaling);
+        const spell_slot_spacing = 7 * ui_scaling;
+        const spells_dims = v2f(
+            (utl.as(f32, self.spells.len)) * (spell_slot_dims.x + spell_slot_spacing) - spell_slot_spacing,
+            spell_slot_dims.y,
+        );
+        const space_for_spells_center = plat.screen_dims_f.x - items_width * 2 - spell_item_margin * 2;
+        const spells_topleft_x = if (space_for_spells_center > spells_dims.x) (plat.screen_dims_f.x - spells_dims.x) * 0.5 else items_width + spell_item_margin;
+        const spells_topleft_y = plat.screen_dims_f.y - bottom_screen_margin * ui_scaling - spell_slot_dims.y;
+        const spells_topleft = v2f(spells_topleft_x, spells_topleft_y);
+        for (self.spells.slice(), 0..) |*slot, i| {
+            const x_off = (spell_slot_dims.x + spell_slot_spacing) * utl.as(f32, i);
+            slot.rect = .{
+                .pos = spells_topleft.add(v2f(x_off, 0)),
+                .dims = spell_slot_dims,
+            };
+            slot.key_rect_pos = slot.rect.pos.sub(V2f.splat(6).scale(ui_scaling));
+        }
 
         // discard and pause to the right
-        {
-            const spells_botright = spells_topleft.add(spells_dims);
-            const btn_dims = v2f(24, 24).scale(ui_scaling);
-            const pause_topleft = spells_botright.add(v2f(7 * ui_scaling, -btn_dims.y));
-            self.pause_slot.rect = .{
-                .pos = pause_topleft,
-                .dims = btn_dims,
+        const spells_botright = spells_topleft.add(spells_dims);
+        const pause_discard_btn_dims = v2f(24, 24).scale(ui_scaling);
+        const pause_topleft = spells_botright.add(v2f(7 * ui_scaling, -pause_discard_btn_dims.y));
+        self.pause_slot.rect = .{
+            .pos = pause_topleft,
+            .dims = pause_discard_btn_dims,
+        };
+        self.pause_slot.key_rect_pos = self.pause_slot.rect.pos.sub(v2f(3, 17).scale(ui_scaling));
+        if (self.discard_slot) |*slot| {
+            slot.rect = .{
+                .pos = pause_topleft.add(v2f(0, -20 * ui_scaling - pause_discard_btn_dims.y)),
+                .dims = pause_discard_btn_dims,
             };
-            self.pause_slot.key_rect_pos = self.pause_slot.rect.pos.sub(v2f(3, 17).scale(ui_scaling));
-            if (self.discard_slot) |*slot| {
-                slot.rect = .{
-                    .pos = pause_topleft.add(v2f(0, -20 * ui_scaling - btn_dims.y)),
-                    .dims = btn_dims,
-                };
-                slot.key_rect_pos = slot.rect.pos.sub(v2f(5, 17).scale(ui_scaling));
-            }
+            slot.key_rect_pos = slot.rect.pos.sub(v2f(5, 17).scale(ui_scaling));
         }
+
         // background rect covers everything at bottom of screen
-        const bg_rect_pos = v2f(
-            0,
-            @min(spells_topleft.y, items_rects.get(0).pos.y) - 10 * ui_scaling,
-        );
-        const bg_rect_dims = v2f(
-            plat.screen_dims_f.x,
-            plat.screen_dims_f.y - bg_rect_pos.y,
-        );
-        self.ui_bg_rect = .{
-            .pos = bg_rect_pos,
-            .dims = bg_rect_dims,
+        const room_bg_rect_pos = spells_topleft.sub(v2f(spell_item_margin, 10 * ui_scaling));
+        const room_bg_rect_dims = plat.screen_dims_f.sub(room_bg_rect_pos);
+        self.room_ui_bg_rect = .{
+            .pos = room_bg_rect_pos,
+            .dims = room_bg_rect_dims,
         };
         // casting rect in center just above
         const casting_bar_dims = v2f(100, 5).scale(ui_scaling);
         self.casting_bar_rect = .{
             .pos = v2f(
                 plat.screen_dims_f.sub(casting_bar_dims).scale(0.5).x,
-                self.ui_bg_rect.pos.y - casting_bar_dims.y - 10 * ui_scaling,
+                self.room_ui_bg_rect.pos.y - casting_bar_dims.y - 10 * ui_scaling,
             ),
             .dims = casting_bar_dims,
         };
@@ -600,7 +608,7 @@ pub const Slots = struct {
 
     pub fn getGameScreenRect(self: *Slots) V2f {
         const plat = getPlat();
-        return plat.screen_dims_f.sub(v2f(0, self.ui_bg_rect.dims.y));
+        return plat.screen_dims_f.sub(v2f(0, self.room_ui_bg_rect.dims.y));
     }
 
     pub fn getSlotsByActionKind(self: *Slots, action_kind: player.Action.Kind) []Slot {
@@ -816,16 +824,25 @@ pub const Slots = struct {
         const room = &run.room;
         self.tooltip_immui.commands.clear();
         self.immui.commands.clear();
-        // big rect, check ui clicked
+        // big rects, check ui clicked
         self.immui.commands.append(.{ .rect = .{
-            .pos = self.ui_bg_rect.pos,
-            .dims = self.ui_bg_rect.dims,
+            .pos = self.run_ui_bg_rect.pos,
+            .dims = self.run_ui_bg_rect.dims.add(v2f(0, 20 * plat.ui_scaling)),
             .opt = .{
                 .fill_color = Colorf.rgb(0.13, 0.11, 0.13),
+                .edge_radius = 0.1,
+            },
+        } }) catch @panic("Fail to append rect cmd");
+        self.immui.commands.append(.{ .rect = .{
+            .pos = self.room_ui_bg_rect.pos,
+            .dims = self.room_ui_bg_rect.dims.add(v2f(0, 20 * plat.ui_scaling)),
+            .opt = .{
+                .fill_color = Colorf.rgb(0.13, 0.09, 0.15),
+                .edge_radius = 0.1,
             },
         } }) catch @panic("Fail to append rect cmd");
         const mouse_pos = plat.getMousePosScreen();
-        const hovered = geom.pointIsInRectf(mouse_pos, self.ui_bg_rect);
+        const hovered = geom.pointIsInRectf(mouse_pos, self.run_ui_bg_rect) or geom.pointIsInRectf(mouse_pos, self.room_ui_bg_rect);
         const clicked = hovered and (plat.input_buffer.mouseBtnIsJustPressed(.left) or plat.input_buffer.mouseBtnIsJustPressed(.right));
         run.ui_hovered = hovered;
         run.ui_clicked = clicked;
