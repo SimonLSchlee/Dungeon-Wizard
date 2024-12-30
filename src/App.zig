@@ -403,9 +403,7 @@ fn render(self: *App) Error!void {
     if (debug.show_mouse_pos) {
         try plat.textf(v2f(10, 10), "mouse screen: {d}", .{plat.getMousePosScreen()}, .{ .color = .white });
         if (self.screen == .run) {
-            if (self.run.room_exists) {
-                try plat.textf(v2f(10, 40), "mouse world: {d}", .{plat.getMousePosWorld(self.run.room.camera)}, .{ .color = .white });
-            }
+            try plat.textf(v2f(10, 40), "mouse world: {d}", .{plat.getMousePosWorld(self.run.room.camera)}, .{ .color = .white });
         }
     }
 }

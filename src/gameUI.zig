@@ -642,11 +642,9 @@ pub const Slots = struct {
     pub fn canActivateSlot(slot: *const Slot, run: *const Run, caster: *const Thing) bool {
         const room = &run.room;
         return slotIsEnabled(slot, caster) and switch (slot.kind.?) {
-            .pause => run.room_exists,
-            .action => |a| if (run.room_exists) switch (a) {
+            .pause => true,
+            .action => |a| switch (a) {
                 inline else => |k| !std.meta.hasMethod(@TypeOf(k), "canUse") or k.canUse(room, caster),
-            } else switch (a) {
-                inline else => |k| !std.meta.hasMethod(@TypeOf(k), "canUseInRun") or k.canUseInRun(caster, run),
             },
         };
     }
@@ -799,7 +797,6 @@ pub const Slots = struct {
 
         switch (slot.command) {
             .pause => {
-                assert(run.room_exists);
                 const room = &run.room;
                 const sprite_name = if (room.paused) Data.MiscIcon.hourglass_down else Data.MiscIcon.hourglass_up;
                 const info = sprites.RenderIconInfo{ .frame = data.misc_icons.getRenderFrame(sprite_name).? };

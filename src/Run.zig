@@ -121,15 +121,18 @@ pub const PlaceKind = enum {
     room,
     shop,
 };
+
+pub const RoomLoadParams = struct {
+    kind: Data.RoomKind,
+    idx: usize,
+    difficulty: f32,
+    waves_params: Room.WavesParams,
+};
+
 pub const Place = union(PlaceKind) {
     pub const Array = std.BoundedArray(Place, 32);
 
-    room: struct {
-        kind: Data.RoomKind,
-        idx: usize,
-        difficulty: f32,
-        waves_params: Room.WavesParams,
-    },
+    room: RoomLoadParams,
     shop: struct {
         num: usize,
     },
@@ -143,7 +146,6 @@ room_buf_tail: usize = 0,
 room_buf_head: usize = 0,
 room_buf_size: usize = 0,
 
-room_exists: bool = false,
 reward_ui: ?Reward.UI = null,
 shop: ?Shop = null,
 dead_menu: DeadMenu = undefined,
@@ -279,6 +281,14 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
     //try places.append(.{ .room = .{ .difficulty = 4, .idx = 0, .kind = .testu } });
     run.places = places;
 
+    // TODO dummy room
+    try run.initRoom(&run.room, .{
+        .difficulty = 0,
+        .kind = .first,
+        .idx = 0,
+        .waves_params = .{ .room_kind = .first },
+    });
+
     return run;
 }
 
@@ -289,9 +299,7 @@ pub fn initRandom(run: *Run, mode: Mode) Error!*Run {
 }
 
 pub fn deinit(self: *Run) void {
-    if (self.room_exists) {
-        self.room.deinit();
-    }
+    self.room.deinit();
     getPlat().heap.free(self.room_buf);
 }
 
@@ -304,32 +312,32 @@ pub fn startRun(self: *Run) Error!void {
     try self.loadPlaceFromCurrIdx();
 }
 
-pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
+pub fn initRoom(self: *Run, room: *Room, params: RoomLoadParams) Error!void {
     const data = App.get().data;
-    if (self.room_exists) {
-        self.room.deinit();
-        self.room_exists = false;
-    }
+    const room_indices = data.room_kind_tilemaps.get(params.kind);
+    const room_idx = room_indices.get(params.idx);
+    const tilemap_ref = data.getByIdx(TileMap, room_idx).?.data_ref;
+    const init_params: Room.InitParams = .{
+        .deck = self.deck,
+        .waves_params = params.waves_params,
+        .tilemap_ref = tilemap_ref,
+        .seed = self.rng.random().int(u64),
+        .player = self.player_thing,
+        .mode = self.mode,
+    };
+    try room.init(&init_params);
+}
+
+pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
     if (self.shop) |*shop| {
         shop.deinit();
         self.shop = null;
     }
     switch (self.places.get(self.curr_place_idx)) {
         .room => |r| {
-            const room_indices = data.room_kind_tilemaps.get(r.kind);
-            const room_idx = room_indices.get(r.idx);
-            const tilemap_ref = data.getByIdx(TileMap, room_idx).?.data_ref;
-            const params: Room.InitParams = .{
-                .deck = self.deck,
-                .waves_params = r.waves_params,
-                .tilemap_ref = tilemap_ref,
-                .seed = self.rng.random().int(u64),
-                .player = self.player_thing,
-                .mode = self.mode,
-            };
-            try self.room.init(&params);
+            self.room.deinit();
+            try self.initRoom(&self.room, r);
             self.ui_slots.beginRoom(&self.room);
-            self.room_exists = true;
             // TODO hacky
             // update once to clear fog
             try self.room.update();
@@ -397,10 +405,8 @@ pub fn pickupProduct(self: *Run, product: *const Shop.Product) void {
             assert(self.deck.len < self.deck.buffer.len);
             self.deck.append(spell) catch unreachable;
             // TODO ugh?
-            if (self.room_exists) {
-                self.room.init_params.deck.append(spell) catch unreachable;
-                self.room.draw_pile.append(spell) catch unreachable;
-            }
+            self.room.init_params.deck.append(spell) catch unreachable;
+            self.room.draw_pile.append(spell) catch unreachable;
         },
         .item => |item| {
             const slot = self.ui_slots.getNextEmptyItemSlot().?;
@@ -414,7 +420,6 @@ fn loadNextPlace(self: *Run) void {
 }
 
 pub fn syncPlayerThing(self: *Run, precedence: enum { run, room }) void {
-    assert(self.room_exists);
     const room = &self.room;
     switch (precedence) {
         .room => {
@@ -431,15 +436,12 @@ pub fn syncPlayerThing(self: *Run, precedence: enum { run, room }) void {
 }
 
 pub fn resolutionChanged(self: *Run) void {
-    if (self.room_exists) {
-        self.room.resolutionChanged();
-    }
+    self.room.resolutionChanged();
     self.ui_slots.reflowRects();
 }
 
 pub fn roomUpdate(self: *Run) Error!void {
     const plat = getPlat();
-    assert(self.room_exists);
     const room = &self.room;
 
     if (debug.enable_debug_controls) {
@@ -493,6 +495,7 @@ pub fn roomUpdate(self: *Run) Error!void {
 
     // update spell slots, and player input
     {
+        // uses self.ui_slots
         if (room.getPlayer()) |thing| {
             try thing.player_input.?.update(self, thing);
         }
@@ -603,9 +606,8 @@ pub fn itemsUpdate(self: *Run) Error!void {
                 self.ui_slots.item_menu_open = null;
             }
         }
-        if (self.room_exists) {
-            self.syncPlayerThing(.run);
-        }
+        // TODO ugh
+        self.syncPlayerThing(.run);
     }
 }
 
@@ -617,11 +619,11 @@ pub fn rewardSpellChoiceUI(self: *Run, idx: usize) Error!void {
     // modal background
     var modal_dims = plat.screen_dims_f.scale(0.8);
     var modal_topleft = plat.screen_dims_f.sub(modal_dims).scale(0.5);
-    if (self.room_exists) {
-        const game_rect_dims = self.ui_slots.getGameScreenRect();
-        modal_dims = v2f(game_rect_dims.x * 0.8, game_rect_dims.y * 0.94);
-        modal_topleft = game_rect_dims.sub(modal_dims).scale(0.5);
-    }
+
+    const game_rect_dims = self.ui_slots.getGameScreenRect();
+    modal_dims = v2f(game_rect_dims.x * 0.8, game_rect_dims.y * 0.94);
+    modal_topleft = game_rect_dims.sub(modal_dims).scale(0.5);
+
     self.imm_ui.commands.appendAssumeCapacity(.{ .rect = .{
         .pos = modal_topleft,
         .dims = modal_dims,
@@ -714,11 +716,11 @@ pub fn rewardUpdate(self: *Run) Error!void {
     // modal background
     var modal_dims = plat.screen_dims_f.scale(0.6);
     var modal_topleft = plat.screen_dims_f.sub(modal_dims).scale(0.5);
-    if (self.room_exists) {
-        const game_rect_dims = self.ui_slots.getGameScreenRect();
-        modal_dims = v2f(game_rect_dims.x * 0.6, game_rect_dims.y * 0.9);
-        modal_topleft = game_rect_dims.sub(modal_dims).scale(0.5);
-    }
+
+    const game_rect_dims = self.ui_slots.getGameScreenRect();
+    modal_dims = v2f(game_rect_dims.x * 0.6, game_rect_dims.y * 0.9);
+    modal_topleft = game_rect_dims.sub(modal_dims).scale(0.5);
+
     self.imm_ui.commands.appendAssumeCapacity(.{ .rect = .{
         .pos = modal_topleft,
         .dims = modal_dims,
@@ -859,7 +861,6 @@ pub fn rewardUpdate(self: *Run) Error!void {
     }
     if (menuUI.textButton(&self.imm_ui.commands, skip_btn_topleft, skip_btn_text, skip_btn_dims, ui_scaling)) {
         self.screen = .room;
-        assert(self.room_exists);
         self.room.took_reward = true;
     }
 }
@@ -897,7 +898,6 @@ pub fn deadUpdate(self: *Run) Error!void {
     } else if (self.dead_menu.quit_button.isClicked()) {
         plat.exit();
     } else if (self.dead_menu.retry_room_button.isClicked()) {
-        assert(self.room_exists);
         try self.room.reset();
         self.screen = .room;
     }
@@ -1038,16 +1038,16 @@ pub fn render(self: *Run, ui_render_texture: Platform.RenderTexture2D, game_rend
     plat.clear(.blank);
     plat.endRenderToTexture();
 
-    if (self.room_exists) {
-        try self.room.render(ui_render_texture, game_render_texture);
-        plat.startRenderToTexture(ui_render_texture);
-        plat.setBlend(.render_tex_alpha);
-        if (!self.room.edit_mode) {
-            try self.ui_slots.render(&self.room);
-        }
-        plat.endRenderToTexture();
+    // room
+    try self.room.render(ui_render_texture, game_render_texture);
+    plat.startRenderToTexture(ui_render_texture);
+    plat.setBlend(.render_tex_alpha);
+    if (!self.room.edit_mode) {
+        try self.ui_slots.render(&self.room);
     }
+    plat.endRenderToTexture();
 
+    // ui
     plat.startRenderToTexture(ui_render_texture);
     plat.setBlend(.render_tex_alpha);
     switch (self.screen) {
@@ -1055,6 +1055,7 @@ pub fn render(self: *Run, ui_render_texture: Platform.RenderTexture2D, game_rend
         .reward => {},
         .shop => {},
         .dead => {
+            // TODO remove - should go into command buffer
             try self.dead_menu.modal.render();
             try self.dead_menu.new_run_button.render();
             try self.dead_menu.quit_button.render();
