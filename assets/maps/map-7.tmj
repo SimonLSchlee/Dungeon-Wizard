@@ -121,18 +121,6 @@
                 }, 
                 {
                  "height":0,
-                 "id":3,
-                 "name":"spawn",
-                 "point":true,
-                 "rotation":0,
-                 "type":"",
-                 "visible":true,
-                 "width":0,
-                 "x":111.916666666667,
-                 "y":91.9166666666667
-                }, 
-                {
-                 "height":0,
                  "id":4,
                  "name":"spawn",
                  "point":true,
@@ -233,6 +221,42 @@
                  "template":"tilesets\/door.tj",
                  "x":96,
                  "y":64
+                }, 
+                {
+                 "height":0,
+                 "id":15,
+                 "name":"spawn",
+                 "point":true,
+                 "properties":[
+                        {
+                         "name":"reward",
+                         "type":"bool",
+                         "value":true
+                        }],
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":0,
+                 "x":112.181818181818,
+                 "y":92.7272727272727
+                }, 
+                {
+                 "height":0,
+                 "id":16,
+                 "name":"spawn",
+                 "point":true,
+                 "properties":[
+                        {
+                         "name":"reward",
+                         "type":"bool",
+                         "value":true
+                        }],
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":0,
+                 "x":112.181818181818,
+                 "y":73.2727272727273
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -266,7 +290,7 @@
          "y":0
         }],
  "nextlayerid":7,
- "nextobjectid":15,
+ "nextobjectid":17,
  "orientation":"orthogonal",
  "properties":[
         {

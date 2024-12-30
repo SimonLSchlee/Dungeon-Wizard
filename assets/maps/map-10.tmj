@@ -116,12 +116,18 @@
                  "id":3,
                  "name":"spawn",
                  "point":true,
+                 "properties":[
+                        {
+                         "name":"reward",
+                         "type":"bool",
+                         "value":true
+                        }],
                  "rotation":0,
                  "type":"",
                  "visible":true,
                  "width":0,
-                 "x":112,
-                 "y":74.5
+                 "x":123.272727272727,
+                 "y":72.1363636363637
                 }, 
                 {
                  "height":0,
@@ -192,8 +198,8 @@
                  "type":"",
                  "visible":true,
                  "width":0,
-                 "x":52,
-                 "y":74.75
+                 "x":50,
+                 "y":74.0227272727273
                 }, 
                 {
                  "id":11,
@@ -201,6 +207,24 @@
                  "template":"tilesets\/door.tj",
                  "x":96,
                  "y":64
+                }, 
+                {
+                 "height":0,
+                 "id":12,
+                 "name":"spawn",
+                 "point":true,
+                 "properties":[
+                        {
+                         "name":"reward",
+                         "type":"bool",
+                         "value":true
+                        }],
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":0,
+                 "x":101.272727272727,
+                 "y":72
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -232,7 +256,7 @@
          "y":0
         }],
  "nextlayerid":7,
- "nextobjectid":12,
+ "nextobjectid":13,
  "orientation":"orthogonal",
  "properties":[
         {

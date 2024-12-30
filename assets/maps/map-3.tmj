@@ -121,18 +121,6 @@
                 }, 
                 {
                  "height":0,
-                 "id":3,
-                 "name":"spawn",
-                 "point":true,
-                 "rotation":0,
-                 "type":"",
-                 "visible":true,
-                 "width":0,
-                 "x":157.666666666667,
-                 "y":110.666666666667
-                }, 
-                {
-                 "height":0,
                  "id":4,
                  "name":"spawn",
                  "point":true,
@@ -152,8 +140,8 @@
                  "type":"",
                  "visible":true,
                  "width":0,
-                 "x":55,
-                 "y":119.25
+                 "x":51,
+                 "y":113.25
                 }, 
                 {
                  "height":0,
@@ -166,18 +154,6 @@
                  "width":0,
                  "x":103.977272727273,
                  "y":172.295454545455
-                }, 
-                {
-                 "height":0,
-                 "id":7,
-                 "name":"spawn",
-                 "point":true,
-                 "rotation":0,
-                 "type":"",
-                 "visible":true,
-                 "width":0,
-                 "x":103.583333333333,
-                 "y":88.6666666666667
                 }, 
                 {
                  "height":0,
@@ -200,8 +176,8 @@
                  "type":"",
                  "visible":true,
                  "width":0,
-                 "x":142.666666666667,
-                 "y":69
+                 "x":152.303030303031,
+                 "y":65.7272727272727
                 }, 
                 {
                  "id":13,
@@ -209,6 +185,42 @@
                  "template":"tilesets\/door.tj",
                  "x":136,
                  "y":64
+                }, 
+                {
+                 "height":0,
+                 "id":14,
+                 "name":"spawn",
+                 "point":true,
+                 "properties":[
+                        {
+                         "name":"reward",
+                         "type":"bool",
+                         "value":true
+                        }],
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":0,
+                 "x":160,
+                 "y":108.545454545455
+                }, 
+                {
+                 "height":0,
+                 "id":15,
+                 "name":"spawn",
+                 "point":true,
+                 "properties":[
+                        {
+                         "name":"reward",
+                         "type":"bool",
+                         "value":true
+                        }],
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":0,
+                 "x":104.909090909091,
+                 "y":86.3636363636364
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -242,7 +254,7 @@
          "y":0
         }],
  "nextlayerid":7,
- "nextobjectid":14,
+ "nextobjectid":16,
  "orientation":"orthogonal",
  "properties":[
         {

@@ -108,18 +108,6 @@
                 }, 
                 {
                  "height":0,
-                 "id":4,
-                 "name":"spawn",
-                 "point":true,
-                 "rotation":0,
-                 "type":"",
-                 "visible":true,
-                 "width":0,
-                 "x":185.25,
-                 "y":108.75
-                }, 
-                {
-                 "height":0,
                  "id":5,
                  "name":"spawn",
                  "point":true,
@@ -220,6 +208,60 @@
                  "template":"tilesets\/door.tj",
                  "x":168,
                  "y":64
+                }, 
+                {
+                 "height":0,
+                 "id":17,
+                 "name":"spawn",
+                 "point":true,
+                 "properties":[
+                        {
+                         "name":"reward",
+                         "type":"bool",
+                         "value":true
+                        }],
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":0,
+                 "x":184.181818181818,
+                 "y":75.6363636363636
+                }, 
+                {
+                 "height":0,
+                 "id":18,
+                 "name":"spawn",
+                 "point":true,
+                 "properties":[
+                        {
+                         "name":"reward",
+                         "type":"bool",
+                         "value":true
+                        }],
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":0,
+                 "x":184.909090909091,
+                 "y":110.727272727273
+                }, 
+                {
+                 "height":0,
+                 "id":19,
+                 "name":"spawn",
+                 "point":true,
+                 "properties":[
+                        {
+                         "name":"reward",
+                         "type":"bool",
+                         "value":true
+                        }],
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":0,
+                 "x":164.727272727273,
+                 "y":88.9090909090909
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -253,7 +295,7 @@
          "y":0
         }],
  "nextlayerid":6,
- "nextobjectid":17,
+ "nextobjectid":20,
  "orientation":"orthogonal",
  "properties":[
         {
