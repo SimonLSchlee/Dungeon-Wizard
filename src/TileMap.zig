@@ -82,6 +82,11 @@ pub const PathLayer = enum {
     pub const ConnIds = std.EnumArray(PathLayer, ?u8);
 };
 
+pub const SpawnPos = struct {
+    pos: V2f,
+    reward: bool = false,
+};
+
 pub const GameTile = struct {
     coord: V2i,
     // default tile is empty (no wall) and fully pathable
@@ -120,7 +125,7 @@ tilesets: std.BoundedArray(TileSetRef, max_map_tilesets) = .{},
 creatures: std.BoundedArray(struct { kind: Thing.CreatureKind, pos: V2f }, max_map_creatures) = .{},
 exits: std.BoundedArray(ExitDoor, max_map_exits) = .{},
 shop: ?Shop = null,
-wave_spawns: std.BoundedArray(V2f, max_map_spawns) = .{},
+wave_spawns: std.BoundedArray(SpawnPos, max_map_spawns) = .{},
 dims_tiles: V2i = .{},
 dims_game: V2i = .{},
 rect_dims: V2f = .{},

@@ -1121,7 +1121,17 @@ pub fn loadTileMapFromJsonString(data: *Data, filename: []const u8, json_string:
                             };
                             try tilemap.exits.append(exit);
                         } else if (startsWith(u8, obj_name, "spawn")) {
-                            try tilemap.wave_spawns.append(obj_pos);
+                            var spawn = TileMap.SpawnPos{ .pos = obj_pos };
+                            if (obj.get("properties")) |_props| {
+                                const props = _props.array;
+                                for (props.items) |prop| {
+                                    const p_name = prop.object.get("name").?.string;
+                                    if (std.mem.eql(u8, p_name, "reward")) {
+                                        spawn.reward = true;
+                                    }
+                                }
+                            }
+                            try tilemap.wave_spawns.append(spawn);
                         }
                     } else if (startsWith(u8, obj_name, "exitdoor")) {
                         const door_pos = obj_pos.sub(v2f(0, 32).scale(core.game_sprite_scaling));

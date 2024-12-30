@@ -75,7 +75,7 @@ fn makeWaves(tilemap: *const TileMap, rng: std.Random, params: WavesParams, arra
         .first => {
             if (tilemap.wave_spawns.len > 0) {
                 var wave = Wave{};
-                wave.spawns.append(.{ .pos = tilemap.wave_spawns.get(0), .proto = data.creature_protos.get(.dummy) }) catch unreachable;
+                wave.spawns.append(.{ .pos = tilemap.wave_spawns.get(0).pos, .proto = data.creature_protos.get(.dummy) }) catch unreachable;
                 array.append(wave) catch unreachable;
                 return;
             }
@@ -94,8 +94,10 @@ fn makeWaves(tilemap: *const TileMap, rng: std.Random, params: WavesParams, arra
     const difficulty_error_per_wave = params.difficulty_error / u.as(f32, num_waves);
     Log.info("num_waves: {}, difficulty per wave: {d:.1}", .{ num_waves, difficulty_per_wave });
 
-    var all_spawn_positions = @TypeOf(tilemap.wave_spawns){};
-    all_spawn_positions.insertSlice(0, tilemap.wave_spawns.constSlice()) catch unreachable;
+    var all_spawn_positions = std.BoundedArray(V2f, TileMap.max_map_spawns){};
+    for (tilemap.wave_spawns.constSlice()) |spawn| {
+        all_spawn_positions.appendAssumeCapacity(spawn.pos);
+    }
     Log.info("  total spawn positions: {}", .{all_spawn_positions.len});
 
     for (0..num_waves) |i| {
@@ -401,10 +403,31 @@ pub fn thingInteract(self: *Room, thing: *Thing) void {
 }
 
 pub fn spawnRewardChest(self: *Room) void {
-    if (self.parent_run_this_frame.reward_ui != null) {
-        self.despawnRewardChest();
-        self.reward_chest = Thing.ChestController.spawnNextToPlayer(self) catch null;
+    if (self.parent_run_this_frame.reward_ui == null) {
+        return;
     }
+    if (self.reward_chest != null) {
+        self.despawnRewardChest();
+    }
+    const proto = Thing.ChestController.proto();
+    const ppos = if (self.getConstPlayer()) |p| p.pos else V2f{};
+    var best_spawn: ?TileMap.SpawnPos = null;
+    var best_dist: f32 = std.math.inf(f32);
+    for (self.tilemap.wave_spawns.constSlice()) |this_sp| {
+        const dist = ppos.dist(this_sp.pos);
+        if (dist > proto.coll_radius + 20) {
+            const yes = if (best_spawn) |best_sp|
+                (if (this_sp.reward) !best_sp.reward or dist < best_dist else !best_sp.reward and dist < best_dist)
+            else
+                true;
+            if (yes) {
+                best_dist = dist;
+                best_spawn = this_sp;
+            }
+        }
+    }
+    const spawn_pos = if (best_spawn) |s| s.pos else ppos;
+    self.reward_chest = self.queueSpawnThing(&proto, spawn_pos) catch null;
 }
 
 pub fn despawnRewardChest(self: *Room) void {

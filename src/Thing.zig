@@ -984,11 +984,10 @@ pub const ChestController = struct {
         }
     }
 
-    pub fn spawnNextToPlayer(room: *Room) Error!?Thing.Id {
+    pub fn proto() Thing {
         _ = Ref.spawn.get();
         _ = Ref.normal.get();
-
-        const proto = Thing{
+        return Thing{
             .kind = .reward_chest,
             .coll_radius = radius,
             .coll_mask = Collision.Mask.initMany(&.{
@@ -1008,11 +1007,6 @@ pub const ChestController = struct {
             },
             .selectable = .{ .radius = 16, .height = 20 },
         };
-        var pos = V2f{};
-        if (room.getConstPlayer()) |p| {
-            pos = p.pos;
-        }
-        return room.queueSpawnThing(&proto, pos);
     }
 };
 
