@@ -1,0 +1,14 @@
+{ "columns":4,
+ "image":"shopspider.png",
+ "imageheight":89,
+ "imagewidth":376,
+ "margin":0,
+ "name":"shop",
+ "spacing":0,
+ "tilecount":4,
+ "tiledversion":"1.11.0",
+ "tileheight":89,
+ "tilewidth":94,
+ "type":"tileset",
+ "version":"1.10"
+}

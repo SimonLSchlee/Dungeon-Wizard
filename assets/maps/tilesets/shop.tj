@@ -1,0 +1,18 @@
+{ "object":
+    {
+     "gid":1,
+     "height":89,
+     "id":17,
+     "name":"",
+     "rotation":0,
+     "type":"",
+     "visible":true,
+     "width":94
+    },
+ "tileset":
+    {
+     "firstgid":1,
+     "source":"shop.tsj"
+    },
+ "type":"template"
+}

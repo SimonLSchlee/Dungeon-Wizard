@@ -1,0 +1,72 @@
+{ "frames": [
+   {
+    "filename": "shopspider 0.aseprite",
+    "frame": { "x": 0, "y": 0, "w": 94, "h": 89 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 94, "h": 89 },
+    "sourceSize": { "w": 94, "h": 89 },
+    "duration": 1000
+   },
+   {
+    "filename": "shopspider 1.aseprite",
+    "frame": { "x": 94, "y": 0, "w": 94, "h": 89 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 94, "h": 89 },
+    "sourceSize": { "w": 94, "h": 89 },
+    "duration": 300
+   },
+   {
+    "filename": "shopspider 2.aseprite",
+    "frame": { "x": 188, "y": 0, "w": 94, "h": 89 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 94, "h": 89 },
+    "sourceSize": { "w": 94, "h": 89 },
+    "duration": 1000
+   },
+   {
+    "filename": "shopspider 3.aseprite",
+    "frame": { "x": 282, "y": 0, "w": 94, "h": 89 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 94, "h": 89 },
+    "sourceSize": { "w": 94, "h": 89 },
+    "duration": 300
+   }
+ ],
+ "meta": {
+  "app": "https://www.aseprite.org/",
+  "version": "1.3.6-arm64",
+  "image": "shopspider.png",
+  "format": "RGBA8888",
+  "size": { "w": 376, "h": 89 },
+  "scale": "1",
+  "frameTags": [
+   { "name": "idle", "from": 0, "to": 3, "direction": "forward", "color": "#000000ff" }
+  ],
+  "layers": [
+   { "name": "carpets n stuff", "opacity": 255, "blendMode": "normal" },
+   { "name": "front cards", "opacity": 255, "blendMode": "normal" },
+   { "name": "weapon rack", "opacity": 255, "blendMode": "normal" },
+   { "name": "bookshelf1", "opacity": 255, "blendMode": "normal" },
+   { "name": "shelf2", "opacity": 255, "blendMode": "normal" },
+   { "name": "rolled up carpets", "opacity": 255, "blendMode": "normal" },
+   { "name": "back legs 2", "opacity": 255, "blendMode": "normal" },
+   { "name": "body", "opacity": 255, "blendMode": "normal" },
+   { "name": "head", "opacity": 255, "blendMode": "normal" },
+   { "name": "front legs 2", "opacity": 255, "blendMode": "normal" },
+   { "name": "tarp back-right-leg and string", "opacity": 255, "blendMode": "normal" },
+   { "name": "side table", "opacity": 255, "blendMode": "normal" },
+   { "name": "stuff on side table", "opacity": 255, "blendMode": "normal" },
+   { "name": "front-round-table", "opacity": 255, "blendMode": "normal" },
+   { "name": "stuff on front round table", "opacity": 255, "blendMode": "normal" },
+   { "name": "tarp", "opacity": 255, "blendMode": "normal" },
+   { "name": "shadow under tarp", "opacity": 120, "blendMode": "normal" },
+   { "name": "tarp strings", "opacity": 255, "blendMode": "normal" }
+  ],
+  "slices": [
+  ]
+ }
+}
