@@ -448,6 +448,7 @@ pub fn update(self: *Room) Error!void {
                         // .lost is set below, after player is freed
                     } else if (defeated_all_enemies or self.init_params.waves_params.room_kind == .first) {
                         self.progress_state = .won;
+                        try Thing.ChestController.spawnNextToPlayer(self);
                     }
                 },
                 .won => {

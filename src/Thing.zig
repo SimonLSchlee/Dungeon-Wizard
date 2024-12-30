@@ -43,6 +43,7 @@ pub const Kind = enum {
     spawner,
     vfx,
     pickup,
+    reward_chest,
 };
 
 pub const CreatureKind = creatures.Kind;
@@ -106,6 +107,7 @@ size_category: SizeCategory = .none,
 coll_radius: f32 = 0,
 coll_mask: Collision.Mask = .{},
 coll_layer: Collision.Mask = .{},
+coll_mass: f32 = 0,
 last_coll: ?Collision = null,
 //
 vision_range: f32 = 0,
@@ -126,6 +128,7 @@ controller: union(enum) {
     text_vfx: TextVFXController,
     mana_pickup: ManaPickupController,
     loop_vfx: LoopVFXController,
+    chest: ChestController,
 } = .default,
 renderer: union(enum) {
     none: struct {},
@@ -161,6 +164,11 @@ hit_airborne: ?struct {
     z_accel: f32 = 0,
 } = null,
 dashing: bool = false,
+rmb_interactable: ?struct {
+    kind: enum {
+        reward_chest,
+    },
+} = null,
 
 pub const Faction = enum {
     object,
@@ -937,6 +945,70 @@ pub const SpawnerRenderer = struct {
     }
 };
 
+pub const ChestController = struct {
+    const Ref = struct {
+        var spawn = Data.Ref(Data.SpriteAnim).init("reward-chest-spawn");
+        var normal = Data.Ref(Data.SpriteAnim).init("reward-chest-normal");
+    };
+    const radius: f32 = 16;
+
+    state: enum {
+        spawning,
+        spawned,
+    } = .spawning,
+
+    pub fn update(self: *Thing, room: *Room) Error!void {
+        _ = room;
+        const controller = &self.controller.chest;
+        const animator = &self.renderer.spriteanim.animator;
+        switch (controller.state) {
+            .spawning => {
+                if (animator.play(.{ .loop = false }).contains(.end)) {
+                    controller.state = .spawned;
+                    self.rmb_interactable = .{
+                        .kind = .reward_chest,
+                    };
+                    animator.* = .{
+                        .anim = Ref.normal,
+                    };
+                }
+            },
+            .spawned => {
+                //
+            },
+        }
+    }
+
+    pub fn spawnNextToPlayer(room: *Room) Error!void {
+        _ = Ref.spawn.get();
+        _ = Ref.normal.get();
+
+        const proto = Thing{
+            .kind = .reward_chest,
+            .coll_radius = radius,
+            .coll_mask = Collision.Mask.initMany(&.{
+                .wall,
+                .creature,
+                .spikes,
+            }),
+            .coll_layer = Collision.Mask.initOne(.creature),
+            .coll_mass = std.math.inf(f32),
+            .controller = .{
+                .chest = .{},
+            },
+            .renderer = .{
+                .spriteanim = .{ .animator = .{
+                    .anim = Ref.spawn,
+                } },
+            },
+            .selectable = .{ .radius = radius, .height = 20 },
+        };
+        if (room.getConstPlayer()) |p| {
+            _ = try room.queueSpawnThing(&proto, p.pos);
+        }
+    }
+};
+
 pub const ManaPickupController = struct {
     state: enum {
         loop,
@@ -1218,21 +1290,10 @@ pub const CreatureRenderer = struct {
     }
 
     pub fn render(self: *const Thing, room: *const Room) Error!void {
+        _ = room;
         assert(self.spawn_state == .spawned);
         const plat = getPlat();
         const renderer = &self.renderer.creature;
-
-        if (debug.show_selectable) {
-            if (self.selectable) |s| {
-                if (room.moused_over_thing) |m| {
-                    if (m.thing.eql(self.id)) {
-                        const opt = draw.PolyOpt{ .fill_color = Colorf.cyan };
-                        plat.circlef(self.pos, s.radius, opt);
-                        plat.rectf(self.pos.sub(v2f(s.radius, s.height)), v2f(s.radius * 2, s.height), opt);
-                    }
-                }
-            }
-        }
 
         const animator = self.animator.?;
         const frame = animator.getCurrRenderFrameDir(self.dir);
@@ -1484,6 +1545,18 @@ pub fn renderUnder(self: *const Thing, room: *const Room) Error!void {
             }
         },
     }
+    const plat = getPlat();
+    if (debug.show_selectable) {
+        if (self.selectable) |s| {
+            if (@constCast(room).getMousedOverThing(Faction.Mask.initFull())) |thing| {
+                if (thing.id.eql(self.id)) {
+                    const opt = draw.PolyOpt{ .fill_color = Colorf.cyan };
+                    plat.circlef(self.pos, s.radius, opt);
+                    plat.rectf(self.pos.sub(v2f(s.radius, s.height)), v2f(s.radius * 2, s.height), opt);
+                }
+            }
+        }
+    }
 }
 
 pub fn render(self: *const Thing, room: *const Room) Error!void {
@@ -1652,16 +1725,25 @@ pub fn moveAndCollide(self: *Thing, room: *Room) void {
         if (_coll) |coll| {
             self.last_coll = coll;
             // push out
-            if (coll.pen_dist > 0) {
-                self.pos = coll.pos.add(coll.normal.scale(self.coll_radius + 0.1));
-            }
+            var push_self_out = false;
             switch (coll.kind) {
                 .thing => |id| {
                     if (room.getThingById(id)) |thing| {
-                        thing.updateVel(coll.normal.neg(), .{ .accel = self.vel.length() * 0.5, .max_speed = self.accel_params.max_speed * 0.5 });
+                        if (thing.coll_mass < std.math.inf(f32)) {
+                            thing.updateVel(coll.normal.neg(), .{ .accel = self.vel.length() * 0.5, .max_speed = self.accel_params.max_speed * 0.5 });
+                        }
                     }
+                    push_self_out = self.coll_mass < std.math.inf(f32);
                 },
-                else => {},
+                .tile => {
+                    push_self_out = true;
+                },
+                .none => {},
+            }
+            if (push_self_out) {
+                if (coll.pen_dist > 0) {
+                    self.pos = coll.pos.add(coll.normal.scale(self.coll_radius + 0.1));
+                }
             }
             // remove -normal component from vel, isn't necessary with current implementation
             //const d = coll_normal.dot(self.vel);
