@@ -459,6 +459,7 @@ pub const RoomKind = enum {
     smol,
     big,
     boss,
+    shop,
 };
 
 // iterates over files in a directory, with a given suffix (including dot, e.g. ".json")
@@ -1134,6 +1135,14 @@ pub fn loadTileMapFromJsonString(data: *Data, filename: []const u8, json_string:
                             },
                         };
                         try tilemap.exits.append(exit);
+                    } else if (startsWith(u8, obj_name, "shop")) {
+                        const spr_pos = obj_pos.sub(v2f(0, 89).scale(core.game_sprite_scaling));
+                        const shop_pos = spr_pos.add(v2f(48, 46).scale(core.game_sprite_scaling));
+                        const shop = TileMap.Shop{
+                            .pos = shop_pos,
+                            .spr_pos = spr_pos,
+                        };
+                        tilemap.shop = shop;
                     } else {
                         Log.err("Invalid map object found: \"{s}\"", .{obj_name});
                     }

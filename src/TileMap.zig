@@ -119,6 +119,7 @@ tile_layers: std.BoundedArray(TileLayer, max_map_layers) = .{},
 tilesets: std.BoundedArray(TileSetRef, max_map_tilesets) = .{},
 creatures: std.BoundedArray(struct { kind: Thing.CreatureKind, pos: V2f }, max_map_creatures) = .{},
 exits: std.BoundedArray(ExitDoor, max_map_exits) = .{},
+shop: ?Shop = null,
 wave_spawns: std.BoundedArray(V2f, max_map_spawns) = .{},
 dims_tiles: V2i = .{},
 dims_game: V2i = .{},
@@ -914,6 +915,58 @@ pub const ExitDoor = struct {
             const rf = self.exit_arrow_anim.getCurrRenderFrame();
             const opt = rf.toTextureOpt(core.game_sprite_scaling);
             plat.texturef(self.pos, rf.texture, opt);
+        }
+    }
+};
+
+pub const Shop = struct {
+    const select_radius: f32 = 100;
+
+    pos: V2f,
+    spr_pos: ?V2f = null,
+    selected: bool = false,
+    hovered: bool = false,
+
+    pub fn updateSelected(self: *Shop, room: *Room) Error!bool {
+        const plat = App.getPlat();
+
+        if (room.getPlayer()) |p| {
+            const mouse_pos = plat.getMousePosWorld(room.camera);
+            self.hovered = mouse_pos.dist(self.pos) <= select_radius;
+
+            if (p.pos.dist(self.pos) < select_radius + 50 and p.path.len > 0) {
+                const last_path_pos = &p.path.buffer[p.path.len - 1];
+                self.selected = last_path_pos.dist(self.pos) <= select_radius;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    pub fn renderUnder(self: *const Shop, room: *const Room) Error!void {
+        const plat = App.getPlat();
+
+        const Refs = struct {
+            var shop = Data.Ref(Data.SpriteAnim).init("shopspider-idle");
+        };
+        const anim: *Data.SpriteAnim = Refs.shop.get();
+        const rf = anim.getRenderFrameFromTick(room.curr_tick);
+        var opt = rf.toTextureOpt(core.game_sprite_scaling);
+        opt.origin = .topleft;
+        plat.texturef(self.spr_pos, rf.texture, opt);
+
+        if (self.selected) {
+            plat.circlef(
+                self.pos,
+                select_radius,
+                .{
+                    .fill_color = null,
+                    .outline = .{
+                        .color = .cyan,
+                    },
+                },
+            );
         }
     }
 };
