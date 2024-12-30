@@ -347,6 +347,10 @@ pub fn serialize(data: anytype, prefix: []const u8, file: std.fs.File, _: *Platf
     inline for (std.meta.fields(T.OptionSerialize)) |s_field| {
         const field = utl.typeFieldByName(T, s_field.name);
         switch (@typeInfo(field.type)) {
+            .float => {
+                const line = utl.bufPrintLocal("{s}.{s}={d:0.2}\n", .{ prefix, field.name, @field(data, field.name) }) catch break;
+                file.writeAll(line) catch break;
+            },
             .@"enum" => |info| {
                 file.writeAll("# Possible values:\n") catch {};
                 inline for (info.fields) |efield| {
@@ -381,6 +385,7 @@ pub fn writeToTxt(self: *const Options, plat: *Platform) void {
     defer options_file.close();
     serialize(self.controls, "controls", options_file, plat);
     serialize(self.display, "display", options_file, plat);
+    serialize(self.audio, "audio", options_file, plat);
 }
 
 pub fn initDefault(plat: *Platform) Options {
@@ -615,6 +620,10 @@ pub fn initTryLoad(plat: *App.Platform) Options {
         }
         ret.display.selected_resolution = best;
         ret.display.dropdown.selected_idx = best_idx;
+    }
+    // fix up audio
+    {
+        ret.audio.sfx_volume = utl.clampf(ret.audio.sfx_volume, 0, 1);
     }
 
     return ret;
