@@ -323,13 +323,23 @@ pub const Controls = struct {
     }
 };
 
+pub const Audio = struct {
+    sfx_volume: f32 = 1,
+
+    pub const OptionSerialize = struct {
+        sfx_volume: void,
+    };
+};
+
 pub const Kind = enum {
     controls,
     display,
+    audio,
 };
 
 controls: Controls = .{},
 display: Display = .{},
+audio: Audio = .{},
 kind_selected: Kind = .controls,
 
 pub fn serialize(data: anytype, prefix: []const u8, file: std.fs.File, _: *Platform) void {
@@ -462,6 +472,13 @@ fn setValByName(plat: *Platform, T: type, data: *T, key: []const u8, val: []cons
     }
 
     switch (@typeInfo(T)) {
+        .float => {
+            if (std.fmt.parseFloat(T, val)) |f| {
+                data.* = f;
+            } else |err| {
+                plat.log.warn("{s}: {any}: Couldn't parse float. key: \"{s}\", val: \"{s}\", type \"{s}\"", .{ @src().fn_name, err, key, val, @typeName(T) });
+            }
+        },
         .@"enum" => {
             if (std.meta.stringToEnum(T, val)) |v| {
                 data.* = v;
@@ -607,6 +624,41 @@ const el_text_padding = v2f(4, 4);
 const el_bg_color = Colorf.rgb(0.2, 0.2, 0.2);
 const el_bg_color_hovered = Colorf.rgb(0.3, 0.3, 0.3);
 const el_bg_color_selected = Colorf.rgb(0.4, 0.4, 0.4);
+
+fn updateAudio(self: *Options, cmd_buf: *ImmUI.CmdBuf, pos: V2f) Error!bool {
+    var dirty: bool = false;
+    dirty = dirty;
+    const audio = self.audio;
+    const plat = App.getPlat();
+    const data = App.getData();
+    const font = data.fonts.get(.pixeloid);
+    const text_opt = draw.TextOpt{
+        .font = font,
+        .size = font.base_size * utl.as(u32, plat.ui_scaling),
+        .color = .white,
+    };
+    const ui_scaling = plat.ui_scaling;
+    const el_padding = el_text_padding.scale(ui_scaling);
+    var curr_row_pos = pos;
+    const row_height: f32 = utl.as(f32, text_opt.size) + el_padding.y * 2;
+
+    { // cast method
+        const sfx_volume_text = try utl.bufPrintLocal("SFX Volume: {d}", .{audio.sfx_volume * 100});
+        const sfx_volume_text_dims = try plat.measureText(sfx_volume_text, text_opt);
+        cmd_buf.appendAssumeCapacity(.{ .label = .{
+            .pos = curr_row_pos.add(el_padding),
+            .text = ImmUI.initLabel(sfx_volume_text),
+            .opt = text_opt,
+        } });
+
+        const slider_pos = pos.add(v2f(sfx_volume_text_dims.x + 8 * ui_scaling, 0));
+        _ = slider_pos;
+        // TODO
+        curr_row_pos.y += row_height;
+    }
+
+    return dirty;
+}
 
 fn updateDisplay(self: *Options, cmd_buf: *ImmUI.CmdBuf, pos: V2f) Error!bool {
     var dirty: bool = false;
@@ -758,6 +810,7 @@ pub fn update(self: *Options, cmd_buf: *ImmUI.CmdBuf) Error!enum { dont_close, c
     if (switch (self.kind_selected) {
         .controls => try self.updateControls(cmd_buf, kind_section_pos),
         .display => try self.updateDisplay(cmd_buf, kind_section_pos),
+        .audio => try self.updateAudio(cmd_buf, kind_section_pos),
     }) {
         self.writeToTxt(plat);
     }
