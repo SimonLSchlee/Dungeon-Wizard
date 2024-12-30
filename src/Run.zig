@@ -338,8 +338,14 @@ pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
             self.room.deinit();
             try self.initRoom(&self.room, r);
             self.ui_slots.beginRoom(&self.room);
+            if (r.kind == .smol or r.kind == .big or r.kind == .boss) {
+                self.makeRewards(r.difficulty);
+            } else {
+                self.reward_ui = null;
+            }
             // TODO hacky
             // update once to clear fog
+            self.room.parent_run_this_frame = self;
             try self.room.update();
             self.screen = .room;
         },
@@ -383,7 +389,6 @@ pub fn makeRewards(self: *Run, difficulty: f32) void {
     }
 
     self.reward_ui = reward_ui;
-    self.screen = .reward;
 }
 
 pub fn canPickupProduct(self: *const Run, product: *const Shop.Product) bool {
@@ -500,6 +505,7 @@ pub fn roomUpdate(self: *Run) Error!void {
             try thing.player_input.?.update(self, thing);
         }
     }
+    room.parent_run_this_frame = self;
     try room.update();
 
     self.syncPlayerThing(.room);
@@ -510,10 +516,7 @@ pub fn roomUpdate(self: *Run) Error!void {
             self.screen = .dead;
         },
         .won => {
-            const curr_room_place = self.places.get(self.curr_place_idx).room;
-            if (!self.room.took_reward and (curr_room_place.kind == .smol or curr_room_place.kind == .big or curr_room_place.kind == .boss)) {
-                self.makeRewards(curr_room_place.difficulty);
-            }
+            //
         },
         .exited => |exit_door| {
             _ = exit_door;
@@ -855,13 +858,10 @@ pub fn rewardUpdate(self: *Run) Error!void {
         modal_topleft.x + (modal_dims.x - skip_btn_dims.x) * 0.5,
         modal_topleft.y + modal_dims.y - 7 * ui_scaling - skip_btn_dims.y,
     );
-    var skip_btn_text: []const u8 = "Skip";
-    if (reward_ui.rewards.len == 0) {
-        skip_btn_text = "Continue";
-    }
-    if (menuUI.textButton(&self.imm_ui.commands, skip_btn_topleft, skip_btn_text, skip_btn_dims, ui_scaling)) {
+    const skip_btn_text: []const u8 = "Close";
+    if (menuUI.textButton(&self.imm_ui.commands, skip_btn_topleft, skip_btn_text, skip_btn_dims, ui_scaling) or reward_ui.rewards.len == 0) {
         self.screen = .room;
-        self.room.took_reward = true;
+        self.room.took_reward = reward_ui.rewards.len == 0;
     }
 }
 
@@ -920,7 +920,11 @@ pub fn update(self: *Run) Error!void {
         }
         if (plat.input_buffer.keyIsJustPressed(.o)) {
             const curr_room_place = self.places.get(self.curr_place_idx).room;
+            self.room.took_reward = false;
             self.makeRewards(curr_room_place.difficulty);
+            if (self.room.reward_chest == null) {
+                self.room.spawnRewardChest();
+            }
         }
         if (plat.input_buffer.keyIsJustPressed(.l)) {
             self.loadNextPlace();
@@ -946,7 +950,6 @@ pub fn update(self: *Run) Error!void {
         .fade_out => if (self.load_timer.tick(true)) {
             self.curr_place_idx += 1;
             try self.loadPlaceFromCurrIdx();
-            self.reward_ui = null;
             self.load_state = .fade_in;
         },
     }

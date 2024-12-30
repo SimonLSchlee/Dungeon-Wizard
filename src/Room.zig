@@ -161,6 +161,7 @@ progress_state: union(enum) {
     exited: TileMap.ExitDoor,
 } = .none,
 took_reward: bool = false,
+reward_chest: ?Thing.Id = null,
 // reinit stuff, never needs saving or copying, probably?:
 moused_over_thing: ?struct {
     thing: Thing.Id,
@@ -170,6 +171,8 @@ edit_mode: bool = false,
 next_pool_id: u32 = 0, // i hate this, can we change it?
 highest_num_things: usize = 0,
 rng: std.Random.DefaultPrng = undefined,
+// NOTE: hack. update it every frame!
+parent_run_this_frame: *Run = undefined,
 // fields to save/load for level loading
 //  - spawns, tiles, zones
 //  - gets 'append'ed to a file
@@ -387,6 +390,32 @@ pub fn getMousedOverThing(self: *Room, faction_mask: Thing.Faction.Mask) ?*Thing
     return null;
 }
 
+pub fn thingInteract(self: *Room, thing: *Thing) void {
+    assert(thing.rmb_interactable != null);
+    const interact = thing.rmb_interactable.?;
+    switch (interact.kind) {
+        .reward_chest => {
+            self.parent_run_this_frame.screen = .reward;
+        },
+    }
+}
+
+pub fn spawnRewardChest(self: *Room) void {
+    if (self.parent_run_this_frame.reward_ui != null) {
+        self.despawnRewardChest();
+        self.reward_chest = Thing.ChestController.spawnNextToPlayer(self) catch null;
+    }
+}
+
+pub fn despawnRewardChest(self: *Room) void {
+    if (self.reward_chest) |id| {
+        if (self.getThingById(id)) |reward_chest_thing| {
+            reward_chest_thing.deferFree(self);
+        }
+    }
+    self.reward_chest = null;
+}
+
 pub fn update(self: *Room) Error!void {
     const plat = getPlat();
     self.moused_over_thing = null;
@@ -448,7 +477,7 @@ pub fn update(self: *Room) Error!void {
                         // .lost is set below, after player is freed
                     } else if (defeated_all_enemies or self.init_params.waves_params.room_kind == .first) {
                         self.progress_state = .won;
-                        try Thing.ChestController.spawnNextToPlayer(self);
+                        self.spawnRewardChest();
                     }
                 },
                 .won => {
@@ -496,6 +525,10 @@ pub fn update(self: *Room) Error!void {
         self.camera.zoom = @min(self.camera.zoom + 1, plat.game_zoom_levels);
     } else if (wheel < 0) {
         self.camera.zoom = @max(self.camera.zoom - 1, 1);
+    }
+
+    if (self.took_reward) {
+        self.despawnRewardChest();
     }
 
     for (self.free_queue.constSlice()) |id| {

@@ -168,6 +168,9 @@ rmb_interactable: ?struct {
     kind: enum {
         reward_chest,
     },
+    interact_radius: f32 = 40,
+    hovered: bool = false,
+    selected: bool = false,
 } = null,
 
 pub const Faction = enum {
@@ -950,7 +953,8 @@ pub const ChestController = struct {
         var spawn = Data.Ref(Data.SpriteAnim).init("reward-chest-spawn");
         var normal = Data.Ref(Data.SpriteAnim).init("reward-chest-normal");
     };
-    const radius: f32 = 16;
+    const select_radius: f32 = 16;
+    const radius: f32 = 8;
 
     state: enum {
         spawning,
@@ -967,6 +971,7 @@ pub const ChestController = struct {
                     controller.state = .spawned;
                     self.rmb_interactable = .{
                         .kind = .reward_chest,
+                        .interact_radius = radius + 15,
                     };
                     animator.* = .{
                         .anim = Ref.normal,
@@ -979,7 +984,7 @@ pub const ChestController = struct {
         }
     }
 
-    pub fn spawnNextToPlayer(room: *Room) Error!void {
+    pub fn spawnNextToPlayer(room: *Room) Error!?Thing.Id {
         _ = Ref.spawn.get();
         _ = Ref.normal.get();
 
@@ -1001,11 +1006,13 @@ pub const ChestController = struct {
                     .anim = Ref.spawn,
                 } },
             },
-            .selectable = .{ .radius = radius, .height = 20 },
+            .selectable = .{ .radius = 16, .height = 20 },
         };
+        var pos = V2f{};
         if (room.getConstPlayer()) |p| {
-            _ = try room.queueSpawnThing(&proto, p.pos);
+            pos = p.pos;
         }
+        return room.queueSpawnThing(&proto, pos);
     }
 };
 
@@ -1533,6 +1540,31 @@ pub fn update(self: *Thing, room: *Room) Error!void {
     }
     if (self.hp) |*hp| {
         hp.update();
+    }
+    if (self.rmb_interactable) |*s| {
+        s.hovered = false;
+        if (@constCast(room).getMousedOverThing(Faction.Mask.initOne(self.faction))) |thing| {
+            if (thing.id.eql(self.id)) {
+                s.hovered = true;
+            }
+        }
+        // this should pretty much work...
+        if (getPlat().input_buffer.mouseBtnIsJustPressed(.right)) {
+            s.selected = s.hovered;
+        }
+        if (room.getPlayer()) |p| {
+            if (p.path.len > 0) {
+                const last_path_pos = &p.path.buffer[p.path.len - 1];
+                //s.selected = last_path_pos.dist(self.pos) <= self.coll_radius;
+                if (s.selected) {
+                    last_path_pos.* = self.pos;
+                    if (p.pos.dist(self.pos) <= s.interact_radius) {
+                        p.path.clear();
+                        room.thingInteract(self);
+                    }
+                }
+            }
+        }
     }
 }
 
