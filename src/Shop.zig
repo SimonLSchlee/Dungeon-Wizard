@@ -269,3 +269,13 @@ pub fn update(self: *Shop, run: *Run) Error!?Product {
 
     return ret;
 }
+
+pub fn shopColliderProto() Thing {
+    return Thing{
+        .kind = .vfx,
+        .spawn_state = .instance,
+        .coll_radius = 62,
+        .coll_mass = std.math.inf(f32),
+        .coll_layer = Thing.Collision.Mask.initMany(&.{.creature}),
+    };
+}

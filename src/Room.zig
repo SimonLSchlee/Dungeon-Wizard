@@ -242,6 +242,12 @@ pub fn reset(self: *Room) Error!void {
         }
     }
     self.exits = tilemap.exits;
+    if (tilemap.shop) |shop| {
+        const proto = @import("Shop.zig").shopColliderProto();
+        for (&[_]V2f{ v2f(56, 70), v2f(106, 60), v2f(135, 116) }) |offset| {
+            _ = try self.queueSpawnThing(&proto, shop.spr_pos.add(offset));
+        }
+    }
 }
 
 pub fn clone(self: *const Room, out: *Room) Error!void {
@@ -589,6 +595,10 @@ pub fn render(self: *const Room, ui_render_texture: Platform.RenderTexture2D, ga
     // exit
     for (self.exits.constSlice()) |exit| {
         try exit.renderUnder(self);
+    }
+
+    if (self.tilemap.shop) |shop| {
+        try shop.renderUnder(self);
     }
 
     // waves

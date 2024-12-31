@@ -928,7 +928,7 @@ pub const Shop = struct {
     const select_radius: f32 = 100;
 
     pos: V2f,
-    spr_pos: ?V2f = null,
+    spr_pos: V2f,
     selected: bool = false,
     hovered: bool = false,
 
@@ -953,7 +953,7 @@ pub const Shop = struct {
         const plat = App.getPlat();
 
         const Refs = struct {
-            var shop = Data.Ref(Data.SpriteAnim).init("shopspider-idle");
+            var shop = Data.Ref(Data.SpriteAnim).init("shop-normal");
         };
         const anim: *Data.SpriteAnim = Refs.shop.get();
         const rf = anim.getRenderFrameFromTick(room.curr_tick);
