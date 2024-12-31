@@ -1,14 +1,20 @@
-{ "columns":4,
- "image":"shopspider.png",
- "imageheight":89,
- "imagewidth":376,
+{ "columns":1,
+ "grid":
+    {
+     "height":96,
+     "orientation":"orthogonal",
+     "width":96
+    },
+ "image":"shop.png",
+ "imageheight":96,
+ "imagewidth":96,
  "margin":0,
  "name":"shop",
  "spacing":0,
- "tilecount":4,
+ "tilecount":1,
  "tiledversion":"1.11.0",
- "tileheight":89,
- "tilewidth":94,
+ "tileheight":96,
+ "tilewidth":96,
  "type":"tileset",
  "version":"1.10"
 }
