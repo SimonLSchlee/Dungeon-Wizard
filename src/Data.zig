@@ -1322,20 +1322,20 @@ pub fn reloadSpriteAnims(self: *Data) Error!void {
         dir_slot.* = spriteanim.data_ref;
     }
     for (self.directionalspriteanims.slice()) |*dir_spriteanim| {
-        assert(dir_spriteanim.anims_ordered_list.len == 0);
+        dir_spriteanim.num_dirs = 0;
         for (0..DirectionalSpriteAnim.max_dirs) |i| {
             const dir: DirectionalSpriteAnim.Dir = @enumFromInt(i);
             const slot = dir_spriteanim.anims_by_dir.getPtr(dir);
-            if (slot.*) |anim_ref| {
-                dir_spriteanim.anims_ordered_list.appendAssumeCapacity(anim_ref);
+            if (slot.*) |_| {
+                dir_spriteanim.num_dirs += 1;
             }
         }
         Log.info(
             "Got directionalspriteanim: {s} with {} dir{s}",
             .{
                 dir_spriteanim.data_ref.name.constSlice(),
-                dir_spriteanim.anims_ordered_list.len,
-                if (dir_spriteanim.anims_ordered_list.len > 1) "s" else "",
+                dir_spriteanim.num_dirs,
+                if (dir_spriteanim.num_dirs > 1) "s" else "",
             },
         );
     }

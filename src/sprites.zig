@@ -385,7 +385,8 @@ pub const DirectionalSpriteAnim = struct {
         N,
         NE,
     };
-    pub const max_dirs = utl.enumValueList(Dir).len;
+    pub const dirs_list = utl.enumValueList(Dir);
+    pub const max_dirs = dirs_list.len;
     pub const dir_suffixes = blk: {
         const arr = utl.enumValueList(Dir);
         var ret: [arr.len][]const u8 = undefined;
@@ -395,9 +396,50 @@ pub const DirectionalSpriteAnim = struct {
         break :blk ret;
     };
     data_ref: Data.Ref(DirectionalSpriteAnim) = .{}, // e.g. "wizard-move", with 4 directions "E","S","W","N"
-
+    num_dirs: usize = 0,
     anims_by_dir: std.EnumArray(Dir, ?Data.Ref(SpriteAnim)) = std.EnumArray(Dir, ?Data.Ref(SpriteAnim)).initFill(null),
-    anims_ordered_list: std.BoundedArray(Data.Ref(SpriteAnim), max_dirs) = .{},
+
+    pub fn dirToSpriteAnim(self: *const DirectionalSpriteAnim, dir: V2f) Data.Ref(SpriteAnim) {
+        const max_dirs_f = utl.as(f32, max_dirs);
+        //const num_dirs_f = utl.as(f32, self.num_dirs);
+        //const angle_inc = utl.tau / max_dirs_f;
+        //const shifted_dir = dir.rotRadians(angle_inc * 0.5); // - self.start_angle_rads);
+        //const shifted_angle = shifted_dir.toAngleRadians();
+        const a = utl.normalizeRadians0_Tau(dir.toAngleRadians());
+        assert(a >= 0 and a <= utl.tau);
+        const f = a / utl.tau;
+        const d_i = f * max_dirs_f;
+        assert(d_i >= 0 and d_i <= max_dirs_f);
+        // accomplishes the same as an angle offset
+        const shifted_d_i = d_i + 0.5;
+        // d_i could be exactly max_dirs_f, mod it to wrap to 0
+        const dir_idx = @mod(utl.as(usize, @floor(shifted_d_i)), max_dirs);
+        const dir_enum: Dir = @enumFromInt(dir_idx);
+        //assert(dir_idx >= 0 and dir_idx < max_dirs);
+        //const dir_frac = d_i - utl.as(f32, dir_idx);
+        if (self.anims_by_dir.getPtrConst(dir_enum).*) |*sprite_ref| {
+            return sprite_ref.*;
+        }
+        // find the closest
+        var best_diff: f32 = std.math.inf(f32);
+        var best_dir: Dir = .E;
+        var best_ref: ?*const Data.Ref(SpriteAnim) = null;
+        for (dirs_list) |a_dir| {
+            if (self.anims_by_dir.getPtrConst(a_dir).*) |*sprite_ref| {
+                const a_dir_i = utl.as(f32, @intFromEnum(a_dir));
+                const abs_diff = @abs(a_dir_i - d_i);
+                const other_diff = max_dirs_f - abs_diff;
+                const diff = @min(abs_diff, other_diff);
+                if (diff < best_diff) {
+                    best_diff = diff;
+                    best_dir = a_dir;
+                    best_ref = sprite_ref;
+                    if (diff < 1) break;
+                }
+            }
+        }
+        return best_ref.?.*;
+    }
 };
 
 pub const SpriteAnim = struct {
@@ -457,6 +499,21 @@ pub const SpriteAnim = struct {
     }
 };
 
+pub const DirectionalSpriteAnimator = struct {
+    anim: Data.Ref(DirectionalSpriteAnim),
+    animator: SpriteAnimator,
+
+    pub fn getCurrRenderFrame(self: *const DirectionalSpriteAnimator) RenderFrame {
+        return self.animator.getCurrRenderFrame();
+    }
+
+    pub fn play(self: *DirectionalSpriteAnimator, dir: V2f, params: SpriteAnimator.PlayParams) AnimEvent.Set {
+        const dir_anim = self.anim.get();
+        self.animator.anim = dir_anim.dirToSpriteAnim(dir);
+        return self.animator.play(params);
+    }
+};
+
 pub const SpriteAnimator = struct {
     pub const PlayParams = struct {
         reset: bool = false, // always true if new anim played
@@ -487,6 +544,8 @@ pub const SpriteAnimator = struct {
             return ret;
         }
         const anim = maybe_anim.?;
+        // This could happen e.g. when switching anims around
+        self.curr_anim_frame = @min(self.curr_anim_frame, anim.num_frames - 1);
         const frame: Data.SpriteSheet.Frame = anim.sheet.getConst().frames[anim.first_frame_idx + self.curr_anim_frame];
         const frame_ticks = utl.as(i32, core.ms_to_ticks(frame.duration_ms));
 
