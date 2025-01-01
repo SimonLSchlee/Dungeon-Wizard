@@ -48,10 +48,11 @@
    { "name": "idle-W", "from": 2, "to": 3, "direction": "forward", "color": "#000000ff" }
   ],
   "layers": [
+   { "name": "data", "opacity": 255, "blendMode": "normal", "cels": [{ "frame": 4, "data": "pivot-y=20" }] },
    { "name": "fake-bg", "opacity": 255, "blendMode": "normal" },
    { "name": "dark", "opacity": 255, "blendMode": "normal" },
    { "name": "midgreen", "opacity": 255, "blendMode": "overlay" },
-   { "name": "light and data", "opacity": 255, "blendMode": "normal", "cels": [{ "frame": 0, "data": "pivot-y=19" }] }
+   { "name": "light", "opacity": 255, "blendMode": "normal" }
   ],
   "slices": [
   ]

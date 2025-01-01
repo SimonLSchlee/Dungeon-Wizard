@@ -443,6 +443,10 @@ pub const DirectionalSpriteAnim = struct {
 };
 
 pub const SpriteAnim = struct {
+    // additional misc points offset from origin
+    pub const PointName = enum {
+        cast,
+    };
     data_ref: Data.Ref(SpriteAnim) = .{}, // spritesheet name dash tag name e.g. "wizard-move-W" or "door-open"
 
     sheet: Data.Ref(Data.SpriteSheet) = undefined,
@@ -457,6 +461,7 @@ pub const SpriteAnim = struct {
     // meta from spritesheet
     origin: draw.TextureOrigin = .topleft,
     events: std.BoundedArray(AnimEvent, 4) = .{},
+    points: std.EnumArray(PointName, ?V2f) = std.EnumArray(PointName, ?V2f).initFill(null),
 
     pub fn getRenderFrame(self: *const SpriteAnim, anim_frame_idx: usize) RenderFrame {
         const sheet = @constCast(self).sheet.get();

@@ -279,6 +279,7 @@ pub const SpriteSheet = struct {
         data: union(enum) {
             int: i64,
             float: f32,
+            vecf: V2f,
             string: u.BoundedString(32),
         } = undefined,
 
@@ -286,8 +287,8 @@ pub const SpriteSheet = struct {
             return switch (self.data) {
                 .int => |i| u.as(f32, i),
                 .float => |f| f,
-                .string => {
-                    Log.warn("Failed to parse Meta.data \"{s}\" as f32\n", .{self.name.constSlice()});
+                else => {
+                    Log.warn("Failed to parse Meta.data \"{s}\" as f32. Is {any}\n", .{ self.name.constSlice(), std.meta.activeTag(self.data) });
                     return Error.ParseFail;
                 },
             };
@@ -325,6 +326,32 @@ pub const CreatureAnimArray = std.EnumArray(sprites.AnimName, ?sprites.CreatureA
 pub const AllCreatureAnimArrays = std.EnumArray(sprites.CreatureAnim.Kind, CreatureAnimArray);
 pub const CreatureSpriteSheetArray = std.EnumArray(sprites.AnimName, ?SpriteSheet);
 pub const AllCreatureSpriteSheetArrays = std.EnumArray(sprites.CreatureAnim.Kind, CreatureSpriteSheetArray);
+
+pub const CreatureSpriteName = enum {
+    creature, // misc anim
+    wizard,
+    dummy,
+    bat,
+    troll,
+    gobbow,
+    sharpboi,
+    impling,
+    acolyte,
+    slime,
+    gobbomber,
+};
+pub const ActionAnimName = enum {
+    idle,
+    move,
+    attack,
+    charge,
+    cast,
+    hit,
+    die,
+};
+
+pub const DirAnimCache = std.EnumArray(ActionAnimName, ?Ref(DirectionalSpriteAnim));
+pub const CreatureDirAnimCache = std.EnumArray(CreatureSpriteName, DirAnimCache);
 
 pub fn EnumToBoundedStringArrayType(E: type) type {
     var max_len = 0;
@@ -540,6 +567,8 @@ sounds: AssetArray(Sound, 128),
 shaders: AssetArray(Shader, 8),
 spriteanims: AssetArray(SpriteAnim, 512),
 directionalspriteanims: AssetArray(DirectionalSpriteAnim, 128),
+// caches for faster simpler lookups for some stuff
+creature_dir_anims: CreatureDirAnimCache,
 // old stuff
 creature_protos: std.EnumArray(Thing.CreatureKind, Thing),
 creature_sprite_sheets: AllCreatureSpriteSheetArrays,
@@ -610,6 +639,21 @@ pub fn getCreatureAnimSpriteSheetOrDefault(self: *Data, creature_kind: sprites.C
     return self.creature_sprite_sheets.get(.creature).get(anim_kind);
 }
 
+pub fn getCreatureDirAnim(self: *Data, creature_kind: Thing.CreatureKind, anim: ActionAnimName) ?*const DirectionalSpriteAnim {
+    var creature_name: ?CreatureSpriteName = std.meta.stringToEnum(CreatureSpriteName, @tagName(creature_kind));
+    if (creature_name == null) {
+        if (creature_kind == .player) {
+            creature_name = .wizard;
+        } else {
+            creature_name = .creature;
+        }
+    }
+    if (self.creature_dir_anims.get(creature_name.?).get(anim)) |ref| {
+        return ref.getConst();
+    }
+    return null;
+}
+
 pub fn reloadSounds(self: *Data) Error!void {
     const plat = App.getPlat();
     for (self.sounds.slice()) |*s| {
@@ -646,6 +690,9 @@ pub fn loadSpriteSheetFromJsonString(data: *Data, sheet_filename: []const u8, js
     const meta = tree.object.get("meta").?.object;
     const image_filename = meta.get("image").?.string;
     const image_path = try u.bufPrintLocal("{s}/{s}", .{ assets_rel_dir_path, image_filename });
+
+    var it_dot = std.mem.tokenizeScalar(u8, sheet_filename, '.');
+    const sheet_name = it_dot.next().?;
 
     var sheet = SpriteSheet{};
     const tex = try plat.loadTexture(image_path);
@@ -693,25 +740,37 @@ pub fn loadSpriteSheetFromJsonString(data: *Data, sheet_filename: []const u8, js
             if (layer.object.get("cels")) |cels| {
                 for (cels.array.items) |cel| {
                     if (cel.object.get("data")) |cel_data| {
-                        var it_data = std.mem.tokenizeScalar(u8, cel_data.string, ',');
+                        var it_data = std.mem.tokenizeScalar(u8, cel_data.string, ';');
                         while (it_data.next()) |item| {
                             var it_eq = std.mem.tokenizeScalar(u8, item, '=');
                             const key = it_eq.next().?;
                             const val = it_eq.next().?;
                             var m = SpriteSheet.Meta{};
-                            m.name = try @TypeOf(m.name).fromSlice(key);
+                            m.name = @TypeOf(m.name).fromSlice(key) catch {
+                                Log.warn("Fail to parse spritesheet meta name. spritesheet: \"{s}\" item: \"{s}\"", .{ sheet_name, item });
+                                continue;
+                            };
                             blk: {
+                                vecf_blk: {
+                                    var v: V2f = undefined;
+                                    _ = V2f.parse(val, &v) catch break :vecf_blk;
+                                    m.data = .{ .vecf = v };
+                                    break :blk;
+                                }
                                 int_blk: {
                                     const int = std.fmt.parseInt(i64, val, 0) catch break :int_blk;
-                                    m.data.int = int;
+                                    m.data = .{ .int = int };
                                     break :blk;
                                 }
                                 float_blk: {
                                     const float = std.fmt.parseFloat(f32, val) catch break :float_blk;
-                                    m.data.float = float;
+                                    m.data = .{ .float = float };
                                     break :blk;
                                 }
-                                m.data.string = try @TypeOf(m.data.string).fromSlice(val);
+                                m.data = .{ .string = @TypeOf(m.data.string).fromSlice(val) catch {
+                                    Log.warn("Fail to parse spritesheet meta value. spritesheet: \"{s}\" item: \"{s}\"", .{ sheet_name, item });
+                                    continue;
+                                } };
                             }
                             try sheet_meta.append(m);
                         }
@@ -721,8 +780,7 @@ pub fn loadSpriteSheetFromJsonString(data: *Data, sheet_filename: []const u8, js
         }
     }
     sheet.meta = try sheet_meta.toOwnedSlice();
-    var it_dot = std.mem.tokenizeScalar(u8, sheet_filename, '.');
-    const sheet_name = it_dot.next().?;
+
     return data.putAsset(SpriteSheet, &sheet, sheet_name);
 }
 
@@ -783,7 +841,7 @@ pub fn loadCreatureSpriteSheets(self: *Data) Error!void {
                 const deg = switch (m.data) {
                     .int => |i| u.as(f32, i),
                     .float => |f| f,
-                    .string => return Error.ParseFail,
+                    else => return Error.ParseFail,
                 };
                 const rads = u.degreesToRadians(deg);
                 anim.start_angle_rads = rads;
@@ -1275,6 +1333,17 @@ pub fn reloadSpriteAnims(self: *Data) Error!void {
                     const x = u.as(f32, spritesheet.frames[0].size.x) * 0.5;
                     anim.origin = .{ .offset = v2f(x, y) };
                     continue;
+                } else if (std.mem.startsWith(u8, m_name, "pt-")) {
+                    const pt_name_str = m_name[3..];
+                    if (std.meta.stringToEnum(sprites.SpriteAnim.PointName, pt_name_str)) |pt_name| {
+                        if (std.meta.activeTag(m.data) == .vecf) {
+                            anim.points.getPtr(pt_name).* = m.data.vecf.scale(core.game_sprite_scaling);
+                        } else {
+                            Log.warn("Spritesheet \"{s}\". Invalid Point data type \"{any}\" (expect vecf)", .{ spritesheet.data_ref.name.constSlice(), std.meta.activeTag(m.data) });
+                        }
+                    } else {
+                        Log.warn("Spritesheet \"{s}\". Invalid Point.Name \"{s}\"", .{ spritesheet.data_ref.name.constSlice(), pt_name_str });
+                    }
                 }
                 const event_info = @typeInfo(sprites.AnimEvent.Kind);
                 inline for (event_info.@"enum".fields) |f| {
@@ -1296,6 +1365,7 @@ pub fn reloadSpriteAnims(self: *Data) Error!void {
             Log.info("Got spriteanim: {s}", .{name});
         }
     }
+    // directional anims
     self.directionalspriteanims.clear();
     for (self.spriteanims.slice()) |*spriteanim| {
         const spriteanim_name = spriteanim.data_ref.name.constSlice();
@@ -1338,6 +1408,26 @@ pub fn reloadSpriteAnims(self: *Data) Error!void {
                 if (dir_spriteanim.num_dirs > 1) "s" else "",
             },
         );
+    }
+    // caches
+    self.creature_dir_anims = CreatureDirAnimCache.initFill(DirAnimCache.initFill(null));
+    for (u.enumValueList(CreatureSpriteName)) |creature_name| {
+        for (u.enumValueList(ActionAnimName)) |action_name| {
+            for (0..2) |i| {
+                // TODO clean up assets to use a single form
+                const dir_sprite_name = (if (i == 0)
+                    u.bufPrintLocal("{s}-{s}", .{ @tagName(creature_name), @tagName(action_name) })
+                else
+                    u.bufPrintLocal("{s}-{s}-{s}", .{ @tagName(creature_name), @tagName(action_name), @tagName(action_name) })) catch {
+                    Log.warn("{s}:{}: Fail to format buf", .{ @src().file, @src().line });
+                    continue;
+                };
+                var ref = Ref(DirectionalSpriteAnim).init(dir_sprite_name);
+                if (ref.tryGet()) |anim| {
+                    self.creature_dir_anims.getPtr(creature_name).getPtr(action_name).* = anim.data_ref;
+                }
+            }
+        }
     }
 }
 

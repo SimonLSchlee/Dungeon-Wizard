@@ -30,6 +30,15 @@ pub const enum_name = "player";
 
 pub fn modePrototype(mode: Run.Mode) Thing {
     var base = App.get().data.creature_protos.get(.player);
+    base.animator = null;
+    base.renderer = .{ .dirspriteanim = .{
+        .animator = .{
+            .anim = Data.Ref(Data.DirectionalSpriteAnim).init("wizard-idle-idle"),
+            .animator = .{
+                .anim = Data.Ref(Data.SpriteAnim).init("wizard-idle-idle-E"),
+            },
+        },
+    } };
     switch (mode) {
         .frank_4_slot => {},
         .mandy_3_mana => {
@@ -343,6 +352,12 @@ pub const Controller = struct {
         }
 
         {
+            const AnimRefs = struct {
+                var idle = Data.Ref(Data.DirectionalSpriteAnim).init("wizard-idle-idle");
+                var move = Data.Ref(Data.DirectionalSpriteAnim).init("wizard-move-move");
+                var cast = Data.Ref(Data.DirectionalSpriteAnim).init("wizard-cast-cast");
+            };
+            const renderer = &self.renderer.dirspriteanim;
             const p = self.followPathGetNextPoint(5);
             const input_dir = p.sub(self.pos).normalizedOrZero();
 
@@ -359,7 +374,8 @@ pub const Controller = struct {
                         continue :state .walk;
                     }
                     self.updateVel(.{}, self.accel_params);
-                    _ = self.animator.?.play(.idle, .{ .loop = true });
+                    _ = AnimRefs.idle.get();
+                    renderer.animator.anim = AnimRefs.idle;
                     break :state .none;
                 },
                 .walk => {
@@ -375,7 +391,8 @@ pub const Controller = struct {
                     if (!self.vel.isZero()) {
                         self.dir = self.vel.normalized();
                     }
-                    _ = self.animator.?.play(.move, .{ .loop = true });
+                    _ = AnimRefs.move.get();
+                    renderer.animator.anim = AnimRefs.move;
                     break :state .walk;
                 },
                 .action => {
@@ -446,10 +463,12 @@ pub const Controller = struct {
                         plat.setSoundVolume(cast_loop_sound, cast_loop_volume);
                     }
                     self.updateVel(.{}, self.accel_params);
-                    _ = self.animator.?.play(.cast, .{ .loop = true });
+                    _ = AnimRefs.cast.get();
+                    renderer.animator.anim = AnimRefs.cast;
                     break :state .action;
                 },
             };
+            _ = renderer.animator.play(self.dir, .{ .loop = true });
             controller.ticks_in_state += 1;
         }
     }

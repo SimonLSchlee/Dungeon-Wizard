@@ -66,7 +66,7 @@
    { "name": "attack-W", "from": 3, "to": 5, "direction": "forward", "color": "#000000ff" }
   ],
   "layers": [
-   { "name": "data", "opacity": 255, "blendMode": "normal", "cels": [{ "frame": 6, "data": "pivot-y=21,hit=1,commit=0" }] },
+   { "name": "data", "opacity": 255, "blendMode": "normal", "cels": [{ "frame": 6, "data": "pivot-y=21;hit=1;commit=0" }] },
    { "name": "legs", "opacity": 255, "blendMode": "normal" },
    { "name": "body", "opacity": 255, "blendMode": "normal" },
    { "name": "head", "opacity": 255, "blendMode": "normal" },

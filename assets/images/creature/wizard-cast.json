@@ -156,7 +156,7 @@
    { "name": "cast-W", "from": 8, "to": 15, "direction": "forward", "color": "#000000ff" }
   ],
   "layers": [
-   { "name": "data", "opacity": 255, "blendMode": "normal", "cels": [{ "frame": 16, "data": "pivot-y=21,cast-y=-3,cast-x=2" }] },
+   { "name": "data", "opacity": 255, "blendMode": "normal", "cels": [{ "frame": 16, "data": "pivot-y=21;pt-cast=(2,-3)" }] },
    { "name": "legs", "opacity": 255, "blendMode": "normal" },
    { "name": "body lit", "opacity": 255, "blendMode": "normal" },
    { "name": "cloak lit", "opacity": 255, "blendMode": "normal" },

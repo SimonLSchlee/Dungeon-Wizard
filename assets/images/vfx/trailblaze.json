@@ -1,6 +1,6 @@
 { "frames": [
    {
-    "filename": "loop 0",
+    "filename": "loop  0",
     "frame": { "x": 0, "y": 0, "w": 24, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -9,7 +9,7 @@
     "duration": 100
    },
    {
-    "filename": "loop 1",
+    "filename": "loop  1",
     "frame": { "x": 24, "y": 0, "w": 24, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -18,7 +18,7 @@
     "duration": 100
    },
    {
-    "filename": "loop 2",
+    "filename": "loop  2",
     "frame": { "x": 48, "y": 0, "w": 24, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -27,7 +27,7 @@
     "duration": 100
    },
    {
-    "filename": "loop 3",
+    "filename": "loop  3",
     "frame": { "x": 72, "y": 0, "w": 24, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -36,7 +36,7 @@
     "duration": 100
    },
    {
-    "filename": "loop 4",
+    "filename": "loop  4",
     "frame": { "x": 96, "y": 0, "w": 24, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -45,7 +45,7 @@
     "duration": 100
    },
    {
-    "filename": "loop 5",
+    "filename": "loop  5",
     "frame": { "x": 120, "y": 0, "w": 24, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -54,7 +54,7 @@
     "duration": 100
    },
    {
-    "filename": "loop 6",
+    "filename": "loop  6",
     "frame": { "x": 144, "y": 0, "w": 24, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -63,7 +63,7 @@
     "duration": 100
    },
    {
-    "filename": "loop 7",
+    "filename": "loop  7",
     "frame": { "x": 168, "y": 0, "w": 24, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -72,7 +72,7 @@
     "duration": 100
    },
    {
-    "filename": "loop 8",
+    "filename": "loop  8",
     "frame": { "x": 192, "y": 0, "w": 24, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -81,7 +81,7 @@
     "duration": 100
    },
    {
-    "filename": "loop 9",
+    "filename": "loop  9",
     "frame": { "x": 216, "y": 0, "w": 24, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -90,7 +90,7 @@
     "duration": 100
    },
    {
-    "filename": "loop 10",
+    "filename": "loop  10",
     "frame": { "x": 240, "y": 0, "w": 24, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -99,7 +99,7 @@
     "duration": 100
    },
    {
-    "filename": "end 0",
+    "filename": "end  0",
     "frame": { "x": 0, "y": 32, "w": 24, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -108,7 +108,7 @@
     "duration": 100
    },
    {
-    "filename": "end 1",
+    "filename": "end  1",
     "frame": { "x": 24, "y": 32, "w": 24, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -117,7 +117,7 @@
     "duration": 100
    },
    {
-    "filename": "end 2",
+    "filename": "end  2",
     "frame": { "x": 48, "y": 32, "w": 24, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -126,7 +126,7 @@
     "duration": 100
    },
    {
-    "filename": "end 3",
+    "filename": "end  3",
     "frame": { "x": 72, "y": 32, "w": 24, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -135,7 +135,7 @@
     "duration": 300
    },
    {
-    "filename": "end 4",
+    "filename": "end  4",
     "frame": { "x": 96, "y": 32, "w": 24, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -144,7 +144,7 @@
     "duration": 300
    },
    {
-    "filename": "end 5",
+    "filename": "end  5",
     "frame": { "x": 120, "y": 32, "w": 24, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -165,11 +165,13 @@
    { "name": "end", "from": 11, "to": 16, "direction": "forward", "color": "#000000ff" }
   ],
   "layers": [
-   { "name": "data", "opacity": 255, "blendMode": "normal", "cels": [{ "frame": 17, "data": "pivot-y=26,hit=4" }] },
+   { "name": "data", "opacity": 255, "blendMode": "normal", "cels": [{ "frame": 17, "data": "pivot-y=26;hit=4" }] },
    { "name": "Layer 5", "opacity": 255, "blendMode": "normal" },
    { "name": "scorch", "opacity": 255, "blendMode": "normal" },
    { "name": "redflame", "opacity": 255, "blendMode": "normal" },
    { "name": "yeller", "opacity": 255, "blendMode": "normal" }
+  ],
+  "slices": [
   ]
  }
 }
