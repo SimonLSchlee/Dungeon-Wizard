@@ -71,11 +71,10 @@ pub const Projectile = struct {
         const projectile: *Projectile = &spell_controller.controller.unherring_projectile;
         const target_id = params.thing.?;
         const _target = room.getThingById(target_id);
-        const animator = &self.renderer.spriteanim.animator;
 
         switch (projectile.state) {
             .loop => {
-                _ = animator.play(.{ .loop = true });
+                _ = self.renderer.sprite.tickCurrAnim(.{ .loop = true });
                 if (_target) |target| {
                     projectile.target_pos = target.pos;
                     projectile.target_radius = target.coll_radius;
@@ -116,7 +115,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     }
     const target = _target.?;
 
-    const herring = Thing{
+    var herring = Thing{
         .kind = .projectile,
         .dir = caster.dir,
         .accel_params = .{
@@ -132,19 +131,17 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             } },
         } },
         .renderer = .{
-            .spriteanim = .{
+            .sprite = .{
                 .draw_over = false,
                 .draw_normal = true,
                 .rotate_to_dir = true,
                 .flip_x_to_dir = true,
                 .rel_pos = v2f(0, -14),
-                .animator = .{
-                    .anim = Data.Ref(Data.SpriteAnim).init("spell-projectile-unherring"),
-                },
             },
         },
         .shadow_radius_x = 7,
     };
+    herring.renderer.sprite.setNormalAnim(Data.Ref(Data.SpriteAnim).init("spell-projectile-unherring"));
     _ = try room.queueSpawnThing(&herring, caster.pos.add(caster.dir.scale(10)));
 }
 

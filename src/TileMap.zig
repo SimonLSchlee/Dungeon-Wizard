@@ -894,7 +894,7 @@ pub const ExitDoor = struct {
         }
 
         if (self.hovered or self.selected or self.exit_arrow_anim.anim_tick != 0) {
-            _ = self.exit_arrow_anim.play(.{ .loop = true });
+            _ = self.exit_arrow_anim.tickCurrAnim(.{ .loop = true });
         }
 
         return false;

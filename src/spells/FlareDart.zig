@@ -77,7 +77,7 @@ pub const Projectile = struct {
         _ = target_pos;
         const projectile: *@This() = &spell_controller.controller.flare_dart_projectile;
         _ = projectile;
-        _ = self.renderer.spriteanim.animator.play(.{ .loop = true });
+        _ = self.renderer.sprite.tickCurrAnim(.{ .loop = true });
 
         if (self.last_coll != null or !self.hitbox.?.active) {
             self.deferFree(room);
@@ -91,7 +91,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     const target_pos = params.pos;
     const target_dir = if (target_pos.sub(caster.pos).normalizedChecked()) |d| d else V2f.right;
 
-    const ball = Thing{
+    var ball = Thing{
         .kind = .projectile,
         .dir = target_dir,
         .vel = target_dir.scale(flare_dart.max_speed),
@@ -105,15 +105,12 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             },
         } },
         .renderer = .{
-            .spriteanim = .{
+            .sprite = .{
                 .draw_over = false,
                 .draw_normal = true,
                 .rotate_to_dir = true,
                 .flip_x_to_dir = true,
                 .rel_pos = v2f(0, -14),
-                .animator = .{
-                    .anim = Data.Ref(Data.SpriteAnim).init("spell-projectile-flare-dart"),
-                },
             },
         },
         .hitbox = .{
@@ -126,6 +123,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
         },
         .shadow_radius_x = flare_dart.ball_radius,
     };
+    ball.renderer.sprite.setNormalAnim(Data.Ref(Data.SpriteAnim).init("spell-projectile-flare-dart"));
     _ = try room.queueSpawnThing(&ball, caster.pos);
 }
 

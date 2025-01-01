@@ -125,7 +125,7 @@ pub const Projectile = struct {
 
         if (!projectile.exploded) {
             const hitbox = &self.hitbox.?;
-            _ = self.renderer.spriteanim.animator.play(.{ .loop = true });
+            _ = self.renderer.sprite.tickCurrAnim(.{ .loop = true });
             if (!hitbox.active or self.pos.dist(target_pos) < self.vel.length() * 2 or self.last_coll != null) {
                 projectile.exploded = true;
                 hitbox.active = true;
@@ -158,7 +158,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     const target_pos = params.pos;
     const target_dir = if (target_pos.sub(caster.pos).normalizedChecked()) |d| d else V2f.right;
 
-    const ball = Thing{
+    var ball = Thing{
         .kind = .projectile,
         .dir = target_dir,
         .vel = target_dir.scale(flamey_explodey.max_speed),
@@ -172,15 +172,12 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             },
         } },
         .renderer = .{
-            .spriteanim = .{
+            .sprite = .{
                 .draw_over = false,
                 .draw_normal = true,
                 .rotate_to_dir = true,
                 .flip_x_to_dir = true,
                 .rel_pos = v2f(0, -14),
-                .animator = .{
-                    .anim = Data.Ref(Data.SpriteAnim).init("spell-projectile-fire-boom"),
-                },
             },
         },
         .hitbox = .{
@@ -193,6 +190,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
         },
         .shadow_radius_x = flamey_explodey.ball_radius,
     };
+    ball.renderer.sprite.setNormalAnim(Data.Ref(Data.SpriteAnim).init("spell-projectile-fire-boom"));
     _ = try room.queueSpawnThing(&ball, params.cast_orig.?);
 }
 

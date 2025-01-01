@@ -31,14 +31,9 @@ pub const enum_name = "player";
 pub fn modePrototype(mode: Run.Mode) Thing {
     var base = App.get().data.creature_protos.get(.player);
     base.animator = null;
-    base.renderer = .{ .dirspriteanim = .{
-        .animator = .{
-            .anim = Data.Ref(Data.DirectionalSpriteAnim).init("wizard-idle-idle"),
-            .animator = .{
-                .anim = Data.Ref(Data.SpriteAnim).init("wizard-idle-idle-E"),
-            },
-        },
-    } };
+    base.renderer = .{ .sprite = .{} };
+    base.renderer.sprite.setDirAnim(Data.Ref(Data.DirectionalSpriteAnim).init("wizard-idle-idle"));
+
     switch (mode) {
         .frank_4_slot => {},
         .mandy_3_mana => {
@@ -357,7 +352,7 @@ pub const Controller = struct {
                 var move = Data.Ref(Data.DirectionalSpriteAnim).init("wizard-move-move");
                 var cast = Data.Ref(Data.DirectionalSpriteAnim).init("wizard-cast-cast");
             };
-            const renderer = &self.renderer.dirspriteanim;
+            const renderer = &self.renderer.sprite;
             const p = self.followPathGetNextPoint(5);
             const input_dir = p.sub(self.pos).normalizedOrZero();
 
@@ -375,7 +370,7 @@ pub const Controller = struct {
                     }
                     self.updateVel(.{}, self.accel_params);
                     _ = AnimRefs.idle.get();
-                    renderer.animator.anim = AnimRefs.idle;
+                    renderer.setDirAnim(AnimRefs.idle);
                     break :state .none;
                 },
                 .walk => {
@@ -392,7 +387,7 @@ pub const Controller = struct {
                         self.dir = self.vel.normalized();
                     }
                     _ = AnimRefs.move.get();
-                    renderer.animator.anim = AnimRefs.move;
+                    renderer.setDirAnim(AnimRefs.move);
                     break :state .walk;
                 },
                 .action => {
@@ -464,11 +459,11 @@ pub const Controller = struct {
                     }
                     self.updateVel(.{}, self.accel_params);
                     _ = AnimRefs.cast.get();
-                    renderer.animator.anim = AnimRefs.cast;
+                    renderer.setDirAnim(AnimRefs.cast);
                     break :state .action;
                 },
             };
-            _ = renderer.animator.play(self.dir, .{ .loop = true });
+            _ = renderer.tickCurrAnim(.{ .loop = true, .dir = self.dir });
             controller.ticks_in_state += 1;
         }
     }

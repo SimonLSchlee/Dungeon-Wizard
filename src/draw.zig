@@ -149,6 +149,10 @@ pub const Colorf = struct {
             u.lerpf(self.a, other.a, t_clamped),
         );
     }
+
+    pub fn eql(self: Colorf, other: Colorf) bool {
+        return self.r == other.r and self.g == other.g and self.b == other.b and self.a == other.a;
+    }
 };
 
 pub const Smoothing = enum {

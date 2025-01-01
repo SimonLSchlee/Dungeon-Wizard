@@ -508,14 +508,24 @@ pub const DirectionalSpriteAnimator = struct {
     anim: Data.Ref(DirectionalSpriteAnim),
     animator: SpriteAnimator,
 
+    pub fn init(anim: Data.Ref(DirectionalSpriteAnim)) DirectionalSpriteAnimator {
+        var dir_anim: *const DirectionalSpriteAnim = anim.getConst();
+        return DirectionalSpriteAnimator{
+            .anim = anim,
+            .animator = .{
+                .anim = dir_anim.dirToSpriteAnim(V2f.right),
+            },
+        };
+    }
+
     pub fn getCurrRenderFrame(self: *const DirectionalSpriteAnimator) RenderFrame {
         return self.animator.getCurrRenderFrame();
     }
 
-    pub fn play(self: *DirectionalSpriteAnimator, dir: V2f, params: SpriteAnimator.PlayParams) AnimEvent.Set {
+    pub fn tickCurrAnim(self: *DirectionalSpriteAnimator, params: SpriteAnimator.PlayParams) AnimEvent.Set {
         const dir_anim = self.anim.get();
-        self.animator.anim = dir_anim.dirToSpriteAnim(dir);
-        return self.animator.play(params);
+        self.animator.anim = dir_anim.dirToSpriteAnim(params.dir);
+        return self.animator.tickCurrAnim(params);
     }
 };
 
@@ -523,6 +533,7 @@ pub const SpriteAnimator = struct {
     pub const PlayParams = struct {
         reset: bool = false, // always true if new anim played
         loop: bool = false,
+        dir: V2f = .{}, // ignored for non-directional anims
     };
 
     anim: Data.Ref(SpriteAnim),
@@ -530,11 +541,17 @@ pub const SpriteAnimator = struct {
     tick_in_frame: i32 = 0,
     anim_tick: i32 = 0,
 
+    pub fn init(anim: Data.Ref(SpriteAnim)) SpriteAnimator {
+        return SpriteAnimator{
+            .anim = anim,
+        };
+    }
+
     pub fn getCurrRenderFrame(self: *const SpriteAnimator) RenderFrame {
         return self.anim.getConst().getRenderFrameFromTick(self.anim_tick);
     }
 
-    pub fn play(self: *SpriteAnimator, params: PlayParams) AnimEvent.Set {
+    pub fn tickCurrAnim(self: *SpriteAnimator, params: PlayParams) AnimEvent.Set {
         var ret = std.EnumSet(AnimEvent.Kind).initEmpty();
 
         if (params.reset) {

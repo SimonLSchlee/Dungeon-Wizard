@@ -136,8 +136,7 @@ renderer: union(enum) {
     shape: ShapeRenderer,
     spawner: SpawnerRenderer,
     vfx: VFXRenderer,
-    spriteanim: SpriteAnimRenderer,
-    dirspriteanim: DirectionalSpriteAnimRenderer,
+    sprite: SpriteRenderer,
 } = .none,
 animator: ?sprites.Animator = null,
 path: std.BoundedArray(V2f, 32) = .{},
@@ -787,6 +786,9 @@ pub const CastVFXController = struct {
             const anim = dir_anim.dirToSpriteAnim(caster.dir).getConst();
             if (anim.points.get(.cast)) |pt| {
                 cast_offset = pt;
+                if (caster.dir.x < 0) {
+                    cast_offset.x *= -1;
+                }
             }
         }
         const cast_pos = caster.pos.add(cast_offset);
@@ -865,7 +867,7 @@ pub const VFXRenderer = struct {
     }
 };
 
-pub const DirectionalSpriteAnimRenderer = struct {
+pub const SpriteRenderer = struct {
     sprite_tint: Colorf = .white,
     draw_normal: bool = true,
     draw_over: bool = false,
@@ -874,11 +876,53 @@ pub const DirectionalSpriteAnimRenderer = struct {
     flip_x_to_dir: bool = false,
     rel_pos: V2f = .{},
     scale: f32 = core.game_sprite_scaling,
-    animator: sprites.DirectionalSpriteAnimator,
+    animator: union(enum) {
+        normal: sprites.SpriteAnimator,
+        dir: sprites.DirectionalSpriteAnimator,
+    } = undefined,
 
-    pub fn _render(self: *const Thing, renderer: *const DirectionalSpriteAnimRenderer, _: *const Room) void {
+    pub fn setNormalAnim(renderer: *SpriteRenderer, anim: Data.Ref(sprites.SpriteAnim)) void {
+        switch (renderer.animator) {
+            .normal => |*a| {
+                a.anim = anim;
+            },
+            .dir => {
+                renderer.animator = .{ .normal = sprites.SpriteAnimator.init(anim) };
+            },
+        }
+    }
+
+    pub fn setDirAnim(renderer: *SpriteRenderer, anim: Data.Ref(sprites.DirectionalSpriteAnim)) void {
+        switch (renderer.animator) {
+            .normal => {
+                renderer.animator = .{ .dir = sprites.DirectionalSpriteAnimator.init(anim) };
+            },
+            .dir => |*da| {
+                da.anim = anim;
+            },
+        }
+    }
+
+    pub fn playDir(renderer: *SpriteRenderer, anim: Data.Ref(sprites.DirectionalSpriteAnim), params: sprites.SpriteAnimator.PlayParams) sprites.AnimEvent.Set {
+        var params_adjusted = params;
+        if (std.meta.activeTag(renderer.animator) == .normal) {
+            params_adjusted.reset = true;
+        }
+        renderer.setDirAnim(anim);
+        return renderer.animator.dir.tickCurrAnim(params_adjusted);
+    }
+
+    pub fn tickCurrAnim(renderer: *SpriteRenderer, params: sprites.SpriteAnimator.PlayParams) sprites.AnimEvent.Set {
+        return switch (renderer.animator) {
+            inline else => |*a| a.tickCurrAnim(params),
+        };
+    }
+
+    pub fn _render(self: *const Thing, renderer: *const SpriteRenderer, _: *const Room) void {
         const plat = App.getPlat();
-        const rf = renderer.animator.getCurrRenderFrame();
+        const rf = switch (renderer.animator) {
+            inline else => |a| a.getCurrRenderFrame(),
+        };
         var opt = rf.toTextureOpt(renderer.scale);
         const status_tint = self.getStatusTint();
         const tint: Colorf = if (!renderer.sprite_tint.eql(.white)) renderer.sprite_tint else status_tint;
@@ -894,21 +938,21 @@ pub const DirectionalSpriteAnimRenderer = struct {
     }
 
     pub fn renderUnder(self: *const Thing, room: *const Room) Error!void {
-        const renderer = &self.renderer.dirspriteanim;
+        const renderer = &self.renderer.sprite;
         if (renderer.draw_under) {
             _render(self, renderer, room);
         }
     }
 
     pub fn render(self: *const Thing, room: *const Room) Error!void {
-        const renderer = &self.renderer.dirspriteanim;
+        const renderer = &self.renderer.sprite;
         if (renderer.draw_normal) {
             _render(self, renderer, room);
         }
     }
 
     pub fn renderOver(self: *const Thing, room: *const Room) Error!void {
-        const renderer = &self.renderer.dirspriteanim;
+        const renderer = &self.renderer.sprite;
         if (renderer.draw_over) {
             _render(self, renderer, room);
         }
@@ -1016,18 +1060,15 @@ pub const ChestController = struct {
     pub fn update(self: *Thing, room: *Room) Error!void {
         _ = room;
         const controller = &self.controller.chest;
-        const animator = &self.renderer.spriteanim.animator;
         switch (controller.state) {
             .spawning => {
-                if (animator.play(.{ .loop = false }).contains(.end)) {
+                if (self.renderer.sprite.tickCurrAnim(.{ .loop = false }).contains(.end)) {
                     controller.state = .spawned;
                     self.rmb_interactable = .{
                         .kind = .reward_chest,
                         .interact_radius = radius + 15,
                     };
-                    animator.* = .{
-                        .anim = Ref.normal,
-                    };
+                    self.renderer.sprite.setNormalAnim(Ref.normal);
                 }
             },
             .spawned => {
@@ -1039,7 +1080,7 @@ pub const ChestController = struct {
     pub fn proto() Thing {
         _ = Ref.spawn.get();
         _ = Ref.normal.get();
-        return Thing{
+        var chest = Thing{
             .kind = .reward_chest,
             .coll_radius = radius,
             .coll_mask = Collision.Mask.initMany(&.{
@@ -1053,12 +1094,12 @@ pub const ChestController = struct {
                 .chest = .{},
             },
             .renderer = .{
-                .spriteanim = .{ .animator = .{
-                    .anim = Ref.spawn,
-                } },
+                .sprite = .{},
             },
             .selectable = .{ .radius = 16, .height = 20 },
         };
+        chest.renderer.sprite.setNormalAnim(Ref.spawn);
+        return chest;
     }
 };
 
