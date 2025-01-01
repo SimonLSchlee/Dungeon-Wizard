@@ -592,6 +592,9 @@ pub const HurtBox = struct {
                 }
                 // stop getting hit by stuff
                 self.hurtbox = null;
+                if (self.player_input == null) {
+                    self.shadow_radius_x = 0;
+                }
                 // and hitting stuff
                 // and etc
                 self.hitbox = null;
@@ -845,7 +848,6 @@ pub const VFXRenderer = struct {
         if (renderer.draw_under) {
             _render(self, renderer, room);
         }
-        self.renderShadow();
     }
 
     pub fn render(self: *const Thing, room: *const Room) Error!void {
@@ -895,7 +897,6 @@ pub const DirectionalSpriteAnimRenderer = struct {
         if (renderer.draw_under) {
             _render(self, renderer, room);
         }
-        self.renderShadow();
     }
 
     pub fn render(self: *const Thing, room: *const Room) Error!void {
@@ -945,7 +946,6 @@ pub const SpriteAnimRenderer = struct {
         if (renderer.draw_under) {
             _render(self, renderer, room);
         }
-        self.renderShadow();
     }
 
     pub fn render(self: *const Thing, room: *const Room) Error!void {
@@ -1090,9 +1090,12 @@ pub const ManaPickupController = struct {
                 _ = animator.play(.loop, .{ .loop = true });
                 if (p.mana) |*mana| {
                     if (mana.curr < mana.max) {
-                        if (Collision.getCircleCircleCollision(self.pos, self.coll_radius, p.pos, p.renderer.creature.draw_radius)) |_| {
-                            mana.curr += 1;
-                            controller.state = .collected;
+                        if (p.selectable) |s| {
+                            const pickup_radius = @max(s.radius - 5, 5);
+                            if (Collision.getCircleCircleCollision(self.pos, self.coll_radius, p.pos, pickup_radius)) |_| {
+                                mana.curr += 1;
+                                controller.state = .collected;
+                            }
                         }
                     }
                 }
@@ -1336,9 +1339,6 @@ pub const CreatureRenderer = struct {
                 plat.arrowf(arrow_start, arrow_end, .{ .thickness = 2.5, .color = renderer.draw_color });
             }
         }
-        if (self.isAliveCreature() or self.player_input != null) {
-            self.renderShadow();
-        }
     }
 
     pub fn render(self: *const Thing, room: *const Room) Error!void {
@@ -1381,116 +1381,119 @@ pub const CreatureRenderer = struct {
             }
         }
     }
+};
 
-    pub fn renderOver(self: *const Thing, _: *const Room) Error!void {
-        assert(self.spawn_state == .spawned);
-        const plat = getPlat();
-        const renderer = &self.renderer.creature;
+pub fn renderStatusBars(self: *const Thing, _: *const Room) Error!void {
+    const plat = getPlat();
+    var status_width: f32 = 20;
+    var status_y_offset: f32 = 30;
+    if (self.selectable) |s| {
+        status_width = @round(s.radius * 2);
+        status_y_offset = @round(s.height + 10);
+    }
+    const status_tl_offset = v2f(-status_width * 0.5, -status_y_offset);
+    const status_topleft = self.pos.add(status_tl_offset); //.round();
 
-        const hp_height = 3;
-        const hp_width = @round(renderer.hp_bar_width);
-        const hp_y_offset = if (self.selectable) |s| s.height + 10 else @round(renderer.draw_radius * 3.5);
-        const hp_offset = v2f(-hp_width * 0.5, -hp_y_offset);
-        const hp_topleft = self.pos.add(hp_offset); //.round();
-        const shields_height = 3;
-        const shields_topleft = hp_topleft.add(v2f(0, hp_height));
+    const hp_height = 3;
+    const hp_topleft = status_topleft;
+    const shields_height = 3;
+    const shields_topleft = hp_topleft.add(v2f(0, hp_height));
 
-        if (self.isAliveCreature()) {
-            if (self.hp) |hp| {
-                const curr_width = @round(utl.remapClampf(0, hp.max, 0, hp_width, hp.curr));
-                plat.rectf(
-                    hp_topleft,
-                    v2f(hp_width, hp_height),
-                    .{
-                        .fill_color = Colorf.black,
-                        //.round_to_pixel = true,
-                    },
-                );
-                const line_inc: f32 = if (hp.max < 100) 10 else 50;
+    if (self.isAliveCreature()) {
+        if (self.hp) |hp| {
+            const curr_width = @round(utl.remapClampf(0, hp.max, 0, status_width, hp.curr));
+            plat.rectf(
+                hp_topleft,
+                v2f(status_width, hp_height),
+                .{
+                    .fill_color = Colorf.black,
+                    //.round_to_pixel = true,
+                },
+            );
+            const line_inc: f32 = if (hp.max < 100) 10 else 50;
+            renderBarWithLines(
+                hp_topleft,
+                v2f(curr_width, hp_height),
+                line_inc,
+                hp.curr,
+                HP.faction_colors.get(self.faction),
+            );
+            var total_shield_amount: f32 = 0;
+            var curr_shield_amount: f32 = 0;
+            for (hp.shields.constSlice()) |shield| {
+                total_shield_amount += shield.max;
+                curr_shield_amount += shield.curr;
+            }
+            const shields_width = status_width * curr_shield_amount / total_shield_amount;
+            if (total_shield_amount > 0) {
+                const shield_color = Colorf.rgb(0.7, 0.7, 0.4);
+                const line_shield_inc: f32 = if (total_shield_amount < 100) 10 else 50;
                 renderBarWithLines(
-                    hp_topleft,
-                    v2f(curr_width, hp_height),
-                    line_inc,
-                    hp.curr,
-                    HP.faction_colors.get(self.faction),
+                    shields_topleft,
+                    v2f(shields_width, hp_height),
+                    line_shield_inc,
+                    curr_shield_amount,
+                    shield_color,
                 );
-                var total_shield_amount: f32 = 0;
-                var curr_shield_amount: f32 = 0;
-                for (hp.shields.constSlice()) |shield| {
-                    total_shield_amount += shield.max;
-                    curr_shield_amount += shield.curr;
-                }
-                const shields_width = hp_width * curr_shield_amount / total_shield_amount;
-                if (total_shield_amount > 0) {
-                    const shield_color = Colorf.rgb(0.7, 0.7, 0.4);
-                    const line_shield_inc: f32 = if (total_shield_amount < 100) 10 else 50;
-                    renderBarWithLines(
-                        shields_topleft,
-                        v2f(shields_width, hp_height),
-                        line_shield_inc,
-                        curr_shield_amount,
-                        shield_color,
-                    );
-                }
-                if (self.mana) |mana| {
-                    const data = App.getData();
-                    if (data.text_icons.getRenderFrame(.mana_crystal_smol)) |rf| {
-                        const cropped_dims = data.text_icons.sprite_dims_cropped.?.get(.mana_crystal_smol);
-                        var opt = rf.toTextureOpt(1);
-                        opt.smoothing = .none;
-                        opt.origin = .topleft;
-                        opt.src_dims = cropped_dims;
-                        opt.round_to_pixel = true;
-                        const mana_topleft = hp_topleft.sub(v2f(0, cropped_dims.y + 1)); //.round();
-                        var curr_pos = mana_topleft;
-                        for (0..utl.as(usize, mana.curr)) |_| {
-                            plat.texturef(curr_pos, rf.texture, opt);
-                            curr_pos.x += cropped_dims.x - 2;
-                        }
-                    } else {
-                        const mana_bar_width = hp_width;
-                        const mana_bar_height = 8;
-                        const mana_topleft = hp_topleft.sub(v2f(0, mana_bar_height));
-                        const mana_inc_px = mana_bar_width / utl.as(f32, mana.max);
-                        const mana_diam = 6;
-                        const mana_radius = mana_diam * 0.5;
-                        const mana_spacing = (mana_inc_px - mana_diam) * 0.666666; // this makes sense cos of reasons
-                        var curr_pos = mana_topleft.add(v2f(mana_spacing + mana_radius, mana_bar_height * 0.5));
-                        for (0..utl.as(usize, mana.curr)) |_| {
-                            plat.circlef(curr_pos, mana_radius, .{
-                                .fill_color = Colorf.rgb(0, 0.5, 1),
-                                .outline = .{ .color = .black },
-                            });
-                            curr_pos.x += mana_spacing + mana_diam;
-                        }
+            }
+            if (self.mana) |mana| {
+                const data = App.getData();
+                if (data.text_icons.getRenderFrame(.mana_crystal_smol)) |rf| {
+                    const cropped_dims = data.text_icons.sprite_dims_cropped.?.get(.mana_crystal_smol);
+                    var opt = rf.toTextureOpt(1);
+                    opt.smoothing = .none;
+                    opt.origin = .topleft;
+                    opt.src_dims = cropped_dims;
+                    opt.round_to_pixel = true;
+                    const mana_topleft = hp_topleft.sub(v2f(0, cropped_dims.y + 1)); //.round();
+                    var curr_pos = mana_topleft;
+                    for (0..utl.as(usize, mana.curr)) |_| {
+                        plat.texturef(curr_pos, rf.texture, opt);
+                        curr_pos.x += cropped_dims.x - 2;
+                    }
+                } else {
+                    const mana_bar_width = status_width;
+                    const mana_bar_height = 8;
+                    const mana_topleft = hp_topleft.sub(v2f(0, mana_bar_height));
+                    const mana_inc_px = mana_bar_width / utl.as(f32, mana.max);
+                    const mana_diam = 6;
+                    const mana_radius = mana_diam * 0.5;
+                    const mana_spacing = (mana_inc_px - mana_diam) * 0.666666; // this makes sense cos of reasons
+                    var curr_pos = mana_topleft.add(v2f(mana_spacing + mana_radius, mana_bar_height * 0.5));
+                    for (0..utl.as(usize, mana.curr)) |_| {
+                        plat.circlef(curr_pos, mana_radius, .{
+                            .fill_color = Colorf.rgb(0, 0.5, 1),
+                            .outline = .{ .color = .black },
+                        });
+                        curr_pos.x += mana_spacing + mana_diam;
                     }
                 }
             }
-            // debug draw statuses
-            const font = App.get().data.fonts.get(.seven_x_five);
-            const status_height: f32 = utl.as(f32, font.base_size);
-            var status_pos = shields_topleft.add(v2f(0, shields_height));
-            for (self.statuses.values) |status| {
-                if (status.stacks == 0) continue;
-                const text = try utl.bufPrintLocal("{}", .{status.stacks});
-                const text_dims = try plat.measureText(text, .{ .size = font.base_size });
-                const status_box_width = text_dims.x + 2;
-                const text_color = Colorf.getContrasting(status.color);
-                plat.rectf(status_pos, v2f(status_box_width, status_height), .{
-                    .fill_color = status.color,
-                });
+        }
+        // debug draw statuses
+        const font = App.get().data.fonts.get(.seven_x_five);
+        const status_height: f32 = utl.as(f32, font.base_size);
+        var status_pos = shields_topleft.add(v2f(0, shields_height));
+        for (self.statuses.values) |status| {
+            if (status.stacks == 0) continue;
+            const text = try utl.bufPrintLocal("{}", .{status.stacks});
+            const text_dims = try plat.measureText(text, .{ .size = font.base_size });
+            const status_box_width = text_dims.x + 2;
+            const text_color = Colorf.getContrasting(status.color);
+            plat.rectf(status_pos, v2f(status_box_width, status_height), .{
+                .fill_color = status.color,
+            });
 
-                try plat.textf(status_pos.add(V2f.splat(1)), "{s}", .{text}, .{
-                    .size = font.base_size,
-                    .color = text_color,
-                    .font = font,
-                    .smoothing = .none,
-                });
-                status_pos.x += status_box_width;
-            }
+            try plat.textf(status_pos.add(V2f.splat(1)), "{s}", .{text}, .{
+                .size = font.base_size,
+                .color = text_color,
+                .font = font,
+                .smoothing = .none,
+            });
+            status_pos.x += status_box_width;
         }
     }
-};
+}
 
 pub const DefaultController = struct {
     pub fn update(self: *Thing, _: *Room) Error!void {
@@ -1622,6 +1625,8 @@ pub fn renderUnder(self: *const Thing, room: *const Room) Error!void {
             }
         },
     }
+    self.renderShadow();
+
     const plat = getPlat();
     if (debug.show_selectable) {
         if (self.selectable) |s| {
@@ -1760,6 +1765,7 @@ pub fn renderOver(self: *const Thing, room: *const Room) Error!void {
             }
         }
     }
+    try self.renderStatusBars(room);
 }
 
 pub fn deferFree(self: *Thing, room: *Room) void {
