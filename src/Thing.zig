@@ -880,7 +880,8 @@ pub const DirectionalSpriteAnimRenderer = struct {
         const plat = App.getPlat();
         const rf = renderer.animator.getCurrRenderFrame();
         var opt = rf.toTextureOpt(renderer.scale);
-        const tint: Colorf = renderer.sprite_tint;
+        const status_tint = self.getStatusTint();
+        const tint: Colorf = if (!renderer.sprite_tint.eql(.white)) renderer.sprite_tint else status_tint;
 
         opt.tint = tint;
         opt.flip_x = renderer.flip_x_to_dir and self.dir.x < 0;
@@ -1349,14 +1350,8 @@ pub const CreatureRenderer = struct {
 
         const animator = self.animator.?;
         const frame = animator.getCurrRenderFrameDir(self.dir);
-        var tint: Colorf = blk: {
-            if (self.isAliveCreature()) {
-                if (self.statuses.get(.frozen).stacks > 0) break :blk StatusEffect.proto_array.get(.frozen).color;
-                if (self.statuses.get(.exposed).stacks > 0) break :blk StatusEffect.proto_array.get(.exposed).color.lerp(.white, 0.25);
-            }
-            break :blk .white;
-        };
-        if (self.isAliveCreature() and self.statuses.get(.unseeable).stacks > 0) tint.a = 0.5;
+        const tint = self.getStatusTint();
+
         const opt = draw.TextureOpt{
             .origin = frame.origin,
             .src_pos = frame.pos.toV2f(),
@@ -1382,6 +1377,18 @@ pub const CreatureRenderer = struct {
         }
     }
 };
+
+pub fn getStatusTint(self: *const Thing) Colorf {
+    var tint: Colorf = blk: {
+        if (self.isAliveCreature()) {
+            if (self.statuses.get(.frozen).stacks > 0) break :blk StatusEffect.proto_array.get(.frozen).color;
+            if (self.statuses.get(.exposed).stacks > 0) break :blk StatusEffect.proto_array.get(.exposed).color.lerp(.white, 0.25);
+        }
+        break :blk .white;
+    };
+    if (self.isAliveCreature() and self.statuses.get(.unseeable).stacks > 0) tint.a = 0.5;
+    return tint;
+}
 
 pub fn renderStatusBars(self: *const Thing, _: *const Room) Error!void {
     const plat = getPlat();
