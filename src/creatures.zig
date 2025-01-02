@@ -125,7 +125,7 @@ pub fn shopspiderProto() Thing {
     ret.dir = V2f.left;
     ret.rmb_interactable = .{
         .kind = .shop,
-        .interact_radius = 80,
+        .interact_radius = 100,
     };
 
     return ret;
