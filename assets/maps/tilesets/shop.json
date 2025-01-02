@@ -20,7 +20,7 @@
    { "name": "normal", "from": 0, "to": 0, "direction": "forward", "color": "#000000ff" }
   ],
   "layers": [
-   { "name": "Layer 1", "opacity": 255, "blendMode": "normal" },
+   { "name": "data", "opacity": 255, "blendMode": "normal", "cels": [{ "frame": 4, "data": "pt-npc=(43.5,50)" }] },
    { "name": "carpets n stuff", "opacity": 255, "blendMode": "normal" },
    { "name": "front cards", "opacity": 255, "blendMode": "normal" },
    { "name": "weapon rack", "opacity": 255, "blendMode": "normal" },
@@ -34,8 +34,7 @@
    { "name": "front-round-table", "opacity": 255, "blendMode": "normal" },
    { "name": "stuff on front round table", "opacity": 255, "blendMode": "normal" },
    { "name": "shadow under tarp", "opacity": 120, "blendMode": "normal" },
-   { "name": "tarp strings", "opacity": 255, "blendMode": "normal" },
-   { "name": "Layer 2", "opacity": 255, "blendMode": "normal" }
+   { "name": "tarp strings", "opacity": 255, "blendMode": "normal" }
   ],
   "slices": [
   ]

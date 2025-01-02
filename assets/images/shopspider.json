@@ -1,6 +1,6 @@
 { "frames": [
    {
-    "filename": "shopspider #idle 0.aseprite",
+    "filename": "shopspider #idle-E 0.aseprite",
     "frame": { "x": 0, "y": 0, "w": 39, "h": 34 },
     "rotated": false,
     "trimmed": false,
@@ -9,7 +9,7 @@
     "duration": 1000
    },
    {
-    "filename": "shopspider #idle 1.aseprite",
+    "filename": "shopspider #idle-E 1.aseprite",
     "frame": { "x": 39, "y": 0, "w": 39, "h": 34 },
     "rotated": false,
     "trimmed": false,
@@ -18,7 +18,7 @@
     "duration": 300
    },
    {
-    "filename": "shopspider #idle 2.aseprite",
+    "filename": "shopspider #idle-E 2.aseprite",
     "frame": { "x": 78, "y": 0, "w": 39, "h": 34 },
     "rotated": false,
     "trimmed": false,
@@ -27,8 +27,44 @@
     "duration": 1000
    },
    {
-    "filename": "shopspider #idle 3.aseprite",
+    "filename": "shopspider #idle-E 3.aseprite",
     "frame": { "x": 117, "y": 0, "w": 39, "h": 34 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 39, "h": 34 },
+    "sourceSize": { "w": 39, "h": 34 },
+    "duration": 300
+   },
+   {
+    "filename": "shopspider #idle-W 0.aseprite",
+    "frame": { "x": 0, "y": 34, "w": 39, "h": 34 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 39, "h": 34 },
+    "sourceSize": { "w": 39, "h": 34 },
+    "duration": 1000
+   },
+   {
+    "filename": "shopspider #idle-W 1.aseprite",
+    "frame": { "x": 39, "y": 34, "w": 39, "h": 34 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 39, "h": 34 },
+    "sourceSize": { "w": 39, "h": 34 },
+    "duration": 300
+   },
+   {
+    "filename": "shopspider #idle-W 2.aseprite",
+    "frame": { "x": 78, "y": 34, "w": 39, "h": 34 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 39, "h": 34 },
+    "sourceSize": { "w": 39, "h": 34 },
+    "duration": 1000
+   },
+   {
+    "filename": "shopspider #idle-W 3.aseprite",
+    "frame": { "x": 117, "y": 34, "w": 39, "h": 34 },
     "rotated": false,
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 39, "h": 34 },
@@ -41,13 +77,14 @@
   "version": "1.3.6-arm64",
   "image": "shopspider.png",
   "format": "RGBA8888",
-  "size": { "w": 156, "h": 34 },
+  "size": { "w": 156, "h": 68 },
   "scale": "1",
   "frameTags": [
-   { "name": "idle", "from": 0, "to": 3, "direction": "forward", "color": "#000000ff" }
+   { "name": "idle-E", "from": 0, "to": 3, "direction": "forward", "color": "#000000ff" },
+   { "name": "idle-W", "from": 4, "to": 7, "direction": "forward", "color": "#000000ff" }
   ],
   "layers": [
-   { "name": "back legs 2", "opacity": 255, "blendMode": "normal", "cels": [{ "frame": 4, "data": "pivot-y=27" }] },
+   { "name": "back legs 2", "opacity": 255, "blendMode": "normal", "cels": [{ "frame": 8, "data": "pivot-y=27" }] },
    { "name": "body", "opacity": 255, "blendMode": "normal" },
    { "name": "head", "opacity": 255, "blendMode": "normal" },
    { "name": "front legs 2", "opacity": 255, "blendMode": "normal" }
