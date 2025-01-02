@@ -446,6 +446,7 @@ pub const SpriteAnim = struct {
     // additional misc points offset from origin
     pub const PointName = enum {
         cast,
+        npc,
     };
     data_ref: Data.Ref(SpriteAnim) = .{}, // spritesheet name dash tag name e.g. "wizard-move-W" or "door-open"
 
@@ -509,11 +510,13 @@ pub const DirectionalSpriteAnimator = struct {
     animator: SpriteAnimator,
 
     pub fn init(anim: Data.Ref(DirectionalSpriteAnim)) DirectionalSpriteAnimator {
-        var dir_anim: *const DirectionalSpriteAnim = anim.getConst();
+        //const dir_anim: *const DirectionalSpriteAnim = anim.getConst(); // this doesnt work before data is initted
+        const default_sprite_anim_name = utl.bufPrintLocal("{s}-E", .{anim.name.constSlice()}) catch "";
         return DirectionalSpriteAnimator{
             .anim = anim,
             .animator = .{
-                .anim = dir_anim.dirToSpriteAnim(V2f.right),
+                //.anim = dir_anim.dirToSpriteAnim(V2f.right), // this doesnt work before data is initted
+                .anim = Data.Ref(SpriteAnim).init(default_sprite_anim_name),
             },
         };
     }

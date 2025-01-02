@@ -18,6 +18,7 @@ const v2i = V2i.v2i;
 const creatures = @This();
 const App = @import("App.zig");
 const getPlat = App.getPlat;
+const Data = @import("Data.zig");
 const Thing = @import("Thing.zig");
 const Room = @import("Room.zig");
 const TileMap = @import("TileMap.zig");
@@ -39,6 +40,7 @@ pub const Kind = enum {
     acolyte,
     slime,
     gobbomber,
+    shopspider,
 
     pub fn getIcon(self: Kind) icon_text.Icon {
         if (self == .player) {
@@ -108,6 +110,19 @@ pub fn playerProto() Thing {
     ret.vision_range = TileMap.tile_sz_f * 4;
     ret.player_input = player.Input{};
     ret.controller = .{ .player = .{} };
+    ret.dir = V2f.left;
+
+    return ret;
+}
+
+pub fn shopspiderProto() Thing {
+    var ret = creatureProto(.shopspider, .creature, .ally, .idle, 60, .big, 100);
+    ret.renderer = .{ .sprite = .{} };
+    ret.renderer.sprite.setDirAnim(Data.Ref(Data.DirectionalSpriteAnim).init("shopspider-idle"));
+    ret.hp = null;
+    ret.animator = null;
+    ret.coll_mask = Thing.Collision.Mask.initEmpty();
+    ret.dir = V2f.left;
 
     return ret;
 }

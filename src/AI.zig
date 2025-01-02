@@ -109,6 +109,12 @@ pub const Decision = union(enum) {
     action: Action.Doing,
 };
 
+pub const AIIdle = struct {
+    pub fn decide(_: *AIIdle, _: *Thing, _: *Room) Decision {
+        return Decision{ .idle = .{} };
+    }
+};
+
 pub const AIAggro = struct {
     pub fn decide(_: *AIAggro, self: *Thing, room: *Room) Decision {
         var ret: Decision = .{ .idle = .{} };
@@ -304,6 +310,7 @@ pub const AIAcolyte = struct {
 
 pub const ActorController = struct {
     pub const Kind = enum {
+        idle,
         aggro,
         acolyte,
         troll,
@@ -311,6 +318,7 @@ pub const ActorController = struct {
         gobbomber,
     };
     pub const KindData = union(Kind) {
+        idle: AIIdle,
         aggro: AIAggro,
         acolyte: AIAcolyte,
         troll: AITroll,
@@ -383,7 +391,13 @@ pub const ActorController = struct {
         switch (controller.decision) {
             .idle => {
                 self.updateVel(.{}, .{});
-                _ = self.animator.?.play(.idle, .{ .loop = true });
+                if (self.animator) |*a| {
+                    _ = a.play(.idle, .{ .loop = true });
+                } else {
+                    if (App.getData().getCreatureDirAnim(self.creature_kind.?, .idle)) |anim| {
+                        _ = self.renderer.sprite.playDir(anim.data_ref, .{ .loop = true, .dir = self.dir });
+                    }
+                }
             },
             .action => |*doing| {
                 const action = &controller.actions.getPtr(doing.slot).*.?;

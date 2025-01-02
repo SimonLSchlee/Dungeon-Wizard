@@ -132,13 +132,13 @@ controller: union(enum) {
 } = .default,
 renderer: union(enum) {
     none: struct {},
-    creature: CreatureRenderer,
+    creature: CreatureRenderer, // TODO deprecate for sprite
     shape: ShapeRenderer,
     spawner: SpawnerRenderer,
-    vfx: VFXRenderer,
+    vfx: VFXRenderer, // TODO deprecate for sprite
     sprite: SpriteRenderer,
 } = .none,
-animator: ?sprites.Animator = null,
+animator: ?sprites.Animator = null, // TODO deprecate for renderer.sprite
 path: std.BoundedArray(V2f, 32) = .{},
 pathing_layer: TileMap.PathLayer = .normal,
 hitbox: ?HitBox = null,

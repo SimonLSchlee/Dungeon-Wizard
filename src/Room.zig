@@ -243,10 +243,16 @@ pub fn reset(self: *Room) Error!void {
     }
     self.exits = tilemap.exits;
     if (tilemap.shop) |shop| {
-        const proto = @import("Shop.zig").shopColliderProto();
+        const coll_proto = @import("Shop.zig").shopColliderProto();
         for (&[_]V2f{ v2f(56, 70), v2f(106, 60), v2f(135, 116) }) |offset| {
-            _ = try self.queueSpawnThing(&proto, shop.spr_pos.add(offset));
+            _ = try self.queueSpawnThing(&coll_proto, shop.spr_pos.add(offset));
         }
+        var spider_pos = shop.pos;
+        const anim = Data.Ref(Data.SpriteAnim).init("shop-normal").getConst();
+        if (anim.points.get(.npc)) |p| {
+            spider_pos = shop.spr_pos.add(p);
+        }
+        _ = try self.queueSpawnCreatureByKind(.shopspider, spider_pos);
     }
 }
 

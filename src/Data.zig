@@ -339,6 +339,7 @@ pub const CreatureSpriteName = enum {
     acolyte,
     slime,
     gobbomber,
+    shopspider,
 };
 pub const ActionAnimName = enum {
     idle,
