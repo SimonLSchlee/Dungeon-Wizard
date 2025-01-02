@@ -478,11 +478,13 @@ pub fn roomUpdate(self: *Run) Error!void {
     }
 
     // update spell slots, and player input
-    {
-        // uses self.ui_slots
-        if (room.getPlayer()) |thing| {
-            try thing.player_input.?.update(self, thing);
+    if (room.getPlayer()) |thing| {
+        try self.ui_slots.roomUpdate(&self.imm_ui.commands, &self.tooltip_ui.commands, self, thing);
+        if (!room.paused) {
+            self.ui_slots.updateTimerAndDrawSpell(room);
         }
+        // uses self.ui_slots
+        try thing.player_input.?.update(self, thing);
     }
     room.parent_run_this_frame = self;
     try room.update();
@@ -914,11 +916,15 @@ pub fn update(self: *Run) Error!void {
             .room => try self.roomUpdate(),
             .reward => {
                 try self.rewardUpdate();
-                //try self.itemsUpdate();
+                if (self.room.getPlayer()) |thing| {
+                    try self.ui_slots.runUpdate(&self.imm_ui.commands, &self.tooltip_ui.commands, self, thing);
+                }
             },
             .shop => {
                 try self.shopUpdate();
-                //try self.itemsUpdate();
+                if (self.room.getPlayer()) |thing| {
+                    try self.ui_slots.runUpdate(&self.imm_ui.commands, &self.tooltip_ui.commands, self, thing);
+                }
             },
             .dead => try self.deadUpdate(),
         },
@@ -1021,12 +1027,6 @@ pub fn render(self: *Run, ui_render_texture: Platform.RenderTexture2D, game_rend
 
     // room
     try self.room.render(ui_render_texture, game_render_texture);
-    plat.startRenderToTexture(ui_render_texture);
-    plat.setBlend(.render_tex_alpha);
-    if (!self.room.edit_mode) {
-        try self.ui_slots.render(&self.room);
-    }
-    plat.endRenderToTexture();
 
     // ui
     plat.startRenderToTexture(ui_render_texture);

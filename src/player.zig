@@ -91,11 +91,6 @@ pub const Input = struct {
         const ui_slots = &run.ui_slots;
         const mouse_pos = plat.getMousePosWorld(room.camera);
 
-        try ui_slots.update(run, self);
-        if (!room.paused) {
-            ui_slots.updateTimerAndDrawSpell(room);
-        }
-
         if (self.mana) |*mana| {
             if (run.mode == .mandy_3_mana) {
                 // automatically discard when out of mana

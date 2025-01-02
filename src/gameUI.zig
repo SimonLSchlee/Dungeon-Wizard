@@ -431,12 +431,6 @@ pub const Slots = struct {
     pause_slot: UISlot = UISlot.init(.pause),
     mana_rect: geom.Rectf = .{},
     hp_rect: geom.Rectf = .{},
-    immui: struct {
-        commands: ImmUI.CmdBuf = .{},
-    } = .{},
-    tooltip_immui: struct {
-        commands: ImmUI.CmdBuf = .{},
-    } = .{},
 
     pub fn init(self: *Slots, num_spell_slots: usize, items: []const ?Item, discard_button: bool) void {
         assert(num_spell_slots <= max_spell_slots);
@@ -763,9 +757,9 @@ pub const Slots = struct {
         }
     }
 
-    fn unqActionSlots(self: *Slots, run: *Run, caster: *const Thing, slots: []Slot, action_kind: player.Action.Kind) Error!void {
+    fn unqActionSlots(self: *Slots, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, run: *Run, caster: *const Thing, slots: []Slot, action_kind: player.Action.Kind) Error!void {
         for (slots, 0..) |*slot, i| {
-            if (try unqSlot(&self.immui.commands, &self.tooltip_immui.commands, slot, caster, run)) |cast_method| {
+            if (try unqSlot(cmd_buf, tooltip_cmd_buf, slot, caster, run)) |cast_method| {
                 self.selectSlot(.action, action_kind, cast_method, i);
             }
         }
@@ -816,21 +810,102 @@ pub const Slots = struct {
         return activation;
     }
 
-    pub fn update(self: *Slots, run: *Run, caster: *const Thing) Error!void {
+    pub fn updateHPandMana(self: *Slots, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, caster: *const Thing) Error!void {
+        _ = tooltip_cmd_buf;
+        const plat = getPlat();
+        const ui_scaling: f32 = plat.ui_scaling;
+        const icon_scaling = ui_scaling * 2;
+        const data = App.get().data;
+        const hp_mana_rect_opt = draw.PolyOpt{
+            .edge_radius = 0.2,
+            .fill_color = slot_bg_color,
+        };
+        const font = data.fonts.get(.pixeloid);
+        const hp_mana_text_opt = draw.TextOpt{
+            .font = font,
+            .size = font.base_size * utl.as(u32, ui_scaling),
+            .smoothing = .none,
+            .color = .white,
+        };
+        try cmd_buf.append(.{ .rect = .{
+            .pos = self.hp_rect.pos,
+            .dims = self.hp_rect.dims,
+            .opt = hp_mana_rect_opt,
+        } });
+        if (caster.hp) |hp| {
+            const cropped_dims = data.text_icons.sprite_dims_cropped.?.get(.heart);
+
+            if (data.text_icons.getRenderFrame(.heart)) |rf| {
+                const heart_pos = self.hp_rect.pos.sub(v2f(cropped_dims.x * 0.5 * (icon_scaling), 0));
+                var opt = rf.toTextureOpt(icon_scaling);
+                opt.src_dims = cropped_dims;
+                opt.tint = .red;
+                opt.origin = .topleft;
+                opt.round_to_pixel = true;
+                try cmd_buf.append(.{ .texture = .{
+                    .pos = heart_pos,
+                    .texture = rf.texture,
+                    .opt = opt,
+                } });
+            }
+            const text_pos = self.hp_rect.pos.add((v2f(cropped_dims.x, 0).add(text_box_padding).scale(ui_scaling)));
+            try cmd_buf.append(.{
+                .label = .{
+                    .pos = text_pos,
+                    .text = ImmUI.initLabel(try utl.bufPrintLocal("{d:.0}/{d:.0}", .{ hp.curr, hp.max })),
+                    .opt = hp_mana_text_opt,
+                },
+            });
+        }
+
+        try cmd_buf.append(.{ .rect = .{
+            .pos = self.mana_rect.pos,
+            .dims = self.mana_rect.dims,
+            .opt = hp_mana_rect_opt,
+        } });
+        if (caster.mana) |mana| {
+            const cropped_dims = data.text_icons.sprite_dims_cropped.?.get(.mana_crystal);
+            if (data.text_icons.getRenderFrame(.mana_crystal)) |rf| {
+                const mana_crystal_pos = self.mana_rect.pos.sub(v2f(cropped_dims.x * 0.5 * (icon_scaling), 0));
+                var opt = rf.toTextureOpt(icon_scaling);
+                opt.src_dims = cropped_dims;
+                opt.origin = .topleft;
+                opt.round_to_pixel = true;
+                try cmd_buf.append(.{ .texture = .{
+                    .pos = mana_crystal_pos,
+                    .texture = rf.texture,
+                    .opt = opt,
+                } });
+            }
+            const text_pos = self.mana_rect.pos.add((v2f(cropped_dims.x, 0).add(text_box_padding).scale(ui_scaling)));
+            try cmd_buf.append(.{
+                .label = .{
+                    .pos = text_pos,
+                    .text = ImmUI.initLabel(try utl.bufPrintLocal("{d:.0}/{d:.0}", .{ mana.curr, mana.max })),
+                    .opt = hp_mana_text_opt,
+                },
+            });
+            if (caster.controller == .player) {
+                if (caster.controller.player.mana_regen) |regen| {
+                    const bar_max_dims = v2f(self.mana_rect.dims.x - 9 * ui_scaling, 2 * ui_scaling);
+                    try cmd_buf.append(.{ .rect = .{
+                        .pos = self.mana_rect.pos.add(v2f(7 * ui_scaling, self.mana_rect.dims.y - 2 * ui_scaling)),
+                        .dims = v2f(regen.timer.remapTo0_1() * bar_max_dims.x, bar_max_dims.y),
+                        .opt = .{
+                            .fill_color = draw.Coloru.rgb(161, 133, 238).toColorf(),
+                        },
+                    } });
+                }
+            }
+        }
+    }
+
+    pub fn roomOnlyUpdate(self: *Slots, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, run: *Run, caster: *const Thing) Error!void {
         const plat = getPlat();
         const room = &run.room;
-        self.tooltip_immui.commands.clear();
-        self.immui.commands.clear();
-        // big rects, check ui clicked
-        self.immui.commands.append(.{ .rect = .{
-            .pos = self.run_ui_bg_rect.pos,
-            .dims = self.run_ui_bg_rect.dims.add(v2f(0, 20 * plat.ui_scaling)),
-            .opt = .{
-                .fill_color = Colorf.rgb(0.13, 0.11, 0.13),
-                .edge_radius = 0.1,
-            },
-        } }) catch @panic("Fail to append rect cmd");
-        self.immui.commands.append(.{ .rect = .{
+
+        // big rect, check ui clicked
+        cmd_buf.append(.{ .rect = .{
             .pos = self.room_ui_bg_rect.pos,
             .dims = self.room_ui_bg_rect.dims.add(v2f(0, 20 * plat.ui_scaling)),
             .opt = .{
@@ -839,155 +914,75 @@ pub const Slots = struct {
             },
         } }) catch @panic("Fail to append rect cmd");
         const mouse_pos = plat.getMousePosScreen();
-        const hovered = geom.pointIsInRectf(mouse_pos, self.run_ui_bg_rect) or geom.pointIsInRectf(mouse_pos, self.room_ui_bg_rect);
+        const hovered = geom.pointIsInRectf(mouse_pos, self.room_ui_bg_rect);
         const clicked = hovered and (plat.input_buffer.mouseBtnIsJustPressed(.left) or plat.input_buffer.mouseBtnIsJustPressed(.right));
         run.ui_hovered = hovered;
         run.ui_clicked = clicked;
 
-        try self.unqActionSlots(run, caster, self.spells.slice(), .spell);
-        try self.unqActionSlots(run, caster, self.items.slice(), .item);
+        try self.unqActionSlots(cmd_buf, tooltip_cmd_buf, run, caster, self.spells.slice(), .spell);
         if (self.discard_slot) |*d| {
-            if (try unqSlot(&self.immui.commands, &self.tooltip_immui.commands, d, caster, run)) |_| {
+            if (try unqSlot(cmd_buf, tooltip_cmd_buf, d, caster, run)) |_| {
                 self.selectSlot(.action, .discard, .quick_release, 0);
             }
         }
-        if (try unqCommandUISlot(&self.pause_slot, &self.immui.commands, &self.tooltip_immui.commands, run, run.room.paused)) {
+        if (try unqCommandUISlot(&self.pause_slot, cmd_buf, tooltip_cmd_buf, run, run.room.paused)) {
             room.paused = !room.paused;
-        }
-
-        { // hp and mana and casting bar
-            const ui_scaling: f32 = plat.ui_scaling;
-            const icon_scaling = ui_scaling * 2;
-            const data = App.get().data;
-            const hp_mana_rect_opt = draw.PolyOpt{
-                .edge_radius = 0.2,
-                .fill_color = slot_bg_color,
-            };
-            const font = data.fonts.get(.pixeloid);
-            const hp_mana_text_opt = draw.TextOpt{
-                .font = font,
-                .size = font.base_size * utl.as(u32, ui_scaling),
-                .smoothing = .none,
-                .color = .white,
-            };
-            try self.immui.commands.append(.{ .rect = .{
-                .pos = self.hp_rect.pos,
-                .dims = self.hp_rect.dims,
-                .opt = hp_mana_rect_opt,
-            } });
-            if (caster.hp) |hp| {
-                const cropped_dims = data.text_icons.sprite_dims_cropped.?.get(.heart);
-
-                if (data.text_icons.getRenderFrame(.heart)) |rf| {
-                    const heart_pos = self.hp_rect.pos.sub(v2f(cropped_dims.x * 0.5 * (icon_scaling), 0));
-                    var opt = rf.toTextureOpt(icon_scaling);
-                    opt.src_dims = cropped_dims;
-                    opt.tint = .red;
-                    opt.origin = .topleft;
-                    opt.round_to_pixel = true;
-                    try self.immui.commands.append(.{ .texture = .{
-                        .pos = heart_pos,
-                        .texture = rf.texture,
-                        .opt = opt,
-                    } });
-                }
-                const text_pos = self.hp_rect.pos.add((v2f(cropped_dims.x, 0).add(text_box_padding).scale(ui_scaling)));
-                try self.immui.commands.append(.{
-                    .label = .{
-                        .pos = text_pos,
-                        .text = ImmUI.initLabel(try utl.bufPrintLocal("{d:.0}/{d:.0}", .{ hp.curr, hp.max })),
-                        .opt = hp_mana_text_opt,
-                    },
-                });
-            }
-
-            try self.immui.commands.append(.{ .rect = .{
-                .pos = self.mana_rect.pos,
-                .dims = self.mana_rect.dims,
-                .opt = hp_mana_rect_opt,
-            } });
-            if (caster.mana) |mana| {
-                const cropped_dims = data.text_icons.sprite_dims_cropped.?.get(.mana_crystal);
-                if (data.text_icons.getRenderFrame(.mana_crystal)) |rf| {
-                    const mana_crystal_pos = self.mana_rect.pos.sub(v2f(cropped_dims.x * 0.5 * (icon_scaling), 0));
-                    var opt = rf.toTextureOpt(icon_scaling);
-                    opt.src_dims = cropped_dims;
-                    opt.origin = .topleft;
-                    opt.round_to_pixel = true;
-                    try self.immui.commands.append(.{ .texture = .{
-                        .pos = mana_crystal_pos,
-                        .texture = rf.texture,
-                        .opt = opt,
-                    } });
-                }
-                const text_pos = self.mana_rect.pos.add((v2f(cropped_dims.x, 0).add(text_box_padding).scale(ui_scaling)));
-                try self.immui.commands.append(.{
-                    .label = .{
-                        .pos = text_pos,
-                        .text = ImmUI.initLabel(try utl.bufPrintLocal("{d:.0}/{d:.0}", .{ mana.curr, mana.max })),
-                        .opt = hp_mana_text_opt,
-                    },
-                });
-                if (caster.controller == .player) {
-                    if (caster.controller.player.mana_regen) |regen| {
-                        const bar_max_dims = v2f(self.mana_rect.dims.x - 9 * ui_scaling, 2 * ui_scaling);
-                        try self.immui.commands.append(.{ .rect = .{
-                            .pos = self.mana_rect.pos.add(v2f(7 * ui_scaling, self.mana_rect.dims.y - 2 * ui_scaling)),
-                            .dims = v2f(regen.timer.remapTo0_1() * bar_max_dims.x, bar_max_dims.y),
-                            .opt = .{
-                                .fill_color = draw.Coloru.rgb(161, 133, 238).toColorf(),
-                            },
-                        } });
-                    }
-                }
-            }
-            switch (caster.controller) {
-                .player => |c| {
-                    if (c.action_casting != null) {
-                        const pad = V2f.splat(1 * ui_scaling);
-                        const curr_x = c.cast_counter.remapTo0_1() * self.casting_bar_rect.dims.x;
-                        try self.immui.commands.append(.{ .rect = .{
-                            .pos = self.casting_bar_rect.pos,
-                            .dims = self.casting_bar_rect.dims,
-                            .opt = .{
-                                .fill_color = .black,
-                                .edge_radius = 0.8,
-                            },
-                        } });
-                        try self.immui.commands.append(.{ .rect = .{
-                            .pos = self.casting_bar_rect.pos.add(pad),
-                            .dims = v2f(curr_x, self.casting_bar_rect.dims.y).sub(pad.scale(2)),
-                            .opt = .{
-                                .fill_color = .lightgray,
-                                .edge_radius = 0.8,
-                            },
-                        } });
-                    }
-                },
-                else => {},
-            }
         }
     }
 
-    pub fn render(self: *const Slots, room: *const Room) Error!void {
-        const plat = App.getPlat();
+    pub fn runUpdate(self: *Slots, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, run: *Run, caster: *const Thing) Error!void {
+        const plat = getPlat();
+        cmd_buf.append(.{ .rect = .{
+            .pos = self.run_ui_bg_rect.pos,
+            .dims = self.run_ui_bg_rect.dims.add(v2f(0, 20 * plat.ui_scaling)),
+            .opt = .{
+                .fill_color = Colorf.rgb(0.13, 0.11, 0.13),
+                .edge_radius = 0.1,
+            },
+        } }) catch @panic("Fail to append rect cmd");
 
-        { // debug deck stuff
-            const p = self.pause_slot.rect.pos.add(v2f(100, -40));
-            try plat.textf(
-                p,
-                "deck: {}\ndiscard: {}\nmislayed: {}\n",
-                .{
-                    room.draw_pile.len,
-                    room.discard_pile.len,
-                    room.mislay_pile.len,
-                },
-                .{ .color = .white },
-            );
+        const mouse_pos = plat.getMousePosScreen();
+        const hovered = geom.pointIsInRectf(mouse_pos, self.run_ui_bg_rect);
+        const clicked = hovered and (plat.input_buffer.mouseBtnIsJustPressed(.left) or plat.input_buffer.mouseBtnIsJustPressed(.right));
+        run.ui_hovered = hovered;
+        run.ui_clicked = clicked;
+
+        try self.unqActionSlots(cmd_buf, tooltip_cmd_buf, run, caster, self.items.slice(), .item);
+        try self.updateHPandMana(cmd_buf, tooltip_cmd_buf, caster);
+    }
+
+    pub fn roomUpdate(self: *Slots, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, run: *Run, caster: *const Thing) Error!void {
+        const plat = getPlat();
+
+        try self.roomOnlyUpdate(cmd_buf, tooltip_cmd_buf, run, caster);
+        try self.runUpdate(cmd_buf, tooltip_cmd_buf, run, caster);
+        // casting progress bar
+        const ui_scaling: f32 = plat.ui_scaling;
+        switch (caster.controller) {
+            .player => |c| {
+                if (c.action_casting != null) {
+                    const pad = V2f.splat(1 * ui_scaling);
+                    const curr_x = c.cast_counter.remapTo0_1() * self.casting_bar_rect.dims.x;
+                    try cmd_buf.append(.{ .rect = .{
+                        .pos = self.casting_bar_rect.pos,
+                        .dims = self.casting_bar_rect.dims,
+                        .opt = .{
+                            .fill_color = .black,
+                            .edge_radius = 0.8,
+                        },
+                    } });
+                    try cmd_buf.append(.{ .rect = .{
+                        .pos = self.casting_bar_rect.pos.add(pad),
+                        .dims = v2f(curr_x, self.casting_bar_rect.dims.y).sub(pad.scale(2)),
+                        .opt = .{
+                            .fill_color = .lightgray,
+                            .edge_radius = 0.8,
+                        },
+                    } });
+                }
+            },
+            else => {},
         }
-
-        try ImmUI.render(&self.immui.commands);
-        try ImmUI.render(&self.tooltip_immui.commands);
     }
 };
 
