@@ -150,7 +150,6 @@ seed: u64,
 rng: std.Random.DefaultPrng = undefined,
 places: Place.Array = .{},
 curr_place_idx: usize = 0,
-player_thing: Thing = undefined,
 ui_slots: gameUI.Slots = .{},
 mode: Mode = undefined,
 deck: Spell.SpellArray = .{},
@@ -180,7 +179,6 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
         .seed = seed,
         .deck = makeStarterDeck(false),
         .dead_menu = makeDeadMenu(),
-        .player_thing = player.modePrototype(mode),
         .mode = mode,
     };
     run.room_buf_size = 0;
@@ -274,12 +272,17 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
     run.places = places;
 
     // TODO dummy room
-    try run.initRoom(&run.room, .{
-        .difficulty = 0,
-        .kind = .first,
-        .idx = 0,
-        .waves_params = .{ .room_kind = .first },
-    });
+    const player_thing = player.modePrototype(mode);
+    try run.initRoom(
+        &run.room,
+        &player_thing,
+        .{
+            .difficulty = 0,
+            .kind = .first,
+            .idx = 0,
+            .waves_params = .{ .room_kind = .first },
+        },
+    );
 
     return run;
 }
@@ -304,7 +307,7 @@ pub fn startRun(self: *Run) Error!void {
     try self.loadPlaceFromCurrIdx();
 }
 
-pub fn initRoom(self: *Run, room: *Room, params: RoomLoadParams) Error!void {
+pub fn initRoom(self: *Run, room: *Room, player_thing: *const Thing, params: RoomLoadParams) Error!void {
     const data = App.get().data;
     const room_indices = data.room_kind_tilemaps.get(params.kind);
     const room_idx = room_indices.get(params.idx);
@@ -314,7 +317,7 @@ pub fn initRoom(self: *Run, room: *Room, params: RoomLoadParams) Error!void {
         .waves_params = params.waves_params,
         .tilemap_ref = tilemap_ref,
         .seed = self.rng.random().int(u64),
-        .player = self.player_thing,
+        .player = player_thing.*,
         .mode = self.mode,
     };
     try room.init(&init_params);
@@ -326,9 +329,13 @@ pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
         self.shop = null;
     }
     const r = self.places.get(self.curr_place_idx).room;
-
+    var player_thing = player.modePrototype(self.mode);
+    if (self.room.getConstPlayer()) |p| {
+        player_thing.hp.?.max = p.hp.?.max;
+        player_thing.hp.?.curr = p.hp.?.curr;
+    }
     self.room.deinit();
-    try self.initRoom(&self.room, r);
+    try self.initRoom(&self.room, &player_thing, r);
     self.ui_slots.beginRoom(&self.room);
     if (r.kind == .smol or r.kind == .big or r.kind == .boss) {
         self.makeRewards(r.difficulty);
@@ -412,22 +419,6 @@ fn loadNextPlace(self: *Run) void {
     self.load_state = .fade_out;
 }
 
-pub fn syncPlayerThing(self: *Run, precedence: enum { run, room }) void {
-    const room = &self.room;
-    switch (precedence) {
-        .room => {
-            if (room.getConstPlayer()) |p| {
-                self.player_thing.hp = p.hp.?;
-            }
-        },
-        .run => {
-            if (room.getPlayer()) |p| {
-                p.hp = self.player_thing.hp.?;
-            }
-        },
-    }
-}
-
 pub fn resolutionChanged(self: *Run) void {
     self.room.resolutionChanged();
     self.ui_slots.reflowRects();
@@ -496,8 +487,6 @@ pub fn roomUpdate(self: *Run) Error!void {
     room.parent_run_this_frame = self;
     try room.update();
 
-    self.syncPlayerThing(.room);
-
     switch (room.progress_state) {
         .none => {},
         .lost => {
@@ -564,7 +553,7 @@ pub fn itemsUpdate(self: *Run) Error!void {
         const item = &slot.kind.?.action.item;
         const slot_rect: geom.Rectf = slot.rect;
         const btn_dims = v2f(100, 75);
-        const can_use = item.canUseInRun(&self.player_thing, self);
+        const can_use = item.canUse(self.room, &self.player_thing, self);
         const menu_padding = V2f.splat(4);
         const num_menu_items: f32 = if (can_use) 2 else 1;
         const menu_dims = v2f(btn_dims.x, btn_dims.y * num_menu_items).add(menu_padding.scale(2).add(v2f(0, (num_menu_items - 1) * menu_padding.y)));
@@ -925,11 +914,11 @@ pub fn update(self: *Run) Error!void {
             .room => try self.roomUpdate(),
             .reward => {
                 try self.rewardUpdate();
-                try self.itemsUpdate();
+                //try self.itemsUpdate();
             },
             .shop => {
                 try self.shopUpdate();
-                try self.itemsUpdate();
+                //try self.itemsUpdate();
             },
             .dead => try self.deadUpdate(),
         },
