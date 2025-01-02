@@ -117,25 +117,16 @@ pub fn makeStarterDeck(dbg: bool) Spell.SpellArray {
     return ret;
 }
 
-pub const PlaceKind = enum {
-    room,
-    shop,
-};
-
 pub const RoomLoadParams = struct {
     kind: Data.RoomKind,
-    idx: usize,
-    difficulty: f32,
+    idx: usize = 0,
+    difficulty: f32 = 0,
     waves_params: Room.WavesParams,
 };
 
-pub const Place = union(PlaceKind) {
+pub const Place = struct {
     pub const Array = std.BoundedArray(Place, 32);
-
     room: RoomLoadParams,
-    shop: struct {
-        num: usize,
-    },
 };
 
 gold: i32 = 0,
@@ -263,9 +254,10 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
         //TODO unhack this?
         place.room.waves_params.difficulty = place.room.difficulty;
     }
-    try places.insert(places.len / 2, .{ .shop = .{ .num = 0 } });
-    try places.insert(0, .{ .room = .{ .difficulty = 0, .kind = .first, .idx = 0, .waves_params = .{ .room_kind = .first, .first_wave_delay_secs = 0 } } });
-    try places.append(.{ .shop = .{ .num = 1 } });
+    try places.insert(places.len / 2, .{ .room = .{ .kind = .shop, .waves_params = .{ .room_kind = .shop, .first_wave_delay_secs = 0 } } });
+    try places.insert(0, .{ .room = .{ .kind = .first, .waves_params = .{ .room_kind = .first, .first_wave_delay_secs = 0 } } });
+    try places.insert(0, .{ .room = .{ .kind = .shop, .waves_params = .{ .room_kind = .shop, .first_wave_delay_secs = 0 } } });
+    try places.append(.{ .room = .{ .kind = .shop, .waves_params = .{ .room_kind = .shop, .first_wave_delay_secs = 0 } } });
     try places.append(.{ .room = .{ .difficulty = 15, .kind = .boss, .idx = 0, .waves_params = .{ .room_kind = .boss } } });
     // TODO this better
     {
@@ -333,28 +325,24 @@ pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
         shop.deinit();
         self.shop = null;
     }
-    switch (self.places.get(self.curr_place_idx)) {
-        .room => |r| {
-            self.room.deinit();
-            try self.initRoom(&self.room, r);
-            self.ui_slots.beginRoom(&self.room);
-            if (r.kind == .smol or r.kind == .big or r.kind == .boss) {
-                self.makeRewards(r.difficulty);
-            } else {
-                self.reward_ui = null;
-            }
-            // TODO hacky
-            // update once to clear fog
-            self.room.parent_run_this_frame = self;
-            try self.room.update();
-            self.screen = .room;
-        },
-        .shop => |s| {
-            _ = s.num;
-            self.shop = try Shop.init(self.rng.random().int(u64), self);
-            self.screen = .shop;
-        },
+    const r = self.places.get(self.curr_place_idx).room;
+
+    self.room.deinit();
+    try self.initRoom(&self.room, r);
+    self.ui_slots.beginRoom(&self.room);
+    if (r.kind == .smol or r.kind == .big or r.kind == .boss) {
+        self.makeRewards(r.difficulty);
+    } else {
+        self.reward_ui = null;
     }
+    if (r.kind == .shop) {
+        self.shop = try Shop.init(self.rng.random().int(u64), self);
+    }
+    // TODO hacky
+    // update once to clear fog
+    self.room.parent_run_this_frame = self;
+    try self.room.update();
+    self.screen = .room;
 }
 
 pub fn makeRewards(self: *Run, difficulty: f32) void {
@@ -886,7 +874,8 @@ pub fn shopUpdate(self: *Run) Error!void {
         self.pickupProduct(product);
     }
     if (shop.state == .done) {
-        self.loadNextPlace();
+        self.screen = .room;
+        shop.state = .shopping;
     }
 }
 

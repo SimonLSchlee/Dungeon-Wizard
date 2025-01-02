@@ -123,6 +123,10 @@ pub fn shopspiderProto() Thing {
     ret.animator = null;
     ret.coll_mask = Thing.Collision.Mask.initEmpty();
     ret.dir = V2f.left;
+    ret.rmb_interactable = .{
+        .kind = .shop,
+        .interact_radius = 80,
+    };
 
     return ret;
 }

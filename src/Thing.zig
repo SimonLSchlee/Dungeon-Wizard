@@ -167,6 +167,7 @@ dashing: bool = false,
 rmb_interactable: ?struct {
     kind: enum {
         reward_chest,
+        shop,
     },
     interact_radius: f32 = 40,
     hovered: bool = false,

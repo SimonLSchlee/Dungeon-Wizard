@@ -411,6 +411,9 @@ pub fn thingInteract(self: *Room, thing: *Thing) void {
         .reward_chest => {
             self.parent_run_this_frame.screen = .reward;
         },
+        .shop => {
+            self.parent_run_this_frame.screen = .shop;
+        },
     }
 }
 
