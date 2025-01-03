@@ -167,6 +167,7 @@ tooltip_ui: struct {
 } = .{},
 ui_clicked: bool = false,
 ui_hovered: bool = false,
+exit_to_menu: bool = false,
 
 pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
     const plat = getPlat();
@@ -919,7 +920,7 @@ pub fn deadUpdate(self: *Run) Error!void {
     curr_btn_pos.y += btn_dims.y + btn_spacing;
 
     if (menuUI.textButton(&self.imm_ui.commands, curr_btn_pos, "Main Menu", btn_dims, ui_scaling)) {
-        plat.exit();
+        self.exit_to_menu = true;
     }
     curr_btn_pos.y += btn_dims.y + btn_spacing;
 
@@ -1024,6 +1025,11 @@ pub fn update(self: *Run) Error!void {
     }
 
     self.curr_tick += 1;
+
+    if (self.exit_to_menu) {
+        self.deinit();
+        App.get().screen = .menu;
+    }
 }
 
 pub fn render(self: *Run, ui_render_texture: Platform.RenderTexture2D, game_render_texture: Platform.RenderTexture2D) Error!void {
