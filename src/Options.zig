@@ -193,7 +193,7 @@ pub const Controls = struct {
                 }
                 for ('a'..('z' + 1)) |char| {
                     const k = std.meta.stringToEnum(core.Key, &.{char}).?;
-                    ret.getPtr(k).* = std.fmt.comptimePrint("{c}", .{utl.as(u8, char)});
+                    ret.getPtr(k).* = std.fmt.comptimePrint("{c}", .{utl.as(u8, std.ascii.toUpper(char))});
                 }
                 for (core.Key.numbers, '0'..('9' + 1)) |k, char| {
                     ret.getPtr(k).* = std.fmt.comptimePrint("{c}", .{utl.as(u8, char)});
