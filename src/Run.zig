@@ -924,13 +924,25 @@ pub fn update(self: *Run) Error!void {
             },
             .dead => try self.deadUpdate(),
         },
-        .fade_in => if (self.load_timer.tick(true)) {
-            self.load_state = .none;
+        .fade_in => {
+            if (self.room.getPlayer()) |thing| {
+                try self.ui_slots.roomUpdate(&self.imm_ui.commands, &self.tooltip_ui.commands, self, thing);
+                self.ui_slots.unselectAction(); // effectively disables UI while fading
+            }
+            if (self.load_timer.tick(true)) {
+                self.load_state = .none;
+            }
         },
-        .fade_out => if (self.load_timer.tick(true)) {
-            self.curr_place_idx += 1;
-            try self.loadPlaceFromCurrIdx();
-            self.load_state = .fade_in;
+        .fade_out => {
+            if (self.room.getPlayer()) |thing| {
+                try self.ui_slots.roomUpdate(&self.imm_ui.commands, &self.tooltip_ui.commands, self, thing);
+                self.ui_slots.unselectAction(); // effectively disables UI while fading
+            }
+            if (self.load_timer.tick(true)) {
+                self.curr_place_idx += 1;
+                try self.loadPlaceFromCurrIdx();
+                self.load_state = .fade_in;
+            }
         },
     }
 
