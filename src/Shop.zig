@@ -262,7 +262,7 @@ pub fn update(self: *Shop, run: *Run) Error!?Product {
         const btn_center = items_center.add(v2f(0, item_slot_dims.y * 0.5 + 40 + proceed_btn_dims.y * 0.5));
         const proceed_btn_pos = btn_center.sub(proceed_btn_dims.scale(0.5));
 
-        if (menuUI.textButton(&run.imm_ui.commands, proceed_btn_pos, "Proceed", proceed_btn_dims, ui_scaling)) {
+        if (menuUI.textButton(&run.imm_ui.commands, proceed_btn_pos, "Leave", proceed_btn_dims, ui_scaling)) {
             self.state = .done;
         }
     }
