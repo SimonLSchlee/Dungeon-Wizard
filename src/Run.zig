@@ -620,7 +620,7 @@ pub fn rewardSpellChoiceUI(self: *Run, idx: usize) Error!void {
         .pos = title_center,
         .text = ImmUI.initLabel("Choose a spell"),
         .opt = .{
-            .size = title_font.base_size * u.as(u32, ui_scaling + 2),
+            .size = title_font.base_size * u.as(u32, ui_scaling + 1),
             .font = title_font,
             .smoothing = .none,
             .color = .white,
@@ -720,7 +720,7 @@ pub fn rewardUpdate(self: *Run) Error!void {
         .pos = title_center,
         .text = ImmUI.initLabel("Found some stuff"),
         .opt = .{
-            .size = title_font.base_size * u.as(u32, ui_scaling + 2),
+            .size = title_font.base_size * u.as(u32, ui_scaling + 1),
             .font = title_font,
             .smoothing = .none,
             .color = .white,
@@ -899,7 +899,7 @@ pub fn deadUpdate(self: *Run) Error!void {
         .pos = title_center,
         .text = ImmUI.initLabel("Your HP reached 0"),
         .opt = .{
-            .size = title_font.base_size * u.as(u32, ui_scaling + 2),
+            .size = title_font.base_size * u.as(u32, ui_scaling + 1),
             .font = title_font,
             .smoothing = .none,
             .color = .white,

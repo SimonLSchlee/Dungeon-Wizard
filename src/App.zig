@@ -250,7 +250,7 @@ fn pauseMenuUpdate(self: *App) Error!void {
     const title_opt = draw.TextOpt{
         .center = true,
         .color = .white,
-        .size = title_font.base_size * utl.as(u32, ui_scaling + 2),
+        .size = title_font.base_size * utl.as(u32, ui_scaling + 1),
         .font = title_font,
         .smoothing = .none,
     };
