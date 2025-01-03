@@ -41,7 +41,6 @@ pub const UISlot = struct {
     command: Options.Controls.InputBinding.Command,
     key_rect_pos: V2f = .{},
     cooldown_timer: ?utl.TickCounter = null,
-    hover_timer: utl.TickCounter = utl.TickCounter.init(15),
     long_hover: menuUI.LongHover = .{},
     rect: geom.Rectf = .{},
     clicked: bool = false,
@@ -57,7 +56,7 @@ pub const UISlot = struct {
         const plat = getPlat();
         const mouse_pos = plat.getMousePosScreen();
         slot.hovered = geom.pointIsInRectf(mouse_pos, slot.rect);
-        slot.clicked = slot.hovered and plat.input_buffer.mouseBtnIsJustPressed(.left);
+        slot.clicked = slot.hovered and plat.input_buffer.mouseBtnIsJustPressed(.left) and slot.hovered;
 
         _ = slot.long_hover.update(slot.hovered);
 
@@ -70,7 +69,7 @@ pub const UISlot = struct {
             },
         } }) catch @panic("Fail to append rect cmd");
 
-        return enabled and slot.hovered and slot.clicked and geom.pointIsInRectf(mouse_pos, slot.rect);
+        return enabled and slot.clicked;
     }
 
     pub fn unqCooldownTimer(slot: *UISlot, cmd_buf: *ImmUI.CmdBuf) Error!void {
@@ -158,8 +157,15 @@ pub const SpellSlot = struct {
 };
 
 pub const ItemSlot = struct {
+    pub const TossBtn = struct {
+        long_hover: menuUI.LongHover = .{},
+        rect: geom.Rectf = .{},
+        clicked: bool = false,
+        hovered: bool = false,
+    };
     ui_slot: UISlot,
     item: ?Item = null,
+    toss_btn: TossBtn = .{},
 };
 
 pub fn getItemsRects() std.BoundedArray(geom.Rectf, max_item_slots) {
@@ -293,6 +299,8 @@ pub const Slots = struct {
         for (self.items.slice(), 0..) |*slot, i| {
             slot.ui_slot.rect = items_rects.get(i);
             slot.ui_slot.key_rect_pos = slot.ui_slot.rect.pos.sub(V2f.splat(8).scale(ui_scaling));
+            slot.toss_btn.rect.dims = V2f.splat(9).scale(ui_scaling);
+            slot.toss_btn.rect.pos = slot.ui_slot.rect.pos.add(v2f(slot.ui_slot.rect.dims.x - slot.toss_btn.rect.dims.x, 0)).add(v2f(2, -4).scale(ui_scaling));
         }
 
         // hp and mana above items
@@ -584,6 +592,87 @@ pub const Slots = struct {
                 }
             }
         }
+    }
+
+    pub const RunItemAction = enum {
+        toss,
+    };
+
+    pub fn unqTossBtn(btn: *ItemSlot.TossBtn, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf) Error!bool {
+        const plat = getPlat();
+        const data = App.getData();
+        const mouse_pos = plat.getMousePosScreen();
+        const ui_scaling = plat.ui_scaling;
+        const font = data.fonts.get(.pixeloid);
+        const text_opt = draw.TextOpt{
+            .font = font,
+            .size = font.base_size * utl.as(u32, ui_scaling),
+            .smoothing = .none,
+            .color = .white,
+            .center = true,
+            .border = .{
+                .dist = ui_scaling,
+            },
+        };
+
+        btn.hovered = geom.pointIsInRectf(mouse_pos, btn.rect);
+        btn.clicked = btn.hovered and plat.input_buffer.mouseBtnIsJustPressed(.left) and btn.hovered;
+
+        _ = btn.long_hover.update(btn.hovered);
+
+        cmd_buf.append(.{
+            .rect = .{
+                .pos = btn.rect.pos,
+                .dims = btn.rect.dims,
+                .opt = .{
+                    .fill_color = if (btn.hovered) .red else Colorf.rgb(0.7, 0, 0),
+                    .edge_radius = 0.2,
+                },
+            },
+        }) catch @panic("Fail to append rect cmd");
+        cmd_buf.append(.{ .label = .{
+            .text = ImmUI.initLabel("x"),
+            .pos = btn.rect.pos.add(btn.rect.dims.scale(0.5).add(v2f(0, -1).scale(ui_scaling))),
+            .opt = text_opt,
+        } }) catch @panic("Fail to append label");
+
+        if (btn.long_hover.is) {
+            const tooltip_pos = btn.rect.pos.add(v2f(btn.rect.dims.x, 0));
+            const tt = Tooltip{
+                .title = Tooltip.Title.fromSlice("Discard item") catch unreachable,
+            };
+            try tt.unqRender(tooltip_cmd_buf, tooltip_pos, ui_scaling);
+        }
+
+        return btn.clicked;
+    }
+
+    pub fn unqItemRunUISlot(self: *Slots, slot: *ItemSlot, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf) Error!?RunItemAction {
+        const plat = App.getPlat();
+        const ui_scaling: f32 = plat.ui_scaling;
+        const ui_slot = &slot.ui_slot;
+        var ret: ?RunItemAction = null;
+        var opt = draw.PolyOpt{
+            .fill_color = slot_bg_color,
+            .edge_radius = 0.2,
+        };
+        opt.outline = self.getActionBorder(ui_slot.command);
+
+        _ = try ui_slot.unqRectHoverClick(cmd_buf, false, opt);
+
+        if (slot.item) |item| {
+            const tooltip_scaling: f32 = plat.ui_scaling;
+            const tooltip_pos = slot.ui_slot.rect.pos.add(v2f(slot.ui_slot.rect.dims.x, 0));
+
+            try item.unqRenderIcon(cmd_buf, slot.ui_slot.rect.pos, ui_scaling);
+            if (try unqTossBtn(&slot.toss_btn, cmd_buf, tooltip_cmd_buf)) {
+                ret = .toss;
+            }
+            if (tooltip_cmd_buf.len == 0 and ui_slot.long_hover.is) {
+                try item.unqRenderTooltip(tooltip_cmd_buf, tooltip_pos, tooltip_scaling);
+            }
+        }
+        return ret;
     }
 
     pub fn unqItemRoomUISlot(self: *Slots, slot: *UISlot, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, room: *const Room, caster: *const Thing, maybe_item: ?Item) Error!?Options.Controls.CastMethod {
@@ -909,8 +998,18 @@ pub const Slots = struct {
         run.ui_clicked = clicked;
 
         for (self.items.slice()) |*slot| {
-            if (try self.unqItemRoomUISlot(&slot.ui_slot, cmd_buf, tooltip_cmd_buf, &run.room, caster, slot.item)) |cast_method| {
-                self.selectAction(slot.ui_slot.command, cast_method);
+            if (run.screen == .room) {
+                if (try self.unqItemRoomUISlot(&slot.ui_slot, cmd_buf, tooltip_cmd_buf, &run.room, caster, slot.item)) |cast_method| {
+                    self.selectAction(slot.ui_slot.command, cast_method);
+                }
+            } else {
+                if (try self.unqItemRunUISlot(slot, cmd_buf, tooltip_cmd_buf)) |run_item_action| {
+                    switch (run_item_action) {
+                        .toss => {
+                            slot.item = null;
+                        },
+                    }
+                }
             }
         }
         try self.updateHPandMana(cmd_buf, tooltip_cmd_buf, caster);
