@@ -102,6 +102,10 @@ pub const proto_fns = blk: {
 
 pub fn playerProto() Thing {
     var ret = creatureProto(.player, .wizard, .player, null, 40, .medium, 18);
+    ret.animator = null;
+    ret.renderer = .{ .sprite = .{} };
+    ret.renderer.sprite.setDirAnim(Data.Ref(Data.DirectionalSpriteAnim).init("wizard-idle-idle"));
+    ret.hurtbox.?.radius *= 0.85;
     ret.accel_params = .{
         .accel = 0.0023 * TileMap.tile_sz_f,
         .friction = 0.0014 * TileMap.tile_sz_f,

@@ -30,9 +30,6 @@ pub const enum_name = "player";
 
 pub fn modePrototype(mode: Run.Mode) Thing {
     var base = App.get().data.creature_protos.get(.player);
-    base.animator = null;
-    base.renderer = .{ .sprite = .{} };
-    base.renderer.sprite.setDirAnim(Data.Ref(Data.DirectionalSpriteAnim).init("wizard-idle-idle"));
 
     switch (mode) {
         .frank_4_slot => {},
