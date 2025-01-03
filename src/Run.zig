@@ -139,7 +139,6 @@ room_buf_size: usize = 0,
 
 reward_ui: ?Reward.UI = null,
 shop: ?Shop = null,
-dead_menu: DeadMenu = undefined,
 screen: enum {
     room,
     reward,
@@ -178,7 +177,6 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
         .rng = std.Random.DefaultPrng.init(seed),
         .seed = seed,
         .deck = makeStarterDeck(false),
-        .dead_menu = makeDeadMenu(),
         .mode = mode,
     };
     run.room_buf_size = 0;
@@ -867,15 +865,75 @@ pub fn shopUpdate(self: *Run) Error!void {
 }
 
 pub fn deadUpdate(self: *Run) Error!void {
+    const data = App.getData();
     const plat = getPlat();
-    if (self.dead_menu.new_run_button.isClicked()) {
+    const ui_scaling = plat.ui_scaling;
+    // modal background
+    var modal_dims = plat.screen_dims_f.scale(0.6);
+    var modal_topleft = plat.screen_dims_f.sub(modal_dims).scale(0.5);
+
+    const game_rect_dims = self.ui_slots.getGameScreenRect();
+    modal_dims = v2f(game_rect_dims.x * 0.6, game_rect_dims.y * 0.9);
+    modal_topleft = game_rect_dims.sub(modal_dims).scale(0.5);
+
+    self.imm_ui.commands.appendAssumeCapacity(.{ .rect = .{
+        .pos = modal_topleft,
+        .dims = modal_dims,
+        .opt = .{
+            .fill_color = Colorf.rgba(0.1, 0.1, 0.1, 0.8),
+            .outline = .{
+                .color = Colorf.rgba(0.1, 0.1, 0.2, 0.8),
+                .thickness = 2 * ui_scaling,
+            },
+        },
+    } });
+
+    var curr_row_y = modal_topleft.y + 10 * ui_scaling;
+    const modal_center_x = modal_topleft.x + modal_dims.x * 0.5;
+
+    // title
+    const title_font = data.fonts.get(.pixeloid);
+    const title_center = v2f(modal_center_x, curr_row_y + 10 * ui_scaling);
+    self.imm_ui.commands.appendAssumeCapacity(.{ .label = .{
+        .pos = title_center,
+        .text = ImmUI.initLabel("Your HP reached 0"),
+        .opt = .{
+            .size = title_font.base_size * u.as(u32, ui_scaling + 2),
+            .font = title_font,
+            .smoothing = .none,
+            .color = .white,
+            .center = true,
+        },
+    } });
+    curr_row_y += 30 * ui_scaling;
+
+    const btn_dims = v2f(70, 30).scale(ui_scaling);
+    const btn_spacing: f32 = 10 * ui_scaling;
+    const btns_x = modal_topleft.x + (modal_dims.x - btn_dims.x) * 0.5;
+    var curr_btn_pos = v2f(btns_x, curr_row_y);
+
+    if (menuUI.textButton(&self.imm_ui.commands, curr_btn_pos, "New Run", btn_dims, ui_scaling)) {
         try self.reset();
         try self.startRun();
-    } else if (self.dead_menu.quit_button.isClicked()) {
+    }
+    curr_btn_pos.y += btn_dims.y + btn_spacing;
+
+    if (menuUI.textButton(&self.imm_ui.commands, curr_btn_pos, "Main Menu", btn_dims, ui_scaling)) {
         plat.exit();
-    } else if (self.dead_menu.retry_room_button.isClicked()) {
-        try self.room.reset();
-        self.screen = .room;
+    }
+    curr_btn_pos.y += btn_dims.y + btn_spacing;
+
+    if (menuUI.textButton(&self.imm_ui.commands, curr_btn_pos, "Exit", btn_dims, ui_scaling)) {
+        plat.exit();
+    }
+    curr_btn_pos.y += btn_dims.y + btn_spacing;
+
+    if (debug.allow_room_retry) {
+        if (menuUI.textButton(&self.imm_ui.commands, curr_btn_pos, "Retry Room", btn_dims, ui_scaling)) {
+            try self.room.reset();
+            self.screen = .room;
+        }
+        curr_btn_pos.y += btn_dims.y + btn_spacing;
     }
 }
 
@@ -968,62 +1026,6 @@ pub fn update(self: *Run) Error!void {
     self.curr_tick += 1;
 }
 
-fn makeDeadMenu() DeadMenu {
-    const plat = getPlat();
-    const modal_dims = v2f(plat.screen_dims_f.x * 0.6, plat.screen_dims_f.y * 0.7);
-    const modal_topleft = plat.screen_dims_f.sub(modal_dims).scale(0.5);
-    const modal_center = modal_topleft.add(modal_dims.scale(0.5));
-    var modal = menuUI.Modal{
-        .rect = .{
-            .dims = modal_dims,
-            .pos = modal_topleft,
-        },
-        .padding = v2f(30, 30),
-        .poly_opt = .{
-            .fill_color = Colorf.rgba(0.1, 0.1, 0.1, 0.8),
-            .outline = .{
-                .color = Colorf.rgba(0.1, 0.1, 0.2, 0.8),
-                .thickness = 4,
-            },
-        },
-        .text_opt = .{
-            .center = true,
-            .color = .white,
-            .size = 30,
-        },
-    };
-    modal.title = @TypeOf(modal.title).fromSlice("Your HP reached 0") catch unreachable;
-    modal.title_rel_pos = v2f(modal_dims.x * 0.5, modal.padding.y + 15);
-
-    const button_dims = v2f(230, 100);
-    var btn_rects = std.BoundedArray(geom.Rectf, 3){};
-    btn_rects.resize(3) catch unreachable;
-    gameUI.layoutRectsFixedSize(3, button_dims, modal_center, .{ .direction = .vertical, .space_between = 20 }, btn_rects.slice());
-    const btn_proto = menuUI.Button{
-        .poly_opt = .{ .fill_color = .orange },
-        .text_opt = .{ .center = true, .color = .black, .size = 30 },
-        .text_rel_pos = button_dims.scale(0.5),
-    };
-    var new_run_btn = btn_proto;
-    new_run_btn.clickable_rect.rect = btn_rects.buffer[0];
-    new_run_btn.text = @TypeOf(btn_proto.text).fromSlice("New Run") catch unreachable;
-    var quit_btn = btn_proto;
-    quit_btn.clickable_rect.rect = btn_rects.buffer[1];
-    quit_btn.text = @TypeOf(btn_proto.text).fromSlice("Quit") catch unreachable;
-
-    var retry_btn = btn_proto;
-    retry_btn.poly_opt.fill_color = Colorf.blue;
-    retry_btn.clickable_rect.rect = btn_rects.buffer[2];
-    retry_btn.text = @TypeOf(btn_proto.text).fromSlice("Retry Room\n(debug only)") catch unreachable;
-
-    return DeadMenu{
-        .modal = modal,
-        .new_run_button = new_run_btn,
-        .quit_button = quit_btn,
-        .retry_room_button = retry_btn,
-    };
-}
-
 pub fn render(self: *Run, ui_render_texture: Platform.RenderTexture2D, game_render_texture: Platform.RenderTexture2D) Error!void {
     const plat = getPlat();
 
@@ -1039,18 +1041,7 @@ pub fn render(self: *Run, ui_render_texture: Platform.RenderTexture2D, game_rend
     // ui
     plat.startRenderToTexture(ui_render_texture);
     plat.setBlend(.render_tex_alpha);
-    switch (self.screen) {
-        .room => {},
-        .reward => {},
-        .shop => {},
-        .dead => {
-            // TODO remove - should go into command buffer
-            try self.dead_menu.modal.render();
-            try self.dead_menu.new_run_button.render();
-            try self.dead_menu.quit_button.render();
-            try self.dead_menu.retry_room_button.render();
-        },
-    }
+
     try ImmUI.render(&self.imm_ui.commands);
     try ImmUI.render(&self.tooltip_ui.commands);
     switch (self.load_state) {
