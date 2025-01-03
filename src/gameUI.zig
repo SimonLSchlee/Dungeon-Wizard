@@ -87,6 +87,23 @@ pub const UISlot = struct {
         }
     }
 
+    pub fn hotkeyIsReleased(slot: *const UISlot) bool {
+        const maybe_binding = App.get().options.controls.getBindingByCommand(slot.command);
+        var ret = false;
+
+        if (maybe_binding) |binding| {
+            const plat = getPlat();
+
+            if (binding.inputs.len == 0) return false;
+            for (binding.inputs.constSlice()) |b| switch (b) {
+                .mouse_button => |btn| ret = ret or !plat.input_buffer.mouseBtnIsDown(btn),
+                .keyboard_key => |key| ret = ret or !plat.input_buffer.keyIsDown(key),
+            };
+            return ret;
+        }
+        return false;
+    }
+
     pub fn unqHotKey(slot: *UISlot, cmd_buf: *ImmUI.CmdBuf, enabled: bool) Error!bool {
         const maybe_binding = App.get().options.controls.getBindingByCommand(slot.command);
         var ret = false;
@@ -97,10 +114,12 @@ pub const UISlot = struct {
             const ui_scaling: f32 = plat.ui_scaling;
 
             if (binding.inputs.len == 0) return false;
-            for (binding.inputs.constSlice()) |b| switch (b) {
-                .mouse_button => |btn| ret = ret or plat.input_buffer.mouseBtnIsJustPressed(btn),
-                .keyboard_key => |key| ret = ret or plat.input_buffer.keyIsJustPressed(key),
-            };
+            if (enabled) {
+                for (binding.inputs.constSlice()) |b| switch (b) {
+                    .mouse_button => |btn| ret = ret or plat.input_buffer.mouseBtnIsJustPressed(btn),
+                    .keyboard_key => |key| ret = ret or plat.input_buffer.keyIsJustPressed(key),
+                };
+            }
             const first_binding = binding.inputs.buffer[0];
             const key_color = if (enabled) Colorf.white else Colorf.gray;
 
@@ -131,6 +150,16 @@ pub const UISlot = struct {
 
         return ret;
     }
+};
+
+pub const SpellSlot = struct {
+    ui_slot: UISlot,
+    spell: ?Spell = null,
+};
+
+pub const ItemSlot = struct {
+    ui_slot: UISlot,
+    item: ?Item = null,
 };
 
 pub fn getItemsRects() std.BoundedArray(geom.Rectf, max_item_slots) {
@@ -166,305 +195,66 @@ pub fn getItemsRects() std.BoundedArray(geom.Rectf, max_item_slots) {
     return rects;
 }
 
-// unq == update and queue (render)
-// Handle all updating and rendering of a generic action Slot, returning a CastMethod if it was activated
-pub fn unqSlot(cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, slot: *Slots.Slot, caster: *const Thing, run: *Run) Error!?Options.Controls.CastMethod {
-    const data = App.get().data;
-    const plat = getPlat();
-    const ui_scaling: f32 = plat.ui_scaling;
-    const room = &run.room;
-
-    var ret: ?Options.Controls.CastMethod = null;
-    const mouse_pos = plat.getMousePosScreen();
-    const hovered = geom.pointIsInRectf(mouse_pos, slot.rect);
-    const clicked = hovered and plat.input_buffer.mouseBtnIsJustPressed(.left);
-    const slot_enabled = Slots.slotIsEnabled(slot, caster);
-    const can_activate_slot = Slots.canActivateSlot(slot, run, caster);
-    const bg_color = slot_bg_color;
-    var slot_contents_pos = slot.rect.pos;
-    var border_color = Colorf.darkgray;
-    var key_color = Colorf.gray;
-
-    // background rect
-    if (can_activate_slot and hovered) {
-        // TODO animate
-        slot_contents_pos = slot.rect.pos.add(v2f(0, -5));
-    }
-    cmd_buf.append(.{ .rect = .{
-        .pos = slot.rect.pos,
-        .dims = slot.rect.dims,
-        .opt = .{
-            .fill_color = bg_color,
-            .edge_radius = 0.2,
-        },
-    } }) catch @panic("Fail to append rect cmd");
-
-    // slot contents
-    if (slot_enabled) {
-        const kind_data = slot.kind.?;
-
-        if (can_activate_slot) {
-            key_color = .white;
-            border_color = if (slot.selection_kind) |s| Slots.SelectionKind.colors.get(s) else Colorf.cyan.fade(0.8);
-            // activated this frame?
-            var activated = false;
-            if (hovered and clicked) {
-                ret = .left_click;
-                activated = true;
-            } else if (plat.input_buffer.keyIsJustPressed(slot.key)) {
-                ret = App.get().options.controls.cast_method;
-                activated = true;
-            }
-            if (activated) {
-                // auto-target self-cast and discard
-                switch (kind_data) {
-                    .pause => {
-                        ret = .quick_release;
-                    },
-                    .action => |a| switch (a) {
-                        .discard => ret = .quick_release,
-                        inline else => |k| {
-                            if (@hasField(@TypeOf(k), "targeting_data")) {
-                                if (k.targeting_data.kind == .self) {
-                                    ret = .quick_release;
-                                }
-                            }
-                        },
-                    },
-                }
-            }
-
-            // border
-            if (slot.selection_kind != null) {
-                var border_rect = slot.rect;
-                var border_thickness: f32 = 4;
-                var border_edge_radius: f32 = 0.2;
-                switch (kind_data) {
-                    .action => |a| switch (a) {
-                        .spell => {
-                            border_rect = .{
-                                .pos = slot_contents_pos.add(v2f(2, 2)),
-                                .dims = slot.rect.dims.sub(v2f(4, 4)),
-                            };
-                            border_thickness = 6;
-                            border_edge_radius = 0.12;
-                        },
-                        else => {},
-                    },
-                    else => {},
-                }
-                cmd_buf.appendAssumeCapacity(.{ .rect = .{
-                    .pos = border_rect.pos,
-                    .dims = border_rect.dims,
-                    .opt = .{
-                        .fill_color = null,
-                        .outline = .{
-                            .color = border_color,
-                            .thickness = border_thickness,
-                        },
-                        .edge_radius = border_edge_radius,
-                    },
-                } });
-            }
-        }
-
-        // card/icon
-        switch (kind_data) {
-            .pause => {
-                const sprite_name = if (room.paused) Data.MiscIcon.hourglass_down else Data.MiscIcon.hourglass_up;
-                const info = sprites.RenderIconInfo{ .frame = data.misc_icons.getRenderFrame(sprite_name).? };
-                try info.unqRender(cmd_buf, slot_contents_pos, ui_scaling);
-            },
-            .action => |a| switch (a) {
-                .discard => {
-                    const info = sprites.RenderIconInfo{ .frame = data.misc_icons.getRenderFrame(.discard).? };
-                    try info.unqRender(cmd_buf, slot_contents_pos, ui_scaling);
-                },
-                .spell => |*spell| {
-                    // TODO maybe?
-                    //const scaling = if (slot.is_long_hovered) ui_scaling + 1 else ui_scaling;
-                    spell.unqRenderCard(cmd_buf, slot_contents_pos, caster, ui_scaling);
-                },
-                .item => |*item| {
-                    try item.unqRenderIcon(cmd_buf, slot_contents_pos, ui_scaling);
-                },
-            },
-        }
-        // tooltip
-        if (slot.long_hover.update(hovered)) {
-            const tooltip_scaling: f32 = plat.ui_scaling;
-            const tooltip_pos = slot.rect.pos.add(v2f(slot.rect.dims.x, 0));
-            switch (kind_data) {
-                .pause => {
-                    const tt = Tooltip{
-                        .title = Tooltip.Title.fromSlice("Pause") catch unreachable,
-                    };
-                    try tt.unqRender(tooltip_cmd_buf, tooltip_pos, tooltip_scaling);
-                },
-                .action => |a| switch (a) {
-                    .discard => {
-                        const tt = Tooltip{
-                            .title = Tooltip.Title.fromSlice("Discard hand") catch unreachable,
-                        };
-                        try tt.unqRender(tooltip_cmd_buf, tooltip_pos, tooltip_scaling);
-                    },
-                    .spell => |*spell| {
-                        try spell.unqRenderTooltip(tooltip_cmd_buf, tooltip_pos, tooltip_scaling);
-                    },
-                    .item => |*item| {
-                        try item.unqRenderTooltip(tooltip_cmd_buf, tooltip_pos, tooltip_scaling);
-                    },
-                },
-            }
-        }
-    }
-    if (slot.cooldown_timer) |*timer| {
-        // NOTE rn the timers are ticked in updateTimerAndDrawSpell, that's fine...
-        if (timer.running) {
-            menuUI.unqSectorTimer(
-                cmd_buf,
-                slot.rect.pos.add(slot.rect.dims.scale(0.5)),
-                slot.rect.dims.x * 0.5 * 0.7,
-                timer,
-                .{ .fill_color = .blue },
-            );
-        }
-    }
-
-    // hotkey
-    const font = data.fonts.get(.pixeloid);
-    const key_text_opt = draw.TextOpt{
-        .color = key_color,
-        .size = font.base_size * utl.as(u32, ui_scaling),
-        .font = font,
-        .smoothing = .none,
-    };
-    const key_str = slot.key_str.constSlice();
-    const str_sz = try plat.measureText(key_str, key_text_opt);
-    cmd_buf.append(.{ .rect = .{
-        .pos = slot.key_rect_pos,
-        .dims = str_sz.add(V2f.splat(4).scale(ui_scaling)),
-        .opt = .{
-            .fill_color = Colorf.black.fade(0.7),
-            .edge_radius = 0.25,
-        },
-    } }) catch @panic("Fail to append label cmd");
-    cmd_buf.append(.{ .label = .{
-        .pos = slot.key_rect_pos.add(v2f(2, 2).scale(ui_scaling)),
-        .text = ImmUI.initLabel(key_str),
-        .opt = key_text_opt,
-    } }) catch @panic("Fail to append label cmd");
-
-    return ret;
-}
-
 // game slots
 pub const Slots = struct {
-    pub const SelectionKind = enum {
+    pub const SelectState = enum {
+        none,
         selected,
         buffered,
-
-        pub const colors = std.EnumArray(SelectionKind, Colorf).init(.{
+        pub const colors = std.EnumArray(SelectState, Colorf).init(.{
+            .none = Colorf.blank,
             .selected = Colorf.orange,
             .buffered = Colorf.green,
         });
     };
-    pub const Slot = struct {
-        pub const Kind = enum {
-            action,
-            pause,
-        };
-        pub const KindData = union(Kind) {
-            action: player.Action.KindData,
-            pause,
-        };
-        pub const KeyStr = utl.BoundedString(8);
-
-        idx: usize,
-        key: core.Key,
-        key_str: KeyStr,
-        key_rect_pos: V2f = .{},
-        kind: ?KindData = null,
-        cooldown_timer: ?utl.TickCounter = null,
-        hover_timer: utl.TickCounter = utl.TickCounter.init(15),
-        long_hover: menuUI.LongHover = .{},
-        selection_kind: ?SelectionKind = null,
-        rect: geom.Rectf = .{},
-    };
 
     pub const text_box_padding = V2f.splat(2);
-
-    pub const spell_idx_to_key = [max_spell_slots]core.Key{ .q, .w, .e, .r, .t, .y };
-    pub const spell_idx_to_key_str = blk: {
-        var arr: [max_spell_slots][3]u8 = undefined;
-        for (spell_idx_to_key, 0..) |key, i| {
-            const key_str = @tagName(key);
-            const c: [1]u8 = .{std.ascii.toUpper(key_str[0])};
-            arr[i] = .{ '[', c[0], ']' };
-        }
-        break :blk arr;
-    };
-    pub const item_idx_to_key = [max_item_slots]core.Key{ .one, .two, .three, .four, .five, .six, .seven, .eight };
-    pub const item_idx_to_key_str = blk: {
-        var arr: [max_item_slots][3]u8 = undefined;
-        for (item_idx_to_key, 0..) |_, i| {
-            arr[i] = .{ '[', '1' + i, ']' };
-        }
-        break :blk arr;
-    };
-    pub const discard_key = core.Key.d;
 
     room_ui_bg_rect: geom.Rectf = .{},
     run_ui_bg_rect: geom.Rectf = .{},
     casting_bar_rect: geom.Rectf = .{},
-    spells: std.BoundedArray(Slot, max_spell_slots) = .{},
-    items: std.BoundedArray(Slot, max_item_slots) = .{},
     item_menu_open: ?usize = null,
-    select_state: ?struct {
-        select_kind: SelectionKind,
-        slot_kind: Slot.Kind,
-        action_kind: ?player.Action.Kind,
-        slot_idx: usize,
-    } = null,
-    selected_method: Options.Controls.CastMethod = .left_click,
-    discard_slot: ?Slot = null,
-    pause_slot: UISlot = UISlot.init(.pause),
     mana_rect: geom.Rectf = .{},
     hp_rect: geom.Rectf = .{},
+
+    // Actions
+    spells: std.BoundedArray(SpellSlot, max_spell_slots) = .{},
+    items: std.BoundedArray(ItemSlot, max_item_slots) = .{},
+    discard_slot: ?UISlot = null,
+    action_selected: ?struct {
+        command: Options.Controls.InputBinding.Command,
+        cast_method: Options.Controls.CastMethod = .left_click,
+        select_state: union(SelectState) {
+            none,
+            selected,
+            buffered: Spell.Params,
+        },
+    } = null,
+
+    // Non-Action Commands
+    pause_slot: UISlot = UISlot.init(.pause),
 
     pub fn init(self: *Slots, num_spell_slots: usize, items: []const ?Item, discard_button: bool) void {
         assert(num_spell_slots <= max_spell_slots);
 
         self.* = .{};
         for (0..num_spell_slots) |i| {
-            const slot = Slot{
-                .idx = i,
-                .key = spell_idx_to_key[i],
-                .key_str = Slot.KeyStr.fromSlice(&spell_idx_to_key_str[i]) catch unreachable,
-                .cooldown_timer = null,
+            const slot = SpellSlot{
+                .ui_slot = UISlot.init(.{ .action = .{ .kind = .spell, .slot_idx = i } }),
             };
-            self.spells.append(slot) catch unreachable;
+            self.spells.appendAssumeCapacity(slot);
         }
 
         for (items, 0..) |maybe_item, i| {
-            var slot = Slot{
-                .idx = i,
-                .key = item_idx_to_key[i],
-                .key_str = Slot.KeyStr.fromSlice(&item_idx_to_key_str[i]) catch unreachable,
+            const slot = ItemSlot{
+                .ui_slot = UISlot.init(.{ .action = .{ .kind = .item, .slot_idx = i } }),
+                .item = maybe_item,
             };
-            if (maybe_item) |item| {
-                slot.kind = .{ .action = .{ .item = item } };
-            }
-            self.items.append(slot) catch unreachable;
+            self.items.appendAssumeCapacity(slot);
         }
 
         if (discard_button) {
-            self.discard_slot = .{
-                .idx = 0,
-                .key = discard_key,
-                .key_str = Slot.KeyStr.fromSlice("[D]") catch unreachable,
-                .kind = .{ .action = .discard },
-            };
+            self.discard_slot = UISlot.init(.{ .action = .{ .kind = .discard } });
         }
 
         self.reflowRects();
@@ -472,10 +262,10 @@ pub const Slots = struct {
 
     pub fn beginRoom(self: *Slots, room: *Room) void {
         for (self.spells.slice()) |*slot| {
-            slot.kind = null;
-            slot.cooldown_timer = null;
+            slot.spell = null;
+            slot.ui_slot.cooldown_timer = null;
             if (room.drawSpell()) |spell| {
-                slot.kind = .{ .action = .{ .spell = spell } };
+                slot.spell = spell;
             }
         }
     }
@@ -501,8 +291,8 @@ pub const Slots = struct {
         };
         const items_width = rightmost_items_x + spell_item_margin;
         for (self.items.slice(), 0..) |*slot, i| {
-            slot.rect = items_rects.get(i);
-            slot.key_rect_pos = slot.rect.pos.sub(V2f.splat(8).scale(ui_scaling));
+            slot.ui_slot.rect = items_rects.get(i);
+            slot.ui_slot.key_rect_pos = slot.ui_slot.rect.pos.sub(V2f.splat(8).scale(ui_scaling));
         }
 
         // hp and mana above items
@@ -556,11 +346,11 @@ pub const Slots = struct {
         const spells_topleft = v2f(spells_topleft_x, spells_topleft_y);
         for (self.spells.slice(), 0..) |*slot, i| {
             const x_off = (spell_slot_dims.x + spell_slot_spacing) * utl.as(f32, i);
-            slot.rect = .{
+            slot.ui_slot.rect = .{
                 .pos = spells_topleft.add(v2f(x_off, 0)),
                 .dims = spell_slot_dims,
             };
-            slot.key_rect_pos = slot.rect.pos.sub(V2f.splat(6).scale(ui_scaling));
+            slot.ui_slot.key_rect_pos = slot.ui_slot.rect.pos.sub(V2f.splat(6).scale(ui_scaling));
         }
 
         // discard and pause to the right
@@ -605,145 +395,184 @@ pub const Slots = struct {
         return plat.screen_dims_f.sub(v2f(0, self.room_ui_bg_rect.dims.y));
     }
 
-    pub fn getSlotsByActionKind(self: *Slots, action_kind: player.Action.Kind) []Slot {
-        return switch (action_kind) {
-            .spell => self.spells.slice(),
-            .item => self.items.slice(),
-            .discard => if (self.discard_slot) |*d| (d)[0..1] else &.{},
-        };
+    pub fn getSelectedActionCommand(self: *const Slots) ?Options.Controls.InputBinding.Command {
+        if (self.action_selected) |a| {
+            return a.command;
+        }
+        return null;
     }
 
-    pub fn getSlotsByActionKindConst(self: *const Slots, action_kind: player.Action.Kind) []const Slot {
-        return @constCast(self).getSlotsByActionKind(action_kind);
-    }
-
-    pub fn getSelectedActionSlot(self: *const Slots) ?Slot {
-        if (self.select_state) |state| {
-            if (state.select_kind == .selected) {
-                if (state.action_kind) |action_kind| {
-                    const slots = self.getSlotsByActionKindConst(action_kind);
-                    return slots[state.slot_idx];
-                }
+    pub fn getSelectedAction(self: *const Slots, select_state: SelectState) ?player.Action.KindData {
+        if (select_state == .none) return null;
+        if (self.action_selected) |a| {
+            if (a.select_state != select_state) return null;
+            if (std.meta.activeTag(a.command) != .action) return null;
+            const slot_idx = a.command.action.slot_idx orelse 0;
+            switch (a.command.action.kind) {
+                .spell => {
+                    const slot = &self.spells.buffer[slot_idx];
+                    if (slot.spell) |spell| {
+                        return .{ .spell = spell };
+                    }
+                },
+                .item => {
+                    const slot = &self.spells.buffer[slot_idx];
+                    if (slot.spell) |spell| {
+                        return .{ .spell = spell };
+                    }
+                },
+                .discard => {
+                    return .{ .discard = .{} };
+                },
             }
         }
         return null;
     }
 
-    pub fn slotIsEnabled(slot: *const Slot, caster: *const Thing) bool {
-        return slot.kind != null and caster.isAliveCreature() and (if (slot.cooldown_timer) |timer| !timer.running else true);
+    pub fn getCastAction(self: *const Slots, run: *const Run) ?player.Action.KindData {
+        if (self.action_selected) |a| {
+            if (a.select_state != .selected) return null;
+            if (std.meta.activeTag(a.command) != .action) return null;
+            const slot_idx = a.command.action.slot_idx orelse 0;
+            const ui_slot: *const UISlot = switch (a.command.action.kind) {
+                .spell => &self.spells.buffer[slot_idx].ui_slot,
+                .item => &self.items.buffer[slot_idx].ui_slot,
+                .discard => if (self.discard_slot) |*d| d else return null,
+            };
+            const plat = App.getPlat();
+            const casted = switch (a.cast_method) {
+                .left_click => !run.ui_clicked and plat.input_buffer.mouseBtnIsJustPressed(.left),
+                .quick_press => true,
+                .quick_release => ui_slot.hotkeyIsReleased(),
+            };
+            if (casted) {
+                return self.getSelectedAction(.selected);
+            }
+        }
+        return null;
     }
 
-    pub fn canActivateSlot(slot: *const Slot, run: *const Run, caster: *const Thing) bool {
+    pub fn bufferSelectedAction(self: *Slots, run: *Run, caster: *const Thing) bool {
+        const plat = App.getPlat();
         const room = &run.room;
-        return slotIsEnabled(slot, caster) and switch (slot.kind.?) {
-            .pause => true,
-            .action => |a| switch (a) {
-                inline else => |k| !std.meta.hasMethod(@TypeOf(k), "canUse") or k.canUse(room, caster),
+        const mouse_pos = plat.getMousePosWorld(room.camera);
+
+        if (self.getCastAction(run)) |action| {
+            const _params: ?Spell.Params = switch (action) {
+                inline else => |a| if (std.meta.hasMethod(@TypeOf(a), "getTargetParams"))
+                    a.getTargetParams(room, caster, mouse_pos)
+                else
+                    null,
+            };
+            if (_params) |params| {
+                switch (action) {
+                    .spell => |s| if (caster.mana) |*mana| {
+                        if (s.mana_cost.getActualCost(caster)) |cost| {
+                            assert(mana.curr >= cost);
+                        }
+                    },
+                    else => {},
+                }
+                self.action_selected.?.select_state = .{ .buffered = params };
+                return true;
+            } else if (action == .discard) {
+                self.action_selected.?.select_state = .{ .buffered = .{ .target_kind = .self } };
+                return true;
+            } else {
+                self.unselectAction();
+            }
+        }
+        return false;
+    }
+
+    pub fn tryUnbufferAction(self: *Slots, run: *Run, caster: *Thing) ?player.Action.Buffered {
+        const room = &run.room;
+        const maybe_action = self.getSelectedAction(.buffered);
+        if (maybe_action == null) return null;
+        const action = maybe_action.?;
+        const params = self.action_selected.?.select_state.buffered;
+        const slot_idx = self.action_selected.?.command.action.slot_idx orelse 0;
+
+        switch (action) {
+            .spell => |spell| {
+                const slot = &self.spells.buffer[slot_idx];
+                slot.spell = null;
+
+                if (spell.mislay) {
+                    room.mislaySpell(spell);
+                } else {
+                    room.discardSpell(spell);
+                }
+                if (caster.mana) |*mana| {
+                    if (spell.mana_cost.getActualCost(caster)) |cost| {
+                        assert(mana.curr >= cost);
+                        mana.curr -= cost;
+                    }
+                }
+                if (caster.statuses.get(.quickdraw).stacks > 0) {
+                    slot.ui_slot.cooldown_timer = utl.TickCounter.init(0);
+                    caster.statuses.getPtr(.quickdraw).addStacks(caster, -1);
+                } else if (spell.draw_immediate) {
+                    slot.ui_slot.cooldown_timer = utl.TickCounter.init(0);
+                } else if (room.init_params.mode == .mandy_3_mana) {
+                    slot.ui_slot.cooldown_timer = null;
+                } else {
+                    // otherwise normal cooldown
+                    slot.ui_slot.cooldown_timer = utl.TickCounter.init(spell.getSlotCooldownTicks());
+                }
             },
+            .item => {
+                self.items.buffer[slot_idx].item = null;
+            },
+            else => {},
+        }
+        self.unselectAction();
+
+        return .{
+            .action = action,
+            .params = params,
         };
     }
 
     pub fn cancelSelectedActionSlotIfInvalid(self: *Slots, run: *const Run, caster: *const Thing) void {
-        if (self.getSelectedActionSlot()) |*slot| {
-            if (!canActivateSlot(slot, run, caster)) {
-                self.unselectSlot();
-            }
+        if (self.getSelectedAction(.selected)) |*slot| {
+            _ = slot;
+            _ = run;
+            _ = caster;
+            // TODO
+            //if (!canActivateSlot(slot, run, caster)) {
+            //    self.unselectSlot();
+            //}
         }
     }
 
-    pub fn getNextEmptyItemSlot(self: *const Slots) ?Slot {
-        for (self.items.constSlice()) |slot| {
-            if (slot.kind == null) return slot;
+    pub fn getNextEmptyItemSlot(self: *Slots) ?*ItemSlot {
+        for (self.items.slice()) |*slot| {
+            if (slot.item == null) return slot;
         }
         return null;
     }
 
-    pub fn setActionSlotCooldown(self: *Slots, slot_idx: usize, action_kind: player.Action.Kind, ticks: ?i64) void {
-        const slots = self.getSlotsByActionKind(action_kind);
-        const slot = &slots[slot_idx];
-        slot.cooldown_timer = if (ticks) |t| utl.TickCounter.init(t) else null;
+    pub fn selectAction(self: *Slots, command: Options.Controls.InputBinding.Command, cast_method: Options.Controls.CastMethod) void {
+        if (command != .action) return;
+        self.action_selected = .{
+            .command = command,
+            .cast_method = cast_method,
+            .select_state = .selected,
+        };
     }
 
-    pub fn clearSlotByActionKind(self: *Slots, slot_idx: usize, action_kind: player.Action.Kind) void {
-        const slots = self.getSlotsByActionKind(action_kind);
-        const slot = &slots[slot_idx];
-
-        slot.kind = null;
-        slot.selection_kind = null;
-
-        if (self.select_state) |*s| {
-            if (s.slot_kind == .action and s.action_kind.? == action_kind and s.slot_idx == slot_idx) {
-                self.select_state = null;
-            }
-        }
-    }
-
-    pub fn selectSlot(self: *Slots, slot_kind: Slot.Kind, action_kind: ?player.Action.Kind, cast_method: Options.Controls.CastMethod, idx: usize) void {
-        self.unselectSlot();
-        switch (slot_kind) {
-            .pause => {
-                // REMOVED
-            },
-            .action => {
-                switch (action_kind.?) {
-                    .spell => assert(idx < self.spells.len),
-                    .item => assert(idx < self.items.len),
-                    .discard => assert(idx == 0),
-                }
-                const slots = self.getSlotsByActionKind(action_kind.?);
-                self.select_state = .{
-                    .slot_idx = idx,
-                    .select_kind = .selected,
-                    .slot_kind = .action,
-                    .action_kind = action_kind.?,
-                };
-                slots[idx].selection_kind = .selected;
-            },
-        }
-
-        self.selected_method = cast_method;
-    }
-
-    pub fn changeSelectedSlotToBuffered(self: *Slots) void {
-        if (self.select_state) |*s| {
-            s.select_kind = .buffered;
-            switch (s.slot_kind) {
-                .pause => {
-                    // REMOVED
-                },
-                .action => {
-                    const slots = self.getSlotsByActionKind(s.action_kind.?);
-                    slots[s.slot_idx].selection_kind = .buffered;
-                },
-            }
-        }
-    }
-
-    pub fn unselectSlot(self: *Slots) void {
-        if (self.select_state) |*s| {
-            switch (s.slot_kind) {
-                .pause => {
-                    // REMOVED
-                },
-                .action => {
-                    const slots = self.getSlotsByActionKind(s.action_kind.?);
-                    slots[s.slot_idx].selection_kind = null;
-                },
-            }
-        }
-        self.select_state = null;
+    pub fn unselectAction(self: *Slots) void {
+        self.action_selected = null;
     }
 
     pub fn updateTimerAndDrawSpell(self: *Slots, room: *Room) void {
         for (self.spells.slice()) |*slot| {
-            if (slot.cooldown_timer) |*timer| {
-                if (slot.kind) |k| {
-                    assert(std.meta.activeTag(k) == .action);
-                    assert(std.meta.activeTag(k.action) == .spell);
-                    // only tick and draw into empty slots!
-                } else if (timer.tick(false)) {
+            if (slot.ui_slot.cooldown_timer) |*timer| {
+                if (timer.tick(false)) {
                     if (room.drawSpell()) |spell| {
-                        slot.kind = .{ .action = .{ .spell = spell } };
+                        slot.spell = spell;
+                        slot.ui_slot.cooldown_timer = null;
                     }
                 }
             }
@@ -751,18 +580,146 @@ pub const Slots = struct {
         if (self.discard_slot) |*slot| {
             if (slot.cooldown_timer) |*timer| {
                 if (timer.tick(false)) {
-                    slot.kind = .{ .action = .discard };
+                    slot.cooldown_timer = null;
                 }
             }
         }
     }
 
-    fn unqActionSlots(self: *Slots, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, run: *Run, caster: *const Thing, slots: []Slot, action_kind: player.Action.Kind) Error!void {
-        for (slots, 0..) |*slot, i| {
-            if (try unqSlot(cmd_buf, tooltip_cmd_buf, slot, caster, run)) |cast_method| {
-                self.selectSlot(.action, action_kind, cast_method, i);
+    pub fn unqItemRoomUISlot(self: *Slots, slot: *UISlot, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, room: *const Room, caster: *const Thing, maybe_item: ?Item) Error!?Options.Controls.CastMethod {
+        const plat = App.getPlat();
+        const ui_scaling: f32 = plat.ui_scaling;
+        const enabled = if (maybe_item) |item| item.canUse(room, caster) else false;
+        var default_cast_method = App.get().options.controls.cast_method;
+        var activation: ?Options.Controls.CastMethod = null;
+        var opt = draw.PolyOpt{
+            .fill_color = slot_bg_color,
+            .edge_radius = 0.2,
+        };
+        opt.outline = self.getActionBorder(slot.command);
+
+        if (try slot.unqRectHoverClick(cmd_buf, enabled, opt)) {
+            activation = .left_click;
+        }
+
+        if (maybe_item) |item| {
+            if (item.targeting_data.kind == .self) {
+                default_cast_method = .quick_release;
+            }
+            const tooltip_scaling: f32 = plat.ui_scaling;
+            const tooltip_pos = slot.rect.pos.add(v2f(slot.rect.dims.x, 0));
+            var slot_contents_pos = slot.rect.pos;
+            if (slot.hovered) slot_contents_pos = slot_contents_pos.add(v2f(0, -5));
+
+            try item.unqRenderIcon(cmd_buf, slot_contents_pos, ui_scaling);
+            if (slot.long_hover.is) {
+                try item.unqRenderTooltip(tooltip_cmd_buf, tooltip_pos, tooltip_scaling);
             }
         }
+
+        if (try slot.unqHotKey(cmd_buf, enabled)) {
+            activation = default_cast_method;
+        }
+
+        return activation;
+    }
+
+    pub fn unqSpellUISlot(self: *Slots, slot: *UISlot, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, room: *const Room, caster: *const Thing, maybe_spell: ?Spell) Error!?Options.Controls.CastMethod {
+        const plat = App.getPlat();
+        const ui_scaling: f32 = plat.ui_scaling;
+        const enabled = if (maybe_spell) |spell| spell.canUse(room, caster) else false;
+        var default_cast_method = App.get().options.controls.cast_method;
+        var activation: ?Options.Controls.CastMethod = null;
+        var opt = draw.PolyOpt{
+            .fill_color = slot_bg_color,
+            .edge_radius = 0.2,
+        };
+        opt.outline = self.getActionBorder(slot.command);
+
+        if (try slot.unqRectHoverClick(cmd_buf, enabled, opt)) {
+            activation = .left_click;
+        }
+
+        if (maybe_spell) |spell| {
+            if (spell.targeting_data.kind == .self) {
+                default_cast_method = .quick_release;
+            }
+            const tooltip_scaling: f32 = plat.ui_scaling;
+            const tooltip_pos = slot.rect.pos.add(v2f(slot.rect.dims.x, 0));
+            var slot_contents_pos = slot.rect.pos;
+            if (slot.hovered) slot_contents_pos = slot_contents_pos.add(v2f(0, -5));
+
+            spell.unqRenderCard(cmd_buf, slot_contents_pos, caster, ui_scaling);
+            if (slot.long_hover.is) {
+                try spell.unqRenderTooltip(tooltip_cmd_buf, tooltip_pos, tooltip_scaling);
+            }
+        } else if (slot.cooldown_timer) |_| {
+            try slot.unqCooldownTimer(cmd_buf);
+        }
+
+        if (try slot.unqHotKey(cmd_buf, enabled)) {
+            activation = default_cast_method;
+        }
+
+        return activation;
+    }
+
+    pub fn getActionBorder(self: *const Slots, command: Options.Controls.InputBinding.Command) ?draw.LineOpt {
+        if (command != .action) return null;
+        if (self.action_selected) |a| {
+            if (a.command.eql(command)) {
+                const color: Colorf = switch (a.select_state) {
+                    .selected => .orange,
+                    .buffered => .green,
+                    .none => return null,
+                };
+                return draw.LineOpt{
+                    .color = color,
+                    .thickness = 3,
+                };
+            }
+        }
+        return null;
+    }
+
+    pub fn unqDiscardUISlot(self: *Slots, slot: *UISlot, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf) Error!bool {
+        const plat = App.getPlat();
+        const data = App.getData();
+        const ui_scaling: f32 = plat.ui_scaling;
+        var activation: bool = false;
+        var opt = draw.PolyOpt{
+            .fill_color = slot_bg_color,
+            .edge_radius = 0.2,
+        };
+        opt.outline = self.getActionBorder(slot.command);
+
+        if (try slot.unqRectHoverClick(cmd_buf, true, opt)) {
+            activation = true;
+        }
+
+        if (slot.cooldown_timer) |_| {
+            try slot.unqCooldownTimer(cmd_buf);
+        } else {
+            const tooltip_scaling: f32 = plat.ui_scaling;
+            const tooltip_pos = slot.rect.pos.add(v2f(slot.rect.dims.x, 0));
+            var slot_contents_pos = slot.rect.pos;
+            if (slot.hovered) slot_contents_pos = slot_contents_pos.add(v2f(0, -5));
+
+            const sprite_name = Data.MiscIcon.discard;
+            const info = sprites.RenderIconInfo{ .frame = data.misc_icons.getRenderFrame(sprite_name).? };
+            try info.unqRender(cmd_buf, slot_contents_pos, ui_scaling);
+            if (slot.long_hover.is) {
+                const tt = Tooltip{
+                    .title = Tooltip.Title.fromSlice("Discard hand") catch unreachable,
+                };
+                try tt.unqRender(tooltip_cmd_buf, tooltip_pos, tooltip_scaling);
+            }
+        }
+
+        if (try slot.unqHotKey(cmd_buf, true)) {
+            activation = true;
+        }
+        return activation;
     }
 
     pub fn unqCommandUISlot(slot: *UISlot, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, run: *Run, selected: bool) Error!bool {
@@ -919,10 +876,14 @@ pub const Slots = struct {
         run.ui_hovered = hovered;
         run.ui_clicked = clicked;
 
-        try self.unqActionSlots(cmd_buf, tooltip_cmd_buf, run, caster, self.spells.slice(), .spell);
+        for (self.spells.slice()) |*slot| {
+            if (try self.unqSpellUISlot(&slot.ui_slot, cmd_buf, tooltip_cmd_buf, room, caster, slot.spell)) |cast_method| {
+                self.selectAction(slot.ui_slot.command, cast_method);
+            }
+        }
         if (self.discard_slot) |*d| {
-            if (try unqSlot(cmd_buf, tooltip_cmd_buf, d, caster, run)) |_| {
-                self.selectSlot(.action, .discard, .quick_release, 0);
+            if (try self.unqDiscardUISlot(d, cmd_buf, tooltip_cmd_buf)) {
+                self.selectAction(.{ .action = .{ .kind = .discard } }, .quick_release);
             }
         }
         if (try unqCommandUISlot(&self.pause_slot, cmd_buf, tooltip_cmd_buf, run, run.room.paused)) {
@@ -947,7 +908,11 @@ pub const Slots = struct {
         run.ui_hovered = hovered;
         run.ui_clicked = clicked;
 
-        try self.unqActionSlots(cmd_buf, tooltip_cmd_buf, run, caster, self.items.slice(), .item);
+        for (self.items.slice()) |*slot| {
+            if (try self.unqItemRoomUISlot(&slot.ui_slot, cmd_buf, tooltip_cmd_buf, &run.room, caster, slot.item)) |cast_method| {
+                self.selectAction(slot.ui_slot.command, cast_method);
+            }
+        }
         try self.updateHPandMana(cmd_buf, tooltip_cmd_buf, caster);
     }
 

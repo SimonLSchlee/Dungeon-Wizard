@@ -386,7 +386,7 @@ pub fn makeRewards(self: *Run, difficulty: f32) void {
     self.reward_ui = reward_ui;
 }
 
-pub fn canPickupProduct(self: *const Run, product: *const Shop.Product) bool {
+pub fn canPickupProduct(self: *Run, product: *const Shop.Product) bool {
     switch (product.kind) {
         .spell => |_| {
             if (self.deck.len >= self.deck.buffer.len) return false;
@@ -410,7 +410,7 @@ pub fn pickupProduct(self: *Run, product: *const Shop.Product) void {
         },
         .item => |item| {
             const slot = self.ui_slots.getNextEmptyItemSlot().?;
-            self.ui_slots.items.buffer[slot.idx].kind = .{ .action = .{ .item = item } };
+            slot.item = item;
         },
     }
 }
@@ -456,6 +456,7 @@ pub fn roomUpdate(self: *Run) Error!void {
             self.room.paused = true;
         }
     }
+    room.parent_run_this_frame = self;
     if (!room.edit_mode) {
         //if (plat.input_buffer.keyIsJustPressed(.escape)) {
         //    room.paused = true;
@@ -479,14 +480,9 @@ pub fn roomUpdate(self: *Run) Error!void {
 
     // update spell slots, and player input
     if (room.getPlayer()) |thing| {
-        try self.ui_slots.roomUpdate(&self.imm_ui.commands, &self.tooltip_ui.commands, self, thing);
-        if (!room.paused) {
-            self.ui_slots.updateTimerAndDrawSpell(room);
-        }
         // uses self.ui_slots
         try thing.player_input.?.update(self, thing);
     }
-    room.parent_run_this_frame = self;
     try room.update();
 
     switch (room.progress_state) {

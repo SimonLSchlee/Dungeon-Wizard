@@ -622,7 +622,7 @@ pub fn render(self: *const Room, ui_render_texture: Platform.RenderTexture2D, ga
     // spell targeting, movement
     if (!self.edit_mode) {
         if (self.getConstPlayer()) |player| {
-            try player.player_input.?.render(self, player);
+            try player.player_input.?.render(self.parent_run_this_frame, player);
         }
     }
 

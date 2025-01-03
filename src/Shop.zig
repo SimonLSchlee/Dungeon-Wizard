@@ -107,12 +107,12 @@ pub fn reset(self: *Shop, run: *Run) Error!*Shop {
     return self;
 }
 
-pub fn canBuy(run: *const Run, product: *const Product) bool {
+pub fn canBuy(run: *Run, product: *const Product) bool {
     const price = product.price.gold;
     return run.gold >= price and run.canPickupProduct(product);
 }
 
-fn unqProductSlot(cmd_buf: *ImmUI.CmdBuf, tooltip_buf: *ImmUI.CmdBuf, slot: *ProductSlot, run: *const Run) Error!bool {
+fn unqProductSlot(cmd_buf: *ImmUI.CmdBuf, tooltip_buf: *ImmUI.CmdBuf, slot: *ProductSlot, run: *Run) Error!bool {
     const plat = getPlat();
     const ui_scaling: f32 = plat.ui_scaling;
     var ret: bool = false;
