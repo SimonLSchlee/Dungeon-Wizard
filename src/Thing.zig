@@ -908,9 +908,10 @@ pub const SpriteRenderer = struct {
         var params_adjusted = params;
         if (std.meta.activeTag(renderer.animator) == .normal) {
             params_adjusted.reset = true;
+            renderer.setDirAnim(anim);
+            return renderer.animator.dir.tickCurrAnim(params);
         }
-        renderer.setDirAnim(anim);
-        return renderer.animator.dir.tickCurrAnim(params_adjusted);
+        return renderer.animator.dir.playAnim(anim, params);
     }
 
     pub fn tickCurrAnim(renderer: *SpriteRenderer, params: sprites.SpriteAnimator.PlayParams) sprites.AnimEvent.Set {
@@ -1534,7 +1535,20 @@ pub fn update(self: *Thing, room: *Room) Error!void {
             self.accel_params.max_speed = old_max_speed;
         }
     } else if (self.isDeadCreature()) {
-        if (self.animator.?.play(.die, .{}).contains(.end)) {
+        if (self.animator) |*a| {
+            if (a.play(.die, .{}).contains(.end)) {
+                self.deferFree(room);
+            }
+        } else if (self.renderer == .sprite) {
+            if (App.getData().getCreatureDirAnim(self.creature_kind.?, .die)) |anim| {
+                if (self.renderer.sprite.playDir(anim.data_ref, .{}).contains(.end)) {
+                    self.deferFree(room);
+                }
+            } else {
+                self.deferFree(room);
+            }
+        } else {
+            Log.warn("No Thing.animator or self.renderer.sprite found for dead creature \"{any}\"", .{self.creature_kind.?});
             self.deferFree(room);
         }
         return;

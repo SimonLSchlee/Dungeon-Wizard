@@ -530,11 +530,28 @@ pub const DirectionalSpriteAnimator = struct {
         self.animator.anim = dir_anim.dirToSpriteAnim(params.dir);
         return self.animator.tickCurrAnim(params);
     }
+
+    pub fn playAnim(self: *DirectionalSpriteAnimator, anim: Data.Ref(DirectionalSpriteAnim), params: SpriteAnimator.PlayParams) AnimEvent.Set {
+        var play_anim = anim;
+        const maybe_anim: ?*DirectionalSpriteAnim = play_anim.tryGet();
+        if (maybe_anim == null) {
+            Log.warn("Can't get anim \"{s}\"", .{play_anim.name.constSlice()});
+            return std.EnumSet(AnimEvent.Kind).initOne(.end);
+        }
+        const new_anim = maybe_anim.?;
+        const curr_anim = self.anim.get();
+        if (new_anim.data_ref.idx != curr_anim.data_ref.idx) {
+            self.animator.resetAnim();
+        }
+        self.anim = new_anim.data_ref;
+        self.animator.anim = new_anim.dirToSpriteAnim(params.dir);
+        return self.animator.tickCurrAnim(params);
+    }
 };
 
 pub const SpriteAnimator = struct {
     pub const PlayParams = struct {
-        reset: bool = false, // always true if new anim played
+        reset: bool = false, // always true if new anim played via playAnim
         loop: bool = false,
         dir: V2f = .{}, // ignored for non-directional anims
     };
@@ -554,13 +571,17 @@ pub const SpriteAnimator = struct {
         return self.anim.getConst().getRenderFrameFromTick(self.anim_tick);
     }
 
+    pub fn resetAnim(self: *SpriteAnimator) void {
+        self.anim_tick = 0;
+        self.tick_in_frame = 0;
+        self.curr_anim_frame = 0;
+    }
+
     pub fn tickCurrAnim(self: *SpriteAnimator, params: PlayParams) AnimEvent.Set {
         var ret = std.EnumSet(AnimEvent.Kind).initEmpty();
 
         if (params.reset) {
-            self.anim_tick = 0;
-            self.tick_in_frame = 0;
-            self.curr_anim_frame = 0;
+            self.resetAnim();
         }
         const maybe_anim: ?*SpriteAnim = self.anim.tryGet();
         if (maybe_anim == null) {
@@ -578,9 +599,7 @@ pub const SpriteAnimator = struct {
             // end of anim: last tick of frame, and on last frame
             if (self.curr_anim_frame >= anim.num_frames - 1) {
                 if (params.loop) {
-                    self.anim_tick = 0;
-                    self.tick_in_frame = 0;
-                    self.curr_anim_frame = 0;
+                    self.resetAnim();
                 }
                 ret.insert(.end);
                 return ret;
@@ -596,5 +615,24 @@ pub const SpriteAnimator = struct {
         self.anim_tick += 1;
         self.tick_in_frame += 1;
         return ret;
+    }
+
+    pub fn playAnim(self: *SpriteAnimator, anim: Data.Ref(SpriteAnim), params: SpriteAnimator.PlayParams) AnimEvent.Set {
+        var play_anim = anim;
+        const maybe_anim: ?*SpriteAnim = play_anim.tryGet();
+        if (maybe_anim == null) {
+            Log.warn("Can't get anim \"{s}\"", .{play_anim.name.constSlice()});
+            return std.EnumSet(AnimEvent.Kind).initOne(.end);
+        }
+        const new_anim = maybe_anim.?;
+        const curr_anim = self.anim.get();
+        var new_params = params;
+        if (new_anim.data_ref.idx != curr_anim.data_ref.idx) {
+            self.resetAnim();
+            new_params.reset = false;
+        }
+        self.anim = new_anim.data_ref;
+
+        return self.tickCurrAnim(new_params);
     }
 };
