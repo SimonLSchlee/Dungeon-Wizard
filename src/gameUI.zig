@@ -694,13 +694,16 @@ pub const Slots = struct {
         if (maybe_item) |item| {
             if (item.targeting_data.kind == .self) {
                 default_cast_method = .quick_release;
+                if (activation != null) {
+                    activation = default_cast_method;
+                }
             }
             const tooltip_scaling: f32 = plat.ui_scaling;
             const tooltip_pos = slot.rect.pos.add(v2f(slot.rect.dims.x, 0));
             var slot_contents_pos = slot.rect.pos;
-            if (slot.hovered) slot_contents_pos = slot_contents_pos.add(v2f(0, -5));
+            if (enabled and slot.hovered) slot_contents_pos = slot_contents_pos.add(v2f(0, -5));
 
-            try item.unqRenderIcon(cmd_buf, slot_contents_pos, ui_scaling);
+            try item.unqRenderIconTint(cmd_buf, slot_contents_pos, ui_scaling, if (enabled) .white else Colorf.white.fade(0.7));
             if (slot.long_hover.is) {
                 try item.unqRenderTooltip(tooltip_cmd_buf, tooltip_pos, tooltip_scaling);
             }
@@ -732,11 +735,14 @@ pub const Slots = struct {
         if (maybe_spell) |spell| {
             if (spell.targeting_data.kind == .self) {
                 default_cast_method = .quick_release;
+                if (activation != null) {
+                    activation = default_cast_method;
+                }
             }
             const tooltip_scaling: f32 = plat.ui_scaling;
             const tooltip_pos = slot.rect.pos.add(v2f(slot.rect.dims.x, 0));
             var slot_contents_pos = slot.rect.pos;
-            if (slot.hovered) slot_contents_pos = slot_contents_pos.add(v2f(0, -5));
+            if (enabled and slot.hovered) slot_contents_pos = slot_contents_pos.add(v2f(0, -5));
 
             spell.unqRenderCard(cmd_buf, slot_contents_pos, caster, ui_scaling);
             if (slot.long_hover.is) {
@@ -962,8 +968,8 @@ pub const Slots = struct {
         const mouse_pos = plat.getMousePosScreen();
         const hovered = geom.pointIsInRectf(mouse_pos, self.room_ui_bg_rect);
         const clicked = hovered and (plat.input_buffer.mouseBtnIsJustPressed(.left) or plat.input_buffer.mouseBtnIsJustPressed(.right));
-        run.ui_hovered = hovered;
-        run.ui_clicked = clicked;
+        run.ui_hovered = run.ui_hovered or hovered;
+        run.ui_clicked = run.ui_clicked or clicked;
 
         for (self.spells.slice()) |*slot| {
             if (try self.unqSpellUISlot(&slot.ui_slot, cmd_buf, tooltip_cmd_buf, room, caster, slot.spell)) |cast_method| {
@@ -994,8 +1000,8 @@ pub const Slots = struct {
         const mouse_pos = plat.getMousePosScreen();
         const hovered = geom.pointIsInRectf(mouse_pos, self.run_ui_bg_rect);
         const clicked = hovered and (plat.input_buffer.mouseBtnIsJustPressed(.left) or plat.input_buffer.mouseBtnIsJustPressed(.right));
-        run.ui_hovered = hovered;
-        run.ui_clicked = clicked;
+        run.ui_hovered = run.ui_hovered or hovered;
+        run.ui_clicked = run.ui_clicked or clicked;
 
         for (self.items.slice()) |*slot| {
             if (run.screen == .room) {

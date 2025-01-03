@@ -485,6 +485,10 @@ pub inline fn unqRenderIcon(self: *const Item, cmd_buf: *ImmUI.CmdBuf, pos: V2f,
     return try self.getRenderIconInfo().unqRender(cmd_buf, pos, scaling);
 }
 
+pub inline fn unqRenderIconTint(self: *const Item, cmd_buf: *ImmUI.CmdBuf, pos: V2f, scaling: f32, tint: Colorf) Error!void {
+    return try self.getRenderIconInfo().unqRenderTint(cmd_buf, pos, scaling, tint);
+}
+
 pub fn getRenderIconInfo(self: *const Item) sprites.RenderIconInfo {
     const data = App.get().data;
     const kind = std.meta.activeTag(self.kind);
