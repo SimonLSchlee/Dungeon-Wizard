@@ -424,9 +424,9 @@ pub const Slots = struct {
                     }
                 },
                 .item => {
-                    const slot = &self.spells.buffer[slot_idx];
-                    if (slot.spell) |spell| {
-                        return .{ .spell = spell };
+                    const slot = &self.items.buffer[slot_idx];
+                    if (slot.item) |item| {
+                        return .{ .item = item };
                     }
                 },
                 .discard => {
