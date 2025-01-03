@@ -338,6 +338,7 @@ pub fn unqRenderIconText(cmd_buf: *ImmUI.CmdBuf, buf: []const u8, pos: V2f, scal
         .font = icon_text_font,
         .size = icon_text_font.base_size * utl.as(u32, @round(scaling)),
         .smoothing = .none,
+        .round_to_pixel = true,
         .color = .white,
     };
     const line_height = utl.as(f32, icon_text_font.base_size * utl.as(u32, @round(scaling)));
@@ -363,6 +364,7 @@ pub fn unqRenderIconText(cmd_buf: *ImmUI.CmdBuf, buf: []const u8, pos: V2f, scal
                             .src_pos = rf.pos.toV2f(),
                             .uniform_scaling = scaling,
                             .tint = fmt.tint.toColor(),
+                            .round_to_pixel = true,
                         },
                     } });
                 }

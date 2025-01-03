@@ -37,7 +37,7 @@ const max_num_items = 4;
 const num_items = 3;
 const items_spacing: f32 = 10;
 
-const slot_margin: f32 = 10;
+const slot_margin: f32 = 5;
 
 pub const SpellOrItem = union(enum) {
     spell: Spell,
@@ -124,7 +124,7 @@ fn unqProductSlot(cmd_buf: *ImmUI.CmdBuf, tooltip_buf: *ImmUI.CmdBuf, slot: *Pro
     const slot_enabled = slot.product != null;
     const can_buy = slot_enabled and canBuy(run, &slot.product.?);
     const bg_color = Colorf.rgb(0.17, 0.15, 0.15);
-    var slot_contents_pos = slot.rect.pos.add(V2f.splat(slot_margin));
+    var slot_contents_pos = slot.rect.pos.add(V2f.splat(slot_margin * ui_scaling));
 
     // background rect
     if (can_buy and hovered) {
@@ -168,7 +168,7 @@ fn unqProductSlot(cmd_buf: *ImmUI.CmdBuf, tooltip_buf: *ImmUI.CmdBuf, slot: *Pro
             },
         );
         const price_str_dims = icon_text.measureIconText(price_str).scale(ui_scaling);
-        const price_pos = slot.rect.pos.add(slot.rect.dims).sub(price_str_dims.add(V2f.splat(slot_margin)));
+        const price_pos = slot.rect.pos.add(slot.rect.dims).sub(price_str_dims.add(v2f(slot_margin, slot_margin - 2).scale(ui_scaling)));
         try icon_text.unqRenderIconText(cmd_buf, price_str, price_pos, ui_scaling);
     }
 
@@ -197,17 +197,16 @@ pub fn update(self: *Shop, run: *Run) Error!?Product {
             .center = true,
             .color = .white,
             .font = title_font,
-            .size = title_font.base_size * utl.as(u32, ui_scaling + 2),
+            .size = title_font.base_size * utl.as(u32, ui_scaling + 1),
         },
     } });
 
     const price_font = data.fonts.get(.seven_x_five);
-    const price_font_size = utl.as(f32, price_font.base_size) * (ui_scaling);
+    const price_font_base_sz_f = utl.as(f32, price_font.base_size);
 
     // spells
-    const spell_dims = Spell.card_dims.scale(ui_scaling);
-    const spell_slot_dims = spell_dims.add(V2f.splat(slot_margin).scale(2)).add(v2f(0, price_font_size + slot_margin));
-    const spells_center = title_center_pos.add(v2f(0, 23 + 60 + spell_dims.y * 0.5));
+    const spell_slot_dims = Spell.card_dims.add(V2f.splat(slot_margin).scale(2)).add(v2f(0, price_font_base_sz_f + slot_margin)).scale(ui_scaling);
+    const spells_center = title_center_pos.add(v2f(0, 35 + Spell.card_dims.y * 0.5).scale(ui_scaling));
 
     var spell_rects = std.BoundedArray(geom.Rectf, max_num_spells){};
     spell_rects.resize(self.spells.len) catch unreachable;
@@ -223,9 +222,8 @@ pub fn update(self: *Shop, run: *Run) Error!?Product {
     }
 
     // items
-    const item_dims = Item.icon_dims.scale(ui_scaling);
-    const item_slot_dims = item_dims.add(V2f.splat(slot_margin).scale(2)).add(v2f(0, price_font_size + slot_margin));
-    const items_center = spells_center.add(v2f(0, spell_slot_dims.y * 0.5 + 40 + item_slot_dims.y * 0.5));
+    const item_slot_dims = Item.icon_dims.add(V2f.splat(slot_margin).scale(2)).add(v2f(0, price_font_base_sz_f + slot_margin)).scale(ui_scaling);
+    const items_center = spells_center.add(v2f(0, spell_slot_dims.y * 0.5 + 20 * ui_scaling + item_slot_dims.y * 0.5));
 
     var item_rects = std.BoundedArray(geom.Rectf, max_num_spells){};
     item_rects.resize(self.items.len) catch unreachable;
@@ -258,8 +256,8 @@ pub fn update(self: *Shop, run: *Run) Error!?Product {
 
     // proceed btn
     {
-        const proceed_btn_dims = v2f(170, 100);
-        const btn_center = items_center.add(v2f(0, item_slot_dims.y * 0.5 + 40 + proceed_btn_dims.y * 0.5));
+        const proceed_btn_dims = v2f(60, 40).scale(ui_scaling);
+        const btn_center = items_center.add(v2f(0, item_slot_dims.y * 0.5 + 20 * ui_scaling + proceed_btn_dims.y * 0.5));
         const proceed_btn_pos = btn_center.sub(proceed_btn_dims.scale(0.5));
 
         if (menuUI.textButton(&run.imm_ui.commands, proceed_btn_pos, "Leave", proceed_btn_dims, ui_scaling)) {
