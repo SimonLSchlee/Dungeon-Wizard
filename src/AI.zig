@@ -338,6 +338,7 @@ pub const ActorController = struct {
     flee_range: f32 = 125,
     // dont flee again for this long (TODO for all Decisions?)
     flee_cooldown: utl.TickCounter = utl.TickCounter.initStopped(1 * core.fups_per_sec),
+    flee_pos: ?V2f = null,
     // debug for flee
     hiding_places: HidingPlacesArray = .{},
     to_enemy: V2f = .{},
@@ -376,7 +377,7 @@ pub const ActorController = struct {
                             controller.non_action_decision_cooldown = utl.TickCounter.init(core.secsToTicks(pursue.at_least_secs));
                         },
                         .flee => |flee| {
-                            controller.hiding_places.len = 0;
+                            controller.flee_pos = null;
                             controller.non_action_decision_cooldown = utl.TickCounter.init(core.secsToTicks(flee.at_least_secs));
                         },
                         .action => {
@@ -388,7 +389,7 @@ pub const ActorController = struct {
             }
         }
 
-        switch (controller.decision) {
+        decision: switch (controller.decision) {
             .idle => {
                 self.updateVel(.{}, .{});
                 if (self.animator) |*a| {
@@ -410,7 +411,11 @@ pub const ActorController = struct {
             },
             .pursue_to_attack => |s| {
                 const _target = room.getThingById(s.target_id);
-                assert(_target != null);
+                if (_target == null) {
+                    controller.decision = .{ .idle = .{} };
+                    controller.non_action_decision_cooldown.stop();
+                    continue :decision controller.decision;
+                }
                 const target = _target.?;
                 const range = target.getRangeToHurtBox(self.pos);
                 _ = self.animator.?.play(.move, .{ .loop = true });
@@ -429,10 +434,15 @@ pub const ActorController = struct {
                 }
             },
             .flee => |flee| {
-                if (controller.hiding_places.len == 0) {
-                    const _thing = room.getThingById(flee.target_id);
-                    assert(_thing != null);
-                    const thing = _thing.?;
+                const _thing = room.getThingById(flee.target_id);
+                if (_thing == null) {
+                    controller.decision = .{ .idle = .{} };
+                    controller.non_action_decision_cooldown.stop();
+                    continue :decision controller.decision;
+                }
+                const thing = _thing.?;
+
+                if (controller.flee_pos == null) {
                     const flee_from_pos = thing.pos;
                     controller.hiding_places = try getHidingPlaces(
                         room,
@@ -458,17 +468,21 @@ pub const ActorController = struct {
                             }
                         }
                         if (best_pos) |pos| {
-                            try self.findPath(room, pos);
+                            controller.flee_pos = pos;
                         }
                     }
                 }
-                _ = self.animator.?.play(.move, .{ .loop = true });
-                const p = self.followPathGetNextPoint(5);
-                self.updateVel(p.sub(self.pos).normalizedOrZero(), self.accel_params);
-                if (!self.vel.isAlmostZero()) {
-                    self.dir = self.vel.normalized();
+                if (controller.flee_pos) |pos| {
+                    try self.findPath(room, pos);
+                    _ = self.animator.?.play(.move, .{ .loop = true });
+                    const p = self.followPathGetNextPoint(5);
+                    self.updateVel(p.sub(self.pos).normalizedOrZero(), self.accel_params);
+                    if (!self.vel.isAlmostZero()) {
+                        self.dir = self.vel.normalized();
+                    }
                 }
-                if (self.path.len == 0) {
+                // end of flee, or fallback if couldn't flee for some reason
+                if (self.path.len == 0 or controller.flee_pos == null) {
                     // make sure we make a new decision now we've arrived
                     controller.non_action_decision_cooldown.stop();
                     // in general the specialized ai will set this, but always set it if we reached the end of the path
