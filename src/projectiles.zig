@@ -23,90 +23,142 @@ const Spell = @import("Spell.zig");
 const Item = @import("Item.zig");
 const gameUI = @import("gameUI.zig");
 const sprites = @import("sprites.zig");
+const StatusEffect = @import("StatusEffect.zig");
 const Action = @This();
 
-pub const ProjectileKind = enum {
-    arrow,
-    bomb,
+pub const Gobarrow = struct {
+    pub const enum_name = "gobarrow";
+    state: enum {
+        in_flight,
+        hitting,
+        destroyed,
+    } = .in_flight,
 
-    pub fn prototype(self: ProjectileKind) Thing {
-        switch (self) {
-            .arrow => return gobbowArrow(),
-            .bomb => return gobbomberBomb(),
+    pub fn update(self: *Thing, room: *Room) Error!void {
+        assert(self.spawn_state == .spawned);
+        var controller = &self.controller.projectile.kind.gobarrow;
+        switch (controller.state) {
+            .in_flight => {
+                const done = self.last_coll != null or if (self.hitbox) |h| !h.active else false;
+                if (done) {
+                    controller.state = .hitting;
+                    self.vel = .{};
+                    return;
+                }
+                self.updateVel(self.dir, self.accel_params);
+            },
+            .hitting => {
+                // TODO anim
+                self.deferFree(room);
+                return;
+            },
+            .destroyed => {
+                // TODO anim
+                self.deferFree(room);
+                return;
+            },
         }
-        unreachable;
+    }
+
+    fn proto() Thing {
+        const arrow = Thing{
+            .kind = .projectile,
+            .coll_radius = 2.5,
+            .accel_params = .{
+                .accel = 2,
+                .friction = 0,
+                .max_speed = 2.2,
+            },
+            .coll_mask = Thing.Collision.Mask.initMany(&.{.wall}),
+            .controller = .{ .projectile = .{ .kind = .{
+                .gobarrow = .{},
+            } } },
+            .renderer = .{ .shape = .{
+                .kind = .{ .arrow = .{
+                    .length = 17.5,
+                    .thickness = 1.5,
+                } },
+                .poly_opt = .{ .fill_color = draw.Coloru.rgb(220, 172, 89).toColorf() },
+            } },
+            .hitbox = .{
+                .active = true,
+                .deactivate_on_hit = true,
+                .deactivate_on_update = false,
+                .effect = .{ .damage = 7 },
+                .radius = 2,
+                .rel_pos = V2f.right.scale(14),
+            },
+        };
+        return arrow;
     }
 };
 
-fn gobbowArrow() Thing {
-    const arrow = Thing{
-        .kind = .projectile,
-        .coll_radius = 2.5,
-        .accel_params = .{
-            .accel = 2,
-            .friction = 0,
-            .max_speed = 2.2,
-        },
-        .coll_mask = Thing.Collision.Mask.initMany(&.{.wall}),
-        .controller = .{ .projectile = .{
-            .kind = .arrow,
-        } },
-        .renderer = .{ .shape = .{
-            .kind = .{ .arrow = .{
-                .length = 17.5,
-                .thickness = 1.5,
-            } },
-            .poly_opt = .{ .fill_color = draw.Coloru.rgb(220, 172, 89).toColorf() },
-        } },
-        .hitbox = .{
-            .active = true,
-            .deactivate_on_hit = true,
-            .deactivate_on_update = false,
-            .effect = .{ .damage = 7 },
-            .radius = 2,
-            .rel_pos = V2f.right.scale(14),
-        },
-    };
-    return arrow;
-}
+pub const FireBlaze = struct {
+    pub const enum_name = "fire_blaze";
 
-fn gobbomberBomb() Thing {
-    const flight_ticks = core.secsToTicks(2);
-    const max_y: f32 = 150;
-    const v0: f32 = 2 * max_y / utl.as(f32, flight_ticks);
-    const g = -2 * v0 / utl.as(f32, flight_ticks);
-    const bomb = Thing{
-        .kind = .projectile,
-        .accel_params = .{
-            .accel = 2,
-            .friction = 0,
-            .max_speed = 1,
-        },
-        .controller = .{ .projectile = .{
-            .kind = .bomb,
-            .timer = utl.TickCounter.init(flight_ticks),
-            .z_vel = v0,
-            .z_accel = g,
-        } },
-        .renderer = .{ .shape = .{
-            .kind = .{ .circle = .{
-                .radius = 4,
-            } },
-            .poly_opt = .{ .fill_color = Colorf.rgb(0.2, 0.18, 0.2) },
-        } },
-        .hitbox = .{
-            .active = false,
-            .deactivate_on_hit = false,
-            .deactivate_on_update = true,
-            .effect = .{ .damage = 10 },
-            .radius = 17.5,
-        },
-    };
-    return bomb;
-}
+    loops_til_end: i32 = 2,
+    state: enum {
+        loop,
+        end,
+    } = .loop,
 
-pub const Controller = struct {
-    kind: ProjectileKind,
+    pub fn update(self: *Thing, room: *Room) Error!void {
+        const controller: *@This() = &self.controller.projectile.kind.fire_blaze;
+        const animator = &self.animator.?;
+        switch (controller.state) {
+            .loop => {
+                const events = animator.play(.loop, .{ .loop = true });
+                if (events.contains(.end)) {
+                    controller.loops_til_end -= 1;
+                    if (controller.loops_til_end <= 0) {
+                        controller.state = .end;
+                    }
+                } else if (events.contains(.hit)) {
+                    self.hitbox.?.active = true;
+                }
+            },
+            .end => {
+                if (animator.play(.end, .{}).contains(.end)) {
+                    self.deferFree(room);
+                }
+            },
+        }
+    }
+
+    pub fn proto() Thing {
+        return Thing{
+            .kind = .projectile,
+            .spawn_state = .instance,
+            .controller = .{ .projectile = .{ .kind = .{
+                .fire_blaze = .{},
+            } } },
+            .renderer = .{ .vfx = .{} },
+            .animator = .{
+                .kind = .{
+                    .vfx = .{
+                        .sheet_name = .trailblaze,
+                    },
+                },
+                .curr_anim = .loop,
+            },
+            .hitbox = .{
+                .mask = Thing.Faction.Mask.initFull(),
+                .radius = 12.5,
+                .sweep_to_rel_pos = v2f(0, -12.5),
+                .deactivate_on_hit = false,
+                .deactivate_on_update = true,
+                .effect = .{
+                    .damage = 0,
+                    .can_be_blocked = false,
+                    .status_stacks = StatusEffect.StacksArray.initDefault(0, .{ .lit = 1 }),
+                },
+            },
+        };
+    }
+};
+
+pub const Gobbomb = struct {
+    pub const enum_name = "gobbomb";
     state: enum {
         in_flight,
         hitting,
@@ -119,63 +171,109 @@ pub const Controller = struct {
 
     pub fn update(self: *Thing, room: *Room) Error!void {
         assert(self.spawn_state == .spawned);
-        var controller = &self.controller.projectile;
-        switch (controller.kind) {
-            .arrow => {
-                switch (controller.state) {
-                    .in_flight => {
-                        const done = self.last_coll != null or if (self.hitbox) |h| !h.active else false;
-                        if (done) {
-                            controller.state = .hitting;
-                            self.vel = .{};
-                            return;
-                        }
-                        self.updateVel(self.dir, self.accel_params);
-                    },
-                    .hitting => {
-                        // TODO anim
-                        self.deferFree(room);
-                        return;
-                    },
-                    .destroyed => {
-                        // TODO anim
-                        self.deferFree(room);
-                        return;
-                    },
+        var controller = &self.controller.projectile.kind.gobbomb;
+
+        switch (controller.state) {
+            .in_flight => {
+                if (self.hitbox) |*h| {
+                    h.rel_pos = controller.target_pos.sub(self.pos);
+                }
+                _ = controller.timer.tick(false);
+                controller.z_vel += controller.z_accel;
+                self.renderer.shape.rel_pos.y += -controller.z_vel;
+                if (self.pos.dist(controller.target_pos) < self.accel_params.max_speed) {
+                    self.vel = .{};
+                    if (self.hitbox) |*h| {
+                        h.active = true;
+                    }
+                    controller.state = .hitting;
+                } else {
+                    self.updateVel(self.dir, self.accel_params);
                 }
             },
-            .bomb => {
-                switch (controller.state) {
-                    .in_flight => {
-                        if (self.hitbox) |*h| {
-                            h.rel_pos = controller.target_pos.sub(self.pos);
-                        }
-                        _ = controller.timer.tick(false);
-                        controller.z_vel += controller.z_accel;
-                        self.renderer.shape.rel_pos.y += -controller.z_vel;
-                        if (self.pos.dist(controller.target_pos) < self.accel_params.max_speed) {
-                            self.vel = .{};
-                            if (self.hitbox) |*h| {
-                                h.active = true;
-                            }
-                            controller.state = .hitting;
-                        } else {
-                            self.updateVel(self.dir, self.accel_params);
-                        }
-                    },
-                    .hitting => {
-                        const done = if (self.hitbox) |h| !h.active else false;
-                        if (done) {
-                            self.deferFree(room);
-                            return;
-                        }
-                    },
-                    else => {
-                        self.deferFree(room);
-                        return;
-                    },
+            .hitting => {
+                const done = if (self.hitbox) |h| !h.active else false;
+                if (done) {
+                    self.deferFree(room);
+                    return;
                 }
             },
+            else => {
+                self.deferFree(room);
+                return;
+            },
+        }
+    }
+
+    fn proto() Thing {
+        const flight_ticks = core.secsToTicks(2);
+        const max_y: f32 = 150;
+        const v0: f32 = 2 * max_y / utl.as(f32, flight_ticks);
+        const g = -2 * v0 / utl.as(f32, flight_ticks);
+        const bomb = Thing{
+            .kind = .projectile,
+            .accel_params = .{
+                .accel = 2,
+                .friction = 0,
+                .max_speed = 1,
+            },
+            .controller = .{ .projectile = .{ .kind = .{
+                .gobbomb = .{
+                    .timer = utl.TickCounter.init(flight_ticks),
+                    .z_vel = v0,
+                    .z_accel = g,
+                },
+            } } },
+            .renderer = .{ .shape = .{
+                .kind = .{ .circle = .{
+                    .radius = 4,
+                } },
+                .poly_opt = .{ .fill_color = Colorf.rgb(0.2, 0.18, 0.2) },
+            } },
+            .hitbox = .{
+                .active = false,
+                .deactivate_on_hit = false,
+                .deactivate_on_update = true,
+                .effect = .{ .damage = 10 },
+                .radius = 17.5,
+            },
+        };
+        return bomb;
+    }
+};
+
+pub const ProjectileTypes = [_]type{
+    FireBlaze,
+    Gobarrow,
+    Gobbomb,
+};
+
+pub const Kind = utl.EnumFromTypes(&ProjectileTypes, "enum_name");
+pub const KindData = utl.TaggedUnionFromTypes(&ProjectileTypes, "enum_name", Kind);
+
+pub fn GetKindType(kind: Kind) type {
+    const fields: []const std.builtin.Type.UnionField = std.meta.fields(KindData);
+    if (std.meta.fieldIndex(KindData, @tagName(kind))) |i| {
+        return fields[i].type;
+    }
+    @compileError("No Projectile kind: " ++ @tagName(kind));
+}
+
+pub fn proto(kind: Kind) Thing {
+    switch (kind) {
+        inline else => |k| {
+            return GetKindType(k).proto();
+        },
+    }
+}
+
+pub const Controller = struct {
+    kind: KindData,
+
+    pub fn update(self: *Thing, room: *Room) Error!void {
+        assert(self.spawn_state == .spawned);
+        switch (self.controller.projectile.kind) {
+            inline else => |c| try @TypeOf(c).update(self, room),
         }
     }
 };

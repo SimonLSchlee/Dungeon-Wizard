@@ -253,7 +253,7 @@ pub fn gobbowProto() Thing {
     ret.controller.ai_actor.flee_range = 115;
     ret.controller.ai_actor.actions.getPtr(.projectile_attack_1).* = (.{
         .kind = .{ .projectile_attack = .{
-            .projectile = .arrow,
+            .projectile = .gobarrow,
             .range = 110,
             .LOS_thiccness = 5,
         } },
@@ -336,7 +336,7 @@ pub fn gobbomberProto() Thing {
     };
     ret.controller.ai_actor.actions.getPtr(.projectile_attack_1).* = .{
         .kind = .{ .projectile_attack = .{
-            .projectile = .bomb,
+            .projectile = .gobbomb,
             .range = 95,
             .LOS_thiccness = 5,
         } },

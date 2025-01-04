@@ -30,7 +30,6 @@ const Params = Spell.Params;
 pub const title = "Trailblaze";
 
 pub const enum_name = "trailblaze";
-pub const Controllers = [_]type{Projectile};
 
 pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
@@ -45,79 +44,7 @@ pub const proto = Spell.makeProto(
     },
 );
 
-pub fn fireProto() Thing {
-    return Thing{
-        .kind = .projectile,
-        .spawn_state = .instance,
-        .controller = .{
-            .spell = .{
-                .params = .{ .target_kind = .self }, // TODO this isn't valid but doesnt matter
-                .spell = proto,
-                .controller = .{ .trailblaze_projectile = .{} },
-            },
-        },
-        .renderer = .{ .vfx = .{} },
-        .animator = .{
-            .kind = .{
-                .vfx = .{
-                    .sheet_name = .trailblaze,
-                },
-            },
-            .curr_anim = .loop,
-        },
-        .hitbox = .{
-            .mask = Thing.Faction.Mask.initFull(),
-            .radius = 12.5,
-            .sweep_to_rel_pos = v2f(0, -12.5),
-            .deactivate_on_hit = false,
-            .deactivate_on_update = true,
-            .effect = .{
-                .damage = 0,
-                .can_be_blocked = false,
-                .status_stacks = StatusEffect.StacksArray.initDefault(0, .{ .lit = 1 }),
-            },
-        },
-    };
-}
-
 num_stacks: i32 = 5,
-
-pub const Projectile = struct {
-    pub const controller_enum_name = enum_name ++ "_projectile";
-
-    loops_til_end: i32 = 2,
-    state: enum {
-        loop,
-        end,
-    } = .loop,
-
-    pub fn update(self: *Thing, room: *Room) Error!void {
-        const spell_controller = &self.controller.spell;
-        const spell = spell_controller.spell;
-        const trailblaze = spell.kind.trailblaze;
-        _ = trailblaze;
-        const projectile: *@This() = &spell_controller.controller.trailblaze_projectile;
-        const animator = &self.animator.?;
-        switch (projectile.state) {
-            .loop => {
-                const events = animator.play(.loop, .{ .loop = true });
-                if (events.contains(.end)) {
-                    projectile.loops_til_end -= 1;
-                    if (projectile.loops_til_end <= 0) {
-                        projectile.state = .end;
-                    }
-                } else if (events.contains(.hit)) {
-                    self.hitbox.?.active = true;
-                }
-            },
-            .end => {
-                if (animator.play(.end, .{}).contains(.end)) {
-                    self.deferFree(room);
-                }
-            },
-        }
-    }
-};
 
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
     params.validate(.self, caster);

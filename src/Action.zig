@@ -42,7 +42,7 @@ pub const MeleeAttack = struct {
 
 pub const ProjectileAttack = struct {
     pub const enum_name = "projectile_attack";
-    projectile: projectiles.ProjectileKind,
+    projectile: projectiles.Kind,
     range: f32 = 50,
     LOS_thiccness: f32 = 5,
     target_pos: V2f = .{},
@@ -261,7 +261,7 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                 doing.can_turn = false;
             }
             // face/track target
-            var projectile: Thing = atk.projectile.prototype();
+            var projectile: Thing = projectiles.proto(atk.projectile);
             if (doing.can_turn) {
                 // default to original target pos
                 self.dir = doing.params.pos.sub(self.pos).normalizedChecked() orelse self.dir;
@@ -275,16 +275,17 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                                 const range = @max(dist - hurtbox.radius, 0);
                                 var ticks_til_hit = utl.as(f32, ticks_til_hit_event);
                                 switch (atk.projectile) {
-                                    .arrow => {
+                                    .gobarrow => {
                                         ticks_til_hit += range / projectile.accel_params.max_speed;
                                     },
-                                    .bomb => {
-                                        ticks_til_hit += utl.as(f32, projectile.controller.projectile.timer.num_ticks);
+                                    .gobbomb => {
+                                        ticks_til_hit += utl.as(f32, projectile.controller.projectile.kind.gobbomb.timer.num_ticks);
                                     },
+                                    else => {},
                                 }
                                 const predicted_target_pos = target.pos.add(target.vel.scale(ticks_til_hit));
                                 switch (atk.projectile) {
-                                    .arrow => {
+                                    .gobarrow => {
                                         const not_too_fast = target.vel.length() < 0.022 * TileMap.tile_sz_f;
                                         // make sure we can actually still get past nearby walls with this new angle!
                                         if (not_too_fast and room.tilemap.isLOSBetweenThicc(self.pos, predicted_target_pos, atk.LOS_thiccness)) {
@@ -296,7 +297,7 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                                             self.dir = target.pos.sub(self.pos).normalizedChecked() orelse self.dir;
                                         }
                                     },
-                                    .bomb => {
+                                    .gobbomb => {
                                         const not_too_fast = target.vel.length() < 0.020 * TileMap.tile_sz_f;
                                         if (not_too_fast) {
                                             atk.target_pos = predicted_target_pos;
@@ -310,6 +311,7 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                                             atk.target_pos = self.pos.add(self.dir.scale(projectile.hitbox.?.radius + 5));
                                         }
                                     },
+                                    else => {},
                                 }
                             }
                         }
@@ -325,20 +327,21 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                 self.renderer.creature.draw_color = Colorf.red;
                 projectile.dir = self.dir;
                 switch (atk.projectile) {
-                    .arrow => {
+                    .gobarrow => {
                         projectile.hitbox.?.rel_pos = self.dir.scale(projectile.hitbox.?.rel_pos.length());
                         projectile.hitbox.?.mask = Thing.Faction.opposing_masks.get(self.faction);
                     },
-                    .bomb => {
+                    .gobbomb => {
                         const dist = atk.target_pos.dist(self.pos);
-                        const ticks_til_hit = projectile.controller.projectile.timer.num_ticks;
+                        const ticks_til_hit = projectile.controller.projectile.kind.gobbomb.timer.num_ticks;
                         projectile.accel_params.max_speed = dist / utl.as(f32, ticks_til_hit);
                         projectile.hitbox.?.mask = Thing.Faction.Mask.initFull();
                         projectile.hitbox.?.indicator = .{
                             .timer = utl.TickCounter.init(ticks_til_hit),
                         };
-                        projectile.controller.projectile.target_pos = atk.target_pos;
+                        projectile.controller.projectile.kind.gobbomb.target_pos = atk.target_pos;
                     },
+                    else => {},
                 }
                 _ = try room.queueSpawnThing(&projectile, self.pos);
             }

@@ -24,6 +24,7 @@ const StatusEffect = @import("../StatusEffect.zig");
 const Data = @import("../Data.zig");
 
 const Collision = @import("../Collision.zig");
+const projectiles = @import("../projectiles.zig");
 const Spell = @import("../Spell.zig");
 const TargetKind = Spell.TargetKind;
 const TargetingData = Spell.TargetingData;
@@ -78,7 +79,7 @@ pub fn spawnFiresInRadius(room: *Room, pos: V2f, radius: f32, comptime max_spawn
     if (max_spawned > 100) {
         @compileError("too many firess");
     }
-    const fire_proto: Thing = Spell.GetKindType(.trailblaze).fireProto();
+    const fire_proto: Thing = projectiles.proto(.fire_blaze);
     const top_left = pos.sub(V2f.splat(radius));
     const sq_size = radius * 2;
     const rnd = room.rng.random();

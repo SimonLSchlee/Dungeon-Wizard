@@ -27,6 +27,7 @@ const icon_text = @import("icon_text.zig");
 const Spell = @import("Spell.zig");
 const ImmUI = @import("ImmUI.zig");
 const Tooltip = @import("Tooltip.zig");
+const projectiles = @import("projectiles.zig");
 
 pub const CdType = enum {
     no_cd,
@@ -300,7 +301,7 @@ pub fn update(status: *StatusEffect, thing: *Thing, room: *Room) Error!void {
             const len = vec.length();
             const spawn_dist: f32 = 12.5;
             if (len > spawn_dist) {
-                const thing_proto: Thing = Spell.GetKindType(.trailblaze).fireProto();
+                const thing_proto: Thing = projectiles.proto(.fire_blaze);
                 const vec_n = vec.scale(1 / len);
                 const num_to_spawn: usize = utl.as(usize, len / spawn_dist);
                 for (0..num_to_spawn) |i| {
