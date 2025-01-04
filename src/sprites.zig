@@ -613,6 +613,10 @@ pub const SpriteAnimator = struct {
         }
 
         self.anim_tick += 1;
+        // make sure we dont loop before tick_in_frame goes over the end of the frame (see above)
+        if (self.anim_tick >= anim.dur_ticks) {
+            self.anim_tick = utl.as(i32, anim.dur_ticks - 1);
+        }
         self.tick_in_frame += 1;
         return ret;
     }
