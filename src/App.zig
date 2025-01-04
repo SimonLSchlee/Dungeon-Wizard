@@ -67,7 +67,9 @@ pub fn resolutionChanged(self: *App) void {
     self.game_render_texture = plat.createRenderTexture("app_game", plat.game_canvas_dims);
     self.ui_render_texture = plat.createRenderTexture("app_ui", plat.screen_dims);
 
-    self.run.resolutionChanged();
+    if (self.screen == .run) {
+        self.run.resolutionChanged();
+    }
 }
 
 export fn appInit(plat: *Platform) *anyopaque {
@@ -362,6 +364,7 @@ fn update(self: *App) Error!void {
             },
         }
     }
+    self.options.alwaysUpdate();
     self.curr_tick += 1;
 }
 

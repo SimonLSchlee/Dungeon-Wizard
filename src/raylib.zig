@@ -89,6 +89,10 @@ pub fn centerGameRect(self: *Platform, screen_rect_pos: V2f, screen_rect_dims: V
     self.game_canvas_screen_topleft_offset = screen_rect_pos.add(screen_rect_dims.sub(self.game_canvas_dims_f.scale(self.game_scaling)).scale(0.5));
 }
 
+pub fn getWindowSize(_: *Platform) V2i {
+    return v2i(r.GetScreenWidth(), r.GetScreenHeight());
+}
+
 pub fn setWindowSize(_: *Platform, dims: V2i) void {
     r.SetWindowSize(@intCast(dims.x), @intCast(dims.y));
 }
@@ -164,14 +168,14 @@ pub fn init(title: []const u8) Error!*Platform {
 
     r.SetTraceLogCallback(raylibTraceLog);
     const title_z = try std.fmt.allocPrintZ(ret.heap, "{s}", .{title});
-    //r.SetConfigFlags(r.FLAG_WINDOW_RESIZABLE);
+    r.SetConfigFlags(r.FLAG_WINDOW_RESIZABLE);
 
     // v2i(1352, 878)
     // core.min_resolution.scale(1); //.add(v2i(32, 32));
     r.InitWindow(@intCast(core.min_resolution.x), @intCast(core.min_resolution.y), title_z);
     const options = Options.initTryLoad(ret);
     const option_dims = options.display.selected_resolution;
-    Options.updateScreenDims(ret, option_dims);
+    Options.updateScreenDims(ret, option_dims, true);
     // show raylib init INFO, then just warnings
     r.SetTraceLogLevel(r.LOG_WARNING);
 

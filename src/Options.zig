@@ -516,7 +516,7 @@ fn setValByName(plat: *Platform, T: type, data: *T, key: []const u8, val: []cons
     }
 }
 
-pub fn updateScreenDims(plat: *Platform, dims: V2i) void {
+pub fn updateScreenDims(plat: *Platform, dims: V2i, resize_window: bool) void {
     plat.screen_dims = dims;
     plat.screen_dims_f = dims.toV2f();
     // get ui scale - fit inside or equal screen dims
@@ -528,6 +528,7 @@ pub fn updateScreenDims(plat: *Platform, dims: V2i) void {
         }
         ui_scaling += 1;
     }
+    ui_scaling = @max(ui_scaling, 1);
     plat.ui_scaling = utl.as(f32, ui_scaling);
     // get game scale
     if (false) {
@@ -579,8 +580,10 @@ pub fn updateScreenDims(plat: *Platform, dims: V2i) void {
 
     const m_info = plat.getMonitorIdxAndDims();
     const m_dims = m_info.dims;
-    plat.setWindowSize(dims);
-    plat.setWindowPosition(m_dims.sub(dims).toV2f().scale(0.5).toV2i());
+    if (resize_window) {
+        plat.setWindowSize(dims);
+        plat.setWindowPosition(m_dims.sub(dims).toV2f().scale(0.5).toV2i());
+    }
 }
 
 // this may be called when getPlat() doesn't work yet!
@@ -699,7 +702,7 @@ fn updateDisplay(self: *Options, cmd_buf: *ImmUI.CmdBuf, pos: V2f) Error!bool {
         }
         if (try self.display.dropdown.update(cmd_buf, dropdown_pos, strings_buf.constSlice())) |new_idx| {
             self.display.selected_resolution = self.display.resolutions.get(new_idx);
-            updateScreenDims(plat, self.display.selected_resolution);
+            updateScreenDims(plat, self.display.selected_resolution, true);
             App.get().resolutionChanged();
             dirty = true;
         }
@@ -830,4 +833,14 @@ pub fn update(self: *Options, cmd_buf: *ImmUI.CmdBuf) Error!enum { dont_close, c
         return .close;
     }
     return .dont_close;
+}
+
+pub fn alwaysUpdate(_: *Options) void {
+    const plat = App.getPlat();
+    const curr_screen_dims = plat.getWindowSize();
+    if (!plat.screen_dims.eql(curr_screen_dims)) {
+        // manually resized
+        updateScreenDims(plat, curr_screen_dims, false);
+        App.get().resolutionChanged();
+    }
 }
