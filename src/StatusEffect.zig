@@ -28,6 +28,12 @@ const Spell = @import("Spell.zig");
 const ImmUI = @import("ImmUI.zig");
 const Tooltip = @import("Tooltip.zig");
 
+pub const CdType = enum {
+    no_cd,
+    remove_one_stack,
+    remove_all_stacks,
+};
+
 const Proto = struct {
     enum_name: [:0]const u8,
     name: []const u8,
@@ -172,45 +178,40 @@ pub const Kind = blk: {
     });
 };
 
+pub const ProtoArray = std.EnumArray(Kind, Proto);
+pub const proto_array = blk: {
+    var ret: ProtoArray = undefined;
+    for (protos) |p| {
+        const kind: Kind = utl.stringToEnum(Kind, p.enum_name).?;
+        ret.set(kind, p);
+    }
+    break :blk ret;
+};
+
 pub const StacksArray = std.EnumArray(Kind, i32);
 pub const StatusArray = std.EnumArray(Kind, StatusEffect);
-pub const proto_array = blk: {
+
+pub const status_array = blk: {
     var ret: StatusArray = undefined;
-    for (protos, 0..) |p, i| {
-        const kind: Kind = @enumFromInt(i);
+    for (protos) |p| {
+        const kind: Kind = utl.stringToEnum(Kind, p.enum_name).?;
         ret.set(kind, .{
-            .name = p.name,
             .kind = kind,
-            .icon = p.icon,
-            .stacks = 0,
             .cooldown = utl.TickCounter.init(p.cd),
-            .cd_type = p.cd_type,
-            .color = p.color,
-            .max_stacks = p.max_stacks,
         });
     }
     break :blk ret;
 };
 
-pub const CdType = enum {
-    no_cd,
-    remove_one_stack,
-    remove_all_stacks,
-};
-
-name: []const u8, // TODO remove
-icon: icon_text.Icon,
 kind: Kind,
 stacks: i32 = 0,
 cooldown: utl.TickCounter = utl.TickCounter.init(core.fups_per_sec * 1),
-cd_type: CdType = .no_cd,
-color: Colorf = .white,
 // should put in a union maybe
 timer: utl.TickCounter = utl.TickCounter.init(core.secsToTicks(1)),
 prev_pos: V2f = .{},
-max_stacks: i32 = 9999,
 
 pub fn setStacks(self: *StatusEffect, thing: *Thing, num: i32) void {
+    const proto = proto_array.get(self.kind);
     switch (self.kind) {
         .lit => {
             if (thing.statuses.get(.moist).stacks > 0) {
@@ -225,7 +226,7 @@ pub fn setStacks(self: *StatusEffect, thing: *Thing, num: i32) void {
     if (self.stacks == 0) {
         self.cooldown.restart();
     }
-    self.stacks = utl.clamp(i32, num, 0, self.max_stacks);
+    self.stacks = utl.clamp(i32, num, 0, proto.max_stacks);
 }
 
 pub fn addStacks(self: *StatusEffect, thing: *Thing, num: i32) void {
@@ -233,15 +234,16 @@ pub fn addStacks(self: *StatusEffect, thing: *Thing, num: i32) void {
 }
 
 pub fn getDurationSeconds(kind: Kind, stacks: i32) ?f32 {
-    const status = proto_array.get(kind);
-    return switch (status.cd_type) {
-        .remove_one_stack => utl.as(f32, stacks) * utl.as(f32, @divFloor(status.cooldown.num_ticks, core.fups_per_sec)),
-        .remove_all_stacks => core.fups_to_secsf(status.cooldown.num_ticks),
+    const proto = proto_array.get(kind);
+    return switch (proto.cd_type) {
+        .remove_one_stack => utl.as(f32, stacks) * utl.as(f32, @divFloor(proto.cd, core.fups_per_sec)),
+        .remove_all_stacks => core.fups_to_secsf(proto.cd),
         .no_cd => null,
     };
 }
 
 pub fn update(status: *StatusEffect, thing: *Thing, room: *Room) Error!void {
+    const proto = proto_array.get(status.kind);
     switch (status.kind) {
         .shield => if (thing.hp) |hp| {
             status.stacks = 0;
@@ -251,11 +253,11 @@ pub fn update(status: *StatusEffect, thing: *Thing, room: *Room) Error!void {
         },
         else => {},
     }
-    if (status.cd_type == .no_cd or status.stacks == 0) {
+    if (proto.cd_type == .no_cd or status.stacks == 0) {
         return;
     }
     if (status.cooldown.tick(true)) {
-        switch (status.cd_type) {
+        switch (proto.cd_type) {
             .remove_one_stack => {
                 status.stacks -= 1;
             },
@@ -268,13 +270,13 @@ pub fn update(status: *StatusEffect, thing: *Thing, room: *Room) Error!void {
             switch (status.kind) {
                 .blackmailed => {
                     assert(thing.isCreature());
-                    const proto = App.get().data.creature_protos.get(thing.creature_kind.?);
-                    thing.faction = proto.faction;
+                    const thing_proto = App.get().data.creature_protos.get(thing.creature_kind.?);
+                    thing.faction = thing_proto.faction;
                 },
                 .trailblaze => {
                     assert(thing.isCreature());
-                    const proto = App.get().data.creature_protos.get(thing.creature_kind.?);
-                    thing.accel_params = proto.accel_params;
+                    const thing_proto = App.get().data.creature_protos.get(thing.creature_kind.?);
+                    thing.accel_params = thing_proto.accel_params;
                 },
                 else => {},
             }
@@ -298,14 +300,14 @@ pub fn update(status: *StatusEffect, thing: *Thing, room: *Room) Error!void {
             const len = vec.length();
             const spawn_dist: f32 = 12.5;
             if (len > spawn_dist) {
-                const proto: Thing = Spell.GetKindType(.trailblaze).fireProto();
+                const thing_proto: Thing = Spell.GetKindType(.trailblaze).fireProto();
                 const vec_n = vec.scale(1 / len);
                 const num_to_spawn: usize = utl.as(usize, len / spawn_dist);
                 for (0..num_to_spawn) |i| {
                     var pos = status.prev_pos.add(vec_n.scale(utl.as(f32, i) * spawn_dist));
                     const v_90 = vec_n.rot90CCW();
                     const rand_offset = v_90.scale(2).add(v_90.neg()).scale(room.rng.random().floatNorm(f32) * 3);
-                    _ = try room.queueSpawnThing(&proto, pos.add(rand_offset));
+                    _ = try room.queueSpawnThing(&thing_proto, pos.add(rand_offset));
                 }
             }
             status.prev_pos = thing.pos;
@@ -318,8 +320,12 @@ pub fn getIcon(kind: StatusEffect.Kind) icon_text.Icon {
     return proto_array.get(kind).icon;
 }
 
+pub inline fn getColor(status: StatusEffect) Colorf {
+    return proto_array.get(status.kind).color;
+}
+
 pub fn fmtDesc(buf: []u8, kind: StatusEffect.Kind) Error![]u8 {
-    const status = proto_array.get(kind);
+    const proto = proto_array.get(kind);
     return switch (kind) {
         .protected => try std.fmt.bufPrint(buf, "The next enemy attack is blocked", .{}),
         .frozen => try std.fmt.bufPrint(buf, "Cannot move or act", .{}),
@@ -334,8 +340,8 @@ pub fn fmtDesc(buf: []u8, kind: StatusEffect.Kind) Error![]u8 {
             buf,
             "Take 1 damage per second per stack.\nRemove 1 stack every {} seconds\nMax {} stacks",
             .{
-                utl.as(i32, @floor(core.fups_to_secsf(status.cooldown.num_ticks))),
-                status.max_stacks,
+                utl.as(i32, @floor(core.fups_to_secsf(proto.cd))),
+                proto.max_stacks,
             },
         ),
         .moist => try std.fmt.bufPrint(
@@ -354,28 +360,28 @@ pub fn fmtDesc(buf: []u8, kind: StatusEffect.Kind) Error![]u8 {
 }
 
 pub fn fmtLong(buf: []u8, kind: StatusEffect.Kind, stacks: i32) Error![]u8 {
-    const status = proto_array.get(kind);
+    const proto = proto_array.get(kind);
     return try icon_text.partsToUtf8(buf, &.{
-        .{ .icon = status.icon },
-        .{ .text = status.name },
+        .{ .icon = proto.icon },
+        .{ .text = proto.name },
         .{ .text = ": " },
         .{ .text = try _fmtStacksLong(kind, stacks) },
     });
 }
 
 pub fn fmtShort(buf: []u8, kind: StatusEffect.Kind, stacks: i32) Error![]u8 {
-    const status = proto_array.get(kind);
+    const proto = proto_array.get(kind);
     return try icon_text.partsToUtf8(buf, &.{
-        .{ .icon = status.icon },
+        .{ .icon = proto.icon },
         .{ .text = try _fmtStacksShort(kind, stacks) },
     });
 }
 
 pub fn fmtName(buf: []u8, kind: StatusEffect.Kind) Error![]u8 {
-    const status = proto_array.get(kind);
+    const proto = proto_array.get(kind);
     return try icon_text.partsToUtf8(buf, &.{
-        .{ .icon = status.icon },
-        .{ .text = status.name },
+        .{ .icon = proto.icon },
+        .{ .text = proto.name },
     });
 }
 

@@ -154,7 +154,7 @@ selectable: ?struct {
     radius: f32 = 10,
     height: f32 = 25,
 } = null,
-statuses: StatusEffect.StatusArray = StatusEffect.proto_array,
+statuses: StatusEffect.StatusArray = StatusEffect.status_array,
 enemy_difficulty: f32 = 0,
 find_path_timer: utl.TickCounter = utl.TickCounter.init(6),
 shadow_radius_x: f32 = 0,
@@ -1480,9 +1480,9 @@ pub fn renderStatusBars(self: *const Thing, _: *const Room) Error!void {
             const text = try utl.bufPrintLocal("{}", .{status.stacks});
             const text_dims = try plat.measureText(text, .{ .size = font.base_size });
             const status_box_width = text_dims.x + 2;
-            const text_color = Colorf.getContrasting(status.color);
+            const text_color = Colorf.getContrasting(status.getColor());
             plat.rectf(status_pos, v2f(status_box_width, status_height), .{
-                .fill_color = status.color,
+                .fill_color = status.getColor(),
             });
 
             try plat.textf(status_pos.add(V2f.splat(1)), "{s}", .{text}, .{

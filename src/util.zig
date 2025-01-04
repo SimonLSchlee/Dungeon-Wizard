@@ -276,6 +276,16 @@ pub fn enumToString(E: type, m: E) []const u8 {
     unreachable;
 }
 
+// naive sting to enum without StaticStringMap
+pub fn stringToEnum(T: type, str: []const u8) ?T {
+    inline for (@typeInfo(T).@"enum".fields) |f| {
+        if (std.mem.eql(u8, str, f.name)) {
+            return @field(T, f.name);
+        }
+    }
+    return null;
+}
+
 pub fn PaddingBits(T: type, bits_used: usize) type {
     return @Type(.{ .int = .{ .bits = @bitSizeOf(T) - bits_used, .signedness = .unsigned } });
 }
