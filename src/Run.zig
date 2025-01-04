@@ -144,6 +144,7 @@ screen: enum {
     reward,
     shop,
     dead,
+    win,
 } = .room,
 seed: u64,
 rng: std.Random.DefaultPrng = undefined,
@@ -938,6 +939,71 @@ pub fn deadUpdate(self: *Run) Error!void {
     }
 }
 
+pub fn winUpdate(self: *Run) Error!void {
+    const data = App.getData();
+    const plat = getPlat();
+    const ui_scaling = plat.ui_scaling;
+    // modal background
+    var modal_dims = plat.screen_dims_f.scale(0.6);
+    var modal_topleft = plat.screen_dims_f.sub(modal_dims).scale(0.5);
+
+    const game_rect_dims = self.ui_slots.getGameScreenRect();
+    modal_dims = v2f(game_rect_dims.x * 0.6, game_rect_dims.y * 0.9);
+    modal_topleft = game_rect_dims.sub(modal_dims).scale(0.5);
+
+    self.imm_ui.commands.appendAssumeCapacity(.{ .rect = .{
+        .pos = modal_topleft,
+        .dims = modal_dims,
+        .opt = .{
+            .fill_color = Colorf.rgba(0.1, 0.1, 0.1, 0.8),
+            .outline = .{
+                .color = Colorf.rgba(0.1, 0.1, 0.2, 0.8),
+                .thickness = 2 * ui_scaling,
+            },
+        },
+    } });
+
+    var curr_row_y = modal_topleft.y + 10 * ui_scaling;
+    const modal_center_x = modal_topleft.x + modal_dims.x * 0.5;
+
+    // title
+    const title_font = data.fonts.get(.pixeloid);
+    const title_center = v2f(modal_center_x, curr_row_y + 10 * ui_scaling);
+    self.imm_ui.commands.appendAssumeCapacity(.{ .label = .{
+        .pos = title_center,
+        .text = ImmUI.initLabel("You have survived!"),
+        .opt = .{
+            .size = title_font.base_size * u.as(u32, ui_scaling + 1),
+            .font = title_font,
+            .smoothing = .none,
+            .color = .white,
+            .center = true,
+        },
+    } });
+    curr_row_y += 30 * ui_scaling;
+
+    const btn_dims = v2f(70, 30).scale(ui_scaling);
+    const btn_spacing: f32 = 10 * ui_scaling;
+    const btns_x = modal_topleft.x + (modal_dims.x - btn_dims.x) * 0.5;
+    var curr_btn_pos = v2f(btns_x, curr_row_y);
+
+    if (menuUI.textButton(&self.imm_ui.commands, curr_btn_pos, "New Run", btn_dims, ui_scaling)) {
+        try self.reset();
+        try self.startRun();
+    }
+    curr_btn_pos.y += btn_dims.y + btn_spacing;
+
+    if (menuUI.textButton(&self.imm_ui.commands, curr_btn_pos, "Main Menu", btn_dims, ui_scaling)) {
+        self.exit_to_menu = true;
+    }
+    curr_btn_pos.y += btn_dims.y + btn_spacing;
+
+    if (menuUI.textButton(&self.imm_ui.commands, curr_btn_pos, "Exit", btn_dims, ui_scaling)) {
+        plat.exit();
+    }
+    curr_btn_pos.y += btn_dims.y + btn_spacing;
+}
+
 pub fn update(self: *Run) Error!void {
     const plat = App.getPlat();
 
@@ -967,41 +1033,47 @@ pub fn update(self: *Run) Error!void {
     }
 
     switch (self.load_state) {
-        .none => switch (self.screen) {
-            .room => try self.roomUpdate(),
-            .reward => {
-                try self.rewardUpdate();
-                if (self.room.getPlayer()) |thing| {
-                    try self.ui_slots.runUpdate(&self.imm_ui.commands, &self.tooltip_ui.commands, self, thing);
-                }
-            },
-            .shop => {
-                try self.shopUpdate();
-                if (self.room.getPlayer()) |thing| {
-                    try self.ui_slots.runUpdate(&self.imm_ui.commands, &self.tooltip_ui.commands, self, thing);
-                }
-            },
-            .dead => try self.deadUpdate(),
-        },
+        .none => {},
         .fade_in => {
-            if (self.room.getPlayer()) |thing| {
-                try self.ui_slots.roomUpdate(&self.imm_ui.commands, &self.tooltip_ui.commands, self, thing);
-                self.ui_slots.unselectAction(); // effectively disables UI while fading
-            }
             if (self.load_timer.tick(true)) {
                 self.load_state = .none;
             }
         },
         .fade_out => {
-            if (self.room.getPlayer()) |thing| {
-                try self.ui_slots.roomUpdate(&self.imm_ui.commands, &self.tooltip_ui.commands, self, thing);
-                self.ui_slots.unselectAction(); // effectively disables UI while fading
-            }
             if (self.load_timer.tick(true)) {
                 self.curr_place_idx += 1;
-                try self.loadPlaceFromCurrIdx();
-                self.load_state = .fade_in;
+                if (self.curr_place_idx >= self.places.len) {
+                    self.screen = .win;
+                    self.load_state = .none;
+                } else {
+                    try self.loadPlaceFromCurrIdx();
+                    self.load_state = .fade_in;
+                }
             }
+        },
+    }
+
+    if (self.room.getPlayer()) |thing| {
+        if (self.screen == .room) {
+            try self.ui_slots.roomUpdate(&self.imm_ui.commands, &self.tooltip_ui.commands, self, thing);
+        } else {
+            try self.ui_slots.runUpdate(&self.imm_ui.commands, &self.tooltip_ui.commands, self, thing);
+        }
+    }
+
+    switch (self.load_state) {
+        .none => switch (self.screen) {
+            .room => try self.roomUpdate(),
+            .reward => try self.rewardUpdate(),
+            .shop => try self.shopUpdate(),
+            .dead => try self.deadUpdate(),
+            .win => try self.winUpdate(),
+        },
+        .fade_in => {
+            self.ui_slots.unselectAction(); // effectively disables UI while fading
+        },
+        .fade_out => {
+            self.ui_slots.unselectAction(); // effectively disables UI while fading
         },
     }
 
@@ -1042,7 +1114,13 @@ pub fn render(self: *Run, ui_render_texture: Platform.RenderTexture2D, game_rend
     plat.endRenderToTexture();
 
     // room
-    try self.room.render(ui_render_texture, game_render_texture);
+    if (self.screen == .win) {
+        plat.startRenderToTexture(ui_render_texture);
+        plat.clear(.black);
+        plat.endRenderToTexture();
+    } else {
+        try self.room.render(ui_render_texture, game_render_texture);
+    }
 
     // ui
     plat.startRenderToTexture(ui_render_texture);

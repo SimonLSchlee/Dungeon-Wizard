@@ -163,13 +163,10 @@ pub const Input = struct {
 
     pub fn update(input: *Input, run: *Run, self: *Thing) Error!void {
         const room = &run.room;
-        try run.ui_slots.roomUpdate(&run.imm_ui.commands, &run.tooltip_ui.commands, run, self);
-        if (!room.paused) {
-            run.ui_slots.updateTimerAndDrawSpell(room);
-        }
         try input.updatePaused(run, self);
         if (!room.paused) {
             try input.updateUnpaused(run, self);
+            run.ui_slots.updateTimerAndDrawSpell(room);
         }
     }
 
