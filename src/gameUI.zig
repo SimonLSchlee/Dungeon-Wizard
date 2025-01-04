@@ -266,12 +266,14 @@ pub const Slots = struct {
         self.reflowRects();
     }
 
-    pub fn beginRoom(self: *Slots, room: *Room) void {
+    pub fn beginRoom(self: *Slots, room: *Room, draw_spells: bool) void {
         for (self.spells.slice()) |*slot| {
             slot.spell = null;
             slot.ui_slot.cooldown_timer = null;
-            if (room.drawSpell()) |spell| {
-                slot.spell = spell;
+            if (draw_spells) {
+                if (room.drawSpell()) |spell| {
+                    slot.spell = spell;
+                }
             }
         }
     }

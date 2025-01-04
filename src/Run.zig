@@ -335,7 +335,7 @@ pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
     }
     self.room.deinit();
     try self.initRoom(&self.room, &player_thing, r);
-    self.ui_slots.beginRoom(&self.room);
+    self.ui_slots.beginRoom(&self.room, r.kind != .shop);
     if (r.kind == .smol or r.kind == .big or r.kind == .boss) {
         self.makeRewards(r.difficulty);
     } else {
