@@ -112,20 +112,20 @@
                  "type":"",
                  "visible":true,
                  "width":0,
-                 "x":61.3552002014606,
+                 "x":135.021866868127,
                  "y":135.290145219509
                 }, 
                 {
                  "height":0,
                  "id":11,
-                 "name":"creature:sharpboi",
+                 "name":"creature:slime",
                  "point":true,
                  "rotation":0,
                  "type":"",
                  "visible":true,
                  "width":0,
-                 "x":66.1818181818182,
-                 "y":79.0909090909091
+                 "x":109.848484848485,
+                 "y":92.0909090909091
                 }, 
                 {
                  "id":14,
