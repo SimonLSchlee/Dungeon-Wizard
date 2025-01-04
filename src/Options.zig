@@ -122,6 +122,7 @@ pub const Display = struct {
     resolutions: std.BoundedArray(V2i, max_resolutions) = .{},
     selected_resolution: V2i = .{},
     dropdown: DropdownMenu = .{},
+    custom_resolution: bool = false,
     //vsync: bool = false, // TODO?
     pub const OptionSerialize = struct {
         mode: void,
@@ -610,19 +611,37 @@ pub fn initTryLoad(plat: *App.Platform) Options {
     }
     // fix up selected resolution
     {
-        var best = ret.display.resolutions.get(0);
-        var best_idx: usize = 0;
-        var best_diff = ret.display.selected_resolution.sub(best).mLen();
-        for (ret.display.resolutions.constSlice()[1..], 1..) |res, i| {
-            const diff = ret.display.selected_resolution.sub(res).mLen();
-            if (diff < best_diff) {
-                best = res;
-                best_idx = i;
-                best_diff = diff;
+        var selected_res = &ret.display.selected_resolution;
+        // crop to monitor size
+        const monitor_dims = plat.getMonitorIdxAndDims().dims;
+        selected_res.x = @min(monitor_dims.x, selected_res.x);
+        selected_res.y = @min(monitor_dims.y, selected_res.y);
+        // find an exact match
+        for (ret.display.resolutions.constSlice(), 0..) |res, i| {
+            if (res.eql(selected_res.*)) {
+                ret.display.selected_resolution = res;
+                ret.display.dropdown.selected_idx = i;
+                break;
             }
+        } else {
+            ret.setCustomResolution(selected_res.*);
         }
-        ret.display.selected_resolution = best;
-        ret.display.dropdown.selected_idx = best_idx;
+        if (false) {
+            // find best match
+            var best = ret.display.resolutions.get(0);
+            var best_idx: usize = 0;
+            var best_diff = ret.display.selected_resolution.sub(best).mLen();
+            for (ret.display.resolutions.constSlice()[1..], 1..) |res, i| {
+                const diff = ret.display.selected_resolution.sub(res).mLen();
+                if (diff < best_diff) {
+                    best = res;
+                    best_idx = i;
+                    best_diff = diff;
+                }
+            }
+            ret.display.selected_resolution = best;
+            ret.display.dropdown.selected_idx = best_idx;
+        }
     }
     // fix up audio
     {
@@ -696,6 +715,7 @@ fn updateDisplay(self: *Options, cmd_buf: *ImmUI.CmdBuf, pos: V2f) Error!bool {
         } });
 
         const dropdown_pos = pos.add(v2f(cast_method_text_dims.x + 8 * ui_scaling, 0));
+        // copy the pointers to the string slices, because we want a []const []const u8 for dropdown.update()
         var strings_buf = std.BoundedArray([]const u8, Display.max_resolutions){};
         for (self.display.resolutions_strings.constSlice()) |*str| {
             strings_buf.appendAssumeCapacity(str.constSlice());
@@ -835,12 +855,31 @@ pub fn update(self: *Options, cmd_buf: *ImmUI.CmdBuf) Error!enum { dont_close, c
     return .dont_close;
 }
 
-pub fn alwaysUpdate(_: *Options) void {
+pub fn setCustomResolution(options: *Options, res: V2i) void {
+    options.display.resolutions.insert(0, res) catch unreachable;
+    options.display.resolutions_strings.insert(
+        0,
+        Display.ResLabel.fromSlice(
+            utl.bufPrintLocal("{d}x{d}", .{ res.x, res.y }) catch "custom",
+        ) catch unreachable,
+    ) catch unreachable;
+    options.display.dropdown.selected_idx = 0;
+    options.display.selected_resolution = res;
+    options.display.custom_resolution = true;
+}
+
+pub fn alwaysUpdate(options: *Options) void {
     const plat = App.getPlat();
     const curr_screen_dims = plat.getWindowSize();
     if (!plat.screen_dims.eql(curr_screen_dims)) {
         // manually resized
         updateScreenDims(plat, curr_screen_dims, false);
+        if (options.display.custom_resolution) {
+            _ = options.display.resolutions.orderedRemove(0);
+            _ = options.display.resolutions_strings.orderedRemove(0);
+        }
+        options.setCustomResolution(curr_screen_dims);
         App.get().resolutionChanged();
+        options.writeToTxt(plat);
     }
 }
