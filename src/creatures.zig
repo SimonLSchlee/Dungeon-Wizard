@@ -136,7 +136,7 @@ pub fn shopspiderProto() Thing {
 }
 
 pub fn implingProto() Thing {
-    var ret = creatureProto(.impling, .impling, .ally, .{ .aggro = .{} }, 25, .medium, 13);
+    var ret = creatureProto(.impling, .impling, .ally, .{ .aggro = .{} }, 15, .medium, 13);
 
     ret.accel_params = .{
         .max_speed = 0.0166 * TileMap.tile_sz_f,
@@ -148,7 +148,7 @@ pub fn implingProto() Thing {
                     .mask = Thing.Faction.opposing_masks.get(.ally),
                     .radius = 10,
                     .rel_pos = V2f.right.scale(10),
-                    .effect = .{ .damage = 6 },
+                    .effect = .{ .damage = 5 },
                 },
                 .range = 15,
             },

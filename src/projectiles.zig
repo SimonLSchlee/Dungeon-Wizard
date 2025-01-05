@@ -85,7 +85,7 @@ pub const Gobarrow = struct {
                 .active = true,
                 .deactivate_on_hit = true,
                 .deactivate_on_update = false,
-                .effect = .{ .damage = 7 },
+                .effect = .{ .damage = 6 },
                 .radius = 2,
                 .rel_pos = V2f.right.scale(14),
             },
