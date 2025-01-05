@@ -53,7 +53,6 @@ pub const WavesParams = struct {
     difficulty: f32 = 0,
     first_wave_delay_secs: f32 = 4,
     wave_secs_per_difficulty: f32 = 8,
-    difficulty_error: f32 = 1,
     max_kinds_per_wave: usize = 2,
     min_waves: usize = 2,
     max_waves: usize = 4,
@@ -90,13 +89,14 @@ fn makeWaves(tilemap: *const TileMap, rng: std.Random, params: WavesParams, arra
         },
         else => {},
     }
+    const difficulty_error = params.difficulty / 3;
 
     var difficulty_left = params.difficulty;
     Log.raw("#############\n", .{});
-    Log.info("Making waves! difficulty: {d:.1}", .{params.difficulty});
+    Log.info("Making waves! difficulty: {d:.1}. Error: {d:.1}", .{ params.difficulty, difficulty_error });
     const num_waves = rng.intRangeLessThan(usize, params.min_waves, params.max_waves);
     const difficulty_per_wave = params.difficulty / u.as(f32, num_waves);
-    const difficulty_error_per_wave = params.difficulty_error / u.as(f32, num_waves);
+    const difficulty_error_per_wave = difficulty_error / u.as(f32, num_waves);
     Log.info("num_waves: {}, difficulty per wave: {d:.1}", .{ num_waves, difficulty_per_wave });
 
     var all_spawn_positions = std.BoundedArray(V2f, TileMap.max_map_spawns){};
@@ -104,11 +104,12 @@ fn makeWaves(tilemap: *const TileMap, rng: std.Random, params: WavesParams, arra
         all_spawn_positions.appendAssumeCapacity(spawn.pos);
     }
     Log.info("  total spawn positions: {}", .{all_spawn_positions.len});
-
-    for (0..num_waves) |i| {
+    var wave_i: usize = 0;
+    var wave_iter: usize = 0;
+    while (wave_i < num_waves and wave_iter < 10 and difficulty_left > -difficulty_error) {
         var difficulty_left_in_wave = difficulty_per_wave;
         var wave = Wave{};
-        Log.info(" Wave {}:", .{i});
+        Log.info(" Wave {}: iter: {}", .{ wave_i, wave_iter });
 
         var enemy_protos: std.BoundedArray(Thing, WavesParams.max_max_kinds_per_wave) = .{};
 
@@ -122,24 +123,43 @@ fn makeWaves(tilemap: *const TileMap, rng: std.Random, params: WavesParams, arra
         rng.shuffleWithIndex(V2f, all_spawn_positions.slice(), u32);
         var curr_spawn_pos_idx: usize = 0;
 
-        while (difficulty_left_in_wave > difficulty_error_per_wave and curr_spawn_pos_idx < all_spawn_positions.len) {
-            const idx = rng.uintLessThan(usize, enemy_protos.len);
-            const proto = enemy_protos.get(idx);
+        while (difficulty_left_in_wave > 0 and curr_spawn_pos_idx < all_spawn_positions.len) {
+            var enemy_iter: usize = 0;
+            const proto = blk: {
+                while (enemy_iter < 3) {
+                    const idx = rng.uintLessThan(usize, enemy_protos.len);
+                    const enemy_proto = enemy_protos.get(idx);
+                    if (difficulty_left_in_wave - enemy_proto.enemy_difficulty < -difficulty_error_per_wave) {
+                        enemy_iter += 1;
+                        continue;
+                    }
+                    break :blk enemy_proto;
+                } else {
+                    break;
+                }
+            };
             wave.total_difficulty += proto.enemy_difficulty;
             difficulty_left_in_wave -= proto.enemy_difficulty;
             wave.spawns.append(.{
                 .pos = all_spawn_positions.buffer[curr_spawn_pos_idx],
                 .proto = proto,
             }) catch unreachable;
-            Log.info("  spawn: {any}", .{proto.creature_kind.?});
+            Log.info("  spawn: {any}. Difficulty: {d:.1}", .{ proto.creature_kind.?, proto.enemy_difficulty });
             curr_spawn_pos_idx += 1;
         }
 
         Log.info("  = wave difficulty: {d:.2}", .{wave.total_difficulty});
+        if (difficulty_left - wave.total_difficulty < -difficulty_error) {
+            wave_iter += 1;
+            Log.info("  Wave too difficult, try again?", .{});
+            continue;
+        }
         difficulty_left -= wave.total_difficulty;
         array.append(wave) catch unreachable;
-        if (difficulty_left < params.difficulty_error) break;
+        wave_i += 1;
+        wave_iter = 0;
     }
+    Log.info("Final room difficulty: {d:.1}", .{params.difficulty - difficulty_left});
 
     Log.info("#############\n", .{});
 }
@@ -361,7 +381,7 @@ pub fn mislaySpell(self: *Room, spell: Spell) void {
 pub fn spawnCurrWave(self: *Room) Error!void {
     assert(self.curr_wave < self.waves.len);
     const wave = self.waves.get(u.as(usize, self.curr_wave));
-    const wave_delay_secs = self.init_params.waves_params.wave_secs_per_difficulty * wave.total_difficulty;
+    const wave_delay_secs = @min(self.init_params.waves_params.wave_secs_per_difficulty * wave.total_difficulty, 30);
     Log.info("Spawning wave {}, next wave in {d:.1} secs", .{ self.curr_wave, wave_delay_secs });
     self.wave_timer = u.TickCounter.init(core.secsToTicks(wave_delay_secs));
     for (wave.spawns.constSlice()) |spawn| {
@@ -461,6 +481,18 @@ pub fn despawnRewardChest(self: *Room) void {
     self.reward_chest = null;
 }
 
+pub fn getCurrTotalDifficulty(self: *const Room) f32 {
+    var total_difficulty: f32 = 0;
+    for (self.enemies_alive.constSlice()) |e_id| {
+        if (self.getConstThingById(e_id)) |enemy| {
+            total_difficulty += enemy.enemy_difficulty;
+        } else {
+            Log.warn("Couldn't get enemy by id!", .{});
+        }
+    }
+    return total_difficulty;
+}
+
 pub fn update(self: *Room) Error!void {
     const plat = getPlat();
     self.moused_over_thing = null;
@@ -507,8 +539,18 @@ pub fn update(self: *Room) Error!void {
     if (!self.edit_mode and !self.paused) {
         // waves spawning
         if (self.curr_wave < self.waves.len) {
-            if (self.wave_timer.tick(false) or (self.curr_wave > 0 and self.enemies_alive.len == 0)) {
-                try self.spawnCurrWave();
+            // wave 0 always waits for the timer
+            if (self.curr_wave == 0) {
+                if (self.wave_timer.tick(false)) {
+                    try self.spawnCurrWave();
+                }
+            } else {
+                // use the strength of the previous wave (the one we're currently fighting!) to check if we should spawn the next
+                const difficulty_left_threshold = self.waves.buffer[u.as(usize, self.curr_wave - 1)].total_difficulty / 3;
+                //Log.info("{d:.2}", .{difficulty_left_threshold});
+                if ((self.wave_timer.tick(false) and self.getCurrTotalDifficulty() <= difficulty_left_threshold) or self.enemies_alive.len == 0) {
+                    try self.spawnCurrWave();
+                }
             }
         }
         // check if won or lost
@@ -736,7 +778,7 @@ pub fn render(self: *const Room, ui_render_texture: Platform.RenderTexture2D, ga
         try plat.textf(p, "{s}", .{txt}, text_opt);
     }
     if (debug.show_num_enemies) {
-        try plat.textf(v2f(10, 10), "enemies_alive.len: {}", .{self.enemies_alive.len}, .{ .color = .white });
+        try plat.textf(v2f(10, 10), "enemies_alive.len: {}. Difficulty left: {d:.1}", .{ self.enemies_alive.len, self.getCurrTotalDifficulty() }, .{ .color = .white });
     }
     if (debug.show_highest_num_things_in_room) {
         try plat.textf(v2f(10, 30), "highest_num_things: {} / {}", .{ self.highest_num_things, max_things_in_room }, .{ .color = .white });
