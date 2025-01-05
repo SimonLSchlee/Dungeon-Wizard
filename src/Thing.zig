@@ -438,6 +438,7 @@ pub const HitBox = struct {
     sweep_to_rel_pos: ?V2f = null,
     radius: f32 = 0,
     mask: Faction.Mask = Faction.Mask.initEmpty(),
+    path_mask: TileMap.PathLayer.Mask = TileMap.PathLayer.Mask.initFull(),
     active: bool = false,
     deactivate_on_update: bool = true,
     deactivate_on_hit: bool = true,
@@ -478,6 +479,7 @@ pub const HitBox = struct {
             if (thing.hurtbox == null) continue;
             var hurtbox = &thing.hurtbox.?;
             if (!hitbox.mask.contains(thing.faction)) continue;
+            if (!hitbox.path_mask.contains(thing.pathing_layer)) continue;
             const hurtbox_pos = thing.pos.add(hurtbox.rel_pos);
 
             const effective_radius = hitbox.radius + hurtbox.radius;

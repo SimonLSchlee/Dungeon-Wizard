@@ -24,6 +24,7 @@ const Item = @import("Item.zig");
 const gameUI = @import("gameUI.zig");
 const sprites = @import("sprites.zig");
 const StatusEffect = @import("StatusEffect.zig");
+const TileMap = @import("TileMap.zig");
 const Action = @This();
 
 pub const Gobarrow = struct {
@@ -295,7 +296,8 @@ pub const SlimePuddle = struct {
                 .active = true,
                 .deactivate_on_hit = false,
                 .deactivate_on_update = false,
-                .mask = Thing.Faction.opposing_masks.get(.enemy),
+                .mask = Thing.Faction.Mask.initFull(),
+                .path_mask = TileMap.PathLayer.Mask.initOne(.normal),
                 .radius = 12.5,
                 .effect = .{
                     .damage = 0,
