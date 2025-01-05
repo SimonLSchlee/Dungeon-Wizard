@@ -242,10 +242,78 @@ pub const Gobbomb = struct {
     }
 };
 
+pub const SlimePuddle = struct {
+    pub const enum_name = "slimepuddle";
+
+    timer: utl.TickCounter = utl.TickCounter.init(7 * core.fups_per_sec),
+    state: enum {
+        loop,
+        end,
+    } = .loop,
+
+    pub fn update(self: *Thing, room: *Room) Error!void {
+        const controller: *@This() = &self.controller.projectile.kind.slimepuddle;
+        const Ref = struct {
+            var loop = Data.Ref(Data.SpriteAnim).init("slime-puddle-loop");
+            var end = Data.Ref(Data.SpriteAnim).init("slime-puddle-end");
+            var got: bool = false;
+        };
+        if (!Ref.got) {
+            _ = Ref.loop.get();
+            _ = Ref.end.get();
+            Ref.got = true;
+        }
+        const renderer = &self.renderer.sprite;
+        switch (controller.state) {
+            .loop => {
+                _ = renderer.playNormal(Ref.loop, .{ .loop = true });
+                if (controller.timer.tick(false)) {
+                    controller.state = .end;
+                    self.hitbox.?.active = false;
+                }
+            },
+            .end => {
+                if (renderer.playNormal(Ref.end, .{}).contains(.end)) {
+                    self.deferFree(room);
+                }
+            },
+        }
+    }
+
+    pub fn proto() Thing {
+        var ret = Thing{
+            .kind = .projectile,
+            .spawn_state = .instance,
+            .controller = .{ .projectile = .{ .kind = .{
+                .slimepuddle = .{},
+            } } },
+            .renderer = .{ .sprite = .{
+                .draw_normal = false,
+                .draw_under = true,
+            } },
+            .hitbox = .{
+                .active = true,
+                .deactivate_on_hit = false,
+                .deactivate_on_update = false,
+                .mask = Thing.Faction.Mask.initFull(),
+                .radius = 12.5,
+                .effect = .{
+                    .damage = 0,
+                    .can_be_blocked = false,
+                    .status_stacks = StatusEffect.StacksArray.initDefault(0, .{ .slimed = 1 }),
+                },
+            },
+        };
+        ret.renderer.sprite.setNormalAnim(Data.Ref(Data.SpriteAnim).init("slime-puddle-loop"));
+        return ret;
+    }
+};
+
 pub const ProjectileTypes = [_]type{
     FireBlaze,
     Gobarrow,
     Gobbomb,
+    SlimePuddle,
 };
 
 pub const Kind = utl.EnumFromTypes(&ProjectileTypes, "enum_name");

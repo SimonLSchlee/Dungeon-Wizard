@@ -52,13 +52,6 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     const trailblaze: @This() = self.kind.trailblaze;
     const status = caster.statuses.getPtr(.trailblaze);
     status.addStacks(caster, trailblaze.num_stacks);
-    status.timer.num_ticks = 20;
-    status.prev_pos = caster.pos;
-    caster.accel_params = .{
-        .accel = 0.3,
-        .friction = 0.15,
-        .max_speed = 1.25,
-    };
 }
 
 pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {

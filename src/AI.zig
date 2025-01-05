@@ -424,12 +424,13 @@ pub const ActorController = struct {
                 var target_pos = target.pos;
                 // predictive movement if close enough
                 if (range < 40) {
-                    const time_til_reach = dist_til_in_range / self.accel_params.max_speed;
+                    const time_til_reach = dist_til_in_range / self.getEffectiveAccelParams().max_speed;
                     target_pos = target.pos.add(target.vel.scale(time_til_reach));
                 }
                 try self.findPath(room, target_pos);
                 const p = self.followPathGetNextPoint(5);
-                self.updateVel(p.sub(self.pos).normalizedOrZero(), self.accel_params);
+                self.move(p.sub(self.pos).normalizedOrZero());
+
                 if (!self.vel.isAlmostZero()) {
                     self.dir = self.vel.normalized();
                 }
@@ -477,7 +478,7 @@ pub const ActorController = struct {
                     try self.findPath(room, pos);
                     _ = self.animator.?.play(.move, .{ .loop = true });
                     const p = self.followPathGetNextPoint(5);
-                    self.updateVel(p.sub(self.pos).normalizedOrZero(), self.accel_params);
+                    self.move(p.sub(self.pos).normalizedOrZero());
                     if (!self.vel.isAlmostZero()) {
                         self.dir = self.vel.normalized();
                     }

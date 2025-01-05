@@ -327,6 +327,7 @@ pub const Damage = struct {
         fire,
         ice,
         lightning,
+        acid,
 
         pub inline fn getIcon(self: Damage.Kind, aoe: bool) icon_text.Icon {
             return switch (self) {
@@ -344,6 +345,7 @@ pub const Damage = struct {
                 .fire => "Fire",
                 .ice => "Ice",
                 .lightning => "Lightning",
+                .acid => "Acid",
             };
         }
 
@@ -367,6 +369,10 @@ pub const Damage = struct {
                     icon = if (aoe) .aoe_lightning else .lightning;
                     dmg_type_string = "Lightning ";
                 },
+                //.acid => {
+                //    icon = .slime;
+                //    dmg_type_string = "Acid ";
+                //},
                 else => {},
             }
             return try std.fmt.bufPrint(buf, "{any}{s}", .{ icon, dmg_type_string });
@@ -905,13 +911,23 @@ pub const SpriteRenderer = struct {
     }
 
     pub fn playDir(renderer: *SpriteRenderer, anim: Data.Ref(sprites.DirectionalSpriteAnim), params: sprites.SpriteAnimator.PlayParams) sprites.AnimEvent.Set {
-        var params_adjusted = params;
         if (std.meta.activeTag(renderer.animator) == .normal) {
+            var params_adjusted = params;
             params_adjusted.reset = true;
             renderer.setDirAnim(anim);
             return renderer.animator.dir.tickCurrAnim(params);
         }
         return renderer.animator.dir.playAnim(anim, params);
+    }
+
+    pub fn playNormal(renderer: *SpriteRenderer, anim: Data.Ref(sprites.SpriteAnim), params: sprites.SpriteAnimator.PlayParams) sprites.AnimEvent.Set {
+        if (std.meta.activeTag(renderer.animator) == .dir) {
+            var params_adjusted = params;
+            params_adjusted.reset = true;
+            renderer.setNormalAnim(anim);
+            return renderer.animator.normal.tickCurrAnim(params);
+        }
+        return renderer.animator.normal.playAnim(anim, params);
     }
 
     pub fn tickCurrAnim(renderer: *SpriteRenderer, params: sprites.SpriteAnimator.PlayParams) sprites.AnimEvent.Set {
@@ -1960,6 +1976,30 @@ pub fn updateVel(self: *Thing, accel_dir: V2f, params: AccelParams) void {
     }
 
     self.vel = new_vel;
+}
+
+pub fn getEffectiveAccelParams(self: *Thing) AccelParams {
+    var accel_params = self.accel_params;
+    if (self.pathing_layer == .normal) {
+        if (self.statuses.get(.trailblaze).stacks > 0) {
+            accel_params.accel = 0.3;
+            accel_params.friction = 0.15;
+            accel_params.max_speed *= 2;
+        }
+        if (self.statuses.get(.slimed).stacks > 0) {
+            accel_params.max_speed *= 0.5;
+        }
+    }
+    return accel_params;
+}
+
+// self-locomotion using regular movement (self.accel_params)
+pub fn move(self: *Thing, dir: V2f) void {
+    // probably a redundant check
+    if (!self.canAct()) {
+        return;
+    }
+    self.updateVel(dir, self.getEffectiveAccelParams());
 }
 
 pub fn debugDrawPath(self: *const Thing, room: *const Room) Error!void {

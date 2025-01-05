@@ -38,11 +38,12 @@ pub const CdType = enum {
 const Proto = struct {
     enum_name: [:0]const u8,
     name: []const u8,
-    cd: i64,
+    cd: i64 = 1 * core.fups_per_sec,
     cd_type: CdType,
     color: Colorf,
     max_stacks: i32 = 9999,
     icon: icon_text.Icon,
+    timer_ticks: i64 = 0,
 };
 
 const protos = [_]Proto{
@@ -57,7 +58,6 @@ const protos = [_]Proto{
     .{
         .enum_name = "frozen",
         .name = "Frozen",
-        .cd = 1 * core.fups_per_sec,
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(0.3, 0.4, 0.9),
         .icon = .ice_ball,
@@ -65,7 +65,6 @@ const protos = [_]Proto{
     .{
         .enum_name = "blackmailed",
         .name = "Blackmailed",
-        .cd = 1 * core.fups_per_sec,
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(0.6, 0, 0),
         .icon = .ouchy_heart,
@@ -73,7 +72,6 @@ const protos = [_]Proto{
     .{
         .enum_name = "mint",
         .name = "Mint",
-        .cd = 1 * core.fups_per_sec,
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(1.0, 0.9, 0),
         .icon = .coin,
@@ -81,7 +79,6 @@ const protos = [_]Proto{
     .{
         .enum_name = "promptitude",
         .name = "Promptitude",
-        .cd = 1 * core.fups_per_sec,
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(0.95, 0.9, 1.0),
         .icon = .fast_forward,
@@ -89,7 +86,6 @@ const protos = [_]Proto{
     .{
         .enum_name = "exposed",
         .name = "Exposed",
-        .cd = 1 * core.fups_per_sec,
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(0.15, 0.1, 0.2),
         .icon = .magic_eye,
@@ -97,7 +93,6 @@ const protos = [_]Proto{
     .{
         .enum_name = "stunned",
         .name = "Stunned",
-        .cd = 1 * core.fups_per_sec,
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(0.9, 0.8, 0.7),
         .icon = .spiral_yellow,
@@ -105,7 +100,6 @@ const protos = [_]Proto{
     .{
         .enum_name = "unseeable",
         .name = "Unseeable",
-        .cd = 1 * core.fups_per_sec,
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(0.26, 0.55, 0.7),
         .icon = .wizard_inverse,
@@ -130,7 +124,6 @@ const protos = [_]Proto{
     .{
         .enum_name = "moist",
         .name = "Moist",
-        .cd = 1 * core.fups_per_sec,
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(0.5, 0.8, 1),
         .icon = .water,
@@ -138,10 +131,10 @@ const protos = [_]Proto{
     .{
         .enum_name = "trailblaze",
         .name = "Trailblaze",
-        .cd = 1 * core.fups_per_sec,
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(1, 0.2, 0),
         .icon = .trailblaze,
+        .timer_ticks = 20,
     },
     .{
         .enum_name = "quickdraw",
@@ -158,6 +151,22 @@ const protos = [_]Proto{
         .cd_type = .no_cd,
         .color = Colorf.rgb(0.8, 0.8, 0.7),
         .icon = .shield,
+    },
+    .{
+        .enum_name = "slimetrail",
+        .name = "Slime Trail",
+        .cd = 0,
+        .cd_type = .no_cd,
+        .color = Colorf.rgb(0.2, 0.7, 0.1),
+        .icon = .slime,
+        .timer_ticks = 45,
+    },
+    .{
+        .enum_name = "slimed",
+        .name = "Slimed",
+        .cd_type = .remove_all_stacks,
+        .color = Colorf.rgb(0.3, 0.9, 0.2),
+        .icon = .slime,
     },
 };
 
@@ -199,6 +208,7 @@ pub const status_array = blk: {
         ret.set(kind, .{
             .kind = kind,
             .cooldown = utl.TickCounter.init(p.cd),
+            .timer = utl.TickCounter.init(p.timer_ticks),
         });
     }
     break :blk ret;
@@ -209,25 +219,48 @@ stacks: i32 = 0,
 cooldown: utl.TickCounter = utl.TickCounter.init(core.fups_per_sec * 1),
 // should put in a union maybe
 timer: utl.TickCounter = utl.TickCounter.init(core.secsToTicks(1)),
-prev_pos: V2f = .{},
+prev_pos: ?V2f = .{},
 
 pub fn setStacks(self: *StatusEffect, thing: *Thing, num: i32) void {
     const proto = proto_array.get(self.kind);
-    switch (self.kind) {
-        .lit => {
-            if (thing.statuses.get(.moist).stacks > 0) {
-                return;
-            }
-        },
-        .moist => {
-            thing.statuses.getPtr(.lit).stacks = 0;
-        },
-        else => {},
+    const old_stacks = self.stacks;
+
+    if (num > 0) {
+        switch (self.kind) {
+            .lit => {
+                if (thing.statuses.get(.moist).stacks > 0) {
+                    return;
+                }
+            },
+            .moist => {
+                thing.statuses.getPtr(.lit).stacks = 0;
+            },
+            .slimed => {
+                // can only have 1 slime stack at a time, and wait for it to expire
+                // slimetrail is immune from slime
+                if (thing.statuses.get(.slimed).stacks > 0 or thing.statuses.get(.slimetrail).stacks > 0) {
+                    return;
+                }
+            },
+            else => {},
+        }
     }
-    if (self.stacks == 0) {
-        self.cooldown.restart();
-    }
+
     self.stacks = utl.clamp(i32, num, 0, proto.max_stacks);
+
+    if (old_stacks == 0 and self.stacks > 0) { // stacks went from 0 to >0
+        self.cooldown.restart();
+        self.prev_pos = null;
+    } else if (self.stacks == 0) { // finished the stacks
+        switch (self.kind) {
+            .blackmailed => {
+                assert(thing.isCreature());
+                const thing_proto = App.get().data.creature_protos.get(thing.creature_kind.?);
+                thing.faction = thing_proto.faction;
+            },
+            else => {},
+        }
+    }
 }
 
 pub fn addStacks(self: *StatusEffect, thing: *Thing, num: i32) void {
@@ -254,35 +287,44 @@ pub fn update(status: *StatusEffect, thing: *Thing, room: *Room) Error!void {
         },
         else => {},
     }
-    if (proto.cd_type == .no_cd or status.stacks == 0) {
+    if (status.stacks == 0) {
         return;
     }
     if (status.cooldown.tick(true)) {
         switch (proto.cd_type) {
             .remove_one_stack => {
-                status.stacks -= 1;
+                status.addStacks(thing, -1);
             },
             .remove_all_stacks => {
-                status.stacks = 0;
+                status.setStacks(thing, 0);
             },
-            else => unreachable,
-        }
-        if (status.stacks == 0) {
-            switch (status.kind) {
-                .blackmailed => {
-                    assert(thing.isCreature());
-                    const thing_proto = App.get().data.creature_protos.get(thing.creature_kind.?);
-                    thing.faction = thing_proto.faction;
-                },
-                .trailblaze => {
-                    assert(thing.isCreature());
-                    const thing_proto = App.get().data.creature_protos.get(thing.creature_kind.?);
-                    thing.accel_params = thing_proto.accel_params;
-                },
-                else => {},
-            }
+            else => {},
         }
     }
+    if (status.stacks == 0) {
+        return;
+    }
+
+    // prev pos will only be null if status was just applied (from 0 stacks)
+    // so can be used as a flag to indicate that
+    if (status.prev_pos == null) {
+        status.prev_pos = thing.pos;
+
+        switch (status.kind) {
+            .slimed => {
+                const hit_effect = Thing.HitEffect{
+                    .damage = 2,
+                    .can_be_blocked = false,
+                    .damage_kind = .acid,
+                };
+                if (thing.hurtbox) |*hurt| {
+                    hurt.hit(thing, room, hit_effect, null);
+                }
+            },
+            else => {},
+        }
+    }
+
     switch (status.kind) {
         // activate at start of each second
         .lit => if (@mod(status.cooldown.curr_tick, core.fups_per_sec) == core.fups_per_sec - 1) {
@@ -297,7 +339,7 @@ pub fn update(status: *StatusEffect, thing: *Thing, room: *Room) Error!void {
             }
         },
         .trailblaze => if (status.timer.tick(true)) {
-            const vec = thing.pos.sub(status.prev_pos);
+            const vec = thing.pos.sub(status.prev_pos.?);
             const len = vec.length();
             const spawn_dist: f32 = 12.5;
             if (len > spawn_dist) {
@@ -305,12 +347,22 @@ pub fn update(status: *StatusEffect, thing: *Thing, room: *Room) Error!void {
                 const vec_n = vec.scale(1 / len);
                 const num_to_spawn: usize = utl.as(usize, len / spawn_dist);
                 for (0..num_to_spawn) |i| {
-                    var pos = status.prev_pos.add(vec_n.scale(utl.as(f32, i) * spawn_dist));
+                    var pos = status.prev_pos.?.add(vec_n.scale(utl.as(f32, i) * spawn_dist));
                     const v_90 = vec_n.rot90CCW();
                     const rand_offset = v_90.scale(2).add(v_90.neg()).scale(room.rng.random().floatNorm(f32) * 3);
                     _ = try room.queueSpawnThing(&thing_proto, pos.add(rand_offset));
                 }
             }
+            status.prev_pos = thing.pos;
+        },
+        .slimetrail => if (status.timer.tick(true)) {
+            const thing_proto: Thing = projectiles.proto(.slimepuddle);
+            const vec = thing.pos.sub(status.prev_pos.?);
+            var pos = status.prev_pos.?.add(vec.scale(0.66));
+            const rand_dir = V2f.fromAngleRadians(room.rng.random().float(f32) * utl.tau);
+            const rand_offset = rand_dir.scale(room.rng.random().float(f32) * 4);
+            //const rand_offset = V2f{};
+            _ = try room.queueSpawnThing(&thing_proto, pos.add(rand_offset));
             status.prev_pos = thing.pos;
         },
         else => {},
@@ -356,6 +408,8 @@ pub fn fmtDesc(buf: []u8, kind: StatusEffect.Kind) Error![]u8 {
         .trailblaze => try std.fmt.bufPrint(buf, "Moves faster.\nLeaves behind a trail of fire", .{}),
         .quickdraw => try std.fmt.bufPrint(buf, "The next spell is drawn instantly", .{}),
         .shield => try std.fmt.bufPrint(buf, "Prevents damage for a duration", .{}),
+        .slimetrail => try std.fmt.bufPrint(buf, "Leave a trail of slime. Immune to said slime", .{}),
+        .slimed => try std.fmt.bufPrint(buf, "Slowed movement, take damage when this is applied. Expires in 1 sec", .{}),
         //else => try std.fmt.bufPrint(buf, "<Placeholder for status: {s}>", .{status.name}),
     };
 }

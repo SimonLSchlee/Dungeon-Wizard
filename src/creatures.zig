@@ -163,6 +163,8 @@ pub fn slimeProto() Thing {
     c.accel_params = .{
         .max_speed = 0.0119 * TileMap.tile_sz_f,
     };
+    const status = c.statuses.getPtr(.slimetrail);
+    status.addStacks(&c, 1);
     c.controller.ai_actor.actions.getPtr(.melee_attack_1).* = (.{
         .kind = .{
             .melee_attack = .{

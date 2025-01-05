@@ -294,7 +294,7 @@ pub const Controller = struct {
                         controller.ticks_in_state = 0;
                         continue :state .walk;
                     }
-                    self.updateVel(.{}, self.accel_params);
+                    self.move(.{});
                     _ = AnimRefs.idle.get();
                     renderer.setDirAnim(AnimRefs.idle);
                     break :state .none;
@@ -308,7 +308,7 @@ pub const Controller = struct {
                         controller.ticks_in_state = 0;
                         continue :state .none;
                     }
-                    self.updateVel(accel_dir, self.accel_params);
+                    self.move(accel_dir);
                     if (!self.vel.isZero()) {
                         self.dir = self.vel.normalized();
                     }
@@ -383,7 +383,7 @@ pub const Controller = struct {
                     } else {
                         plat.setSoundVolume(cast_loop_sound, cast_loop_volume);
                     }
-                    self.updateVel(.{}, self.accel_params);
+                    self.move(.{});
                     _ = AnimRefs.cast.get();
                     renderer.setDirAnim(AnimRefs.cast);
                     break :state .action;
