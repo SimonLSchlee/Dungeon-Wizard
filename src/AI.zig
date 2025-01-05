@@ -281,7 +281,7 @@ pub const AIAcolyte = struct {
         }
         // prioritize summoning
         // TODO track summons' ids?
-        if (!action.cooldown.running and room.num_enemies_alive < 10) {
+        if (!action.cooldown.running and room.enemies_alive.len < 10) {
             const dir = (if (nearest_enemy) |e| e.pos.sub(self.pos) else self.pos.neg()).normalizedOrZero();
             const spawn_pos = self.pos.add(dir.scale(self.coll_radius * 2));
             const params = Action.Params{ .target_kind = .pos, .pos = spawn_pos };

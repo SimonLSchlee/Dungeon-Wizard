@@ -29,7 +29,12 @@ const Spell = @import("Spell.zig");
 const Item = @import("Item.zig");
 const Run = @import("Run.zig");
 
-pub const max_things_in_room = 128;
+pub const max_enemies_in_room = 32;
+pub const max_allies_in_room = 16;
+pub const max_npcs_in_room = 4;
+pub const max_creatures_in_room = max_enemies_in_room + max_allies_in_room + max_npcs_in_room + 1;
+pub const max_vfx_in_room = max_creatures_in_room * 4;
+pub const max_things_in_room = max_creatures_in_room + max_vfx_in_room;
 
 pub const ThingBoundedArray = std.BoundedArray(pool.Id, max_things_in_room);
 
@@ -154,7 +159,7 @@ advance_one_frame: bool = false, // if true, pause on next frame
 waves: WavesArray = .{},
 wave_timer: u.TickCounter = undefined,
 curr_wave: i32 = 0,
-num_enemies_alive: i32 = 0,
+enemies_alive: std.BoundedArray(Thing.Id, max_enemies_in_room) = .{},
 exits: std.BoundedArray(TileMap.ExitDoor, TileMap.max_map_exits) = .{},
 progress_state: union(enum) {
     none,
@@ -224,7 +229,7 @@ pub fn reset(self: *Room) Error!void {
     self.rng = std.Random.DefaultPrng.init(self.init_params.seed);
     self.wave_timer = u.TickCounter.init(core.secsToTicks(self.init_params.waves_params.first_wave_delay_secs));
     self.curr_wave = 0;
-    self.num_enemies_alive = 0;
+    self.enemies_alive = .{};
     self.progress_state = .none;
     self.paused = false;
     self.draw_pile = self.init_params.deck;
@@ -281,7 +286,9 @@ pub fn queueSpawnThing(self: *Room, proto: *const Thing, pos: V2f) Error!?pool.I
         thing.spawn_state = .spawning;
         thing.pos = pos;
         try self.spawn_queue.append(thing.id);
-        if (thing.isEnemy()) self.num_enemies_alive += 1;
+        if (thing.isEnemy()) self.enemies_alive.append(thing.id) catch {
+            Log.warn("Failed to add to enemies list!", .{});
+        };
         return thing.id;
     } else {
         Log.warn(
@@ -500,7 +507,7 @@ pub fn update(self: *Room) Error!void {
     if (!self.edit_mode and !self.paused) {
         // waves spawning
         if (self.curr_wave < self.waves.len) {
-            if (self.wave_timer.tick(false) or (self.curr_wave > 0 and self.num_enemies_alive == 0)) {
+            if (self.wave_timer.tick(false) or (self.curr_wave > 0 and self.enemies_alive.len == 0)) {
                 try self.spawnCurrWave();
             }
         }
@@ -510,7 +517,7 @@ pub fn update(self: *Room) Error!void {
             const hp = player.hp.?;
             switch (self.progress_state) {
                 .none => {
-                    const defeated_all_enemies = self.curr_wave >= self.waves.len and self.num_enemies_alive == 0;
+                    const defeated_all_enemies = self.curr_wave >= self.waves.len and self.enemies_alive.len == 0;
                     if (hp.curr <= 0) {
                         // .lost is set below, after player is freed
                     } else if (defeated_all_enemies or self.init_params.waves_params.room_kind == .first) {
@@ -578,7 +585,17 @@ pub fn update(self: *Room) Error!void {
         assert(thing.alloc_state == .allocated);
         assert(thing.spawn_state == .freeable);
         self.things.free(id);
-        if (thing.isEnemy()) self.num_enemies_alive -= 1;
+    }
+    { // remove all the enemies we can't look up, because they've been freed
+        var i: usize = 0;
+        while (i < self.enemies_alive.len) {
+            const id = self.enemies_alive.buffer[i];
+            if (self.getThingById(id) == null) {
+                _ = self.enemies_alive.swapRemove(i);
+                continue;
+            }
+            i += 1;
+        }
     }
     self.free_queue.len = 0;
 
@@ -719,7 +736,7 @@ pub fn render(self: *const Room, ui_render_texture: Platform.RenderTexture2D, ga
         try plat.textf(p, "{s}", .{txt}, text_opt);
     }
     if (debug.show_num_enemies) {
-        try plat.textf(v2f(10, 10), "num_enemies_alive: {}", .{self.num_enemies_alive}, .{ .color = .white });
+        try plat.textf(v2f(10, 10), "enemies_alive.len: {}", .{self.enemies_alive.len}, .{ .color = .white });
     }
     if (debug.show_highest_num_things_in_room) {
         try plat.textf(v2f(10, 30), "highest_num_things: {} / {}", .{ self.highest_num_things, max_things_in_room }, .{ .color = .white });
