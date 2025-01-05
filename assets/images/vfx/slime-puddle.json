@@ -76,9 +76,9 @@
   ],
   "layers": [
    { "name": "data", "opacity": 255, "blendMode": "normal", "cels": [{ "frame": 7, "data": "pivot-y=8" }] },
-   { "name": "Layer 1 Copy", "opacity": 179, "blendMode": "normal" },
+   { "name": "Layer 1 Copy", "opacity": 128, "blendMode": "normal" },
    { "name": "Layer 2 Copy", "opacity": 204, "blendMode": "normal" },
-   { "name": "end", "opacity": 181, "blendMode": "normal" }
+   { "name": "end", "opacity": 102, "blendMode": "normal" }
   ],
   "slices": [
   ]
