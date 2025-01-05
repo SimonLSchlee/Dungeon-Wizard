@@ -179,7 +179,7 @@ pub fn slimeProto() Thing {
         },
         .cooldown = utl.TickCounter.initStopped(90),
     });
-    c.enemy_difficulty = 0.75;
+    c.enemy_difficulty = 1;
     return c;
 }
 
@@ -202,7 +202,7 @@ pub fn batProto() Thing {
         },
         .cooldown = utl.TickCounter.initStopped(70),
     });
-    ret.enemy_difficulty = 0.25;
+    ret.enemy_difficulty = 0.5;
     return ret;
 }
 
@@ -344,7 +344,7 @@ pub fn gobbomberProto() Thing {
         } },
         .cooldown = utl.TickCounter.initStopped(90),
     };
-    ret.enemy_difficulty = 2.0;
+    ret.enemy_difficulty = 2.5;
     return ret;
 }
 
