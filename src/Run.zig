@@ -254,7 +254,8 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
     }
     try places.insert(places.len / 2, .{ .room = .{ .kind = .shop, .waves_params = .{ .room_kind = .shop, .first_wave_delay_secs = 0 } } });
     try places.insert(0, .{ .room = .{ .kind = .first, .waves_params = .{ .room_kind = .first, .first_wave_delay_secs = 0 } } });
-    try places.insert(0, .{ .room = .{ .kind = .shop, .waves_params = .{ .room_kind = .shop, .first_wave_delay_secs = 0 } } });
+    // shop at very start
+    //try places.insert(0, .{ .room = .{ .kind = .shop, .waves_params = .{ .room_kind = .shop, .first_wave_delay_secs = 0 } } });
     try places.append(.{ .room = .{ .kind = .shop, .waves_params = .{ .room_kind = .shop, .first_wave_delay_secs = 0 } } });
     try places.append(.{ .room = .{ .difficulty = 15, .kind = .boss, .idx = 0, .waves_params = .{ .room_kind = .boss } } });
     // TODO this better
