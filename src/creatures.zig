@@ -120,7 +120,9 @@ pub fn playerProto() Thing {
 }
 
 pub fn shopspiderProto() Thing {
-    var ret = creatureProto(.shopspider, .creature, .ally, .idle, 60, .big, 100);
+    var ret = creatureProto(.shopspider, .creature, .ally, .idle, 60, .big, 24);
+    ret.selectable.?.radius = 24;
+    ret.coll_mass = std.math.inf(f32);
     ret.renderer = .{ .sprite = .{} };
     ret.renderer.sprite.setDirAnim(Data.Ref(Data.DirectionalSpriteAnim).init("shopspider-idle"));
     ret.hp = null;
@@ -129,7 +131,7 @@ pub fn shopspiderProto() Thing {
     ret.dir = V2f.left;
     ret.rmb_interactable = .{
         .kind = .shop,
-        .interact_radius = 100,
+        .interact_radius = 50,
     };
 
     return ret;

@@ -187,6 +187,7 @@ rmb_interactable: ?struct {
     interact_radius: f32 = 40,
     hovered: bool = false,
     selected: bool = false,
+    in_range: bool = false,
 } = null,
 
 pub const Faction = enum {
@@ -1636,27 +1637,37 @@ pub fn update(self: *Thing, room: *Room) Error!void {
     if (self.hp) |*hp| {
         hp.update();
     }
-    if (self.rmb_interactable) |*s| {
-        s.hovered = false;
-        if (@constCast(room).getMousedOverThing(Faction.Mask.initOne(self.faction))) |thing| {
-            if (thing.id.eql(self.id)) {
-                s.hovered = true;
-            }
-        }
-        // this should pretty much work...
-        if (getPlat().input_buffer.mouseBtnIsJustPressed(.right)) {
-            s.selected = s.hovered;
-        }
-        if (room.getPlayer()) |p| {
-            if (p.path.len > 0) {
-                const last_path_pos = &p.path.buffer[p.path.len - 1];
-                //s.selected = last_path_pos.dist(self.pos) <= self.coll_radius;
-                if (s.selected) {
-                    last_path_pos.* = self.pos;
-                    if (p.pos.dist(self.pos) <= s.interact_radius) {
+    if (self.rmb_interactable) |*inter| {
+        if (self.selectable) |sel| {
+            if (room.getPlayer()) |p| {
+                const plat = getPlat();
+                const mouse_on_ui = room.parent_run_this_frame.ui_hovered;
+
+                inter.hovered = false;
+                if (sel.pointIsIn(room.mouse_pos_world, self)) {
+                    inter.hovered = true;
+                }
+                inter.in_range = false;
+                if (p.pos.dist(self.pos) <= inter.interact_radius) {
+                    inter.in_range = true;
+                }
+                if (!mouse_on_ui and plat.input_buffer.mouseBtnIsDown(.right)) {
+                    inter.selected = inter.hovered;
+                }
+
+                if (inter.selected) {
+                    if (inter.in_range) {
                         p.path.clear();
                         room.thingInteract(self);
+                        inter.selected = false;
+                    } else if (p.path.len > 0) {
+                        const last_path_pos = &p.path.buffer[p.path.len - 1];
+                        last_path_pos.* = self.pos;
+                    } else {
+                        inter.selected = false;
                     }
+                } else if (inter.in_range and !mouse_on_ui and plat.input_buffer.mouseBtnIsJustPressed(.left)) {
+                    room.thingInteract(self);
                 }
             }
         }
@@ -1683,6 +1694,19 @@ pub fn renderUnder(self: *const Thing, room: *const Room) Error!void {
                     plat.circlef(self.pos, s.radius, opt);
                     plat.rectf(self.pos.sub(v2f(s.radius, s.height)), v2f(s.radius * 2, s.height), opt);
                 }
+            }
+        }
+    }
+    if (self.selectable) |_| {
+        if (self.rmb_interactable) |inter| {
+            if ((inter.hovered or inter.selected) and inter.in_range) {
+                const opt = draw.PolyOpt{
+                    .fill_color = null,
+                    .outline = .{
+                        .color = Colorf.green.fade(0.5),
+                    },
+                };
+                plat.circlef(self.pos, inter.interact_radius, opt);
             }
         }
     }
@@ -1813,6 +1837,26 @@ pub fn renderOver(self: *const Thing, room: *const Room) Error!void {
         }
     }
     try self.renderStatusBars(room);
+    if (self.selectable) |s| {
+        if (self.rmb_interactable) |inter| {
+            if (inter.hovered or inter.selected) {
+                const bottom_pt = self.pos.add(v2f(0, -s.height - 10));
+                const points = [_]V2f{
+                    bottom_pt,
+                    bottom_pt.add(v2f(5, -10)),
+                    bottom_pt.add(v2f(-5, -10)),
+                };
+                var opt = draw.PolyOpt{
+                    .fill_color = .green,
+                };
+                if (!inter.selected) {
+                    opt.fill_color = null;
+                    opt.outline = .{ .color = .green, .thickness = 2 };
+                }
+                plat.trianglef(points, opt);
+            }
+        }
+    }
 }
 
 pub fn deferFree(self: *Thing, room: *Room) void {

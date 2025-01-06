@@ -875,10 +875,8 @@ pub const ExitDoor = struct {
     },
 
     pub fn updateSelected(self: *ExitDoor, room: *Room) Error!bool {
-        const plat = App.getPlat();
-
         if (room.getPlayer()) |p| {
-            const mouse_pos = plat.getMousePosWorld(room.camera);
+            const mouse_pos = room.mouse_pos_world;
             self.hovered = mouse_pos.dist(self.pos) <= select_radius or if (self.door_rect) |rect| geom.pointIsInRectf(mouse_pos, rect) else false;
 
             if (p.path.len > 0) {
