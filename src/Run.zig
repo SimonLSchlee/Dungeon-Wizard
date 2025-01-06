@@ -432,6 +432,8 @@ pub fn roomUpdate(self: *Run) Error!void {
     if (debug.enable_debug_controls) {
         if (plat.input_buffer.keyIsJustPressed(.f4)) {
             try room.reset();
+            const r = self.places.get(self.curr_place_idx).room;
+            self.ui_slots.beginRoom(&self.room, r.kind != .shop);
         }
         if (room.edit_mode) {
             if (plat.input_buffer.getNumberKeyJustPressed()) |num| {
@@ -443,6 +445,7 @@ pub fn roomUpdate(self: *Run) Error!void {
                     const tilemap_idx = test_rooms.get(n);
                     const ref = data.getByIdx(TileMap, tilemap_idx).?.data_ref;
                     try room.reloadFromTileMap(ref);
+                    self.ui_slots.beginRoom(&self.room, true);
                 }
             }
         }
@@ -934,6 +937,8 @@ pub fn deadUpdate(self: *Run) Error!void {
     if (debug.allow_room_retry) {
         if (menuUI.textButton(&self.imm_ui.commands, curr_btn_pos, "Retry Room", btn_dims, ui_scaling)) {
             try self.room.reset();
+            const r = self.places.get(self.curr_place_idx).room;
+            self.ui_slots.beginRoom(&self.room, r.kind != .shop);
             self.screen = .room;
         }
         curr_btn_pos.y += btn_dims.y + btn_spacing;
