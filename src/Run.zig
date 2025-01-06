@@ -121,7 +121,7 @@ pub fn makeStarterDeck(dbg: bool) Spell.SpellArray {
 pub const RoomLoadParams = struct {
     kind: Data.RoomKind,
     idx: usize = 0,
-    difficulty: f32 = 0,
+    difficulty_per_wave: f32 = 0,
     waves_params: Room.WavesParams,
 };
 
@@ -206,7 +206,7 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
 
     for (0..@min(smol_room_idxs.len, 3)) |i| {
         try places.append(.{ .room = .{
-            .difficulty = 0,
+            .difficulty_per_wave = 0,
             .kind = .smol,
             .idx = smol_room_idxs.get(i),
             .waves_params = .{ .room_kind = .smol },
@@ -221,7 +221,7 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
 
     for (0..@min(big_room_idxs.len, 3)) |i| {
         try places.append(.{ .room = .{
-            .difficulty = 0,
+            .difficulty_per_wave = 0,
             .kind = .big,
             .idx = big_room_idxs.get(i),
             .waves_params = .{ .room_kind = .big },
@@ -251,21 +251,23 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
             place.room.waves_params.enemy_probabilities.getPtr(.gobbow).* = 1;
             place.room.waves_params.enemy_probabilities.getPtr(.sharpboi).* = 1;
             place.room.waves_params.enemy_probabilities.getPtr(.troll).* = 1;
+            place.room.waves_params.num_waves = 3;
         }
-        place.room.difficulty = 2 + u.as(f32, i) * 2;
+        place.room.difficulty_per_wave = 1 + u.as(f32, i) * 0.6;
         //TODO unhack this?
-        place.room.waves_params.difficulty = place.room.difficulty;
+        place.room.waves_params.difficulty_per_wave = place.room.difficulty_per_wave;
     }
     try places.insert(places.len / 2, .{ .room = .{ .kind = .shop, .waves_params = .{ .room_kind = .shop, .first_wave_delay_secs = 0 } } });
     try places.insert(0, .{ .room = .{ .kind = .first, .waves_params = .{ .room_kind = .first, .first_wave_delay_secs = 0 } } });
     // shop at very start
     //try places.insert(0, .{ .room = .{ .kind = .shop, .waves_params = .{ .room_kind = .shop, .first_wave_delay_secs = 0 } } });
     try places.append(.{ .room = .{ .kind = .shop, .waves_params = .{ .room_kind = .shop, .first_wave_delay_secs = 0 } } });
-    try places.append(.{ .room = .{ .difficulty = 15, .kind = .boss, .idx = 0, .waves_params = .{ .room_kind = .boss } } });
+    try places.append(.{ .room = .{ .difficulty_per_wave = 5, .kind = .boss, .idx = 0, .waves_params = .{ .room_kind = .boss } } });
     // TODO this better
     {
         const boss_params = &places.buffer[places.len - 1].room.waves_params;
-        boss_params.difficulty = 15;
+        boss_params.difficulty_per_wave = 5;
+        boss_params.num_waves = 4;
         boss_params.enemy_probabilities.getPtr(.slime).* = 0;
         boss_params.enemy_probabilities.getPtr(.sharpboi).* = 1;
         boss_params.enemy_probabilities.getPtr(.acolyte).* = 1;
@@ -282,7 +284,7 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
         &run.room,
         &player_thing,
         .{
-            .difficulty = 0,
+            .difficulty_per_wave = 0,
             .kind = .first,
             .idx = 0,
             .waves_params = .{ .room_kind = .first },
@@ -295,6 +297,7 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
 pub fn initRandom(run: *Run, mode: Mode) Error!*Run {
     var rng = std.Random.DefaultPrng.init(u.as(u64, std.time.microTimestamp()));
     const seed = rng.random().int(u64);
+    Log.info("Initting seeded run: {}", .{seed});
     return try initSeeded(run, mode, seed);
 }
 
@@ -346,7 +349,7 @@ pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
     try self.initRoom(&self.room, &player_thing, r);
     self.ui_slots.beginRoom(&self.room, r.kind != .shop);
     if (r.kind == .smol or r.kind == .big or r.kind == .boss) {
-        self.makeRewards(r.difficulty);
+        self.makeRewards(r.difficulty_per_wave);
     } else {
         self.reward_ui = null;
     }
@@ -1039,7 +1042,7 @@ pub fn update(self: *Run) Error!void {
         if (plat.input_buffer.keyIsJustPressed(.o)) {
             const curr_room_place = self.places.get(self.curr_place_idx).room;
             self.room.took_reward = false;
-            self.makeRewards(curr_room_place.difficulty);
+            self.makeRewards(curr_room_place.difficulty_per_wave * u.as(f32, curr_room_place.waves_params.num_waves));
             if (self.room.reward_chest == null) {
                 self.room.spawnRewardChest();
             }

@@ -50,12 +50,11 @@ pub const InitParams = struct {
 pub const WavesParams = struct {
     const max_max_kinds_per_wave = 4;
 
-    difficulty: f32 = 0,
+    difficulty_per_wave: f32 = 0,
     first_wave_delay_secs: f32 = 4,
     wave_secs_per_difficulty: f32 = 8,
     max_kinds_per_wave: usize = 2,
-    min_waves: usize = 2,
-    max_waves: usize = 4,
+    num_waves: usize = 2,
     enemy_probabilities: std.EnumArray(Thing.CreatureKind, f32) = std.EnumArray(Thing.CreatureKind, f32).initDefault(0, .{
         .slime = 1,
     }),
@@ -89,15 +88,18 @@ fn makeWaves(tilemap: *const TileMap, rng: std.Random, params: WavesParams, arra
         },
         else => {},
     }
-    const difficulty_error = params.difficulty / 3;
-
-    var difficulty_left = params.difficulty;
     Log.raw("#############\n", .{});
-    Log.info("Making waves! difficulty: {d:.1}. Error: {d:.1}", .{ params.difficulty, difficulty_error });
-    const num_waves = rng.intRangeLessThan(usize, params.min_waves, params.max_waves);
-    const difficulty_per_wave = params.difficulty / u.as(f32, num_waves);
-    const difficulty_error_per_wave = difficulty_error / u.as(f32, num_waves);
-    Log.info("num_waves: {}, difficulty per wave: {d:.1}", .{ num_waves, difficulty_per_wave });
+
+    //const num_waves = rng.intRangeAtMost(usize, params.min_waves, params.max_waves);
+    const num_waves = params.num_waves;
+    const num_waves_f = u.as(f32, num_waves);
+    const difficulty_per_wave = params.difficulty_per_wave;
+    const difficulty_error_per_wave = difficulty_per_wave / 3;
+    const total_difficulty = difficulty_per_wave * num_waves_f;
+    const total_difficulty_error = difficulty_error_per_wave * num_waves_f;
+    Log.info("Making waves! difficulty: {d:.2}. Error: {d:.12}", .{ total_difficulty, total_difficulty_error });
+    Log.info("num_waves: {}, difficulty per wave: {d:.2}, error: {d:.2}", .{ num_waves, difficulty_per_wave, difficulty_error_per_wave });
+    var difficulty_left = total_difficulty;
 
     var all_spawn_positions = std.BoundedArray(V2f, TileMap.max_map_spawns){};
     for (tilemap.wave_spawns.constSlice()) |spawn| {
@@ -106,7 +108,7 @@ fn makeWaves(tilemap: *const TileMap, rng: std.Random, params: WavesParams, arra
     Log.info("  total spawn positions: {}", .{all_spawn_positions.len});
     var wave_i: usize = 0;
     var wave_iter: usize = 0;
-    while (wave_i < num_waves and wave_iter < 10 and difficulty_left > -difficulty_error) {
+    while (wave_i < num_waves and wave_iter < 10 and difficulty_left > -total_difficulty_error) {
         var difficulty_left_in_wave = difficulty_per_wave;
         var wave = Wave{};
         Log.info(" Wave {}: iter: {}", .{ wave_i, wave_iter });
@@ -117,7 +119,7 @@ fn makeWaves(tilemap: *const TileMap, rng: std.Random, params: WavesParams, arra
             const idx = rng.weightedIndex(f32, &params.enemy_probabilities.values);
             const kind: Thing.CreatureKind = @enumFromInt(idx);
             enemy_protos.append(data.creature_protos.get(kind)) catch unreachable;
-            Log.info("  possible enemy: {any} : probability: {d:.2}", .{ kind, params.enemy_probabilities.get(kind) });
+            Log.info("    possible enemy: {any} : probability: {d:.2}", .{ kind, params.enemy_probabilities.get(kind) });
         }
 
         rng.shuffleWithIndex(V2f, all_spawn_positions.slice(), u32);
@@ -144,12 +146,12 @@ fn makeWaves(tilemap: *const TileMap, rng: std.Random, params: WavesParams, arra
                 .pos = all_spawn_positions.buffer[curr_spawn_pos_idx],
                 .proto = proto,
             }) catch unreachable;
-            Log.info("  spawn: {any}. Difficulty: {d:.1}", .{ proto.creature_kind.?, proto.enemy_difficulty });
+            Log.info("  SPAWN: {any} : difficulty: {d:.2}", .{ proto.creature_kind.?, proto.enemy_difficulty });
             curr_spawn_pos_idx += 1;
         }
 
         Log.info("  = wave difficulty: {d:.2}", .{wave.total_difficulty});
-        if (difficulty_left - wave.total_difficulty < -difficulty_error) {
+        if (difficulty_left - wave.total_difficulty < -total_difficulty_error) {
             wave_iter += 1;
             Log.info("  Wave too difficult, try again?", .{});
             continue;
@@ -159,7 +161,7 @@ fn makeWaves(tilemap: *const TileMap, rng: std.Random, params: WavesParams, arra
         wave_i += 1;
         wave_iter = 0;
     }
-    Log.info("Final room difficulty: {d:.1}", .{params.difficulty - difficulty_left});
+    Log.info("Final room difficulty: {d:.2}", .{total_difficulty - difficulty_left});
 
     Log.info("#############\n", .{});
 }
