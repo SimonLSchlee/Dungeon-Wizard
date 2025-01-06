@@ -269,9 +269,17 @@ pub fn reset(self: *Room) Error!void {
     }
     self.exits = tilemap.exits;
     if (tilemap.shop) |shop| {
-        const coll_proto = @import("Shop.zig").shopColliderProto();
-        for (&[_]V2f{ v2f(56, 70), v2f(106, 60), v2f(135, 116) }) |offset| {
-            _ = try self.queueSpawnThing(&coll_proto, shop.spr_pos.add(offset));
+        var coll_proto = @import("Shop.zig").shopColliderProto();
+        const pts = [_]struct { V2f, f32 }{
+            .{ v2f(18, 88), 20 },
+            .{ v2f(40, 60), 36 },
+            .{ v2f(100, 70), 60 },
+            .{ v2f(116, 118), 26 },
+            .{ v2f(170, 142), 35 },
+        };
+        for (&pts) |s| {
+            coll_proto.coll_radius = s[1];
+            _ = try self.queueSpawnThing(&coll_proto, shop.spr_pos.add(s[0]));
         }
         var spider_pos = shop.pos;
         const anim = Data.Ref(Data.SpriteAnim).init("shop-normal").getConst();
