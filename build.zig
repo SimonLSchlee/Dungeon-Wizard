@@ -2,7 +2,7 @@ const std = @import("std");
 const raylib_build = @import("raylib");
 
 const title = "action-deckbuilder";
-const version = "v0.9.0";
+const version = "v0.10.0";
 
 const raylib_config = "-DSUPPORT_CUSTOM_FRAME_CONTROL=1";
 
