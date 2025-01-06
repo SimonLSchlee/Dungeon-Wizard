@@ -334,6 +334,7 @@ pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
     if (self.room.getConstPlayer()) |p| {
         player_thing.hp.?.max = p.hp.?.max;
         player_thing.hp.?.curr = p.hp.?.curr;
+        player_thing.dir = if (p.dir.x > 0) V2f.right else V2f.left;
     }
     self.room.deinit();
     try self.initRoom(&self.room, &player_thing, r);
