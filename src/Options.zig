@@ -300,11 +300,11 @@ pub const Controls = struct {
                 &.{.{ .keyboard_key = .escape }},
                 .pause_menu,
             ),
-            InputBinding.init(
-                "Show Deck",
-                &.{.{ .keyboard_key = .n }},
-                .show_deck,
-            ),
+            //InputBinding.init(
+            //    "Show Deck",
+            //    &.{.{ .keyboard_key = .n }},
+            //    .show_deck,
+            //),
         });
         return input_bindings.items;
     }
@@ -783,7 +783,7 @@ fn updateControls(self: *Options, cmd_buf: *ImmUI.CmdBuf, pos: V2f) Error!bool {
             for (binding.inputs.constSlice()) |d| {
                 const text = d.getIconText();
                 const text_sz = icon_text.measureIconText(text);
-                try icon_text.unqRenderIconText(cmd_buf, text, icon_pos, ui_scaling + 1);
+                try icon_text.unqRenderIconText(cmd_buf, text, icon_pos, ui_scaling);
                 icon_pos.x += text_sz.x + 2 * ui_scaling;
             }
             curr_row_pos.y += row_height;
