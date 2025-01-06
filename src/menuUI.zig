@@ -220,3 +220,35 @@ pub fn textButton(cmd_buf: *ImmUI.CmdBuf, pos: V2f, str: []const u8, dims: V2f, 
     }) catch @panic("Fail to append text cmd");
     return clicked;
 }
+
+pub fn textButtonEx(cmd_buf: *ImmUI.CmdBuf, pos: V2f, str: []const u8, dims: V2f, scaling: f32, color: Colorf) bool {
+    const plat = getPlat();
+    const mouse_pos = plat.getMousePosScreen();
+    const hovered = geom.pointIsInRectf(mouse_pos, .{ .pos = pos, .dims = dims });
+    const clicked = hovered and plat.input_buffer.mouseBtnIsJustPressed(.left);
+    cmd_buf.append(.{
+        .rect = .{
+            .pos = pos,
+            .dims = dims,
+            .opt = .{
+                .fill_color = color,
+                .outline = if (hovered) .{ .color = .red, .thickness = 2 * scaling } else null,
+            },
+        },
+    }) catch @panic("Fail to append rect cmd");
+    const font = App.get().data.fonts.get(.pixeloid);
+    cmd_buf.append(.{
+        .label = .{
+            .pos = pos.add(dims.scale(0.5)),
+            .text = ImmUI.initLabel(str),
+            .opt = .{
+                .center = true,
+                .color = .black,
+                .size = font.base_size * utl.as(u32, scaling),
+                .font = font,
+                .smoothing = .none,
+            },
+        },
+    }) catch @panic("Fail to append text cmd");
+    return clicked;
+}

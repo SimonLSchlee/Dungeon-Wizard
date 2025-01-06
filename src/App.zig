@@ -167,10 +167,10 @@ fn menuUpdate(self: *App) Error!void {
     };
     const title_dims = try plat.measureText(title_text, title_opt);
     const btn_dims = v2f(85, 45).scale(ui_scaling);
-    const title_padding = v2f(25, 25).scale(ui_scaling);
+    const title_padding = v2f(55, 25).scale(ui_scaling);
     const btn_spacing: f32 = 10 * ui_scaling;
     const bottom_spacing: f32 = 20 * ui_scaling;
-    const num_buttons = 3;
+    const num_buttons = 4;
     const panel_dims = v2f(
         title_dims.x + title_padding.x * 2,
         title_dims.y + title_padding.y * 2 + btn_dims.y * num_buttons + btn_spacing * (num_buttons - 1) + bottom_spacing,
@@ -221,15 +221,15 @@ fn menuUpdate(self: *App) Error!void {
         }
 
         curr_btn_pos.y += btn_dims.y + btn_spacing;
-
-        if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "      New Run\n(Mandy 3-mana)", btn_dims, ui_scaling)) {
-            try self.startNewRun(.mandy_3_mana);
-        }
-        curr_btn_pos.y += btn_dims.y + btn_spacing;
     }
 
-    if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "      New Run\n(Crispin\nCrystal-picker)", btn_dims, ui_scaling)) {
+    if (menuUI.textButtonEx(&self.menu_ui.commands, curr_btn_pos, "   New Run\n(Crispin\nCrystal-picker)", btn_dims, ui_scaling, .yellow)) {
         try self.startNewRun(.crispin_picker);
+    }
+    curr_btn_pos.y += btn_dims.y + btn_spacing;
+
+    if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "      New Run\n(Mandy 3-mana)", btn_dims, ui_scaling)) {
+        try self.startNewRun(.mandy_3_mana);
     }
     curr_btn_pos.y += btn_dims.y + btn_spacing;
 
