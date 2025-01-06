@@ -1000,8 +1000,7 @@ pub fn loadTileSetFromJsonString(data: *Data, filename: []const u8, json_string:
         // TODO spritesheet
         .texture = try plat.loadTexture(image_path),
     };
-    assert(tileset.texture.dims.x == image_dims.x);
-    assert(tileset.texture.dims.y == image_dims.y);
+    assert(tileset.texture.dims.eql(image_dims));
 
     try tileset.tiles.resize(u.as(usize, tileset.sheet_dims.x * tileset.sheet_dims.y));
     if (tree.get("tiles")) |tiles| {
