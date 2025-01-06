@@ -85,8 +85,8 @@
                  "type":"",
                  "visible":true,
                  "width":0,
-                 "x":43.75,
-                 "y":74.75
+                 "x":47.9318181818182,
+                 "y":65.2954545454545
                 }, 
                 {
                  "height":0,
@@ -208,6 +208,14 @@
                  "width":0,
                  "x":120.909090909091,
                  "y":100.909090909091
+                },
+            
+                {
+                 "id":14,
+                 "name":"entrydoor",
+                 "template":"tilesets\/door.tj",
+                 "x":32,
+                 "y":64
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -239,7 +247,7 @@
          "y":0
         }],
  "nextlayerid":6,
- "nextobjectid":14,
+ "nextobjectid":15,
  "orientation":"orthogonal",
  "properties":[
         {
