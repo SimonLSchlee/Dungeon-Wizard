@@ -16,6 +16,7 @@ const v2i = V2i.v2i;
 const debug = @import("debug.zig");
 
 const Run = @This();
+const config = @import("config");
 const App = @import("App.zig");
 const Log = App.Log;
 const getPlat = App.getPlat;
@@ -173,17 +174,20 @@ exit_to_menu: bool = false,
 pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
     const plat = getPlat();
     const app = App.get();
-    Log.info("Allocating debug room buf: {}KiB\n", .{(@sizeOf(Room) * 60) / 1024});
     run.* = .{
-        .room_buf = try plat.heap.alloc(Room, 60),
         .rng = std.Random.DefaultPrng.init(seed),
         .seed = seed,
         .deck = makeStarterDeck(false),
         .mode = mode,
     };
-    run.room_buf_size = 0;
-    run.room_buf_head = 0;
-    run.room_buf_tail = 0;
+
+    if (!config.is_release) {
+        Log.info("Allocating debug room buf: {}KiB\n", .{(@sizeOf(Room) * 60) / 1024});
+        run.room_buf = try plat.heap.alloc(Room, 60);
+        run.room_buf_size = 0;
+        run.room_buf_head = 0;
+        run.room_buf_tail = 0;
+    }
 
     run.ui_slots.init(
         4,
@@ -296,7 +300,9 @@ pub fn initRandom(run: *Run, mode: Mode) Error!*Run {
 
 pub fn deinit(self: *Run) void {
     self.room.deinit();
-    getPlat().heap.free(self.room_buf);
+    if (!config.is_release) {
+        getPlat().heap.free(self.room_buf);
+    }
 }
 
 pub fn reset(self: *Run) Error!void {
@@ -450,15 +456,17 @@ pub fn roomUpdate(self: *Run) Error!void {
                 }
             }
         }
-        if (plat.input_buffer.keyIsJustPressed(.comma)) {
-            if (self.room_buf_size > 0) {
-                const prev = (self.room_buf_head + self.room_buf.len - 1) % self.room_buf.len;
-                self.room.deinit();
-                self.room = self.room_buf[prev];
-                self.room_buf_head = prev;
-                self.room_buf_size -= 1;
+        if (!config.is_release) {
+            if (plat.input_buffer.keyIsJustPressed(.comma)) {
+                if (self.room_buf_size > 0) {
+                    const prev = (self.room_buf_head + self.room_buf.len - 1) % self.room_buf.len;
+                    self.room.deinit();
+                    self.room = self.room_buf[prev];
+                    self.room_buf_head = prev;
+                    self.room_buf_size -= 1;
+                }
+                self.room.paused = true;
             }
-            self.room.paused = true;
         }
     }
     room.parent_run_this_frame = self;
@@ -468,19 +476,21 @@ pub fn roomUpdate(self: *Run) Error!void {
         //    self.screen = .pause_menu;
         //}
     }
-    if (!room.paused) {
-        const next_head = (self.room_buf_head + 1) % self.room_buf.len;
-        const next_tail = (self.room_buf_tail + 1) % self.room_buf.len;
-        // equal means either full or empty
-        if (self.room_buf_head == self.room_buf_tail and self.room_buf_size == self.room_buf.len) {
-            // full, deinit so we can overwrite, and bump tail along
-            self.room_buf[self.room_buf_head].deinit();
-            self.room_buf_tail = next_tail;
-            self.room_buf_size -= 1;
+    if (!config.is_release) {
+        if (!room.paused) {
+            const next_head = (self.room_buf_head + 1) % self.room_buf.len;
+            const next_tail = (self.room_buf_tail + 1) % self.room_buf.len;
+            // equal means either full or empty
+            if (self.room_buf_head == self.room_buf_tail and self.room_buf_size == self.room_buf.len) {
+                // full, deinit so we can overwrite, and bump tail along
+                self.room_buf[self.room_buf_head].deinit();
+                self.room_buf_tail = next_tail;
+                self.room_buf_size -= 1;
+            }
+            try room.clone(&self.room_buf[self.room_buf_head]);
+            self.room_buf_head = next_head;
+            self.room_buf_size += 1;
         }
-        try room.clone(&self.room_buf[self.room_buf_head]);
-        self.room_buf_head = next_head;
-        self.room_buf_size += 1;
     }
 
     // update spell slots, and player input

@@ -27,9 +27,10 @@ fn linkOSStuff(b: *std.Build, target: std.Build.ResolvedTarget, artifact: *std.B
     }
 }
 
-pub fn addDynGameConfig(b: *std.Build, module: *std.Build.Module) void {
+pub fn addDynGameConfig(b: *std.Build, module: *std.Build.Module, is_release: bool) void {
     const options = b.addOptions();
     options.addOption([]const u8, "version", version);
+    options.addOption(bool, "is_release", is_release);
     module.addOptions("config", options);
 }
 
@@ -72,7 +73,7 @@ pub fn buildDynamic(b: *std.Build, target: std.Build.ResolvedTarget, optimize: s
     });
     app_lib.linkLibrary(raylib);
     app_lib.addIncludePath(b.path("raylib/src"));
-    addDynGameConfig(b, &app_lib.root_module);
+    addDynGameConfig(b, &app_lib.root_module, do_release);
 
     if (!app_only) {
         const exe = b.addExecutable(.{
