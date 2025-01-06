@@ -194,6 +194,7 @@ moused_over_thing: ?struct {
     thing: Thing.Id,
     faction_mask: Thing.Faction.Mask,
 } = null,
+mouse_pos_world: V2f = .{},
 edit_mode: bool = false,
 next_pool_id: u32 = 0, // i hate this, can we change it?
 highest_num_things: usize = 0,
@@ -392,12 +393,11 @@ pub fn spawnCurrWave(self: *Room) Error!void {
 }
 
 pub fn getMousedOverThing(self: *Room, faction_mask: Thing.Faction.Mask) ?*Thing {
-    const plat = getPlat();
     //cached
     if (self.moused_over_thing) |s| {
         if (s.faction_mask.eql(faction_mask)) return self.getThingById(s.thing);
     }
-    const mouse_pos = plat.getMousePosWorld(self.camera);
+    const mouse_pos = self.mouse_pos_world;
     var best_thing: ?*Thing = null;
     var best_y = -std.math.inf(f32);
     for (&self.things.items) |*thing| {
@@ -407,16 +407,7 @@ pub fn getMousedOverThing(self: *Room, faction_mask: Thing.Faction.Mask) ?*Thing
         if (best_thing != null and thing.pos.y < best_y) continue;
 
         const selectable = thing.selectable.?;
-        const rect = geom.Rectf{
-            .pos = thing.pos.sub(v2f(selectable.radius, selectable.height)),
-            .dims = v2f(selectable.radius * 2, selectable.height),
-        };
-        //const top_circle_pos = thing.pos.sub(v2f(0, selectable.height));
-
-        if (mouse_pos.dist(thing.pos) < selectable.radius or
-            geom.pointIsInRectf(mouse_pos, rect)) //or
-            //mouse_pos.dist(top_circle_pos) < selectable.radius)
-        {
+        if (selectable.pointIsIn(mouse_pos, thing)) {
             best_y = thing.pos.y;
             best_thing = thing;
         }
@@ -496,6 +487,7 @@ pub fn getCurrTotalDifficulty(self: *const Room) f32 {
 pub fn update(self: *Room) Error!void {
     const plat = getPlat();
     self.moused_over_thing = null;
+    self.mouse_pos_world = plat.getMousePosWorld(self.camera);
 
     if (self.advance_one_frame) {
         self.paused = true;
@@ -734,7 +726,7 @@ pub fn render(self: *const Room, ui_render_texture: Platform.RenderTexture2D, ga
     // show LOS raycast
     if (false) {
         if (self.getConstPlayer()) |player| {
-            const mouse_pos = plat.getMousePosWorld(self.camera);
+            const mouse_pos = self.mouse_pos_world;
             plat.linef(player.pos, mouse_pos, .{ .thickness = 1, .color = .red });
             if (self.tilemap.raycastLOS(player.pos, mouse_pos)) |tile_coord| {
                 const rect = TileMap.tileCoordToRect(tile_coord);

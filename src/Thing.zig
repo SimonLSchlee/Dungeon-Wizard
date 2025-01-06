@@ -81,6 +81,25 @@ pub const SizeCategory = enum {
     });
 };
 
+pub const Selectable = struct {
+    // its a half capsule shape
+    radius: f32 = 10,
+    height: f32 = 25,
+
+    pub fn pointIsIn(selectable: Selectable, point: V2f, thing: *const Thing) bool {
+        const rect = geom.Rectf{
+            .pos = thing.pos.sub(v2f(selectable.radius, selectable.height)),
+            .dims = v2f(selectable.radius * 2, selectable.height),
+        };
+        //const top_circle_pos = thing.pos.sub(v2f(0, selectable.height));
+
+        return point.dist(thing.pos) < selectable.radius or
+            geom.pointIsInRectf(point, rect); //or
+        //mouse_pos.dist(top_circle_pos) < selectable.radius)
+
+    }
+};
+
 pub const Pool = pool.BoundedPool(Thing, Room.max_things_in_room);
 // TODO wrap
 pub const Id = pool.Id;
@@ -149,11 +168,7 @@ mana: ?struct {
     max: i32,
 } = null,
 faction: Faction = .object,
-selectable: ?struct {
-    // its a half capsule shape
-    radius: f32 = 10,
-    height: f32 = 25,
-} = null,
+selectable: ?Selectable = null,
 statuses: StatusEffect.StatusArray = StatusEffect.status_array,
 enemy_difficulty: f32 = 0,
 find_path_timer: utl.TickCounter = utl.TickCounter.init(6),
