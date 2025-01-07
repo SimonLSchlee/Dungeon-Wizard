@@ -118,6 +118,11 @@ pub const Input = struct {
         if (ui_slots.bufferSelectedAction(run, self)) {
             self.path.len = 0; // cancel the current path on cast, but you can buffer a new one
         }
+        if (App.get().options.controls.getBindingByCommand(.stop_moving)) |stop_binding| {
+            if (stop_binding.isJustPressed()) {
+                self.path.len = 0;
+            }
+        }
     }
 
     pub fn updateUnpaused(_: *Input, run: *Run, self: *Thing) Error!void {

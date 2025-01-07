@@ -214,6 +214,7 @@ pub const Controls = struct {
         pub const InputsArray = std.BoundedArray(InputBinding.KindData, max_input_bindings);
         pub const Command = union(enum) {
             action: player.Action.Id,
+            stop_moving,
             pause,
             pause_menu,
             show_deck,
@@ -247,6 +248,20 @@ pub const Controls = struct {
         }
         pub fn initAction(name: []const u8, inputs: []const InputBinding.KindData, action_id: player.Action.Id) InputBinding {
             return InputBinding.init(name, inputs, .{ .action = action_id });
+        }
+        pub fn isJustPressed(self: *const InputBinding) bool {
+            const plat = App.getPlat();
+            for (self.inputs.constSlice()) |binding| {
+                switch (binding) {
+                    .keyboard_key => |k| {
+                        return plat.input_buffer.keyIsJustPressed(k);
+                    },
+                    .mouse_button => |m| {
+                        return plat.input_buffer.mouseBtnIsJustPressed(m);
+                    },
+                }
+            }
+            return false;
         }
     };
 
@@ -290,6 +305,11 @@ pub const Controls = struct {
             );
         }
         input_bindings.appendSliceAssumeCapacity(&.{
+            InputBinding.init(
+                "Stop Moving",
+                &.{.{ .keyboard_key = .s }},
+                .stop_moving,
+            ),
             InputBinding.init(
                 "Pause/Unpause",
                 &.{.{ .keyboard_key = .space }},
