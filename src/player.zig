@@ -268,6 +268,18 @@ pub const Controller = struct {
                         if (mrgn.timer.tick(true)) {
                             mana.curr += 1;
                         }
+                        if (@mod(mrgn.timer.curr_tick, @divFloor(mrgn.timer.num_ticks, 4)) == 0) {
+                            const proto = Thing.LoopVFXController.proto(
+                                .swirlies,
+                                .loop,
+                                0.66,
+                                0.66,
+                                false,
+                                draw.Coloru.rgb(119, 87, 255).toColorf(),
+                                false,
+                            );
+                            _ = room.queueSpawnThing(&proto, self.pos.add(v2f(0, 1))) catch {};
+                        }
                     }
                 }
             }
