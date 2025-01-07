@@ -921,7 +921,8 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     }
 }
 
-pub fn canUse(self: *const Spell, room: *const Room, caster: *const Thing) bool {
+pub fn canUse(self: *const Spell, caster: *const Thing) bool {
+    if (!caster.canAct()) return false;
     if (caster.mana) |mana| {
         if (self.mana_cost.getActualCost(caster)) |cost| {
             if (mana.curr < cost) return false;
@@ -931,7 +932,7 @@ pub fn canUse(self: *const Spell, room: *const Room, caster: *const Thing) bool 
         inline else => |k| {
             const K = @TypeOf(k);
             if (std.meta.hasMethod(K, "canUse")) {
-                return K.canUse(self, room, caster);
+                return K.canUse(self, caster);
             }
         },
     }
@@ -1022,12 +1023,14 @@ pub fn getName(self: *const Spell) []const u8 {
 
 pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caster: ?*const Thing, scaling: f32) void {
     const data = App.get().data;
-    var show_as_disabled = false;
+    var have_enough_mana = true;
     if (caster) |c|
         if (c.mana) |mana|
             if (self.mana_cost.getActualCost(c)) |cost| {
-                show_as_disabled = (cost > mana.curr);
+                have_enough_mana = (cost <= mana.curr);
             };
+    // this does check mana so a little redundant but...
+    const show_as_disabled = if (caster) |c| !self.canUse(c) else false;
 
     if (data.card_sprites.getRenderFrame(.card_base)) |rf| {
         cmd_buf.appendAssumeCapacity(.{ .texture = .{
@@ -1102,7 +1105,7 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caste
     }
     // mana cost
     if (data.card_mana_cost.getRenderFrame(self.mana_cost.toSpriteEnum())) |rf| {
-        const tint: Colorf = if (show_as_disabled) .red else .white;
+        const tint: Colorf = if (have_enough_mana) .white else .red;
         cmd_buf.appendAssumeCapacity(.{ .texture = .{
             .pos = mana_topleft,
             .texture = rf.texture,

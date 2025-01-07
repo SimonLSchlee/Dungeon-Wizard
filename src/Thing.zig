@@ -1548,7 +1548,7 @@ fn updateController(self: *Thing, room: *Room) Error!void {
     }
 }
 
-inline fn canAct(self: *const Thing) bool {
+pub inline fn canAct(self: *const Thing) bool {
     if (self.creature_kind != null) {
         return self.isAliveCreature() and self.statuses.get(.frozen).stacks == 0 and self.statuses.get(.stunned).stacks == 0 and self.hit_airborne == null;
     }

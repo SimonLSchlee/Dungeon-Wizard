@@ -72,7 +72,8 @@ pub const PotionHP = struct {
         }
     }
 
-    pub fn canUse(self: *const Item, _: *const Room, user: *const Thing) bool {
+    pub fn canUse(self: *const Item, user: *const Thing) bool {
+        if (!user.canAct()) return false;
         return self.canUseInRun(user, null);
     }
 
@@ -201,7 +202,7 @@ pub const PotionMana = struct {
         }
     }
 
-    pub fn canUse(_: *const Item, _: *const Room, caster: *const Thing) bool {
+    pub fn canUse(_: *const Item, caster: *const Thing) bool {
         if (caster.mana) |mana| {
             return (mana.curr < mana.max);
         }
@@ -412,12 +413,12 @@ pub fn use(self: *const Item, caster: *Thing, room: *Room, params: Params) Error
     }
 }
 
-pub fn canUse(self: *const Item, room: *const Room, user: *const Thing) bool {
+pub fn canUse(self: *const Item, user: *const Thing) bool {
     switch (self.kind) {
         inline else => |k| {
             const K = @TypeOf(k);
             if (std.meta.hasMethod(K, "canUse")) {
-                return K.canUse(self, room, user);
+                return K.canUse(self, user);
             }
         },
     }

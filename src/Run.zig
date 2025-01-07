@@ -566,10 +566,10 @@ pub fn itemsUpdate(self: *Run) Error!void {
         self.tooltip_ui.commands.clear(); // TODO - rethink??
         assert(idx < self.ui_slots.items.len);
         const slot: *gameUI.Slots.Slot = &self.ui_slots.items.buffer[idx];
-        const item = &slot.kind.?.action.item;
+        const item: *Item = &slot.kind.?.action.item;
         const slot_rect: geom.Rectf = slot.rect;
         const btn_dims = v2f(100, 75);
-        const can_use = item.canUse(self.room, &self.player_thing, self);
+        const can_use = item.canUse(&self.player_thing, self);
         const menu_padding = V2f.splat(4);
         const num_menu_items: f32 = if (can_use) 2 else 1;
         const menu_dims = v2f(btn_dims.x, btn_dims.y * num_menu_items).add(menu_padding.scale(2).add(v2f(0, (num_menu_items - 1) * menu_padding.y)));

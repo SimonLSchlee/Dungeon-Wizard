@@ -677,10 +677,10 @@ pub const Slots = struct {
         return ret;
     }
 
-    pub fn unqItemRoomUISlot(self: *Slots, slot: *UISlot, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, room: *const Room, caster: *const Thing, maybe_item: ?Item) Error!?Options.Controls.CastMethod {
+    pub fn unqItemRoomUISlot(self: *Slots, slot: *UISlot, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, caster: *const Thing, maybe_item: ?Item) Error!?Options.Controls.CastMethod {
         const plat = App.getPlat();
         const ui_scaling: f32 = plat.ui_scaling;
-        const enabled = if (maybe_item) |item| item.canUse(room, caster) else false;
+        const enabled = if (maybe_item) |item| item.canUse(caster) else false;
         var default_cast_method = App.get().options.controls.cast_method;
         var activation: ?Options.Controls.CastMethod = null;
         var opt = draw.PolyOpt{
@@ -718,10 +718,10 @@ pub const Slots = struct {
         return activation;
     }
 
-    pub fn unqSpellUISlot(self: *Slots, slot: *UISlot, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, room: *const Room, caster: *const Thing, maybe_spell: ?Spell) Error!?Options.Controls.CastMethod {
+    pub fn unqSpellUISlot(self: *Slots, slot: *UISlot, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, caster: *const Thing, maybe_spell: ?Spell) Error!?Options.Controls.CastMethod {
         const plat = App.getPlat();
         const ui_scaling: f32 = plat.ui_scaling;
-        const enabled = if (maybe_spell) |spell| spell.canUse(room, caster) else false;
+        const enabled = if (maybe_spell) |spell| spell.canUse(caster) else false;
         var default_cast_method = App.get().options.controls.cast_method;
         var activation: ?Options.Controls.CastMethod = null;
         var opt = draw.PolyOpt{
@@ -779,10 +779,11 @@ pub const Slots = struct {
         return null;
     }
 
-    pub fn unqDiscardUISlot(self: *Slots, slot: *UISlot, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf) Error!bool {
+    pub fn unqDiscardUISlot(self: *Slots, slot: *UISlot, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, user: *const Thing) Error!bool {
         const plat = App.getPlat();
         const data = App.getData();
         const ui_scaling: f32 = plat.ui_scaling;
+        const enabled = user.canAct();
         var activation: bool = false;
         var opt = draw.PolyOpt{
             .fill_color = slot_bg_color,
@@ -790,7 +791,7 @@ pub const Slots = struct {
         };
         opt.outline = self.getActionBorder(slot.command);
 
-        if (try slot.unqRectHoverClick(cmd_buf, true, opt)) {
+        if (try slot.unqRectHoverClick(cmd_buf, enabled, opt)) {
             activation = true;
         }
 
@@ -813,7 +814,7 @@ pub const Slots = struct {
             }
         }
 
-        if (try slot.unqHotKey(cmd_buf, true)) {
+        if (try slot.unqHotKey(cmd_buf, enabled)) {
             activation = true;
         }
         return activation;
@@ -974,12 +975,12 @@ pub const Slots = struct {
         run.ui_clicked = run.ui_clicked or clicked;
 
         for (self.spells.slice()) |*slot| {
-            if (try self.unqSpellUISlot(&slot.ui_slot, cmd_buf, tooltip_cmd_buf, room, caster, slot.spell)) |cast_method| {
+            if (try self.unqSpellUISlot(&slot.ui_slot, cmd_buf, tooltip_cmd_buf, caster, slot.spell)) |cast_method| {
                 self.selectAction(slot.ui_slot.command, cast_method);
             }
         }
         if (self.discard_slot) |*d| {
-            if (try self.unqDiscardUISlot(d, cmd_buf, tooltip_cmd_buf)) {
+            if (try self.unqDiscardUISlot(d, cmd_buf, tooltip_cmd_buf, caster)) {
                 self.selectAction(.{ .action = .{ .kind = .discard } }, .quick_release);
             }
         }
@@ -1007,7 +1008,7 @@ pub const Slots = struct {
 
         for (self.items.slice()) |*slot| {
             if (run.screen == .room) {
-                if (try self.unqItemRoomUISlot(&slot.ui_slot, cmd_buf, tooltip_cmd_buf, &run.room, caster, slot.item)) |cast_method| {
+                if (try self.unqItemRoomUISlot(&slot.ui_slot, cmd_buf, tooltip_cmd_buf, caster, slot.item)) |cast_method| {
                     self.selectAction(slot.ui_slot.command, cast_method);
                 }
             } else {
