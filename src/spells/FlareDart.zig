@@ -64,6 +64,10 @@ ball_radius: f32 = base_ball_radius,
 range: f32 = base_range,
 max_speed: f32 = 3,
 
+const AnimRef = struct {
+    var projectile_loop = Data.Ref(Data.SpriteAnim).init("spell-projectile-flare-dart");
+};
+
 pub const Projectile = struct {
     pub const controller_enum_name = enum_name ++ "_projectile";
 
@@ -77,7 +81,8 @@ pub const Projectile = struct {
         _ = target_pos;
         const projectile: *@This() = &spell_controller.controller.flare_dart_projectile;
         _ = projectile;
-        _ = self.renderer.sprite.tickCurrAnim(.{ .loop = true });
+        _ = AnimRef.projectile_loop.get();
+        _ = self.renderer.sprite.playNormal(AnimRef.projectile_loop, .{ .loop = true });
 
         if (self.last_coll != null or !self.hitbox.?.active) {
             self.deferFree(room);
@@ -123,7 +128,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
         },
         .shadow_radius_x = flare_dart.ball_radius,
     };
-    ball.renderer.sprite.setNormalAnim(Data.Ref(Data.SpriteAnim).init("spell-projectile-flare-dart"));
+    ball.renderer.sprite.setNormalAnim(AnimRef.projectile_loop);
     _ = try room.queueSpawnThing(&ball, caster.pos);
 }
 

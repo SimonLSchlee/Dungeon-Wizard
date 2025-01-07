@@ -932,7 +932,6 @@ pub const SpriteRenderer = struct {
             var params_adjusted = params;
             params_adjusted.reset = true;
             renderer.setDirAnim(anim);
-            return renderer.animator.dir.tickCurrAnim(params);
         }
         return renderer.animator.dir.playAnim(anim, params);
     }
@@ -942,7 +941,6 @@ pub const SpriteRenderer = struct {
             var params_adjusted = params;
             params_adjusted.reset = true;
             renderer.setNormalAnim(anim);
-            return renderer.animator.normal.tickCurrAnim(params);
         }
         return renderer.animator.normal.playAnim(anim, params);
     }

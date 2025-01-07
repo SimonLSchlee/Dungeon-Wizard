@@ -590,8 +590,12 @@ pub const SpriteAnimator = struct {
             return ret;
         }
         const anim = maybe_anim.?;
-        // This could happen e.g. when switching anims around
-        self.curr_anim_frame = @min(self.curr_anim_frame, anim.num_frames - 1);
+        // This could happen e.g. when switching anims around without explicitly resetting (i.e. not using playAnim())
+        // NOT RECOMMENDED since different frames can take different amounts of time so anim_tick may not be lined up
+        // with curr_anim_frame at all if switching like this (they could be misaligned without overflowing too)
+        if (self.curr_anim_frame >= anim.num_frames or self.anim_tick >= anim.dur_ticks) {
+            self.resetAnim();
+        }
         const frame: Data.SpriteSheet.Frame = anim.sheet.getConst().frames[anim.first_frame_idx + self.curr_anim_frame];
         const frame_ticks = utl.as(i32, core.ms_to_ticks(frame.duration_ms));
 

@@ -110,6 +110,10 @@ pub fn spawnFiresInRadius(room: *Room, pos: V2f, radius: f32, comptime max_spawn
     }
 }
 
+const AnimRef = struct {
+    var ball_projectile = Data.Ref(Data.SpriteAnim).init("spell-projectile-fire-boom");
+};
+
 pub const Projectile = struct {
     pub const controller_enum_name = enum_name ++ "_projectile";
 
@@ -126,7 +130,8 @@ pub const Projectile = struct {
 
         if (!projectile.exploded) {
             const hitbox = &self.hitbox.?;
-            _ = self.renderer.sprite.tickCurrAnim(.{ .loop = true });
+            _ = AnimRef.ball_projectile.get();
+            _ = self.renderer.sprite.playNormal(AnimRef.ball_projectile, .{ .loop = true });
             if (!hitbox.active or self.pos.dist(target_pos) < self.vel.length() * 2 or self.last_coll != null) {
                 projectile.exploded = true;
                 hitbox.active = true;
@@ -191,7 +196,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
         },
         .shadow_radius_x = flamey_explodey.ball_radius,
     };
-    ball.renderer.sprite.setNormalAnim(Data.Ref(Data.SpriteAnim).init("spell-projectile-fire-boom"));
+    ball.renderer.sprite.setNormalAnim(AnimRef.ball_projectile);
     _ = try room.queueSpawnThing(&ball, params.cast_orig.?);
 }
 

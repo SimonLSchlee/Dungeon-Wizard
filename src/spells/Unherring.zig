@@ -53,6 +53,10 @@ hit_effect: Thing.HitEffect = .{
     .damage = 6,
 },
 
+const AnimRef = struct {
+    var projectile_loop = Data.Ref(Data.SpriteAnim).init("spell-projectile-unherring");
+};
+
 pub const Projectile = struct {
     pub const controller_enum_name = enum_name ++ "_projectile";
 
@@ -74,7 +78,8 @@ pub const Projectile = struct {
 
         switch (projectile.state) {
             .loop => {
-                _ = self.renderer.sprite.tickCurrAnim(.{ .loop = true });
+                _ = AnimRef.projectile_loop.get();
+                _ = self.renderer.sprite.playNormal(AnimRef.projectile_loop, .{ .loop = true });
                 if (_target) |target| {
                     projectile.target_pos = target.pos;
                     projectile.target_radius = target.coll_radius;
@@ -141,7 +146,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
         },
         .shadow_radius_x = 7,
     };
-    herring.renderer.sprite.setNormalAnim(Data.Ref(Data.SpriteAnim).init("spell-projectile-unherring"));
+    herring.renderer.sprite.setNormalAnim(AnimRef.projectile_loop);
     _ = try room.queueSpawnThing(&herring, caster.pos.add(caster.dir.scale(10)));
 }
 

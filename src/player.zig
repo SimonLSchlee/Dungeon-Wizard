@@ -314,7 +314,7 @@ pub const Controller = struct {
                     }
                     self.move(.{});
                     _ = AnimRefs.idle.get();
-                    renderer.setDirAnim(AnimRefs.idle);
+                    _ = renderer.playDir(AnimRefs.idle, .{ .loop = true, .dir = self.dir });
                     break :state .none;
                 },
                 .walk => {
@@ -331,7 +331,7 @@ pub const Controller = struct {
                         self.dir = self.vel.normalized();
                     }
                     _ = AnimRefs.move.get();
-                    renderer.setDirAnim(AnimRefs.move);
+                    _ = renderer.playDir(AnimRefs.move, .{ .loop = true, .dir = self.dir });
                     break :state .walk;
                 },
                 .action => {
@@ -403,11 +403,11 @@ pub const Controller = struct {
                     }
                     self.move(.{});
                     _ = AnimRefs.cast.get();
-                    renderer.setDirAnim(AnimRefs.cast);
+                    _ = renderer.playDir(AnimRefs.cast, .{ .loop = true, .dir = self.dir });
                     break :state .action;
                 },
             };
-            _ = renderer.tickCurrAnim(.{ .loop = true, .dir = self.dir });
+
             controller.ticks_in_state += 1;
         }
     }
