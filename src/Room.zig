@@ -548,7 +548,7 @@ pub fn update(self: *Room) Error!void {
                 }
             } else {
                 // use the strength of the previous wave (the one we're currently fighting!) to check if we should spawn the next
-                const difficulty_left_threshold = self.waves.buffer[u.as(usize, self.curr_wave - 1)].total_difficulty / 3;
+                const difficulty_left_threshold = self.waves.buffer[u.as(usize, self.curr_wave - 1)].total_difficulty / 2;
                 //Log.info("{d:.2}", .{difficulty_left_threshold});
                 if ((self.wave_timer.tick(false) and self.getCurrTotalDifficulty() <= difficulty_left_threshold) or self.enemies_alive.len == 0) {
                     try self.spawnCurrWave();
