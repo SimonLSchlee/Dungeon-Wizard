@@ -166,6 +166,10 @@ hp: ?HP = null,
 mana: ?struct {
     curr: i32,
     max: i32,
+    regen: ?struct {
+        timer: utl.TickCounter,
+        max_threshold: usize,
+    } = null,
 } = null,
 faction: Faction = .object,
 selectable: ?Selectable = null,
@@ -1467,6 +1471,17 @@ pub fn renderStatusBars(self: *const Thing, _: *const Room) Error!void {
                 );
             }
             if (self.mana) |mana| {
+                // regen bar
+                if (mana.regen) |*mrgn| {
+                    const f = mrgn.timer.remapTo0_1();
+                    const mana_color = draw.Coloru.rgb(161, 133, 238).toColorf();
+                    const bar_dims = v2f(status_width * f, 2).round();
+                    const bar_topleft = hp_topleft.sub(v2f(0, bar_dims.y));
+                    plat.rectf(bar_topleft, bar_dims, .{
+                        .fill_color = mana_color,
+                    });
+                }
+                // crystals
                 const data = App.getData();
                 if (data.text_icons.getRenderFrame(.mana_crystal_smol)) |rf| {
                     const cropped_dims = data.text_icons.sprite_dims_cropped.?.get(.mana_crystal_smol);
@@ -1475,7 +1490,7 @@ pub fn renderStatusBars(self: *const Thing, _: *const Room) Error!void {
                     opt.origin = .topleft;
                     opt.src_dims = cropped_dims;
                     opt.round_to_pixel = true;
-                    const mana_topleft = hp_topleft.sub(v2f(0, cropped_dims.y + 1)); //.round();
+                    const mana_topleft = hp_topleft.sub(v2f(0, cropped_dims.y + 2)); //.round();
                     var curr_pos = mana_topleft;
                     for (0..utl.as(usize, mana.curr)) |_| {
                         plat.texturef(curr_pos, rf.texture, opt);

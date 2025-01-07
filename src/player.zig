@@ -37,10 +37,13 @@ pub fn modePrototype(mode: Run.Mode) Thing {
             base.mana = .{ .max = 3, .curr = 3 };
         },
         .crispin_picker => {
-            base.mana = .{ .max = 5, .curr = 3 };
-            base.controller.player.mana_regen = .{
-                .timer = utl.TickCounter.init(core.secsToTicks(3)),
-                .max_threshold = 3,
+            base.mana = .{
+                .max = 5,
+                .curr = 3,
+                .regen = .{
+                    .timer = utl.TickCounter.init(core.secsToTicks(3)),
+                    .max_threshold = 3,
+                },
             };
         },
     }
@@ -253,20 +256,18 @@ pub const Controller = struct {
     cast_counter: utl.TickCounter = .{},
     cast_vfx: ?Thing.Id = null,
     ticks_in_state: i64 = 0,
-    mana_regen: ?struct {
-        timer: utl.TickCounter,
-        max_threshold: usize,
-    } = null,
 
     pub fn update(self: *Thing, room: *Room) Error!void {
         assert(self.spawn_state == .spawned);
         const controller = &self.controller.player;
 
-        if (controller.mana_regen) |*mrgn| {
-            if (self.mana) |*mana| {
+        if (self.mana) |*mana| {
+            if (mana.regen) |*mrgn| {
                 if (mana.curr < mrgn.max_threshold) {
-                    if (mrgn.timer.tick(true)) {
-                        mana.curr += 1;
+                    if (self.vel.isAlmostZero()) {
+                        if (mrgn.timer.tick(true)) {
+                            mana.curr += 1;
+                        }
                     }
                 }
             }
