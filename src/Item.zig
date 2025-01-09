@@ -163,7 +163,7 @@ pub const PotionThorns = struct {
 pub const PotionMana = struct {
     pub const title = "Mana Potion";
     pub const description =
-        \\Fill mana bar to maximum.
+        \\Restore 5 mana
     ;
 
     pub const enum_name = "pot_mana";
@@ -185,7 +185,7 @@ pub const PotionMana = struct {
         _ = self;
         _ = room;
         if (user.mana) |*mana| {
-            mana.curr = mana.max;
+            mana.curr = @min(mana.curr + 5, mana.max);
         }
     }
 
