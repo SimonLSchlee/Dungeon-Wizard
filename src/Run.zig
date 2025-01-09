@@ -41,6 +41,7 @@ pub const Mode = enum {
     frank_4_slot,
     mandy_3_mana,
     crispin_picker,
+    harriet_hoarder,
 };
 
 pub const Reward = struct {
@@ -343,6 +344,10 @@ pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
     if (self.room.getConstPlayer()) |p| {
         player_thing.hp.?.max = p.hp.?.max;
         player_thing.hp.?.curr = p.hp.?.curr;
+        if (p.mana) |mana| {
+            player_thing.mana.?.curr = mana.curr;
+            player_thing.mana.?.max = mana.max;
+        }
         player_thing.dir = if (p.dir.x > 0) V2f.right else V2f.left;
     }
     self.room.deinit();

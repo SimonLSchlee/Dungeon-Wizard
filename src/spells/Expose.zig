@@ -39,7 +39,7 @@ pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
     .{
         .cast_time = .medium,
-        .mana_cost = Spell.ManaCost.num(2),
+        .mana_cost = Spell.ManaCost.num(3),
         .obtainableness = std.EnumSet(Spell.Obtainableness).initOne(.starter),
         .color = StatusEffect.proto_array.get(.exposed).color,
         .targeting_data = .{

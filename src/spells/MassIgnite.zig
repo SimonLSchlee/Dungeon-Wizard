@@ -36,6 +36,7 @@ pub const enum_name = "mass_ignite";
 pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
     .{
+        .mana_cost = Spell.ManaCost.num(2),
         .cast_time = .fast,
         .color = .orange,
         .rarity = .exceptional,
@@ -43,7 +44,6 @@ pub const proto = Spell.makeProto(
             .kind = .self,
             .target_faction_mask = Thing.Faction.Mask.initOne(.enemy),
         },
-        .mana_cost = .{ .number = 2 },
     },
 );
 

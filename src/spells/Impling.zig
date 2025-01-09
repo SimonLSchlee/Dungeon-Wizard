@@ -37,7 +37,7 @@ pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
     .{
         .cast_time = .slow,
-        .mana_cost = Spell.ManaCost.num(2),
+        .mana_cost = Spell.ManaCost.num(4),
         .rarity = .exceptional,
         .color = draw.Coloru.rgb(194, 222, 49).toColorf(),
         .targeting_data = .{
@@ -55,7 +55,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     const impling = self.kind.impling;
     _ = impling;
     const target_pos = params.pos;
-    const spawner = Thing.SpawnerController.prototype(.impling);
+    const spawner = Thing.SpawnerController.prototypeSummon(.impling);
     _ = try room.queueSpawnThing(&spawner, target_pos);
 }
 

@@ -193,6 +193,8 @@ rmb_interactable: ?struct {
     selected: bool = false,
     in_range: bool = false,
 } = null,
+manas_given: i32 = 0,
+is_summon: bool = false,
 
 pub const Faction = enum {
     object,
@@ -562,13 +564,17 @@ pub const HurtBox = struct {
                 const pre_damage_done = hp.total_damage_done;
                 hp.doDamage(effect.damage_kind, damage, self, room);
                 const post_damage_done = hp.total_damage_done;
-                if (room.init_params.mode == .crispin_picker and self.isEnemy()) {
+                if ((room.init_params.mode == .crispin_picker or room.init_params.mode == .harriet_hoarder) and self.isEnemy() and !self.is_summon) {
                     const total_manas = @max(@ceil(self.enemy_difficulty * 2.5), 1);
-                    const damage_per_mana = hp.max / total_manas;
-                    const post_manas = @floor(post_damage_done / damage_per_mana);
-                    const pre_manas = @floor(pre_damage_done / damage_per_mana);
-                    const num_manas = utl.as(usize, post_manas - pre_manas);
-                    ManaPickupController.spawnSome(num_manas, self.pos, room);
+                    const manas_left = total_manas - utl.as(f32, self.manas_given);
+                    if (manas_left > 0) {
+                        const damage_per_mana = hp.max / total_manas;
+                        const post_manas = @floor(post_damage_done / damage_per_mana);
+                        const pre_manas = @floor(pre_damage_done / damage_per_mana);
+                        const num_manas = utl.as(usize, @min(post_manas - pre_manas, manas_left));
+                        ManaPickupController.spawnSome(num_manas, self.pos, room);
+                        self.manas_given += utl.as(i32, num_manas);
+                    }
                 }
             }
         }
@@ -1195,6 +1201,7 @@ pub const SpawnerController = struct {
                 if (spawner.timer.tick(true)) {
                     var proto = App.get().data.creature_protos.get(spawner.creature_kind);
                     proto.faction = self.faction;
+                    proto.is_summon = self.is_summon;
                     _ = try room.queueSpawnThing(&proto, self.pos);
                     spawner.state = .fade_out_circle;
                 }
@@ -1227,6 +1234,11 @@ pub const SpawnerController = struct {
             },
             .faction = proto.faction, // to ensure num_enemies_alive > 0
         };
+    }
+    pub fn prototypeSummon(creature_kind: CreatureKind) Thing {
+        var ret = prototype(creature_kind);
+        ret.is_summon = true;
+        return ret;
     }
 };
 

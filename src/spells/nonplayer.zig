@@ -48,7 +48,7 @@ pub const spells = [_]type{
             params.validate(.pos, caster);
             _ = self;
             const target_pos = params.pos;
-            var spawner = Thing.SpawnerController.prototype(.bat);
+            var spawner = Thing.SpawnerController.prototypeSummon(.bat);
             spawner.faction = caster.faction;
             _ = try room.queueSpawnThing(&spawner, target_pos);
         }

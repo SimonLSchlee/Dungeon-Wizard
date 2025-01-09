@@ -46,7 +46,15 @@ pub fn modePrototype(mode: Run.Mode) Thing {
                 },
             };
         },
+        .harriet_hoarder => {
+            base.mana = .{
+                .max = 10,
+                .curr = 10,
+            };
+        },
     }
+    base.player_input.?.mode = mode;
+
     return base;
 }
 
@@ -81,6 +89,7 @@ pub const Action = struct {
 pub const Input = struct {
     move_press_ui_timer: utl.TickCounter = utl.TickCounter.initStopped(60),
     move_release_ui_timer: utl.TickCounter = utl.TickCounter.initStopped(60),
+    mode: Run.Mode = undefined,
 
     pub fn updatePaused(input: *Input, run: *Run, self: *Thing) Error!void {
         const plat = App.getPlat();
