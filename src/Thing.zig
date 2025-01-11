@@ -1099,7 +1099,7 @@ pub const ManaPickupController = struct {
         collected,
     } = .loop,
     fading: bool = false,
-    timer: utl.TickCounter = utl.TickCounter.init(core.secsToTicks(8)),
+    timer: utl.TickCounter = utl.TickCounter.init(core.secsToTicks(12)),
 
     pub fn update(self: *Thing, room: *Room) Error!void {
         const controller = &self.controller.mana_pickup;
