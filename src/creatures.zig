@@ -41,6 +41,7 @@ pub const Kind = enum {
     slime,
     gobbomber,
     shopspider,
+    djinn,
 
     pub fn getIcon(self: Kind) icon_text.Icon {
         if (self == .player) {
@@ -116,6 +117,26 @@ pub fn playerProto() Thing {
     ret.controller = .{ .player = .{} };
     ret.dir = V2f.left;
 
+    return ret;
+}
+
+pub fn djinnProto() Thing {
+    var ret = creatureProto(.djinn, .creature, .enemy, .{ .acolyte = .{} }, 80, .big, 26);
+    ret.animator = null;
+    ret.renderer = .{ .sprite = .{} };
+    ret.renderer.sprite.setDirAnim(Data.Ref(Data.DirectionalSpriteAnim).init("wizard-idle-idle"));
+    ret.accel_params = .{
+        .accel = 0.0047 * TileMap.tile_sz_f,
+        .max_speed = 0.0198 * TileMap.tile_sz_f,
+    };
+    ret.controller.ai_actor.flee_range = 70;
+    ret.controller.ai_actor.actions.getPtr(.spell_cast_summon_1).* = (.{
+        .kind = .{ .spell_cast = .{
+            .spell = Spell.getProto(.summon_bat),
+        } },
+        .cooldown = utl.TickCounter.initStopped(5 * core.fups_per_sec),
+    });
+    ret.enemy_difficulty = 8;
     return ret;
 }
 
