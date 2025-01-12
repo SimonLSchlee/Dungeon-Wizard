@@ -217,6 +217,10 @@ pub const Faction = enum {
 };
 
 pub const HP = struct {
+    const AnimRefs = struct {
+        var swirlies = Data.Ref(Data.SpriteAnim).init("swirlies-loop");
+    };
+
     pub const Shield = struct {
         curr: f32,
         max: f32,
@@ -260,9 +264,9 @@ pub const HP = struct {
     pub fn heal(hp: *HP, amount: f32, self: *Thing, room: *Room) void {
         const amount_healed = @min(amount, hp.max - hp.curr);
         hp.curr += amount_healed;
+        _ = AnimRefs.swirlies.get();
         const proto = Thing.LoopVFXController.proto(
-            .swirlies,
-            .loop,
+            AnimRefs.swirlies,
             0.8,
             1,
             true,
@@ -345,6 +349,25 @@ pub const Damage = struct {
         ice,
         lightning,
         acid,
+
+        pub fn getHitAnim(self: Damage.Kind, amount: f32) Data.Ref(Data.SpriteAnim) {
+            const AnimRef = Data.Ref(Data.SpriteAnim);
+            const Refs = struct {
+                var magic_smol = AnimRef.init("explode_hit-magic_smol");
+                var magic_big = AnimRef.init("explode_hit-magic_big");
+                var fire_smol = AnimRef.init("explode_hit-fire_smol");
+                var physical_smol = AnimRef.init("explode_hit-physical_smol");
+                var physical_big = AnimRef.init("explode_hit-physical_big");
+            };
+            const ref = switch (self) {
+                //.water => .water,
+                .magic => if (amount < 8) &Refs.magic_smol else &Refs.magic_big,
+                .fire => &Refs.fire_smol,
+                else => if (amount < 8) &Refs.physical_smol else &Refs.physical_big,
+            };
+            _ = ref.get();
+            return ref.*;
+        }
 
         pub inline fn getIcon(self: Damage.Kind, aoe: bool) icon_text.Icon {
             return switch (self) {
@@ -636,7 +659,7 @@ pub const HurtBox = struct {
 };
 
 pub const LoopVFXController = struct {
-    anim_to_loop: sprites.AnimName = .loop,
+    anim_to_loop: Data.Ref(Data.SpriteAnim) = undefined,
     tint: Colorf = .white,
     timer: utl.TickCounter = utl.TickCounter.init(core.secsToTicks(2)),
     fade_secs: f32 = 1,
@@ -650,7 +673,7 @@ pub const LoopVFXController = struct {
         assert(self.spawn_state == .spawned);
         const controller = &self.controller.loop_vfx;
 
-        const events = self.animator.?.play(controller.anim_to_loop, .{ .loop = controller.loop });
+        const events = self.renderer.sprite.playNormal(controller.anim_to_loop, .{ .loop = controller.loop });
 
         switch (controller.state) {
             .loop => {
@@ -660,15 +683,15 @@ pub const LoopVFXController = struct {
                 }
             },
             .fade => {
-                self.renderer.vfx.sprite_tint = controller.tint.fade(1 - controller.timer.remapTo0_1());
+                self.renderer.sprite.sprite_tint = controller.tint.fade(1 - controller.timer.remapTo0_1());
                 if (controller.timer.tick(false)) {
                     self.deferFree(room);
                 }
             },
         }
     }
-    pub fn proto(spritesheet: sprites.VFXAnim.SheetName, anim: sprites.AnimName, lifetime_secs: f32, fade_secs: f32, loop: bool, tint: Colorf, draw_over: bool) Thing {
-        return Thing{
+    pub fn proto(anim: Data.Ref(Data.SpriteAnim), lifetime_secs: f32, fade_secs: f32, loop: bool, tint: Colorf, draw_over: bool) Thing {
+        var ret = Thing{
             .kind = .vfx,
             .controller = .{ .loop_vfx = .{
                 .anim_to_loop = anim,
@@ -677,22 +700,14 @@ pub const LoopVFXController = struct {
                 .fade_secs = @max(fade_secs, 0),
                 .loop = loop,
             } },
-            .renderer = .{
-                .vfx = .{
-                    .draw_normal = !draw_over,
-                    .draw_over = draw_over,
-                    .sprite_tint = tint,
-                },
-            },
-            .animator = .{
-                .kind = .{
-                    .vfx = .{
-                        .sheet_name = spritesheet,
-                    },
-                },
-                .curr_anim = anim,
-            },
+            .renderer = .{ .sprite = .{
+                .draw_normal = !draw_over,
+                .draw_over = draw_over,
+                .sprite_tint = tint,
+            } },
         };
+        ret.renderer.sprite.setNormalAnim(anim);
+        return ret;
     }
     pub fn spawnExplodeHit(thing: *Thing, kind: Damage.Kind, amount: f32, room: *Room) void {
         const rfloat = room.rng.random().float(f32);
@@ -700,14 +715,9 @@ pub const LoopVFXController = struct {
         const center_pos = if (thing.selectable) |s| thing.pos.add(v2f(0, -s.height * 0.5)) else thing.pos;
         const radius = (if (thing.selectable) |s| s.radius else thing.coll_radius) * 0.75;
         const rpos = center_pos.add(rdir.scale(radius));
+        const anim = kind.getHitAnim(amount);
 
-        const anim: sprites.AnimName = switch (kind) {
-            //.water => .water,
-            .magic => if (amount < 8) .magic_smol else .magic_big,
-            .fire => .fire_smol,
-            else => if (amount < 8) .physical_smol else .physical_big,
-        };
-        const p = proto(.explode_hit, anim, 99, 0, false, .white, true);
+        const p = proto(anim, 99, 0, false, .white, true);
         _ = room.queueSpawnThing(&p, rpos) catch {};
     }
 };

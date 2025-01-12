@@ -259,6 +259,12 @@ pub const Input = struct {
 };
 
 pub const Controller = struct {
+    const AnimRefs = struct {
+        var idle = Data.Ref(Data.DirectionalSpriteAnim).init("wizard-idle-idle");
+        var move = Data.Ref(Data.DirectionalSpriteAnim).init("wizard-move-move");
+        var cast = Data.Ref(Data.DirectionalSpriteAnim).init("wizard-cast-cast");
+        var swirlies = Data.Ref(Data.SpriteAnim).init("swirlies-loop");
+    };
     const State = enum {
         none,
         action,
@@ -283,9 +289,9 @@ pub const Controller = struct {
                             mana.curr += 1;
                         }
                         if (@mod(mrgn.timer.curr_tick, @divFloor(mrgn.timer.num_ticks, 4)) == 0) {
+                            _ = AnimRefs.swirlies.get();
                             const proto = Thing.LoopVFXController.proto(
-                                .swirlies,
-                                .loop,
+                                AnimRefs.swirlies,
                                 0.66,
                                 0.66,
                                 false,
@@ -300,11 +306,6 @@ pub const Controller = struct {
         }
 
         {
-            const AnimRefs = struct {
-                var idle = Data.Ref(Data.DirectionalSpriteAnim).init("wizard-idle-idle");
-                var move = Data.Ref(Data.DirectionalSpriteAnim).init("wizard-move-move");
-                var cast = Data.Ref(Data.DirectionalSpriteAnim).init("wizard-cast-cast");
-            };
             const renderer = &self.renderer.sprite;
             const p = self.followPathGetNextPoint(5);
             const input_dir = p.sub(self.pos).normalizedOrZero();
