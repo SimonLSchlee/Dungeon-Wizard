@@ -17,6 +17,7 @@ const v2i = V2i.v2i;
 
 const App = @import("../App.zig");
 const getPlat = App.getPlat;
+const Data = @import("../Data.zig");
 const Room = @import("../Room.zig");
 const Thing = @import("../Thing.zig");
 const TileMap = @import("../TileMap.zig");
@@ -59,6 +60,11 @@ hit_effect: Thing.HitEffect = .{
 },
 radius: f32 = base_radius,
 
+const AnimRef = struct {
+    var loop = Data.Ref(Data.SpriteAnim).init("expose_circle-loop");
+    var end = Data.Ref(Data.SpriteAnim).init("expose_circle-end");
+};
+
 pub const Projectile = struct {
     pub const controller_enum_name = enum_name ++ "_projectile";
 
@@ -84,12 +90,12 @@ pub const Projectile = struct {
                     projectile.timer = utl.TickCounter.init(60);
                     projectile.state = .fading;
                     self.hitbox.?.active = true;
-                    self.renderer.vfx.scale = core.game_sprite_scaling * 0.5;
-                    self.renderer.vfx.sprite_tint = Colorf.white;
-                    self.animator.?.curr_anim = .end;
+                    self.renderer.sprite.scale = core.game_sprite_scaling * 0.5;
+                    self.renderer.sprite.sprite_tint = Colorf.white;
+                    self.renderer.sprite.setNormalAnim(AnimRef.end);
                 } else {
                     const f = projectile.timer.remapTo0_1();
-                    self.renderer.vfx.scale = f * core.game_sprite_scaling * 0.5;
+                    self.renderer.sprite.scale = f * core.game_sprite_scaling * 0.5;
                 }
             },
             .fading => {
@@ -97,7 +103,7 @@ pub const Projectile = struct {
                     self.deferFree(room);
                 } else {
                     const f = projectile.timer.remapTo0_1();
-                    self.renderer.vfx.sprite_tint = Colorf.white.lerp(base_color, f).fade(1 - f);
+                    self.renderer.sprite.sprite_tint = Colorf.white.lerp(base_color, f).fade(1 - f);
                 }
             },
         }
@@ -108,7 +114,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     params.validate(.pos, caster);
     const expose = self.kind.expose;
     const target_pos = params.pos;
-    const hit_circle = Thing{
+    var hit_circle = Thing{
         .kind = .projectile,
         .accel_params = .{
             .accel = 0.5,
@@ -126,18 +132,17 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             .mask = Thing.Faction.opposing_masks.get(caster.faction),
             .radius = expose.radius,
         },
-        .renderer = .{ .vfx = .{
+        .renderer = .{ .sprite = .{
             .draw_normal = false,
             .draw_under = true,
             .rotate_to_dir = true,
             .sprite_tint = base_color,
             .scale = 0,
         } },
-        .animator = .{
-            .kind = .{ .vfx = .{ .sheet_name = .expose_circle } },
-            .curr_anim = .loop,
-        },
     };
+    _ = AnimRef.loop.get();
+    _ = AnimRef.end.get();
+    hit_circle.renderer.sprite.setNormalAnim(AnimRef.loop);
     _ = try room.queueSpawnThing(&hit_circle, target_pos);
 }
 

@@ -1117,6 +1117,10 @@ pub const ChestController = struct {
 };
 
 pub const ManaPickupController = struct {
+    const AnimRef = struct {
+        var loop = Data.Ref(Data.SpriteAnim).init("mana_pickup-loop");
+        var end = Data.Ref(Data.SpriteAnim).init("mana_pickup-end");
+    };
     state: enum {
         loop,
         collected,
@@ -1126,8 +1130,7 @@ pub const ManaPickupController = struct {
 
     pub fn update(self: *Thing, room: *Room) Error!void {
         const controller = &self.controller.mana_pickup;
-        const animator = &self.animator.?;
-        const renderer = &self.renderer.vfx;
+        const renderer = &self.renderer.sprite;
         if (controller.timer.tick(false)) {
             if (controller.fading) {
                 self.deferFree(room);
@@ -1142,7 +1145,7 @@ pub const ManaPickupController = struct {
         }
         switch (controller.state) {
             .loop => if (room.getPlayer()) |p| {
-                _ = animator.play(.loop, .{ .loop = true });
+                _ = renderer.playNormal(AnimRef.loop, .{ .loop = true });
                 if (p.mana) |*mana| {
                     if (mana.curr < mana.max) {
                         if (p.selectable) |s| {
@@ -1159,7 +1162,7 @@ pub const ManaPickupController = struct {
                 renderer.sprite_tint = Colorf.white; // it could be fading, brighten it back to full
                 renderer.draw_normal = false;
                 renderer.draw_over = true;
-                if (animator.play(.end, .{}).contains(.end)) {
+                if (renderer.playNormal(AnimRef.end, .{}).contains(.end)) {
                     self.deferFree(room);
                 }
             },
@@ -1177,19 +1180,12 @@ pub const ManaPickupController = struct {
             .coll_radius = radius,
             .coll_mask = Collision.Mask.initMany(&.{ .wall, .spikes }),
             .controller = .{ .mana_pickup = .{} },
-            .renderer = .{
-                .vfx = .{},
-            },
-            .animator = .{
-                .kind = .{
-                    .vfx = .{
-                        .sheet_name = .mana_pickup,
-                    },
-                },
-                .curr_anim = .loop,
-            },
+            .renderer = .{ .sprite = .{} },
             .shadow_radius_x = 6,
         };
+        _ = AnimRef.end.get();
+        _ = AnimRef.loop.get();
+        proto.renderer.sprite.setNormalAnim(AnimRef.loop);
         var rnd = room.rng.random();
         for (0..num) |_| {
             const rdir = V2f.fromAngleRadians(rnd.float(f32) * utl.tau);

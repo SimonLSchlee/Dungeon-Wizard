@@ -96,6 +96,10 @@ pub const Gobarrow = struct {
 
 pub const FireBlaze = struct {
     pub const enum_name = "fire_blaze";
+    const AnimRef = struct {
+        var loop = Data.Ref(Data.SpriteAnim).init("trailblaze-loop");
+        var end = Data.Ref(Data.SpriteAnim).init("trailblaze-end");
+    };
 
     loops_til_end: i32 = 2,
     state: enum {
@@ -127,21 +131,13 @@ pub const FireBlaze = struct {
     }
 
     pub fn proto() Thing {
-        return Thing{
+        var ret = Thing{
             .kind = .projectile,
             .spawn_state = .instance,
             .controller = .{ .projectile = .{ .kind = .{
                 .fire_blaze = .{},
             } } },
-            .renderer = .{ .vfx = .{} },
-            .animator = .{
-                .kind = .{
-                    .vfx = .{
-                        .sheet_name = .trailblaze,
-                    },
-                },
-                .curr_anim = .loop,
-            },
+            .renderer = .{ .sprite = .{} },
             .hitbox = .{
                 .mask = Thing.Faction.Mask.initFull(),
                 .radius = 12.5,
@@ -155,6 +151,10 @@ pub const FireBlaze = struct {
                 },
             },
         };
+        _ = AnimRef.loop.get();
+        _ = AnimRef.end.get();
+        ret.renderer.sprite.setNormalAnim(AnimRef.loop);
+        return ret;
     }
 };
 
