@@ -583,7 +583,7 @@ pub const SpriteAnimator = struct {
         if (params.reset) {
             self.resetAnim();
         }
-        const maybe_anim: ?*SpriteAnim = self.anim.tryGet();
+        const maybe_anim: ?*SpriteAnim = self.anim.tryGetOrDefault();
         if (maybe_anim == null) {
             Log.warn("Can't get anim \"{s}\"", .{self.anim.name.constSlice()});
             ret.insert(.end);
@@ -627,7 +627,7 @@ pub const SpriteAnimator = struct {
 
     pub fn playAnim(self: *SpriteAnimator, anim: Data.Ref(SpriteAnim), params: SpriteAnimator.PlayParams) AnimEvent.Set {
         var play_anim = anim;
-        const maybe_anim: ?*SpriteAnim = play_anim.tryGet();
+        const maybe_anim: ?*SpriteAnim = play_anim.tryGetOrDefault();
         if (maybe_anim == null) {
             Log.warn("Can't get anim \"{s}\"", .{play_anim.name.constSlice()});
             return std.EnumSet(AnimEvent.Kind).initOne(.end);

@@ -105,6 +105,13 @@ pub fn Ref(AssetType: type) type {
             return null;
         }
 
+        pub fn tryGetOrDefault(self: *Self) ?*Self.Type {
+            if (self.tryGet()) |s| return s;
+            const data = App.getData();
+            if (data.getDefault(Self.Type)) |d| return d;
+            return null;
+        }
+
         pub fn get(self: *Self) *Self.Type {
             if (self.tryGet()) |ret| return ret;
             const data = App.getData();
@@ -121,6 +128,10 @@ pub fn Ref(AssetType: type) type {
 
         pub fn getConst(self: *const Self) *const Self.Type {
             return @constCast(self).get();
+        }
+
+        pub fn isDefault(self: *const Self) bool {
+            return std.mem.startsWith(u8, self.name.constSlice(), "__default");
         }
     };
 }
@@ -152,8 +163,8 @@ pub fn getByIdx(data: *Data, AssetType: type, idx: usize) ?*AssetType {
 pub fn getDefault(data: *Data, AssetType: type) ?*AssetType {
     const field_name = comptime assetTypeToDefaultIdxName(AssetType);
     if (@hasField(Data, field_name)) {
-        const field = &@field(data, field_name);
-        if (data.getByIdx(AssetType, @field(data, field))) |asset| {
+        const idx = @field(data, field_name);
+        if (data.getByIdx(AssetType, idx)) |asset| {
             return asset;
         }
     }
@@ -568,7 +579,9 @@ tilemaps: AssetArray(TileMap, 32),
 sounds: AssetArray(Sound, 128),
 shaders: AssetArray(Shader, 8),
 spriteanims: AssetArray(SpriteAnim, 512),
+spriteanim_default: usize,
 directionalspriteanims: AssetArray(DirectionalSpriteAnim, 128),
+directionalspriteanim_default: usize,
 // caches for faster simpler lookups for some stuff
 creature_dir_anims: CreatureDirAnimCache,
 // old stuff
@@ -1362,7 +1375,10 @@ pub fn reloadSpriteAnims(self: *Data) Error!void {
             }
 
             const name = try u.bufPrintLocal("{s}-{s}", .{ spritesheet.data_ref.name.constSlice(), tag.name.constSlice() });
-            _ = self.putAsset(SpriteAnim, &anim, name);
+            const put_anim = self.putAsset(SpriteAnim, &anim, name);
+            if (put_anim.data_ref.isDefault() and std.mem.endsWith(u8, put_anim.data_ref.name.constSlice(), "loop")) {
+                self.spriteanim_default = put_anim.data_ref.idx.?;
+            }
             Log.info("Got spriteanim: {s}", .{name});
         }
     }
@@ -1400,6 +1416,9 @@ pub fn reloadSpriteAnims(self: *Data) Error!void {
             if (slot.*) |_| {
                 dir_spriteanim.num_dirs += 1;
             }
+        }
+        if (dir_spriteanim.data_ref.isDefault()) {
+            self.directionalspriteanim_default = dir_spriteanim.data_ref.idx.?;
         }
         Log.info(
             "Got directionalspriteanim: {s} with {} dir{s}",
