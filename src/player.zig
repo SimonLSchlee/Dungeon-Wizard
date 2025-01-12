@@ -400,7 +400,7 @@ pub const Controller = struct {
                         plat.setSoundVolume(cast_loop_sound, vol * cast_loop_volume);
                         if (controller.cast_vfx) |id| {
                             if (room.getThingById(id)) |cast| {
-                                cast.controller.cast_vfx.anim_to_play = .basic_cast;
+                                cast.controller.cast_vfx.state = .cast;
                             }
                         }
                         if (controller.cast_vfx != null) {

@@ -793,8 +793,17 @@ pub const TextVFXController = struct {
 };
 
 pub const CastVFXController = struct {
+    const AnimRefs = struct {
+        var loop = Data.Ref(Data.SpriteAnim).init("spellcasting-basic_loop");
+        var cast = Data.Ref(Data.SpriteAnim).init("spellcasting-basic_cast");
+        var fizzle = Data.Ref(Data.SpriteAnim).init("spellcasting-basic_fizzle");
+    };
     parent: Thing.Id,
-    anim_to_play: sprites.AnimName = .basic_loop,
+    state: enum {
+        loop,
+        fizzle,
+        cast,
+    } = .loop,
 
     pub fn update(self: *Thing, room: *Room) Error!void {
         assert(self.spawn_state == .spawned);
@@ -802,18 +811,23 @@ pub const CastVFXController = struct {
 
         if (room.getThingById(controller.parent)) |parent| {
             if (parent.isDeadCreature()) {
-                controller.anim_to_play = .basic_fizzle;
+                controller.state = .fizzle;
             }
         } else {
-            controller.anim_to_play = .basic_fizzle;
+            controller.state = .fizzle;
         }
 
-        switch (controller.anim_to_play) {
-            .basic_loop => {
-                _ = self.animator.?.play(controller.anim_to_play, .{ .loop = true });
+        switch (controller.state) {
+            .loop => {
+                _ = self.renderer.sprite.playNormal(AnimRefs.loop, .{ .loop = true });
             },
-            else => |anim_name| {
-                if (self.animator.?.play(anim_name, .{}).contains(.end)) {
+            .fizzle => {
+                if (self.renderer.sprite.playNormal(AnimRefs.fizzle, .{}).contains(.end)) {
+                    self.deferFree(room);
+                }
+            },
+            .cast => {
+                if (self.renderer.sprite.playNormal(AnimRefs.cast, .{}).contains(.end)) {
                     self.deferFree(room);
                 }
             },
@@ -832,7 +846,7 @@ pub const CastVFXController = struct {
             }
         }
         const cast_pos = caster.pos.add(cast_offset);
-        return .{
+        var ret = Thing{
             .kind = .vfx,
             .pos = cast_pos,
             .controller = .{
@@ -840,19 +854,18 @@ pub const CastVFXController = struct {
                     .parent = caster.id,
                 },
             },
-            .renderer = .{ .vfx = .{
-                .draw_over = true,
-                .draw_normal = false,
-            } },
-            .animator = .{
-                .kind = .{
-                    .vfx = .{
-                        .sheet_name = .spellcasting,
-                    },
+            .renderer = .{
+                .sprite = .{
+                    .draw_over = true,
+                    .draw_normal = false,
                 },
-                .curr_anim = .basic_loop,
             },
         };
+        _ = AnimRefs.loop.get();
+        _ = AnimRefs.fizzle.get();
+        _ = AnimRefs.cast.get();
+        ret.renderer.sprite.setNormalAnim(AnimRefs.loop);
+        return ret;
     }
 };
 
