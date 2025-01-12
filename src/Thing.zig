@@ -154,7 +154,6 @@ renderer: union(enum) {
     creature: CreatureRenderer, // TODO deprecate for sprite
     shape: ShapeRenderer,
     spawner: SpawnerRenderer,
-    vfx: VFXRenderer, // TODO deprecate for sprite
     sprite: SpriteRenderer,
 } = .none,
 animator: ?sprites.Animator = null, // TODO deprecate for renderer.sprite
@@ -866,57 +865,6 @@ pub const CastVFXController = struct {
         _ = AnimRefs.cast.get();
         ret.renderer.sprite.setNormalAnim(AnimRefs.loop);
         return ret;
-    }
-};
-
-pub const VFXRenderer = struct {
-    sprite_tint: Colorf = .white,
-    draw_normal: bool = true,
-    draw_over: bool = false,
-    draw_under: bool = false,
-    rotate_to_dir: bool = false,
-    flip_x_to_dir: bool = false,
-    rel_pos: V2f = .{},
-    scale: f32 = core.game_sprite_scaling,
-
-    pub fn _render(self: *const Thing, renderer: *const VFXRenderer, _: *const Room) void {
-        const plat = App.getPlat();
-        const frame = self.animator.?.getCurrRenderFrame();
-        const tint: Colorf = renderer.sprite_tint;
-        var opt = draw.TextureOpt{
-            .origin = frame.origin,
-            .src_pos = frame.pos.toV2f(),
-            .src_dims = frame.size.toV2f(),
-            .uniform_scaling = renderer.scale,
-            .tint = tint,
-            .flip_x = renderer.flip_x_to_dir and self.dir.x < 0,
-            .rot_rads = if (renderer.rotate_to_dir) self.dir.toAngleRadians() else 0,
-        };
-        if (opt.flip_x and renderer.rotate_to_dir and self.dir.x < 0) {
-            opt.rot_rads += utl.pi;
-        }
-        plat.texturef(self.pos.add(renderer.rel_pos), frame.texture, opt);
-    }
-
-    pub fn renderUnder(self: *const Thing, room: *const Room) Error!void {
-        const renderer = &self.renderer.vfx;
-        if (renderer.draw_under) {
-            _render(self, renderer, room);
-        }
-    }
-
-    pub fn render(self: *const Thing, room: *const Room) Error!void {
-        const renderer = &self.renderer.vfx;
-        if (renderer.draw_normal) {
-            _render(self, renderer, room);
-        }
-    }
-
-    pub fn renderOver(self: *const Thing, room: *const Room) Error!void {
-        const renderer = &self.renderer.vfx;
-        if (renderer.draw_over) {
-            _render(self, renderer, room);
-        }
     }
 };
 
