@@ -346,6 +346,7 @@ pub const ActorController = struct {
 
     pub fn update(self: *Thing, room: *Room) Error!void {
         assert(self.spawn_state == .spawned);
+        const renderer = &self.renderer.sprite;
         const controller = &self.controller.ai_actor;
 
         // tick action cooldowns
@@ -393,13 +394,7 @@ pub const ActorController = struct {
         decision: switch (controller.decision) {
             .idle => {
                 self.updateVel(.{}, .{});
-                if (self.animator) |*a| {
-                    _ = a.play(.idle, .{ .loop = true });
-                } else {
-                    if (App.getData().getCreatureDirAnim(self.creature_kind.?, .idle)) |anim| {
-                        _ = self.renderer.sprite.playDir(anim.data_ref, .{ .loop = true, .dir = self.dir });
-                    }
-                }
+                _ = self.renderer.sprite.playCreatureAnim(self, .idle, .{ .loop = true });
             },
             .action => |*doing| {
                 const action = &controller.actions.getPtr(doing.slot).*.?;
@@ -419,7 +414,8 @@ pub const ActorController = struct {
                 }
                 const target = _target.?;
                 const range = target.getRangeToHurtBox(self.pos);
-                _ = self.animator.?.play(.move, .{ .loop = true });
+                _ = renderer.playCreatureAnim(self, .move, .{ .loop = true });
+
                 const dist_til_in_range = range - s.attack_range;
                 var target_pos = target.pos;
                 // predictive movement if close enough
@@ -476,7 +472,7 @@ pub const ActorController = struct {
                 }
                 if (controller.flee_pos) |pos| {
                     try self.findPath(room, pos);
-                    _ = self.animator.?.play(.move, .{ .loop = true });
+                    _ = renderer.playCreatureAnim(self, .move, .{ .loop = true });
                     const p = self.followPathGetNextPoint(5);
                     self.move(p.sub(self.pos).normalizedOrZero());
                     if (!self.vel.isAlmostZero()) {

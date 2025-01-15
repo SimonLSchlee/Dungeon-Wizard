@@ -103,9 +103,8 @@ pub const proto_fns = blk: {
 
 pub fn playerProto() Thing {
     var ret = creatureProto(.player, .wizard, .player, null, 40, .medium, 18);
-    ret.animator = null;
     ret.renderer = .{ .sprite = .{} };
-    ret.renderer.sprite.setDirAnim(Data.Ref(Data.DirectionalSpriteAnim).init("wizard-idle-idle"));
+    ret.renderer.sprite.setDirAnim(Data.Ref(Data.DirectionalSpriteAnim).init("wizard-idle"));
     ret.hurtbox.?.radius *= 0.85;
     ret.accel_params = .{
         .accel = 0.0023 * TileMap.tile_sz_f,
@@ -122,9 +121,8 @@ pub fn playerProto() Thing {
 
 pub fn djinnProto() Thing {
     var ret = creatureProto(.djinn, .creature, .enemy, .{ .acolyte = .{} }, 80, .big, 26);
-    ret.animator = null;
     ret.renderer = .{ .sprite = .{} };
-    ret.renderer.sprite.setDirAnim(Data.Ref(Data.DirectionalSpriteAnim).init("wizard-idle-idle"));
+    ret.renderer.sprite.setDirAnim(Data.Ref(Data.DirectionalSpriteAnim).init("wizard-idle"));
     ret.accel_params = .{
         .accel = 0.0047 * TileMap.tile_sz_f,
         .max_speed = 0.0198 * TileMap.tile_sz_f,
@@ -147,7 +145,6 @@ pub fn shopspiderProto() Thing {
     ret.renderer = .{ .sprite = .{} };
     ret.renderer.sprite.setDirAnim(Data.Ref(Data.DirectionalSpriteAnim).init("shopspider-idle"));
     ret.hp = null;
-    ret.animator = null;
     ret.coll_mask = Thing.Collision.Mask.initEmpty();
     ret.dir = V2f.left;
     ret.rmb_interactable = .{
@@ -378,22 +375,18 @@ pub fn dummyProto() Thing {
     return ret;
 }
 
-pub fn creatureProto(creature_kind: Kind, sprite_kind: sprites.CreatureAnim.Kind, faction: Thing.Faction, ai: ?AI.ActorController.KindData, hp: f32, size_cat: Thing.SizeCategory, select_height_px: f32) Thing {
-    return Thing{
+pub fn creatureProto(creature_kind: Kind, sprite_kind: Data.CreatureSpriteName, faction: Thing.Faction, ai: ?AI.ActorController.KindData, hp: f32, size_cat: Thing.SizeCategory, select_height_px: f32) Thing {
+    var ret = Thing{
         .kind = .creature,
         .creature_kind = creature_kind,
         .spawn_state = .instance,
         .vision_range = 80,
+        .draw_radius = Thing.SizeCategory.draw_radii.get(size_cat),
         .coll_radius = Thing.SizeCategory.coll_radii.get(size_cat),
         .coll_mask = Thing.Collision.Mask.initMany(&.{ .creature, .wall }),
         .coll_layer = Thing.Collision.Mask.initMany(&.{.creature}),
         .controller = if (ai) |a| .{ .ai_actor = .{ .ai = a } } else .default,
-        .renderer = .{ .creature = .{
-            .draw_color = .yellow,
-            .draw_radius = Thing.SizeCategory.draw_radii.get(size_cat),
-            .hp_bar_width = Thing.SizeCategory.hp_bar_width.get(size_cat),
-        } },
-        .animator = .{ .kind = .{ .creature = .{ .kind = sprite_kind } } },
+        .renderer = .{ .sprite = .{} },
         .hurtbox = .{
             .radius = Thing.SizeCategory.hurtbox_radii.get(size_cat),
         },
@@ -405,4 +398,9 @@ pub fn creatureProto(creature_kind: Kind, sprite_kind: sprites.CreatureAnim.Kind
         .faction = faction,
         .shadow_radius_x = Thing.SizeCategory.draw_radii.get(size_cat),
     };
+    const anim_name = utl.bufPrintLocal("{s}-idle", .{utl.enumToString(Data.CreatureSpriteName, sprite_kind)}) catch @panic("Unable to fmt anim name string");
+    const idle_ref = Data.Ref(sprites.DirectionalSpriteAnim).init(anim_name);
+    ret.renderer.sprite.setDirAnim(idle_ref);
+
+    return ret;
 }

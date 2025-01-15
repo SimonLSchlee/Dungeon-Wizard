@@ -109,10 +109,10 @@ pub const FireBlaze = struct {
 
     pub fn update(self: *Thing, room: *Room) Error!void {
         const controller: *@This() = &self.controller.projectile.kind.fire_blaze;
-        const animator = &self.animator.?;
+        const renderer = &self.renderer.sprite;
         switch (controller.state) {
             .loop => {
-                const events = animator.play(.loop, .{ .loop = true });
+                const events = renderer.playNormal(AnimRef.loop, .{ .loop = true });
                 if (events.contains(.end)) {
                     controller.loops_til_end -= 1;
                     if (controller.loops_til_end <= 0) {
@@ -123,7 +123,7 @@ pub const FireBlaze = struct {
                 }
             },
             .end => {
-                if (animator.play(.end, .{}).contains(.end)) {
+                if (renderer.playNormal(AnimRef.end, .{}).contains(.end)) {
                     self.deferFree(room);
                 }
             },

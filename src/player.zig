@@ -260,9 +260,9 @@ pub const Input = struct {
 
 pub const Controller = struct {
     const AnimRefs = struct {
-        var idle = Data.Ref(Data.DirectionalSpriteAnim).init("wizard-idle-idle");
-        var move = Data.Ref(Data.DirectionalSpriteAnim).init("wizard-move-move");
-        var cast = Data.Ref(Data.DirectionalSpriteAnim).init("wizard-cast-cast");
+        var idle = Data.Ref(Data.DirectionalSpriteAnim).init("wizard-idle");
+        var move = Data.Ref(Data.DirectionalSpriteAnim).init("wizard-move");
+        var cast = Data.Ref(Data.DirectionalSpriteAnim).init("wizard-cast");
         var swirlies = Data.Ref(Data.SpriteAnim).init("swirlies-loop");
     };
     const State = enum {

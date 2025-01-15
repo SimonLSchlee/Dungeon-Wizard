@@ -547,6 +547,10 @@ pub const DirectionalSpriteAnimator = struct {
         self.animator.anim = new_anim.dirToSpriteAnim(params.dir);
         return self.animator.tickCurrAnim(params);
     }
+
+    pub fn getTicksUntilEvent(self: *const DirectionalSpriteAnimator, event: AnimEvent.Kind) ?i64 {
+        return self.animator.getTicksUntilEvent(event);
+    }
 };
 
 pub const SpriteAnimator = struct {
@@ -642,5 +646,29 @@ pub const SpriteAnimator = struct {
         self.anim = new_anim.data_ref;
 
         return self.tickCurrAnim(new_params);
+    }
+
+    pub fn getTicksUntilEvent(self: *const SpriteAnimator, event: AnimEvent.Kind) ?i64 {
+        const maybe_anim: ?*const SpriteAnim = self.anim.tryGetConstOrDefault();
+        if (maybe_anim == null) {
+            Log.warn("Can't get anim \"{s}\"", .{self.anim.name.constSlice()});
+            return null;
+        }
+        const anim = maybe_anim.?;
+        for (anim.events.constSlice()) |e| {
+            if (e.kind == event) {
+                const e_frame_idx = utl.as(usize, e.frame);
+                if (e.frame <= self.curr_anim_frame) return null;
+                const sprite_sheet = anim.sheet.getConst();
+                const curr_frame_idx = utl.as(usize, self.curr_anim_frame);
+                var num_ticks: i64 = core.ms_to_ticks(sprite_sheet.frames[curr_frame_idx].duration_ms) - self.tick_in_frame;
+                for (sprite_sheet.frames[curr_frame_idx + 1 .. e_frame_idx]) |frame| {
+                    num_ticks += core.ms_to_ticks(frame.duration_ms);
+                }
+                return num_ticks;
+            }
+        }
+
+        return null;
     }
 };

@@ -123,6 +123,7 @@ dir_accel_params: DirAccelParams = .{},
 accel_params: AccelParams = .{},
 vel: V2f = .{},
 size_category: SizeCategory = .none,
+draw_radius: f32 = 0,
 coll_radius: f32 = 0,
 coll_mask: Collision.Mask = .{},
 coll_layer: Collision.Mask = .{},
@@ -151,12 +152,12 @@ controller: union(enum) {
 } = .default,
 renderer: union(enum) {
     none: struct {},
-    creature: CreatureRenderer, // TODO deprecate for sprite
+    //creature: CreatureRenderer, // TODO deprecate for sprite
     shape: ShapeRenderer,
     spawner: SpawnerRenderer,
     sprite: SpriteRenderer,
 } = .none,
-animator: ?sprites.Animator = null, // TODO deprecate for renderer.sprite
+//animator: ?sprites.Animator = null, // TODO deprecate for renderer.sprite
 path: std.BoundedArray(V2f, 32) = .{},
 pathing_layer: TileMap.PathLayer = .normal,
 hitbox: ?HitBox = null,
@@ -928,6 +929,25 @@ pub const SpriteRenderer = struct {
         };
     }
 
+    pub fn getTicksUntilEvent(renderer: *const SpriteRenderer, event: sprites.AnimEvent.Kind) ?i64 {
+        return switch (renderer.animator) {
+            inline else => |*a| a.getTicksUntilEvent(event),
+        };
+    }
+
+    pub fn playCreatureAnim(renderer: *SpriteRenderer, thing: *Thing, action_anim: Data.ActionAnimName, params: sprites.SpriteAnimator.PlayParams) sprites.AnimEvent.Set {
+        assert(thing.creature_kind != null);
+        const data = App.getData();
+        if (data.getCreatureDirAnim(thing.creature_kind.?, action_anim) orelse data.getDefault(Data.DirectionalSpriteAnim)) |dir_anim| {
+            var p = params;
+            p.dir = thing.dir;
+            return renderer.playDir(dir_anim.data_ref, p);
+        } else {
+            Log.warn("Failed to get any anim for creature {any} : {any} !", .{ thing.creature_kind.?, action_anim });
+            return sprites.AnimEvent.Set.initOne(.end);
+        }
+    }
+
     pub fn _render(self: *const Thing, renderer: *const SpriteRenderer, _: *const Room) void {
         const plat = App.getPlat();
         const rf = switch (renderer.animator) {
@@ -970,8 +990,6 @@ pub const SpriteRenderer = struct {
 };
 
 pub const SpawnerRenderer = struct {
-    creature_kind: sprites.CreatureAnim.Kind,
-    base_circle_radius: f32,
     sprite_tint: Colorf = .blank,
     base_circle_color: Colorf = .blank,
 
@@ -980,7 +998,7 @@ pub const SpawnerRenderer = struct {
         const plat = App.getPlat();
         plat.circlef(
             self.pos,
-            renderer.base_circle_radius,
+            self.draw_radius,
             .{
                 .fill_color = renderer.base_circle_color,
                 .smoothing = .none,
@@ -989,18 +1007,13 @@ pub const SpawnerRenderer = struct {
     }
 
     pub fn render(self: *const Thing, _: *const Room) Error!void {
+        const controller = &self.controller.spawner;
         const renderer = &self.renderer.spawner;
         const plat = App.getPlat();
-        const anim = App.get().data.getCreatureAnim(renderer.creature_kind, .idle).?;
-        const frame = anim.getRenderFrame(self.dir, 0);
-        const tint: Colorf = renderer.sprite_tint;
-        const opt = draw.TextureOpt{
-            .origin = frame.origin,
-            .src_pos = frame.pos.toV2f(),
-            .src_dims = frame.size.toV2f(),
-            .uniform_scaling = core.game_sprite_scaling,
-            .tint = tint,
-        };
+        const anim = App.get().data.getCreatureDirAnim(controller.creature_kind, .idle).?;
+        const frame = anim.dirToSpriteAnim(self.dir).getConst().getRenderFrame(0);
+        var opt = frame.toTextureOpt(core.game_sprite_scaling);
+        opt.tint = renderer.sprite_tint;
         plat.texturef(self.pos, frame.texture, opt);
     }
 };
@@ -1188,16 +1201,14 @@ pub const SpawnerController = struct {
         return .{
             .kind = .spawner,
             .dir = proto.dir,
+            .draw_radius = proto.draw_radius,
             .controller = .{
                 .spawner = .{
                     .creature_kind = creature_kind,
                 },
             },
             .renderer = .{
-                .spawner = .{
-                    .creature_kind = proto.animator.?.kind.creature.kind,
-                    .base_circle_radius = proto.renderer.creature.draw_radius,
-                },
+                .spawner = .{},
             },
             .faction = proto.faction, // to ensure num_enemies_alive > 0
         };
@@ -1556,20 +1567,7 @@ pub fn update(self: *Thing, room: *Room) Error!void {
             self.accel_params.max_speed = old_max_speed;
         }
     } else if (self.isDeadCreature()) {
-        if (self.animator) |*a| {
-            if (a.play(.die, .{}).contains(.end)) {
-                self.deferFree(room);
-            }
-        } else if (self.renderer == .sprite) {
-            if (App.getData().getCreatureDirAnim(self.creature_kind.?, .die)) |anim| {
-                if (self.renderer.sprite.playDir(anim.data_ref, .{}).contains(.end)) {
-                    self.deferFree(room);
-                }
-            } else {
-                self.deferFree(room);
-            }
-        } else {
-            Log.warn("No Thing.animator or self.renderer.sprite found for dead creature \"{any}\"", .{self.creature_kind.?});
+        if (self.renderer.sprite.playCreatureAnim(self, .die, .{}).contains(.end)) {
             self.deferFree(room);
         }
         return;

@@ -171,6 +171,7 @@ pub fn begin(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) E
 
 // return true if done
 pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) Error!bool {
+    const renderer = &self.renderer.sprite;
     const maybe_target_thing: ?*const Thing =
         if (doing.params.thing) |target_id|
         if (room.getConstThingById(target_id)) |t| t else null
@@ -180,7 +181,7 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
     switch (action.kind) {
         .melee_attack => |melee| {
             self.updateVel(.{}, .{});
-            const events = self.animator.?.play(.attack, .{ .loop = true });
+            const events = renderer.playCreatureAnim(self, .attack, .{ .loop = true });
             if (events.contains(.commit)) {
                 doing.can_turn = false;
                 self.hitbox = melee.hitbox;
@@ -190,7 +191,7 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                 if (hitbox.sweep_to_rel_pos) |*sw| {
                     sw.* = V2f.fromAngleRadians(dir_ang).scale(sw.length());
                 }
-                if (self.animator.?.getTicksUntilEvent(.hit)) |ticks_til_hit_event| {
+                if (renderer.getTicksUntilEvent(.hit)) |ticks_til_hit_event| {
                     hitbox.indicator = .{
                         .timer = utl.TickCounter.init(ticks_til_hit_event),
                     };
@@ -200,7 +201,7 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
             if (doing.can_turn) {
                 if (maybe_target_thing) |target| {
                     if (!target.isInvisible()) {
-                        if (self.animator.?.getTicksUntilEvent(.hit)) |ticks_til_hit_event| {
+                        if (renderer.getTicksUntilEvent(.hit)) |ticks_til_hit_event| {
                             if (target.hurtbox) |hurtbox| {
                                 const dist = target.pos.dist(self.pos);
                                 const range = @max(dist - hurtbox.radius, 0);
@@ -218,7 +219,9 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
             // end and hit are mutually exclusive
             if (events.contains(.end)) {
                 // deactivate hitbox
-                self.hitbox.?.active = false;
+                if (self.hitbox) |*h| {
+                    h.active = false;
+                }
                 if (melee.lunge_accel) |accel_params| {
                     self.dashing = false;
                     self.coll_mask.insert(.creature);
@@ -229,7 +232,6 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
             }
 
             if (events.contains(.hit)) {
-                self.renderer.creature.draw_color = Colorf.red;
                 const hitbox = &self.hitbox.?;
                 //std.debug.print("hit targetu\n", .{});
                 hitbox.mask = Thing.Faction.opposing_masks.get(self.faction);
@@ -256,7 +258,7 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
         },
         .projectile_attack => |*atk| {
             self.updateVel(.{}, .{});
-            const events = self.animator.?.play(.attack, .{ .loop = true });
+            const events = renderer.playCreatureAnim(self, .attack, .{ .loop = true });
             if (events.contains(.commit)) {
                 doing.can_turn = false;
             }
@@ -269,7 +271,7 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
 
                 if (maybe_target_thing) |target| {
                     if (!target.isInvisible()) {
-                        if (self.animator.?.getTicksUntilEvent(.hit)) |ticks_til_hit_event| {
+                        if (renderer.getTicksUntilEvent(.hit)) |ticks_til_hit_event| {
                             if (target.hurtbox) |hurtbox| { // TODO hurtbox pos?
                                 const dist = target.pos.dist(self.pos);
                                 const range = @max(dist - hurtbox.radius, 0);
@@ -324,7 +326,6 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
             }
 
             if (events.contains(.hit)) {
-                self.renderer.creature.draw_color = Colorf.red;
                 projectile.dir = self.dir;
                 switch (atk.projectile) {
                     .gobarrow => {
@@ -366,7 +367,7 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                 return true;
             }
             self.updateVel(.{}, .{});
-            _ = self.animator.?.play(.cast, .{ .loop = true });
+            _ = renderer.playCreatureAnim(self, .cast, .{ .loop = true });
         },
         .regen_hp => |*r| {
             if (r.timer.tick(true)) {
@@ -383,7 +384,7 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                 }
             }
             self.updateVel(.{}, .{});
-            _ = self.animator.?.play(.idle, .{ .loop = true });
+            _ = renderer.playCreatureAnim(self, .idle, .{ .loop = true });
         },
         .shield_up => |*r| {
             if (r.timer.tick(true)) {
@@ -393,7 +394,7 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                 }
             }
             self.updateVel(.{}, .{});
-            _ = self.animator.?.play(.idle, .{ .loop = true });
+            _ = renderer.playCreatureAnim(self, .idle, .{ .loop = true });
         },
     }
     action.curr_tick += 1;

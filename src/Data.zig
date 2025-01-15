@@ -122,6 +122,10 @@ pub fn Ref(AssetType: type) type {
             @panic("Failed to get asset");
         }
 
+        pub fn tryGetConstOrDefault(self: *const Self) ?*const Self.Type {
+            return @constCast(self).tryGetOrDefault();
+        }
+
         pub fn tryGetConst(self: *const Self) ?*const Self.Type {
             return @constCast(self).tryGet();
         }
@@ -665,6 +669,8 @@ pub fn getCreatureDirAnim(self: *Data, creature_kind: Thing.CreatureKind, anim: 
     }
     if (self.creature_dir_anims.get(creature_name.?).get(anim)) |ref| {
         return ref.getConst();
+    } else if (self.creature_dir_anims.get(.creature).get(anim)) |ref| {
+        return ref.getConst();
     }
     return null;
 }
@@ -967,9 +973,6 @@ pub fn reloadSpriteSheets(self: *Data) Error!void {
             Log.err("Failed load spritesheet: {s}. Error: {any}", .{ next.basename, err });
         }
     }
-
-    try self.loadCreatureSpriteSheets();
-    try self.loadVFXSpriteSheets();
 
     self.item_icons = try @TypeOf(self.item_icons).init(self.getByName(SpriteSheet, "item_icons").?);
     self.misc_icons = try @TypeOf(self.misc_icons).init(self.getByName(SpriteSheet, "misc-icons").?);
