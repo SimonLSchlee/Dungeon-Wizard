@@ -1668,9 +1668,22 @@ pub fn renderUnder(self: *const Thing, room: *const Room) Error!void {
             }
         },
     }
-    self.renderShadow();
-
     const plat = getPlat();
+    self.renderShadow();
+    if (room.paused) {
+        if (self.isAliveCreature() and self.draw_radius > 0) {
+            plat.circlef(self.pos, self.draw_radius, .{
+                .fill_color = null,
+                .smoothing = .none,
+                .round_to_pixel = true,
+                .outline = .{ .color = .yellow },
+            });
+            const arrow_start = self.pos.add(self.dir.scale(self.draw_radius));
+            const arrow_end = self.pos.add(self.dir.scale(self.draw_radius + 2.5));
+            plat.arrowf(arrow_start, arrow_end, .{ .thickness = 2.5, .color = .yellow });
+        }
+    }
+
     if (debug.show_selectable) {
         if (self.selectable) |s| {
             if (@constCast(room).getMousedOverThing(Faction.Mask.initFull())) |thing| {

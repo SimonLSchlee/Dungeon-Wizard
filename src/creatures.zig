@@ -103,8 +103,6 @@ pub const proto_fns = blk: {
 
 pub fn playerProto() Thing {
     var ret = creatureProto(.player, .wizard, .player, null, 40, .medium, 18);
-    ret.renderer = .{ .sprite = .{} };
-    ret.renderer.sprite.setDirAnim(Data.Ref(Data.DirectionalSpriteAnim).init("wizard-idle"));
     ret.hurtbox.?.radius *= 0.85;
     ret.accel_params = .{
         .accel = 0.0023 * TileMap.tile_sz_f,
@@ -121,8 +119,6 @@ pub fn playerProto() Thing {
 
 pub fn djinnProto() Thing {
     var ret = creatureProto(.djinn, .creature, .enemy, .{ .acolyte = .{} }, 80, .big, 26);
-    ret.renderer = .{ .sprite = .{} };
-    ret.renderer.sprite.setDirAnim(Data.Ref(Data.DirectionalSpriteAnim).init("wizard-idle"));
     ret.accel_params = .{
         .accel = 0.0047 * TileMap.tile_sz_f,
         .max_speed = 0.0198 * TileMap.tile_sz_f,
@@ -142,8 +138,6 @@ pub fn shopspiderProto() Thing {
     var ret = creatureProto(.shopspider, .creature, .ally, .idle, 60, .big, 24);
     ret.selectable.?.radius = 24;
     ret.coll_mass = std.math.inf(f32);
-    ret.renderer = .{ .sprite = .{} };
-    ret.renderer.sprite.setDirAnim(Data.Ref(Data.DirectionalSpriteAnim).init("shopspider-idle"));
     ret.hp = null;
     ret.coll_mask = Thing.Collision.Mask.initEmpty();
     ret.dir = V2f.left;
@@ -369,7 +363,7 @@ pub fn gobbomberProto() Thing {
 }
 
 pub fn dummyProto() Thing {
-    var ret = creatureProto(.dummy, .dummy, .enemy, null, 25, .medium, 20);
+    var ret = creatureProto(.dummy, .dummy, .enemy, .idle, 25, .medium, 20);
     ret.dir = V2f.left;
     ret.enemy_difficulty = 1.5;
     return ret;
