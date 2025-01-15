@@ -575,6 +575,8 @@ pub fn FileWalkerIterator(assets_rel_dir: []const u8, file_suffix: []const u8) t
     };
 }
 
+creature_protos: std.EnumArray(Thing.CreatureKind, Thing),
+room_kind_tilemaps: std.EnumArray(RoomKind, TileMapIdxBuf),
 // "new" universal asset arrays - all assets of given type stored here
 // directionalspriteanims: std.ArrayList(DirectionalSpriteAnim), // TODO
 spritesheets: AssetArray(SpriteSheet, 128),
@@ -588,13 +590,7 @@ directionalspriteanims: AssetArray(DirectionalSpriteAnim, 128),
 directionalspriteanim_default: usize,
 // caches for faster simpler lookups for some stuff
 creature_dir_anims: CreatureDirAnimCache,
-// old stuff
-creature_protos: std.EnumArray(Thing.CreatureKind, Thing),
-creature_sprite_sheets: AllCreatureSpriteSheetArrays,
-creature_anims: AllCreatureAnimArrays,
-vfx_sprite_sheet_mappings: sprites.VFXAnim.IdxMapping,
-vfx_anims: std.ArrayList(sprites.VFXAnim),
-vfx_anim_mappings: sprites.VFXAnim.IdxMapping,
+// hopefully-soon-deprecated stuff
 spell_icons: EnumSpriteSheet(Spell.Kind),
 item_icons: EnumSpriteSheet(Item.Kind),
 misc_icons: EnumSpriteSheet(MiscIcon),
@@ -603,13 +599,10 @@ text_icons: EnumSpriteSheet(icon_text.Icon),
 card_sprites: EnumSpriteSheet(Spell.CardSpriteEnum),
 card_mana_cost: EnumSpriteSheet(Spell.ManaCost.SpriteEnum),
 fonts: FontArr,
-// roooms
-room_kind_tilemaps: std.EnumArray(RoomKind, TileMapIdxBuf),
 
 pub fn init() Error!*Data {
     const plat = App.getPlat();
     const data = plat.heap.create(Data) catch @panic("Out of memory");
-    data.vfx_anims = @TypeOf(data.vfx_anims).init(plat.heap);
 
     // TODO default init these
     data.spritesheets.clear();
@@ -620,42 +613,6 @@ pub fn init() Error!*Data {
     data.spriteanims.clear();
 
     return data;
-}
-
-pub fn getVFXAnim(self: *Data, sheet_name: sprites.VFXAnim.SheetName, anim_name: sprites.AnimName) ?sprites.VFXAnim {
-    if (self.vfx_anim_mappings.getPtr(sheet_name).get(anim_name)) |idx| {
-        return self.vfx_anims.items[idx];
-    }
-    return null;
-}
-
-pub fn getVFXSpriteSheet(self: *Data, sheet_name: sprites.VFXAnim.SheetName, anim_name: sprites.AnimName) ?SpriteSheet {
-    if (self.vfx_sprite_sheet_mappings.getPtr(sheet_name).get(anim_name)) |idx| {
-        return self.spritesheets.buffer[idx];
-    }
-    return null;
-}
-
-pub fn getCreatureAnim(self: *Data, creature_kind: sprites.CreatureAnim.Kind, anim_kind: sprites.AnimName) ?sprites.CreatureAnim {
-    return self.creature_anims.get(creature_kind).get(anim_kind);
-}
-
-pub fn getCreatureAnimOrDefault(self: *Data, creature_kind: sprites.CreatureAnim.Kind, anim_kind: sprites.AnimName) ?sprites.CreatureAnim {
-    if (self.creature_anims.get(creature_kind).get(anim_kind)) |a| {
-        return a;
-    }
-    return self.creature_anims.get(.creature).get(anim_kind);
-}
-
-pub fn getCreatureAnimSpriteSheet(self: *Data, creature_kind: sprites.CreatureAnim.Kind, anim_kind: sprites.AnimName) ?SpriteSheet {
-    return self.creature_sprite_sheets.get(creature_kind).get(anim_kind);
-}
-
-pub fn getCreatureAnimSpriteSheetOrDefault(self: *Data, creature_kind: sprites.CreatureAnim.Kind, anim_kind: sprites.AnimName) ?SpriteSheet {
-    if (self.creature_sprite_sheets.get(creature_kind).get(anim_kind)) |s| {
-        return s;
-    }
-    return self.creature_sprite_sheets.get(.creature).get(anim_kind);
 }
 
 pub fn getCreatureDirAnim(self: *Data, creature_kind: Thing.CreatureKind, anim: ActionAnimName) ?*const DirectionalSpriteAnim {
@@ -803,157 +760,6 @@ pub fn loadSpriteSheetFromJsonString(data: *Data, sheet_filename: []const u8, js
     sheet.meta = try sheet_meta.toOwnedSlice();
 
     return data.putAsset(SpriteSheet, &sheet, sheet_name);
-}
-
-pub fn loadCreatureSpriteSheets(self: *Data) Error!void {
-    const plat = App.getPlat();
-
-    self.creature_anims = @TypeOf(self.creature_anims).initFill(CreatureAnimArray.initFill(null));
-    self.creature_sprite_sheets = @TypeOf(self.creature_sprite_sheets).initFill(CreatureSpriteSheetArray.initFill(null));
-
-    var file_it = try FileWalkerIterator("images/creature", ".json").init(plat.heap);
-    defer file_it.deinit();
-
-    while (try file_it.next()) |s| {
-        defer plat.heap.free(s.owned_string);
-
-        const sheet = self.getByName(SpriteSheet, filenameToAssetName(s.basename)).?;
-
-        var it_dash = std.mem.tokenizeScalar(u8, sheet.data_ref.name.constSlice(), '-');
-        const creature_name = it_dash.next().?;
-        const creature_kind = std.meta.stringToEnum(sprites.CreatureAnim.Kind, creature_name).?;
-        const anim_name = it_dash.next().?;
-        const anim_kind = std.meta.stringToEnum(sprites.AnimName, anim_name).?;
-        self.creature_sprite_sheets.getPtr(creature_kind).getPtr(anim_kind).* = sheet.*;
-        if (anim_kind == .idle) {
-            const none_sheet = self.creature_sprite_sheets.getPtr(creature_kind).getPtr(.none);
-            if (none_sheet.* == null) {
-                none_sheet.* = sheet.*;
-            }
-        }
-
-        // sprite sheet to creature anim
-        var anim = sprites.CreatureAnim{
-            .creature_kind = creature_kind,
-            .anim_kind = anim_kind,
-            .num_frames = sheet.tags[0].to_frame - sheet.tags[0].from_frame + 1,
-            .num_dirs = u.as(u8, sheet.tags.len), // TODO
-        };
-
-        meta_blk: for (sheet.meta) |m| {
-            const m_name = m.name.constSlice();
-            //std.debug.print("Meta '{s}'\n", .{m_name});
-
-            if (std.mem.eql(u8, m_name, "pivot-y")) {
-                const y = m.asf32() catch continue;
-                const x = u.as(f32, sheet.frames[0].size.x) * 0.5;
-                anim.origin = .{ .offset = v2f(x, y) };
-                continue;
-            }
-            if (std.mem.eql(u8, m_name, "cast-y")) {
-                anim.cast_offset.y = m.asf32() catch continue;
-                continue;
-            }
-            if (std.mem.eql(u8, m_name, "cast-x")) {
-                anim.cast_offset.x = m.asf32() catch continue;
-                continue;
-            }
-            if (std.mem.eql(u8, m_name, "start-angle-deg")) {
-                const deg = switch (m.data) {
-                    .int => |i| u.as(f32, i),
-                    .float => |f| f,
-                    else => return Error.ParseFail,
-                };
-                const rads = u.degreesToRadians(deg);
-                anim.start_angle_rads = rads;
-            }
-
-            const event_info = @typeInfo(sprites.AnimEvent.Kind);
-            inline for (event_info.@"enum".fields) |f| {
-                if (std.mem.eql(u8, m_name, f.name)) {
-                    //std.debug.print("Adding event '{s}' on frame {}\n", .{ f.name, m.data.int });
-                    anim.events.append(.{
-                        .frame = u.as(i32, m.data.int),
-                        .kind = @enumFromInt(f.value),
-                    }) catch {
-                        Log.warn("Skipped adding anim event \"{s}\"; buffer full", .{f.name});
-                    };
-                    continue :meta_blk;
-                }
-            }
-        }
-        self.creature_anims.getPtr(creature_kind).getPtr(anim_kind).* = anim;
-        if (anim_kind == .idle) {
-            const none_anim = self.creature_anims.getPtr(creature_kind).getPtr(.none);
-            if (none_anim.* == null) {
-                none_anim.* = anim;
-            }
-        }
-    }
-}
-
-pub fn loadVFXSpriteSheets(self: *Data) Error!void {
-    const plat = App.getPlat();
-
-    self.vfx_anims.clearRetainingCapacity();
-    self.vfx_anim_mappings = @TypeOf(self.vfx_anim_mappings).initFill(sprites.VFXAnim.AnimNameIdxMapping.initFill(null));
-    self.vfx_sprite_sheet_mappings = @TypeOf(self.vfx_sprite_sheet_mappings).initFill(sprites.VFXAnim.AnimNameIdxMapping.initFill(null));
-
-    var file_it = try FileWalkerIterator("images/vfx", ".json").init(plat.heap);
-    defer file_it.deinit();
-
-    while (try file_it.next()) |s| {
-        defer plat.heap.free(s.owned_string);
-
-        const sheet = self.getByName(SpriteSheet, filenameToAssetName(s.basename)).?;
-
-        if (std.meta.stringToEnum(sprites.VFXAnim.SheetName, sheet.data_ref.name.constSlice())) |vfx_sheet_name| {
-            // sprite sheet to vfx anims
-            for (sheet.tags) |tag| {
-                if (std.meta.stringToEnum(sprites.AnimName, tag.name.constSlice())) |vfx_anim_name| {
-                    var anim: sprites.VFXAnim = .{
-                        .sheet_name = vfx_sheet_name,
-                        .anim_name = vfx_anim_name,
-                        .start_frame = tag.from_frame,
-                        .num_frames = tag.to_frame - tag.from_frame + 1,
-                    };
-
-                    meta_blk: for (sheet.meta) |m| {
-                        const m_name = m.name.constSlice();
-                        //std.debug.print("Meta '{s}'\n", .{m_name});
-
-                        if (std.mem.eql(u8, m_name, "pivot-y")) {
-                            const y = m.asf32() catch continue;
-                            const x = u.as(f32, sheet.frames[0].size.x) * 0.5;
-                            anim.origin = .{ .offset = v2f(x, y) };
-                            continue;
-                        }
-                        const event_info = @typeInfo(sprites.AnimEvent.Kind);
-                        inline for (event_info.@"enum".fields) |f| {
-                            if (std.mem.eql(u8, m_name, f.name)) {
-                                //std.debug.print("Adding event '{s}' on frame {}\n", .{ f.name, m.data.int });
-                                anim.events.append(.{
-                                    .frame = u.as(i32, m.data.int),
-                                    .kind = @enumFromInt(f.value),
-                                }) catch {
-                                    Log.err("Skipped adding vfx anim event \"{s}\"; buffer full", .{f.name});
-                                };
-                                continue :meta_blk;
-                            }
-                        }
-                    }
-                    const anim_idx = self.vfx_anims.items.len;
-                    try self.vfx_anims.append(anim);
-                    self.vfx_sprite_sheet_mappings.getPtr(vfx_sheet_name).getPtr(vfx_anim_name).* = sheet.data_ref.idx;
-                    self.vfx_anim_mappings.getPtr(vfx_sheet_name).getPtr(vfx_anim_name).* = anim_idx;
-                } else {
-                    Log.warn("Unknown vfx anim skipped: {s}", .{tag.name.constSlice()});
-                }
-            }
-        } else {
-            Log.warn("Unknown vfx spritesheet skipped: {s}", .{sheet.data_ref.name.constSlice()});
-        }
-    }
 }
 
 pub fn reloadSpriteSheets(self: *Data) Error!void {

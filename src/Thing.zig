@@ -152,12 +152,10 @@ controller: union(enum) {
 } = .default,
 renderer: union(enum) {
     none: struct {},
-    //creature: CreatureRenderer, // TODO deprecate for sprite
     shape: ShapeRenderer,
     spawner: SpawnerRenderer,
     sprite: SpriteRenderer,
 } = .none,
-//animator: ?sprites.Animator = null, // TODO deprecate for renderer.sprite
 path: std.BoundedArray(V2f, 32) = .{},
 pathing_layer: TileMap.PathLayer = .normal,
 hitbox: ?HitBox = null,
