@@ -156,6 +156,14 @@ renderer: union(enum) {
     spawner: SpawnerRenderer,
     sprite: SpriteRenderer,
 } = .none,
+on_die: union(enum) {
+    default: struct {},
+    djinn_boss: struct {
+        pub fn onDie(self: *Thing, room: *Room) Error!void {
+            _ = try room.queueSpawnCreatureByKind(.djinn_smoke, self.pos);
+        }
+    },
+} = .default,
 path: std.BoundedArray(V2f, 32) = .{},
 pathing_layer: TileMap.PathLayer = .normal,
 hitbox: ?HitBox = null,
@@ -193,6 +201,7 @@ rmb_interactable: ?struct {
 } = null,
 manas_given: i32 = 0,
 is_summon: bool = false,
+is_boss: bool = false,
 
 pub const Faction = enum {
     object,
@@ -1566,6 +1575,14 @@ pub fn update(self: *Thing, room: *Room) Error!void {
         }
     } else if (self.isDeadCreature()) {
         if (self.renderer.sprite.playCreatureAnim(self, .die, .{}).contains(.end)) {
+            switch (self.on_die) {
+                inline else => |s| {
+                    const S = @TypeOf(s);
+                    if (@hasDecl(S, "onDie")) {
+                        try S.onDie(self, room);
+                    }
+                },
+            }
             self.deferFree(room);
         }
         return;

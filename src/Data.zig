@@ -356,6 +356,7 @@ pub const CreatureSpriteName = enum {
     gobbomber,
     shopspider,
     djinn,
+    djinn_smoke,
 };
 pub const ActionAnimName = enum {
     idle,
@@ -627,6 +628,8 @@ pub fn getCreatureDirAnim(self: *Data, creature_kind: Thing.CreatureKind, anim: 
     if (self.creature_dir_anims.get(creature_name.?).get(anim)) |ref| {
         return ref.getConst();
     } else if (self.creature_dir_anims.get(.creature).get(anim)) |ref| {
+        return ref.getConst();
+    } else if (self.creature_dir_anims.get(creature_name.?).get(.idle)) |ref| {
         return ref.getConst();
     }
     return null;

@@ -29,10 +29,11 @@ const Spell = @import("Spell.zig");
 const Item = @import("Item.zig");
 const Run = @import("Run.zig");
 
+pub const max_bosses_in_room = 2;
 pub const max_enemies_in_room = 32;
 pub const max_allies_in_room = 16;
 pub const max_npcs_in_room = 4;
-pub const max_creatures_in_room = max_enemies_in_room + max_allies_in_room + max_npcs_in_room + 1;
+pub const max_creatures_in_room = max_bosses_in_room + max_enemies_in_room + max_allies_in_room + max_npcs_in_room + 1;
 pub const max_vfx_in_room = max_creatures_in_room * 4;
 pub const max_things_in_room = max_creatures_in_room + max_vfx_in_room;
 
@@ -55,9 +56,8 @@ pub const WavesParams = struct {
     wave_secs_per_difficulty: f32 = 8,
     max_kinds_per_wave: usize = 2,
     num_waves: usize = 2,
-    enemy_probabilities: std.EnumArray(Thing.CreatureKind, f32) = std.EnumArray(Thing.CreatureKind, f32).initDefault(0, .{
-        .slime = 1,
-    }),
+    boss: ?Thing.CreatureKind = null,
+    enemy_probabilities: std.EnumArray(Thing.CreatureKind, f32) = std.EnumArray(Thing.CreatureKind, f32).initFill(0),
     room_kind: Data.RoomKind,
 };
 
@@ -65,6 +65,7 @@ pub const Wave = struct {
     const Spawn = struct {
         proto: Thing = undefined,
         pos: V2f,
+        boss: bool = false,
     };
     total_difficulty: f32 = 0,
     spawns: std.BoundedArray(Spawn, 16) = .{},
@@ -105,7 +106,7 @@ fn makeWaves(tilemap: *const TileMap, rng: std.Random, params: WavesParams, arra
     for (tilemap.wave_spawns.constSlice()) |spawn| {
         all_spawn_positions.appendAssumeCapacity(spawn.pos);
     }
-    Log.info("  total spawn positions: {}", .{all_spawn_positions.len});
+    Log.info("  total spawn positions: {}", .{tilemap.wave_spawns.len});
     var wave_i: usize = 0;
     var wave_iter: usize = 0;
     while (wave_i < num_waves and wave_iter < 10 and difficulty_left > -total_difficulty_error) {
@@ -118,36 +119,49 @@ fn makeWaves(tilemap: *const TileMap, rng: std.Random, params: WavesParams, arra
         for (0..params.max_kinds_per_wave) |_| {
             const idx = rng.weightedIndex(f32, &params.enemy_probabilities.values);
             const kind: Thing.CreatureKind = @enumFromInt(idx);
+            if (params.enemy_probabilities.get(kind) == 0) break;
             enemy_protos.append(data.creature_protos.get(kind)) catch unreachable;
             Log.info("    possible enemy: {any} : probability: {d:.2}", .{ kind, params.enemy_probabilities.get(kind) });
         }
 
         rng.shuffleWithIndex(V2f, all_spawn_positions.slice(), u32);
         var curr_spawn_pos_idx: usize = 0;
+        if (wave_i == 0) {
+            if (params.boss) |boss_kind| {
+                wave.spawns.appendAssumeCapacity(.{
+                    .pos = all_spawn_positions.buffer[curr_spawn_pos_idx],
+                    .proto = data.creature_protos.get(boss_kind),
+                    .boss = true,
+                });
+                curr_spawn_pos_idx += 1;
+            }
+        }
 
-        while (difficulty_left_in_wave > 0 and curr_spawn_pos_idx < all_spawn_positions.len) {
-            var enemy_iter: usize = 0;
-            const proto = blk: {
-                while (enemy_iter < 3) {
-                    const idx = rng.uintLessThan(usize, enemy_protos.len);
-                    const enemy_proto = enemy_protos.get(idx);
-                    if (difficulty_left_in_wave - enemy_proto.enemy_difficulty < -difficulty_error_per_wave) {
-                        enemy_iter += 1;
-                        continue;
+        if (enemy_protos.len > 0) {
+            while (difficulty_left_in_wave > 0 and curr_spawn_pos_idx < all_spawn_positions.len) {
+                var enemy_iter: usize = 0;
+                const proto = blk: {
+                    while (enemy_iter < 3) {
+                        const idx = rng.uintLessThan(usize, enemy_protos.len);
+                        const enemy_proto = enemy_protos.get(idx);
+                        if (difficulty_left_in_wave - enemy_proto.enemy_difficulty < -difficulty_error_per_wave) {
+                            enemy_iter += 1;
+                            continue;
+                        }
+                        break :blk enemy_proto;
+                    } else {
+                        break;
                     }
-                    break :blk enemy_proto;
-                } else {
-                    break;
-                }
-            };
-            wave.total_difficulty += proto.enemy_difficulty;
-            difficulty_left_in_wave -= proto.enemy_difficulty;
-            wave.spawns.append(.{
-                .pos = all_spawn_positions.buffer[curr_spawn_pos_idx],
-                .proto = proto,
-            }) catch unreachable;
-            Log.info("  SPAWN: {any} : difficulty: {d:.2}", .{ proto.creature_kind.?, proto.enemy_difficulty });
-            curr_spawn_pos_idx += 1;
+                };
+                wave.total_difficulty += proto.enemy_difficulty;
+                difficulty_left_in_wave -= proto.enemy_difficulty;
+                wave.spawns.append(.{
+                    .pos = all_spawn_positions.buffer[curr_spawn_pos_idx],
+                    .proto = proto,
+                }) catch unreachable;
+                Log.info("  SPAWN: {any} : difficulty: {d:.2}", .{ proto.creature_kind.?, proto.enemy_difficulty });
+                curr_spawn_pos_idx += 1;
+            }
         }
 
         Log.info("  = wave difficulty: {d:.2}", .{wave.total_difficulty});
@@ -182,6 +196,7 @@ waves: WavesArray = .{},
 wave_timer: u.TickCounter = undefined,
 curr_wave: i32 = 0,
 enemies_alive: std.BoundedArray(Thing.Id, max_enemies_in_room) = .{},
+bosses: std.BoundedArray(Thing.Id, max_bosses_in_room) = .{},
 exits: std.BoundedArray(TileMap.ExitDoor, TileMap.max_map_exits) = .{},
 progress_state: union(enum) {
     none,
@@ -317,9 +332,16 @@ pub fn queueSpawnThing(self: *Room, proto: *const Thing, pos: V2f) Error!?pool.I
         thing.spawn_state = .spawning;
         thing.pos = pos;
         try self.spawn_queue.append(thing.id);
-        if (thing.isEnemy()) self.enemies_alive.append(thing.id) catch {
-            Log.warn("Failed to add to enemies list!", .{});
-        };
+        if (thing.isEnemy()) {
+            self.enemies_alive.append(thing.id) catch {
+                Log.warn("Failed to add to enemies list!", .{});
+            };
+            if (thing.is_boss) {
+                self.bosses.append(thing.id) catch {
+                    Log.warn("Failed to add to bosses list!", .{});
+                };
+            }
+        }
         return thing.id;
     } else {
         Log.warn(
@@ -512,7 +534,9 @@ pub fn update(self: *Room) Error!void {
             for (&self.things.items) |*thing| {
                 if (!thing.isActive()) continue;
                 if (!thing.isEnemy()) continue;
-                thing.deferFree(self);
+                if (thing.hp) |*hp| {
+                    hp.curr = 0;
+                }
             }
         }
         if (self.paused) {
@@ -549,8 +573,9 @@ pub fn update(self: *Room) Error!void {
             } else {
                 // use the strength of the previous wave (the one we're currently fighting!) to check if we should spawn the next
                 const difficulty_left_threshold = self.waves.buffer[u.as(usize, self.curr_wave - 1)].total_difficulty / 2;
+                const timer_done = self.wave_timer.tick(false);
                 //Log.info("{d:.2}", .{difficulty_left_threshold});
-                if ((self.wave_timer.tick(false) and self.getCurrTotalDifficulty() <= difficulty_left_threshold) or self.enemies_alive.len == 0) {
+                if ((timer_done and self.getCurrTotalDifficulty() <= difficulty_left_threshold) or self.enemies_alive.len == 0 or self.bosses.len == self.enemies_alive.len) {
                     try self.spawnCurrWave();
                 }
             }
@@ -636,6 +661,15 @@ pub fn update(self: *Room) Error!void {
             const id = self.enemies_alive.buffer[i];
             if (self.getThingById(id) == null) {
                 _ = self.enemies_alive.swapRemove(i);
+                continue;
+            }
+            i += 1;
+        }
+        i = 0;
+        while (i < self.bosses.len) {
+            const id = self.bosses.buffer[i];
+            if (self.getThingById(id) == null) {
+                _ = self.bosses.swapRemove(i);
                 continue;
             }
             i += 1;

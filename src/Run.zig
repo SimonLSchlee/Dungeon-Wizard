@@ -268,13 +268,17 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
     {
         const boss_params = &places.buffer[places.len - 1].room.waves_params;
         boss_params.difficulty_per_wave = 5;
-        boss_params.num_waves = 4;
-        boss_params.enemy_probabilities.getPtr(.slime).* = 0;
-        boss_params.enemy_probabilities.getPtr(.sharpboi).* = 1;
-        boss_params.enemy_probabilities.getPtr(.acolyte).* = 1;
-        boss_params.enemy_probabilities.getPtr(.gobbow).* = 1;
-        boss_params.enemy_probabilities.getPtr(.troll).* = 0.5;
+        boss_params.num_waves = 1;
+        if (false) {
+            boss_params.num_waves = 4;
+            boss_params.enemy_probabilities.getPtr(.sharpboi).* = 1;
+            boss_params.enemy_probabilities.getPtr(.acolyte).* = 1;
+            boss_params.enemy_probabilities.getPtr(.gobbow).* = 1;
+            boss_params.enemy_probabilities.getPtr(.troll).* = 0.5;
+        }
+        boss_params.boss = .djinn;
     }
+    try places.insert(0, places.buffer[places.len]);
 
     //try places.append(.{ .room = .{ .difficulty = 4, .idx = 0, .kind = .testu } });
     run.places = places;

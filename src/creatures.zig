@@ -42,6 +42,7 @@ pub const Kind = enum {
     gobbomber,
     shopspider,
     djinn,
+    djinn_smoke,
 
     pub fn getIcon(self: Kind) icon_text.Icon {
         if (self == .player) {
@@ -131,6 +132,26 @@ pub fn djinnProto() Thing {
         .cooldown = utl.TickCounter.initStopped(5 * core.fups_per_sec),
     });
     ret.enemy_difficulty = 8;
+    ret.is_boss = true;
+    ret.on_die = .djinn_boss;
+    return ret;
+}
+
+pub fn djinn_smokeProto() Thing {
+    var ret = creatureProto(.djinn_smoke, .creature, .enemy, .{ .acolyte = .{} }, 80, .big, 26);
+    ret.accel_params = .{
+        .accel = 0.0047 * TileMap.tile_sz_f,
+        .max_speed = 0.0198 * TileMap.tile_sz_f,
+    };
+    ret.controller.ai_actor.flee_range = 70;
+    ret.controller.ai_actor.actions.getPtr(.spell_cast_summon_1).* = (.{
+        .kind = .{ .spell_cast = .{
+            .spell = Spell.getProto(.summon_bat),
+        } },
+        .cooldown = utl.TickCounter.initStopped(5 * core.fups_per_sec),
+    });
+    ret.enemy_difficulty = 8;
+    ret.is_boss = true;
     return ret;
 }
 
