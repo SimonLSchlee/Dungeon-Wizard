@@ -1,6 +1,6 @@
 { "frames": [
    {
-    "filename": "robe-idle-E  0",
+    "filename": "idle-E  0",
     "frame": { "x": 0, "y": 0, "w": 24, "h": 45 },
     "rotated": false,
     "trimmed": false,
@@ -9,7 +9,7 @@
     "duration": 200
    },
    {
-    "filename": "robe-idle-E  1",
+    "filename": "idle-E  1",
     "frame": { "x": 24, "y": 0, "w": 24, "h": 45 },
     "rotated": false,
     "trimmed": false,
@@ -18,7 +18,7 @@
     "duration": 200
    },
    {
-    "filename": "robe-idle-E  2",
+    "filename": "idle-E  2",
     "frame": { "x": 48, "y": 0, "w": 24, "h": 45 },
     "rotated": false,
     "trimmed": false,
@@ -27,7 +27,7 @@
     "duration": 600
    },
    {
-    "filename": "robe-idle-E  3",
+    "filename": "idle-E  3",
     "frame": { "x": 72, "y": 0, "w": 24, "h": 45 },
     "rotated": false,
     "trimmed": false,
@@ -36,7 +36,7 @@
     "duration": 200
    },
    {
-    "filename": "robe-idle-E  4",
+    "filename": "idle-E  4",
     "frame": { "x": 96, "y": 0, "w": 24, "h": 45 },
     "rotated": false,
     "trimmed": false,
@@ -45,7 +45,7 @@
     "duration": 200
    },
    {
-    "filename": "robe-idle-E  5",
+    "filename": "idle-E  5",
     "frame": { "x": 120, "y": 0, "w": 24, "h": 45 },
     "rotated": false,
     "trimmed": false,
@@ -54,7 +54,7 @@
     "duration": 600
    },
    {
-    "filename": "robe-cast-E  0",
+    "filename": "cast-E  0",
     "frame": { "x": 0, "y": 45, "w": 24, "h": 45 },
     "rotated": false,
     "trimmed": false,
@@ -63,7 +63,7 @@
     "duration": 100
    },
    {
-    "filename": "robe-cast-E  1",
+    "filename": "cast-E  1",
     "frame": { "x": 24, "y": 45, "w": 24, "h": 45 },
     "rotated": false,
     "trimmed": false,
@@ -72,7 +72,7 @@
     "duration": 100
    },
    {
-    "filename": "robe-cast-E  2",
+    "filename": "cast-E  2",
     "frame": { "x": 48, "y": 45, "w": 24, "h": 45 },
     "rotated": false,
     "trimmed": false,
@@ -81,7 +81,7 @@
     "duration": 100
    },
    {
-    "filename": "robe-cast-E  3",
+    "filename": "cast-E  3",
     "frame": { "x": 72, "y": 45, "w": 24, "h": 45 },
     "rotated": false,
     "trimmed": false,
@@ -90,7 +90,7 @@
     "duration": 100
    },
    {
-    "filename": "robe-cast-E  4",
+    "filename": "cast-E  4",
     "frame": { "x": 96, "y": 45, "w": 24, "h": 45 },
     "rotated": false,
     "trimmed": false,
@@ -99,7 +99,7 @@
     "duration": 100
    },
    {
-    "filename": "robe-cast-E  5",
+    "filename": "cast-E  5",
     "frame": { "x": 120, "y": 45, "w": 24, "h": 45 },
     "rotated": false,
     "trimmed": false,
@@ -108,7 +108,7 @@
     "duration": 300
    },
    {
-    "filename": "robe-cast-E  6",
+    "filename": "cast-E  6",
     "frame": { "x": 144, "y": 45, "w": 24, "h": 45 },
     "rotated": false,
     "trimmed": false,
@@ -117,7 +117,7 @@
     "duration": 100
    },
    {
-    "filename": "robe-cast-E  7",
+    "filename": "cast-E  7",
     "frame": { "x": 168, "y": 45, "w": 24, "h": 45 },
     "rotated": false,
     "trimmed": false,
@@ -126,58 +126,13 @@
     "duration": 100
    },
    {
-    "filename": "robe-cast-E  8",
+    "filename": "cast-E  8",
     "frame": { "x": 192, "y": 45, "w": 24, "h": 45 },
     "rotated": false,
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 24, "h": 45 },
     "sourceSize": { "w": 24, "h": 45 },
     "duration": 100
-   },
-   {
-    "filename": "smoke-idle-E  0",
-    "frame": { "x": 0, "y": 90, "w": 24, "h": 45 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 24, "h": 45 },
-    "sourceSize": { "w": 24, "h": 45 },
-    "duration": 200
-   },
-   {
-    "filename": "smoke-idle-E  1",
-    "frame": { "x": 24, "y": 90, "w": 24, "h": 45 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 24, "h": 45 },
-    "sourceSize": { "w": 24, "h": 45 },
-    "duration": 200
-   },
-   {
-    "filename": "smoke-idle-E  2",
-    "frame": { "x": 48, "y": 90, "w": 24, "h": 45 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 24, "h": 45 },
-    "sourceSize": { "w": 24, "h": 45 },
-    "duration": 200
-   },
-   {
-    "filename": "smoke-idle-E  3",
-    "frame": { "x": 72, "y": 90, "w": 24, "h": 45 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 24, "h": 45 },
-    "sourceSize": { "w": 24, "h": 45 },
-    "duration": 200
-   },
-   {
-    "filename": "smoke-idle-E  4",
-    "frame": { "x": 96, "y": 90, "w": 24, "h": 45 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 24, "h": 45 },
-    "sourceSize": { "w": 24, "h": 45 },
-    "duration": 200
    }
  ],
  "meta": {
@@ -185,15 +140,14 @@
   "version": "1.3.6-arm64",
   "image": "djinn.png",
   "format": "RGBA8888",
-  "size": { "w": 216, "h": 135 },
+  "size": { "w": 216, "h": 90 },
   "scale": "1",
   "frameTags": [
-   { "name": "robe-idle-E", "from": 0, "to": 5, "direction": "forward", "color": "#000000ff" },
-   { "name": "robe-cast-E", "from": 6, "to": 14, "direction": "forward", "color": "#000000ff" },
-   { "name": "smoke-idle-E", "from": 15, "to": 19, "direction": "forward", "color": "#000000ff" }
+   { "name": "idle-E", "from": 0, "to": 5, "direction": "forward", "color": "#000000ff" },
+   { "name": "cast-E", "from": 6, "to": 14, "direction": "forward", "color": "#000000ff" }
   ],
   "layers": [
-   { "name": "data", "opacity": 255, "blendMode": "normal", "cels": [{ "frame": 19, "data": "pivot-y=39" }] },
+   { "name": "data", "opacity": 255, "blendMode": "normal", "cels": [{ "frame": 15, "data": "pivot-y=39" }] },
    { "name": "djinn smoke", "opacity": 255, "blendMode": "normal" },
    { "name": "djinn head", "opacity": 255, "blendMode": "normal" },
    { "name": "djinn hands", "opacity": 255, "blendMode": "normal" },
