@@ -1477,35 +1477,31 @@ pub fn renderStatusBars(self: *const Thing, _: *const Room) Error!void {
                     });
                 }
                 // crystals
-                const data = App.getData();
-                if (data.text_icons.getRenderFrame(.mana_crystal_smol)) |rf| {
+                blk: {
+                    const data = App.getData();
+                    const full_rf = data.text_icons.getRenderFrame(.mana_crystal_smol) orelse break :blk;
+                    const empty_rf = data.text_icons.getRenderFrame(.mana_empty) orelse break :blk;
+                    const flame_rf = data.text_icons.getRenderFrame(.mana_flame) orelse break :blk;
                     const cropped_dims = data.text_icons.sprite_dims_cropped.?.get(.mana_crystal_smol);
-                    var opt = rf.toTextureOpt(1);
-                    opt.smoothing = .none;
-                    opt.origin = .topleft;
-                    opt.src_dims = cropped_dims;
-                    opt.round_to_pixel = true;
                     const mana_topleft = hp_topleft.sub(v2f(0, cropped_dims.y + 2)); //.round();
                     var curr_pos = mana_topleft;
-                    for (0..utl.as(usize, mana.curr)) |_| {
+                    for (0..utl.as(usize, mana.max)) |i_sz| {
+                        const i = utl.as(i32, i_sz);
+                        const is_full = i < mana.curr;
+                        const is_crystal = if (mana.regen) |regen| i < regen.max_threshold else true;
+                        const rf = if (is_crystal)
+                            (if (is_full) full_rf else empty_rf)
+                        else if (is_full)
+                            flame_rf
+                        else
+                            break;
+                        var opt = rf.toTextureOpt(1);
+                        opt.smoothing = .none;
+                        opt.origin = .topleft;
+                        opt.src_dims = cropped_dims;
+                        opt.round_to_pixel = true;
                         plat.texturef(curr_pos, rf.texture, opt);
-                        curr_pos.x += cropped_dims.x - 2;
-                    }
-                } else {
-                    const mana_bar_width = status_width;
-                    const mana_bar_height = 8;
-                    const mana_topleft = hp_topleft.sub(v2f(0, mana_bar_height));
-                    const mana_inc_px = mana_bar_width / utl.as(f32, mana.max);
-                    const mana_diam = 6;
-                    const mana_radius = mana_diam * 0.5;
-                    const mana_spacing = (mana_inc_px - mana_diam) * 0.666666; // this makes sense cos of reasons
-                    var curr_pos = mana_topleft.add(v2f(mana_spacing + mana_radius, mana_bar_height * 0.5));
-                    for (0..utl.as(usize, mana.curr)) |_| {
-                        plat.circlef(curr_pos, mana_radius, .{
-                            .fill_color = Colorf.rgb(0, 0.5, 1),
-                            .outline = .{ .color = .black },
-                        });
-                        curr_pos.x += mana_spacing + mana_diam;
+                        curr_pos.x += cropped_dims.x - 1;
                     }
                 }
             }

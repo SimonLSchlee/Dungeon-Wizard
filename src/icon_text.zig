@@ -74,6 +74,8 @@ pub const Icon = enum(u8) {
     mislay,
     mana_crystal_smol,
     slime,
+    mana_empty,
+    mana_flame,
 
     pub const codepoint_start: u21 = pua_codepoint_start;
     pub const codepoint_end: u21 = codepoint_start + std.math.maxInt(@typeInfo(Icon).@"enum".tag_type);
