@@ -174,7 +174,7 @@ mana: ?struct {
     max: i32,
     regen: ?struct {
         timer: utl.TickCounter,
-        max_threshold: usize,
+        max_threshold: i32,
     } = null,
 } = null,
 faction: Faction = .object,

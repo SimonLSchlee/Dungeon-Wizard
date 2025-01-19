@@ -41,7 +41,7 @@ pub fn modePrototype(mode: Run.Mode) Thing {
                 .max = 5,
                 .curr = 3,
                 .regen = .{
-                    .timer = utl.TickCounter.init(core.secsToTicks(3)),
+                    .timer = utl.TickCounter.init(core.secsToTicks(2)),
                     .max_threshold = 3,
                 },
             };
