@@ -27,12 +27,15 @@ pub const RenderFrame = struct {
     size: V2i,
     texture: Platform.Texture2D,
     origin: draw.TextureOrigin,
+    flip_x: bool = false,
+    flip_y: bool = false,
     pub fn toTextureOpt(self: *const RenderFrame, scaling: f32) draw.TextureOpt {
         return .{
             .origin = self.origin,
             .src_pos = self.pos.toV2f(),
             .src_dims = self.size.toV2f(),
             .uniform_scaling = scaling,
+            .flip_x = self.flip_x,
         };
     }
 };
@@ -100,6 +103,19 @@ pub const DirectionalSpriteAnim = struct {
         NW,
         N,
         NE,
+        pub fn getOpposite(self: Dir) Dir {
+            const opposites = [_]Dir{
+                .W,
+                .NW,
+                .N,
+                .NE,
+                .E,
+                .SE,
+                .S,
+                .SW,
+            };
+            return opposites[@intFromEnum(self)];
+        }
     };
     pub const dirs_list = utl.enumValueList(Dir);
     pub const max_dirs = dirs_list.len;
@@ -175,6 +191,10 @@ pub const SpriteAnim = struct {
     num_frames: usize = 0,
     // core.fups_per_sec == ticks
     dur_ticks: i64 = 0,
+    can_flip_x: bool = true,
+    can_flip_y: bool = false,
+    flip_x: bool = false,
+    flip_y: bool = false,
     // meta from spritesheet
     origin: draw.TextureOrigin = .topleft,
     events: std.BoundedArray(AnimEvent, 4) = .{},
@@ -188,6 +208,8 @@ pub const SpriteAnim = struct {
             .size = frame.size,
             .texture = sheet.texture,
             .origin = self.origin,
+            .flip_x = self.flip_x,
+            .flip_y = self.flip_y,
         };
     }
 

@@ -1225,8 +1225,32 @@ pub fn reloadSpriteAnims(self: *Data) Error!void {
         for (0..DirectionalSpriteAnim.max_dirs) |i| {
             const dir: DirectionalSpriteAnim.Dir = @enumFromInt(i);
             const slot = dir_spriteanim.anims_by_dir.getPtr(dir);
-            if (slot.*) |_| {
+            if (slot.*) |anim_ref| {
                 dir_spriteanim.num_dirs += 1;
+
+                // try creating flipped anim if opposite slot is empty
+                const opp_dir = dir.getOpposite();
+                const opp_slot = dir_spriteanim.anims_by_dir.getPtr(opp_dir);
+                if (opp_slot.* != null) continue;
+                const anim: *SpriteAnim = self.getByIdx(SpriteAnim, anim_ref.idx.?).?;
+                const flip_x = anim.can_flip_x and dir != .N and dir != .S;
+                const flip_y = anim.can_flip_y and dir != .E and dir != .W;
+                if (!flip_x and !flip_y) continue;
+
+                const opp_name = u.bufPrintLocal(
+                    "{s}-{s}",
+                    .{ dir_spriteanim.data_ref.name.constSlice(), u.enumToString(@TypeOf(opp_dir), opp_dir) },
+                ) catch unreachable;
+                const opp_anim = self.allocAsset(SpriteAnim, opp_name);
+                // copy the anim, but retain the new data ref
+                const opp_anim_data_ref = opp_anim.data_ref;
+                opp_anim.* = anim.*;
+                opp_anim.data_ref = opp_anim_data_ref;
+                opp_anim.flip_x = flip_x;
+                opp_anim.flip_y = flip_y;
+                opp_slot.* = opp_anim.data_ref;
+                Log.info("Created flipped anim: {s}", .{opp_anim.data_ref.name.constSlice()});
+                // NOTE num_dirs will get incremented later in the loop
             }
         }
         if (dir_spriteanim.data_ref.isDefault()) {

@@ -965,7 +965,8 @@ pub const SpriteRenderer = struct {
         const tint: Colorf = if (!renderer.sprite_tint.eql(.white)) renderer.sprite_tint else status_tint;
 
         opt.tint = tint;
-        opt.flip_x = renderer.flip_x_to_dir and self.dir.x < 0;
+        // TODO we'r defining flipped in a few places arggh, this only works because we use them in different cases
+        opt.flip_x = (renderer.flip_x_to_dir and self.dir.x < 0) or opt.flip_x;
         opt.rot_rads = if (renderer.rotate_to_dir) self.dir.toAngleRadians() else 0;
 
         if (opt.flip_x and renderer.rotate_to_dir and self.dir.x < 0) {
