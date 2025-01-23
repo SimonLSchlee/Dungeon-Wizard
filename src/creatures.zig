@@ -119,18 +119,32 @@ pub fn playerProto() Thing {
 }
 
 pub fn djinnProto() Thing {
-    var ret = creatureProto(.djinn, .creature, .enemy, .{ .acolyte = .{} }, 80, .big, 26);
+    var ret = creatureProto(.djinn, .creature, .enemy, .{ .djinn = .{} }, 80, .big, 26);
     ret.accel_params = .{
         .accel = 0.0047 * TileMap.tile_sz_f,
         .max_speed = 0.0198 * TileMap.tile_sz_f,
     };
-    ret.controller.ai_actor.flee_range = 70;
-    ret.controller.ai_actor.actions.getPtr(.spell_cast_summon_1).* = (.{
+    ret.controller.ai_actor.flee_range = 90;
+    ret.controller.ai_actor.actions.getPtr(.spell_cast_thing_attack_1).* = (.{
         .kind = .{ .spell_cast = .{
-            .spell = Spell.getProto(.summon_bat),
+            .spell = Spell.getProto(.crescent_throw),
         } },
-        .cooldown = utl.TickCounter.initStopped(5 * core.fups_per_sec),
+        .cooldown = utl.TickCounter.initStopped(4 * core.fups_per_sec),
     });
+    if (false) {
+        ret.controller.ai_actor.actions.getPtr(.spell_cast_self_buff_1).* = (.{
+            .kind = .{ .spell_cast = .{
+                .spell = Spell.getProto(.protect_self),
+            } },
+            .cooldown = utl.TickCounter.initStopped(10 * core.fups_per_sec),
+        });
+        ret.controller.ai_actor.actions.getPtr(.spell_cast_summon_1).* = (.{
+            .kind = .{ .spell_cast = .{
+                .spell = Spell.getProto(.summon_bat),
+            } },
+            .cooldown = utl.TickCounter.initStopped(7 * core.fups_per_sec),
+        });
+    }
     ret.enemy_difficulty = 8;
     ret.is_boss = true;
     ret.on_die = .djinn_boss;

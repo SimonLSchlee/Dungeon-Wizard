@@ -7,7 +7,7 @@ const DateTime = @import("DateTime.zig");
 const config = @import("config");
 pub const assert = std.debug.assert;
 
-pub const enable_debug_controls = false;
+pub const enable_debug_controls = true;
 
 // misc
 pub const show_mouse_pos = false;

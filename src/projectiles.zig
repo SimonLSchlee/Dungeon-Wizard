@@ -311,11 +311,90 @@ pub const SlimePuddle = struct {
     }
 };
 
+pub const DjinnCrescent = struct {
+    pub const enum_name = "djinncrescent";
+    const AnimRef = struct {
+        var crescent_projectile = Data.Ref(Data.SpriteAnim).init("spell-projectile-djinn-crescent");
+    };
+    target_pos: V2f = undefined,
+    lifetimer: utl.TickCounter = utl.TickCounter.init(core.secsToTicks(3)),
+    state: enum {
+        in_flight,
+        hitting,
+        destroyed,
+    } = .in_flight,
+
+    pub fn update(self: *Thing, room: *Room) Error!void {
+        assert(self.spawn_state == .spawned);
+        var controller = &self.controller.projectile.kind.djinncrescent;
+        const renderer = &self.renderer.sprite;
+        switch (controller.state) {
+            .in_flight => {
+                const done = controller.lifetimer.tick(false) or self.last_coll != null or if (self.hitbox) |h| !h.active else false;
+                if (done) {
+                    controller.state = .hitting;
+                    self.vel = .{};
+                    return;
+                }
+                self.dir = controller.target_pos.sub(self.pos).normalizedChecked() orelse V2f.right;
+                self.updateVel(self.dir, self.accel_params);
+                _ = renderer.tickCurrAnim(.{ .loop = true });
+            },
+            .hitting => {
+                // TODO anim
+                self.deferFree(room);
+                return;
+            },
+            .destroyed => {
+                // TODO anim
+                self.deferFree(room);
+                return;
+            },
+        }
+    }
+
+    pub fn proto() Thing {
+        var crescent = Thing{
+            .kind = .projectile,
+            .coll_radius = 2.5,
+            .accel_params = .{
+                .accel = 0.1,
+                .friction = 0.001,
+                .max_speed = 2,
+            },
+            .coll_mask = Thing.Collision.Mask.initMany(&.{.wall}),
+            .controller = .{ .projectile = .{ .kind = .{
+                .djinncrescent = .{},
+            } } },
+            .renderer = .{
+                .sprite = .{
+                    .draw_over = false,
+                    .draw_normal = true,
+                    .rotate_to_dir = true,
+                    .flip_x_to_dir = true,
+                    .rel_pos = v2f(0, -14),
+                },
+            },
+            .hitbox = .{
+                .active = true,
+                .deactivate_on_hit = true,
+                .deactivate_on_update = false,
+                .effect = .{ .damage = 7 },
+                .radius = 8,
+            },
+            .shadow_radius_x = 8,
+        };
+        crescent.renderer.sprite.setNormalAnim(AnimRef.crescent_projectile);
+        return crescent;
+    }
+};
+
 pub const ProjectileTypes = [_]type{
     FireBlaze,
     Gobarrow,
     Gobbomb,
     SlimePuddle,
+    DjinnCrescent,
 };
 
 pub const Kind = utl.EnumFromTypes(&ProjectileTypes, "enum_name");

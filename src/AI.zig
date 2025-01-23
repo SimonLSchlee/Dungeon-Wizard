@@ -309,6 +309,67 @@ pub const AIAcolyte = struct {
     }
 };
 
+pub const AIDjinn = struct {
+    pub fn decide(_: *AIDjinn, self: *Thing, room: *Room) Decision {
+        const controller = &self.controller.ai_actor;
+        const nearest_enemy: ?*Thing = getNearestOpposingThing(self, room);
+
+        const attack = &controller.actions.getPtr(.spell_cast_thing_attack_1).*.?;
+        // we've been fleeing, set cooldown
+        if (std.meta.activeTag(controller.decision) == .flee) {
+            controller.flee_cooldown = utl.TickCounter.init(core.secsToTicks(1));
+        }
+        // prioritize attac
+        if (nearest_enemy) |enemy| {
+            if (!attack.cooldown.running) {
+                if (enemy.pos.dist(self.pos) <= attack.kind.spell_cast.spell.targeting_data.max_range) {
+                    return .{ .action = .{
+                        .slot = .spell_cast_thing_attack_1,
+                        .params = .{ .target_kind = .pos, .pos = enemy.pos },
+                    } };
+                }
+            }
+        }
+        if (false) {
+            const self_buff = &controller.actions.getPtr(.spell_cast_self_buff_1).*.?;
+            const summon = &controller.actions.getPtr(.spell_cast_summon_1).*.?;
+            // prioritize protec
+            if (!self_buff.cooldown.running) {
+                return .{ .action = .{
+                    .slot = .spell_cast_self_buff_1,
+                    .params = .{ .target_kind = .self, .thing = self.id },
+                } };
+            }
+            // TODO track summons' ids?
+            if (!summon.cooldown.running and room.enemies_alive.len < 10) {
+                const dir = (if (nearest_enemy) |e| e.pos.sub(self.pos) else self.pos.neg()).normalizedOrZero();
+                const spawn_pos = self.pos.add(dir.scale(self.coll_radius * 2));
+                const params = Action.Params{ .target_kind = .pos, .pos = spawn_pos };
+                return .{ .action = .{
+                    .slot = .spell_cast_summon_1,
+                    .params = params,
+                } };
+            }
+            // otherwise fleee! (or idle)
+            if (nearest_enemy) |target| {
+                if (!controller.flee_cooldown.running) {
+                    if (target.pos.dist(self.pos) <= controller.flee_range) {
+                        return .{
+                            .flee = .{
+                                .min_dist = 50,
+                                .max_dist = controller.flee_range,
+                                .target_id = target.id,
+                                .at_least_secs = core.fups_to_secsf(self_buff.cooldown.num_ticks),
+                            },
+                        };
+                    }
+                }
+            }
+        }
+        return .{ .idle = .{} };
+    }
+};
+
 pub const ActorController = struct {
     pub const Kind = enum {
         idle,
@@ -317,6 +378,7 @@ pub const ActorController = struct {
         troll,
         ranged_flee,
         gobbomber,
+        djinn,
     };
     pub const KindData = union(Kind) {
         idle: AIIdle,
@@ -325,6 +387,7 @@ pub const ActorController = struct {
         troll: AITroll,
         ranged_flee: AIRangedFlee,
         gobbomber: AIGobbomber,
+        djinn: AIDjinn,
     };
 
     actions: Action.Slot.Array = Action.Slot.Array.initFill(null),

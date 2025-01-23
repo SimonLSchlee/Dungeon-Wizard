@@ -1339,68 +1339,6 @@ pub fn renderBarWithLines(pos: V2f, dims: V2f, line_inc_amount: f32, bar_amount:
     }
 }
 
-pub const CreatureRenderer = struct {
-    draw_radius: f32 = 10,
-    draw_color: Colorf = Colorf.red,
-    hp_bar_width: f32 = 20,
-    rel_pos: V2f = .{},
-
-    pub fn renderUnder(self: *const Thing, room: *const Room) Error!void {
-        assert(self.spawn_state == .spawned);
-        const plat = getPlat();
-        const renderer = &self.renderer.creature;
-
-        if (room.paused) {
-            if (self.isAliveCreature()) {
-                plat.circlef(self.pos, renderer.draw_radius, .{
-                    .fill_color = null,
-                    .smoothing = .none,
-                    .round_to_pixel = true,
-                    .outline = .{ .color = renderer.draw_color },
-                });
-                const arrow_start = self.pos.add(self.dir.scale(renderer.draw_radius));
-                const arrow_end = self.pos.add(self.dir.scale(renderer.draw_radius + 2.5));
-                plat.arrowf(arrow_start, arrow_end, .{ .thickness = 2.5, .color = renderer.draw_color });
-            }
-        }
-    }
-
-    pub fn render(self: *const Thing, room: *const Room) Error!void {
-        _ = room;
-        assert(self.spawn_state == .spawned);
-        const plat = getPlat();
-        const renderer = &self.renderer.creature;
-
-        const animator = self.animator.?;
-        const frame = animator.getCurrRenderFrameDir(self.dir);
-        const tint = self.getStatusTint();
-
-        const opt = draw.TextureOpt{
-            .origin = frame.origin,
-            .src_pos = frame.pos.toV2f(),
-            .src_dims = frame.size.toV2f(),
-            .uniform_scaling = core.game_sprite_scaling,
-            .tint = tint,
-            .round_to_pixel = true,
-        };
-        plat.texturef(self.pos.add(renderer.rel_pos), frame.texture, opt);
-
-        const protected = self.statuses.get(.protected);
-        if (self.isAliveCreature() and protected.stacks > 0) {
-            // TODO dont use select radius
-            const r = if (self.selectable) |s| s.height * 0.5 else self.coll_radius;
-            const shield_center = self.pos.sub(v2f(0, r));
-            const popt = draw.PolyOpt{
-                .fill_color = null,
-                .outline = .{ .color = StatusEffect.proto_array.get(.protected).color },
-            };
-            for (0..utl.as(usize, protected.stacks)) |i| {
-                plat.circlef(shield_center, r * 2 + 2 + utl.as(f32, i) * 2, popt);
-            }
-        }
-    }
-};
-
 pub fn getStatusTint(self: *const Thing) Colorf {
     var tint: Colorf = blk: {
         if (self.isAliveCreature()) {
@@ -1816,6 +1754,20 @@ pub fn renderOver(self: *const Thing, room: *const Room) Error!void {
             plat.circlef(self.pos.add(hurtbox.rel_pos), hurtbox.radius, .{ .fill_color = color });
         }
     }
+    // protected bubble
+    const protected = self.statuses.get(.protected);
+    if (self.isAliveCreature() and protected.stacks > 0) {
+        // TODO dont use select radius
+        const r = if (self.selectable) |s| s.height * 0.4 else self.coll_radius;
+        const shield_center = self.pos.sub(v2f(0, r));
+        const popt = draw.PolyOpt{
+            .fill_color = null,
+            .outline = .{ .color = StatusEffect.proto_array.get(.protected).color },
+        };
+        for (0..utl.as(usize, protected.stacks)) |i| {
+            plat.circlef(shield_center, r * 2 + 2 + utl.as(f32, i) * 2, popt);
+        }
+    }
     // hitbox indicator
     if (self.hitbox) |hitbox| {
         if (hitbox.indicator) |indicator| {
@@ -2028,7 +1980,7 @@ pub fn updateVel(self: *Thing, accel_dir: V2f, params: AccelParams) void {
 
     // max speed isn't a hard limit - we just can't accelerate past it
     // this allows being over max speed if it changed over time, or something else accelerated us
-    if (len < params.max_speed) {
+    if (len <= params.max_speed) {
         new_vel = self.vel.add(accel);
         len_after_accel = new_vel.length();
         if (len_after_accel > params.max_speed) {
