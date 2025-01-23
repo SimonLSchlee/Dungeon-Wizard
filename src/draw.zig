@@ -192,6 +192,7 @@ pub const PolyOpt = struct {
     edge_radius: f32 = 0, // rectangles only
     smoothing: Smoothing = .none,
     round_to_pixel: bool = false,
+    rot_rads: f32 = 0,
 };
 
 pub const TextureOrigin = union(enum) {

@@ -658,16 +658,25 @@ pub fn ellipsef(self: *Platform, center: V2f, radii: V2f, opt: draw.PolyOpt) voi
         center_r = center_r.scale(self.curr_cam.zoom).round().scale(1 / self.curr_cam.zoom);
     }
     // raylib's ellipse drawing, for SOME reason, doesn't get rounded properly, so use a triangle fan + line strip
-    pt_buf.appendAssumeCapacity(center_r);
+    // center point at 0,0
+    pt_buf.appendAssumeCapacity(.{});
     var i: f32 = 0;
     while (i <= 360) {
         const rads = -u.degreesToRadians(i);
-        const pt = center_r.add(v2f(
+        const pt = v2f(
             @cos(rads) * radii.x,
             @sin(rads) * radii.y,
-        ));
+        );
         pt_buf.appendAssumeCapacity(pt);
         i += 10;
+    }
+    if (opt.rot_rads != 0) {
+        for (pt_buf.slice()) |*pt| {
+            pt.* = pt.rotRadians(opt.rot_rads);
+        }
+    }
+    for (pt_buf.slice()) |*pt| {
+        pt.* = pt.add(center_r);
     }
 
     switch (opt.smoothing) {

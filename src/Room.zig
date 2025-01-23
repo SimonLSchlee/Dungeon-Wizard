@@ -678,7 +678,7 @@ pub fn update(self: *Room) Error!void {
     self.free_queue.len = 0;
 
     // TODO might mess up edit modeu
-    if (!self.edit_mode) {
+    if (!self.edit_mode and !self.paused) {
         self.curr_tick += 1;
     }
 }

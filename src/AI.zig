@@ -314,25 +314,27 @@ pub const AIDjinn = struct {
         const controller = &self.controller.ai_actor;
         const nearest_enemy: ?*Thing = getNearestOpposingThing(self, room);
 
-        const attack = &controller.actions.getPtr(.spell_cast_thing_attack_1).*.?;
         // we've been fleeing, set cooldown
         if (std.meta.activeTag(controller.decision) == .flee) {
             controller.flee_cooldown = utl.TickCounter.init(core.secsToTicks(1));
         }
-        // prioritize attac
-        if (nearest_enemy) |enemy| {
-            if (!attack.cooldown.running) {
-                if (enemy.pos.dist(self.pos) <= attack.kind.spell_cast.spell.targeting_data.max_range) {
-                    return .{ .action = .{
-                        .slot = .spell_cast_thing_attack_1,
-                        .params = .{ .target_kind = .pos, .pos = enemy.pos },
-                    } };
+        if (false) {
+            const attack = &controller.actions.getPtr(.spell_cast_thing_attack_1).*.?;
+            // prioritize attac
+            if (nearest_enemy) |enemy| {
+                if (!attack.cooldown.running) {
+                    if (enemy.pos.dist(self.pos) <= attack.kind.spell_cast.spell.targeting_data.max_range) {
+                        return .{ .action = .{
+                            .slot = .spell_cast_thing_attack_1,
+                            .params = .{ .target_kind = .pos, .pos = enemy.pos },
+                        } };
+                    }
                 }
             }
         }
-        if (false) {
-            const self_buff = &controller.actions.getPtr(.spell_cast_self_buff_1).*.?;
-            const summon = &controller.actions.getPtr(.spell_cast_summon_1).*.?;
+        const self_buff = &controller.actions.getPtr(.spell_cast_self_buff_1).*.?;
+        if (true) {
+
             // prioritize protec
             if (!self_buff.cooldown.running) {
                 return .{ .action = .{
@@ -340,6 +342,9 @@ pub const AIDjinn = struct {
                     .params = .{ .target_kind = .self, .thing = self.id },
                 } };
             }
+        }
+        if (false) {
+            const summon = &controller.actions.getPtr(.spell_cast_summon_1).*.?;
             // TODO track summons' ids?
             if (!summon.cooldown.running and room.enemies_alive.len < 10) {
                 const dir = (if (nearest_enemy) |e| e.pos.sub(self.pos) else self.pos.neg()).normalizedOrZero();

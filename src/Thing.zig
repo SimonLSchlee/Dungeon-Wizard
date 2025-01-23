@@ -1669,6 +1669,34 @@ pub fn render(self: *const Thing, room: *const Room) Error!void {
             }
         },
     }
+    const plat = App.getPlat();
+    // protected bubble
+    const protected = self.statuses.get(.protected);
+    if (self.isAliveCreature() and protected.stacks > 0) {
+        // TODO dont use select radius
+        const h = if (self.selectable) |s| s.height else self.coll_radius * 2.5;
+        const shield_center = self.pos.sub(v2f(0, h * 0.5));
+        const popt = draw.PolyOpt{
+            .fill_color = null,
+            .outline = .{ .color = StatusEffect.proto_array.get(.protected).color },
+        };
+        const r = h * 0.68 + 2;
+        plat.circlef(shield_center, r, popt);
+        const ticks_in_loop: i32 = 30;
+        const ticks_in_loop_2: i32 = ticks_in_loop / 2;
+        const tick_inc = @max(@divTrunc(ticks_in_loop, protected.stacks), 1);
+        const angle_inc = @max(utl.pi / utl.as(f32, protected.stacks), utl.tau / 18);
+        for (0..utl.as(usize, protected.stacks)) |i| {
+            var eopt = popt;
+            eopt.rot_rads = utl.as(f32, i) * angle_inc;
+            const tick = room.curr_tick + utl.as(i64, i * tick_inc);
+            const mod_tick = @mod(tick, ticks_in_loop) - ticks_in_loop_2;
+            const f = utl.as(f32, mod_tick) / ticks_in_loop_2;
+            const r2 = r * f;
+            plat.ellipsef(shield_center, v2f(r2, r), eopt);
+            plat.circlef(shield_center, r, popt);
+        }
+    }
 }
 
 pub fn renderOver(self: *const Thing, room: *const Room) Error!void {
@@ -1752,20 +1780,6 @@ pub fn renderOver(self: *const Thing, room: *const Room) Error!void {
         if (self.hurtbox) |hurtbox| {
             const color = Colorf.yellow.fade(0.5);
             plat.circlef(self.pos.add(hurtbox.rel_pos), hurtbox.radius, .{ .fill_color = color });
-        }
-    }
-    // protected bubble
-    const protected = self.statuses.get(.protected);
-    if (self.isAliveCreature() and protected.stacks > 0) {
-        // TODO dont use select radius
-        const r = if (self.selectable) |s| s.height * 0.4 else self.coll_radius;
-        const shield_center = self.pos.sub(v2f(0, r));
-        const popt = draw.PolyOpt{
-            .fill_color = null,
-            .outline = .{ .color = StatusEffect.proto_array.get(.protected).color },
-        };
-        for (0..utl.as(usize, protected.stacks)) |i| {
-            plat.circlef(shield_center, r * 2 + 2 + utl.as(f32, i) * 2, popt);
         }
     }
     // hitbox indicator
