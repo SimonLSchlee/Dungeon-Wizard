@@ -37,7 +37,7 @@ pub const proto = Spell.makeProto(
     .{
         .cast_time = .medium,
         .obtainableness = std.EnumSet(Spell.Obtainableness).initOne(.starter),
-        .color = .red,
+        .color = .cyan,
         .targeting_data = .{
             .kind = .thing,
             .target_faction_mask = Thing.Faction.Mask.initOne(.enemy),

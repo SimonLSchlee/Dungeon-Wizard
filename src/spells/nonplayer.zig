@@ -43,6 +43,7 @@ pub const spells = [_]type{
                     .max_range = 50,
                     .show_max_range_ring = true,
                 },
+                .color = Colorf.purple.lerp(.white, 0.6),
             },
         );
         pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
@@ -65,6 +66,7 @@ pub const spells = [_]type{
                 .targeting_data = .{
                     .kind = .self,
                 },
+                .color = Colorf.yellow.lerp(.white, 0.3),
             },
         );
         pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {

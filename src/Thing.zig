@@ -841,7 +841,7 @@ pub const CastVFXController = struct {
         }
     }
 
-    pub fn castingProto(caster: *Thing) Thing {
+    pub fn castingProto(caster: *Thing, color: Colorf) Thing {
         var cast_offset = V2f{};
         if (App.getData().getCreatureDirAnim(caster.creature_kind.?, .cast)) |dir_anim| {
             const anim = dir_anim.dirToSpriteAnim(caster.dir).getConst();
@@ -865,6 +865,7 @@ pub const CastVFXController = struct {
                 .sprite = .{
                     .draw_over = true,
                     .draw_normal = false,
+                    .sprite_tint = color,
                 },
             },
         };

@@ -363,8 +363,8 @@ pub const Controller = struct {
                             }
                         }
                         switch (controller.action_casting.?.action) {
-                            .spell => {
-                                const cast_proto = Thing.CastVFXController.castingProto(self);
+                            .spell => |spell| {
+                                const cast_proto = Thing.CastVFXController.castingProto(self, spell.color);
                                 if (try room.queueSpawnThing(&cast_proto, cast_proto.pos)) |id| {
                                     controller.cast_vfx = id;
                                 }

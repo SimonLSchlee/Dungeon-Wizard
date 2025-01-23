@@ -350,7 +350,7 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
         },
         .spell_cast => |*spc| {
             if (action.curr_tick == 0) {
-                const cast_proto = Thing.CastVFXController.castingProto(self);
+                const cast_proto = Thing.CastVFXController.castingProto(self, spc.spell.color);
                 if (try room.queueSpawnThing(&cast_proto, cast_proto.pos)) |id| {
                     spc.cast_vfx = id;
                 }
