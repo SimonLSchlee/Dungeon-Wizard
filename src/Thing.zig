@@ -724,6 +724,11 @@ pub const LoopVFXController = struct {
         const rpos = center_pos.add(rdir.scale(radius));
         const anim = kind.getHitAnim(amount);
 
+        const Refs = struct {
+            var thwack = Data.Ref(Data.Sound).init("thwack");
+        };
+        App.getPlat().playSound(Refs.thwack.get().sound);
+
         const p = proto(anim, 99, 0, false, .white, true);
         _ = room.queueSpawnThing(&p, rpos) catch {};
     }

@@ -341,7 +341,27 @@ pub const Controller = struct {
                         self.dir = self.vel.normalized();
                     }
                     _ = AnimRefs.move.get();
-                    _ = renderer.playDir(AnimRefs.move, .{ .loop = true, .dir = self.dir });
+                    _ = renderer.playDir(AnimRefs.move, .{ .loop = true, .dir = self.dir }).contains(.end);
+                    // TODO use event
+                    if (renderer.animator.dir.animator.curr_anim_frame % 4 == 0 and renderer.animator.dir.animator.tick_in_frame == 4) {
+                        const plat = App.getPlat();
+                        const Refs = struct {
+                            var last_idx: usize = 0;
+                            var steps = [_]Data.Ref(Data.Sound){
+                                Data.Ref(Data.Sound).init("player-step-1"),
+                                Data.Ref(Data.Sound).init("player-step-2"),
+                                Data.Ref(Data.Sound).init("player-step-3"),
+                            };
+                        };
+                        var idx = room.rng.random().intRangeLessThan(usize, 0, Refs.steps.len);
+                        if (idx == Refs.last_idx) {
+                            idx = (idx + 1) % Refs.steps.len;
+                        }
+                        const sound = Refs.steps[idx].get().sound;
+                        plat.setSoundVolume(sound, 0.2);
+                        plat.playSound(sound);
+                        Refs.last_idx = idx;
+                    }
                     break :state .walk;
                 },
                 .action => {

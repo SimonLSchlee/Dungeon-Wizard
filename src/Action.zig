@@ -231,7 +231,16 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                 }
                 return true;
             }
-
+            // some windup
+            if (renderer.getTicksUntilEvent(.hit)) |ticks| {
+                if (ticks == 18) {
+                    // play sound
+                    const Refs = struct {
+                        var thwack = Data.Ref(Data.Sound).init("attack-swing-fast");
+                    };
+                    App.getPlat().playSound(Refs.thwack.get().sound);
+                }
+            }
             if (events.contains(.hit)) {
                 const hitbox = &self.hitbox.?;
                 //std.debug.print("hit targetu\n", .{});
@@ -243,11 +252,6 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                         hitbox.effect.force = .{ .fixed = d.scale(melee.hit_to_side_force) };
                     }
                 }
-                // play sound
-                const Refs = struct {
-                    var thwack = Data.Ref(Data.Sound).init("thwack");
-                };
-                App.getPlat().playSound(Refs.thwack.get().sound);
 
                 if (melee.lunge_accel) |accel_params| {
                     self.dashing = true;
