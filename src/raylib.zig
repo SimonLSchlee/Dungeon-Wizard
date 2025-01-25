@@ -1034,7 +1034,7 @@ pub fn _loadSound(_: *Platform, name: []const u8, path_z: [:0]const u8) Error!So
 }
 
 pub fn loadSound(self: *Platform, path: []const u8) Error!Sound {
-    const path_z = try std.fmt.bufPrintZ(self.str_fmt_buf, "{s}/sounds/{s}", .{ self.assets_path, path });
+    const path_z = try std.fmt.bufPrintZ(self.str_fmt_buf, "{s}/{s}", .{ self.assets_path, path });
     return self._loadSound(path, path_z);
 }
 
@@ -1152,6 +1152,7 @@ pub const FileWalkerIterator = struct {
     }
 
     pub const NextEntry = struct {
+        path: []const u8,
         subdir: []const u8,
         basename: []const u8,
         owned_string: []u8,
@@ -1171,9 +1172,18 @@ pub const FileWalkerIterator = struct {
                     continue;
                 }
             }
-            const file = self.dir.openFile(entry.path, .{}) catch return Error.FileSystemFail;
-            const str = file.readToEndAlloc(self.allocator, 8 * 1024 * 1024) catch return Error.FileSystemFail;
+            const file = self.dir.openFile(entry.path, .{}) catch {
+                // can't be used from dynlib
+                //getPlat().log.err("Failed to open \"{s}\"", .{entry.path});
+                continue;
+            };
+            const str = file.readToEndAlloc(self.allocator, 8 * 1024 * 1024) catch {
+                // can't be used from dynlib
+                //getPlat().log.err("Failed to read \"{s}\"", .{entry.path});
+                continue;
+            };
             return .{
+                .path = entry.path,
                 .subdir = entry.path[0..(entry.path.len - entry.basename.len)],
                 .basename = entry.basename,
                 .owned_string = str,

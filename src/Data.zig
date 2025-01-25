@@ -642,23 +642,16 @@ pub fn reloadSounds(self: *Data) Error!void {
     }
     self.sounds.clear();
 
-    const sound_list = [_][]const u8{
-        "thwack.wav",
-        "casting.wav",
-        "cast-end.wav",
-    };
-    for (sound_list) |s_filename| {
+    var file_it = try plat.iterateAssets("", &[_][]const u8{".wav"});
+    defer file_it.deinit();
+    while (try file_it.next()) |next| {
+        defer next.deinit(file_it);
         const sound = Sound{
-            .sound = try plat.loadSound(s_filename),
+            .sound = try plat.loadSound(next.path),
         };
-        _ = self.putAsset(Sound, &sound, filenameToAssetName(s_filename));
+        const asset = self.putAsset(Sound, &sound, filenameToAssetName(next.basename));
+        Log.info("Loaded sound: {s}", .{asset.data_ref.name.constSlice()});
     }
-    // TODO music and sounds... yea
-    const music_filename = "dungongnu.wav";
-    const music = Sound{
-        .sound = try plat.loadMusic(music_filename),
-    };
-    _ = self.putAsset(Sound, &music, filenameToAssetName(music_filename));
 }
 
 pub fn loadSpriteSheetFromJsonString(data: *Data, sheet_filename: []const u8, json_string: []u8, assets_rel_dir_path: []const u8) Error!*SpriteSheet {
