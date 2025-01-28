@@ -48,8 +48,11 @@ pub const PlayingSound = struct {
     // set to false after one loop. reset to true if ya want it to keep looping!
     loop_once: bool = false,
     stopped: bool = false,
+    volume: f32 = 1,
 
     pub fn update(self: *PlayingSound) void {
+        const volume = App.get().options.audio.sfx_volume * self.volume;
+        self.audio_stream.setVolume(volume);
         if (self.audio_stream.updateSound(self.loop_once)) {
             if (!self.loop_once) {
                 self.stopAndFree();
@@ -59,7 +62,7 @@ pub const PlayingSound = struct {
         }
     }
     pub fn setVolume(self: *PlayingSound, volume: f32) void {
-        self.audio_stream.setVolume(volume);
+        self.volume = volume;
     }
     pub fn stopAndFree(self: *PlayingSound) void {
         self.audio_stream.stop();
@@ -97,10 +100,10 @@ pub const SFXPlayer = struct {
         const ps = self.sounds.alloc() orelse return null;
         ps.ref = sound_ref.*;
         ps.loop_once = params.loop;
+        ps.volume = params.volume;
         ps.stopped = false;
-        ps.audio_stream.setVolume(params.volume);
         ps.audio_stream.setSound(sound.sound);
-        _ = ps.audio_stream.updateSound(params.loop);
+        ps.update();
         ps.audio_stream.play();
         return ps.id;
     }
