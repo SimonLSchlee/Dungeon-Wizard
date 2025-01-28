@@ -785,11 +785,6 @@ pub fn unloadTexture(self: *Platform, texture: Texture2D) void {
     r.UnloadTexture(texture.r_tex);
 }
 
-pub fn unloadSound(self: *Platform, sound: Sound) void {
-    _ = self;
-    r.UnloadSound(sound.r_sound);
-}
-
 pub const ImageBuf = struct {
     dims: V2i,
     data: []Coloru,
@@ -1003,34 +998,111 @@ pub fn fitTextToRect(self: *Platform, dims: V2f, text: []const u8, opt: draw.Tex
 
 pub const Sound = struct {
     name: []const u8,
-    r_sound: r.Sound,
+    r_wave: r.Wave,
 };
 
-pub fn stopSound(_: *Platform, sound: Sound) void {
-    r.StopSound(sound.r_sound);
-}
+pub const AudioStream = struct {
+    const sample_rate: c_int = 44100;
+    const sample_size_bits: c_int = 16;
+    const num_channels: c_int = 1;
+    const stride_bits = sample_size_bits * num_channels;
+    const FrameInt = std.meta.Int(.unsigned, stride_bits);
+    // bit of buffer, i think this is in frames
+    const buf_sz: c_int = 4096;
+    var scratch_buf: [buf_sz]FrameInt = undefined;
 
-pub fn playSound(_: *Platform, sound: Sound) void {
-    r.PlaySound(sound.r_sound);
-}
+    playing_sound: ?Sound = null,
+    play_offset: usize = 0,
+    r_stream: r.AudioStream,
 
-pub fn loopSound(_: *Platform, sound: Sound) void {
-    if (!r.IsSoundPlaying(sound.r_sound)) {
-        r.PlaySound(sound.r_sound);
+    pub fn setSound(self: *AudioStream, sound: Sound) void {
+        self.playing_sound = sound;
+        self.play_offset = 0;
     }
+    // return true if ended (or looped)
+    pub fn updateSound(self: *AudioStream, loop: bool) bool {
+        if (self.playing_sound == null) return true;
+        const r_wave = self.playing_sound.?.r_wave;
+        // we got to the end of the wave
+        var ret = false;
+        if (!r.IsAudioStreamProcessed(self.r_stream)) {
+            return false;
+        }
+
+        if (self.play_offset >= r_wave.frameCount) {
+            // we don't reset it to 0 because of looping.
+            // we might be starting at a non-zero offset
+            // (see below where we use scratch_buffer)
+            self.play_offset -= r_wave.frameCount;
+            ret = true;
+            if (!loop) {
+                self.playing_sound = null;
+                return ret;
+            }
+        }
+        const frames_left = r_wave.frameCount - self.play_offset;
+        const batch_size = @min(frames_left, buf_sz);
+        const batch_end = self.play_offset + batch_size;
+        const wave_buf: []FrameInt = @as([*]FrameInt, @alignCast(@ptrCast(r_wave.data.?)))[0..r_wave.frameCount];
+        var buf = wave_buf[self.play_offset..batch_end];
+        // we reached the end of the data, and we want to loop.
+        // but raylib will always play the FULL buffer - all the way to the end (zeroing out unused part)
+        // so, to loop seamlessly we need to copy the first part of the sound into the
+        // end of a scratch buffer and send that too
+        if (loop and batch_size < buf_sz) {
+            const remaining_space = u.as(usize, buf_sz - batch_size);
+            @memcpy(scratch_buf[0..batch_size], buf);
+            @memcpy(scratch_buf[batch_size..], wave_buf[0..remaining_space]);
+            buf = &scratch_buf;
+        }
+        r.UpdateAudioStream(self.r_stream, @ptrCast(buf), u.as(c_int, buf.len));
+        self.play_offset += buf.len;
+
+        // ret is false here unless we looped
+        return ret;
+    }
+
+    pub fn setVolume(self: *AudioStream, vol: f32) void {
+        r.SetAudioStreamVolume(self.r_stream, vol);
+    }
+    // start playing the stream, assuming there's a sound and it's been updated
+    pub fn play(self: *AudioStream) void {
+        r.PlayAudioStream(self.r_stream);
+    }
+    pub fn stop(self: *AudioStream) void {
+        self.playing_sound = null;
+        r.StopAudioStream(self.r_stream);
+    }
+};
+
+pub fn createAudioStream(_: *Platform) AudioStream {
+    r.SetAudioStreamBufferSizeDefault(AudioStream.buf_sz);
+    const r_stream = r.LoadAudioStream(AudioStream.sample_rate, AudioStream.sample_size_bits, AudioStream.num_channels);
+    return .{
+        .r_stream = r_stream,
+    };
 }
-pub fn setSoundVolume(_: *Platform, sound: Sound, volume: f32) void {
-    r.SetSoundVolume(sound.r_sound, volume);
+
+pub fn destroyAudioStream(_: *Platform, s: AudioStream) void {
+    r.UnloadAudioStream(s.r_stream);
 }
 
 pub fn _loadSound(_: *Platform, name: []const u8, path_z: [:0]const u8) Error!Sound {
     @setRuntimeSafety(core.rt_safe_blocks);
-    const r_sound = r.LoadSound(path_z);
+    var r_wave = r.LoadWave(path_z);
+    if (!r.IsWaveValid(r_wave)) {
+        return Error.FormatFail;
+    }
+    r.WaveFormat(&r_wave, AudioStream.sample_rate, AudioStream.sample_size_bits, AudioStream.num_channels);
     const ret: Sound = .{
         .name = name,
-        .r_sound = r_sound,
+        .r_wave = r_wave,
     };
     return ret;
+}
+
+pub fn unloadSound(_: *Platform, sound: Sound) void {
+    r.UnloadWave(sound.r_wave);
 }
 
 pub fn loadSound(self: *Platform, path: []const u8) Error!Sound {

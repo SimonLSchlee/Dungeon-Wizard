@@ -344,7 +344,6 @@ pub const Controller = struct {
                     _ = renderer.playDir(AnimRefs.move, .{ .loop = true, .dir = self.dir }).contains(.end);
                     // TODO use event
                     if (renderer.animator.dir.animator.curr_anim_frame % 4 == 0 and renderer.animator.dir.animator.tick_in_frame == 4) {
-                        const plat = App.getPlat();
                         const Refs = struct {
                             var last_idx: usize = 0;
                             var steps = [_]Data.Ref(Data.Sound){
@@ -357,24 +356,13 @@ pub const Controller = struct {
                         if (idx == Refs.last_idx) {
                             idx = (idx + 1) % Refs.steps.len;
                         }
-                        const sound = Refs.steps[idx].get().sound;
-                        plat.setSoundVolume(sound, 0.2);
-                        plat.playSound(sound);
+                        _ = App.get().sfx_player.playSound(&Refs.steps[idx], .{ .volume = 0.2 });
                         Refs.last_idx = idx;
                     }
                     break :state .walk;
                 },
                 .action => {
                     assert(controller.action_casting != null);
-                    const plat = getPlat();
-                    const Refs = struct {
-                        var casting = Data.Ref(Data.Sound).init("casting");
-                        var cast_end = Data.Ref(Data.Sound).init("cast-end");
-                    };
-                    const cast_loop_sound = Refs.casting.get().sound;
-                    const cast_end_sound = Refs.cast_end.get().sound;
-                    const cast_loop_volume = 0.2;
-                    const cast_end_volume = 0.4;
                     const s = controller.action_casting.?;
                     if (controller.ticks_in_state == 0) {
                         if (s.params) |params| {
@@ -407,29 +395,19 @@ pub const Controller = struct {
                                 }
                             },
                         }
-                        plat.stopSound(cast_loop_sound);
                         controller.action_casting = null;
                         controller.ticks_in_state = 0;
                         continue :state .none;
                     }
-                    plat.loopSound(cast_loop_sound);
                     // TODO bit of a hacky wacky
                     const ticks_left = controller.cast_counter.num_ticks - controller.cast_counter.curr_tick;
                     if (ticks_left <= 30) {
-                        const vol: f32 = utl.as(f32, ticks_left) / 30.0;
-                        plat.setSoundVolume(cast_loop_sound, vol * cast_loop_volume);
                         if (controller.cast_vfx) |id| {
                             if (room.getThingById(id)) |cast| {
-                                cast.controller.cast_vfx.state = .cast;
+                                cast.controller.cast_vfx.cast();
                             }
                         }
-                        if (controller.cast_vfx != null) {
-                            plat.setSoundVolume(cast_end_sound, cast_end_volume);
-                            plat.playSound(cast_end_sound);
-                        }
                         controller.cast_vfx = null;
-                    } else {
-                        plat.setSoundVolume(cast_loop_sound, cast_loop_volume);
                     }
                     self.move(.{});
                     _ = AnimRefs.cast.get();

@@ -20,6 +20,7 @@ const App = @This();
 const Run = @import("Run.zig");
 const Data = @import("Data.zig");
 const Options = @import("Options.zig");
+const sounds = @import("sounds.zig");
 const ImmUI = @import("ImmUI.zig");
 const menuUI = @import("menuUI.zig");
 const config = @import("config");
@@ -46,6 +47,8 @@ pub inline fn getData() *Data {
 
 data: *Data = undefined,
 options: Options = undefined,
+sfx_player: sounds.SFXPlayer = undefined,
+music_player: sounds.MusicPlayer = undefined,
 curr_tick: i64 = 0,
 screen: enum {
     menu,
@@ -84,6 +87,8 @@ export fn appInit(plat: *Platform) *anyopaque {
     app.* = .{
         .options = Options.initTryLoad(plat),
         .data = Data.init() catch @panic("Failed to init data"),
+        .sfx_player = sounds.SFXPlayer.init(),
+        .music_player = sounds.MusicPlayer.init(),
     };
 
     // populate _app here, Room.init() uses it, and data.reload
@@ -370,6 +375,7 @@ fn update(self: *App) Error!void {
         }
     }
     self.options.alwaysUpdate();
+    self.sfx_player.update();
     self.curr_tick += 1;
 }
 

@@ -236,9 +236,9 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                 if (ticks == 18) {
                     // play sound
                     const Refs = struct {
-                        var thwack = Data.Ref(Data.Sound).init("attack-swing-fast");
+                        var swing = Data.Ref(Data.Sound).init("attack-swing-fast");
                     };
-                    App.getPlat().playSound(Refs.thwack.get().sound);
+                    _ = App.get().sfx_player.playSound(&Refs.swing, .{});
                 }
             }
             if (events.contains(.hit)) {

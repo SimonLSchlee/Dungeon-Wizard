@@ -35,6 +35,7 @@ const AI = @import("AI.zig");
 const Action = @import("Action.zig");
 const icon_text = @import("icon_text.zig");
 const projectiles = @import("projectiles.zig");
+const sounds = @import("sounds.zig");
 
 pub const Kind = enum {
     creature,
@@ -202,6 +203,7 @@ rmb_interactable: ?struct {
 manas_given: i32 = 0,
 is_summon: bool = false,
 is_boss: bool = false,
+sound_player: SoundPlayer = .{},
 
 pub const Faction = enum {
     object,
@@ -727,7 +729,7 @@ pub const LoopVFXController = struct {
         const Refs = struct {
             var thwack = Data.Ref(Data.Sound).init("thwack");
         };
-        App.getPlat().playSound(Refs.thwack.get().sound);
+        _ = App.get().sfx_player.playSound(&Refs.thwack, .{});
 
         const p = proto(anim, 99, 0, false, .white, true);
         _ = room.queueSpawnThing(&p, rpos) catch {};
@@ -804,46 +806,111 @@ pub const TextVFXController = struct {
     }
 };
 
+pub const SoundPlayer = struct {
+    pub const PlayParams = struct {
+        loop: bool = false,
+        volume: f32 = 1.0,
+    };
+
+    playing_sound: ?sounds.Id = null,
+
+    pub fn play(sp: *SoundPlayer, sound_ref: *Data.Ref(Data.Sound), params: PlayParams) void {
+        const sfx_player = &App.get().sfx_player;
+        const sound_asset: *Data.Sound = sound_ref.tryGetOrDefault() orelse {
+            Log.warn("Failed to get sound \"{s}\"", .{sound_ref.name.constSlice()});
+            return;
+        };
+        if (sp.playing_sound) |id| {
+            if (sfx_player.getById(id)) |ps| {
+                if (sound_asset.data_ref.idx.? != ps.ref.idx.?) {
+                    sp.playing_sound = sfx_player.playSound(&sound_asset.data_ref, .{ .loop = params.loop, .volume = params.volume });
+                    return;
+                }
+                // it's already playing, just loop if needed
+                ps.loop_once = params.loop;
+                ps.setVolume(params.volume);
+            }
+        } else {
+            sp.playing_sound = sfx_player.playSound(&sound_asset.data_ref, .{ .loop = params.loop, .volume = params.volume });
+        }
+    }
+
+    pub fn stop(sp: *SoundPlayer) void {
+        const sfx_player = &App.get().sfx_player;
+        if (sp.playing_sound) |id| {
+            if (sfx_player.getById(id)) |ps| {
+                ps.stopAndFree();
+            }
+        }
+        sp.playing_sound = null;
+    }
+};
+
 pub const CastVFXController = struct {
     const AnimRefs = struct {
         var loop = Data.Ref(Data.SpriteAnim).init("spellcasting-basic_loop");
         var cast = Data.Ref(Data.SpriteAnim).init("spellcasting-basic_cast");
         var fizzle = Data.Ref(Data.SpriteAnim).init("spellcasting-basic_fizzle");
     };
+    const SoundRefs = struct {
+        var loop = Data.Ref(Data.Sound).init("casting");
+        var cast = Data.Ref(Data.Sound).init("cast-end");
+        var fizzle = Data.Ref(Data.Sound).init("crackle");
+    };
     parent: Thing.Id,
+    sound_fade_timer: utl.TickCounter = utl.TickCounter.init(30),
     state: enum {
         loop,
         fizzle,
         cast,
     } = .loop,
 
+    pub fn cast(controller: *CastVFXController) void {
+        controller.state = .cast;
+        const sfx_player = &App.get().sfx_player;
+        _ = sfx_player.playSound(&SoundRefs.cast, .{ .volume = 0.6 });
+    }
+
+    pub fn fizzle(controller: *CastVFXController) void {
+        controller.state = .fizzle;
+        const sfx_player = &App.get().sfx_player;
+        _ = sfx_player.playSound(&SoundRefs.cast, .{});
+    }
+
     pub fn update(self: *Thing, room: *Room) Error!void {
         assert(self.spawn_state == .spawned);
         const controller = &self.controller.cast_vfx;
 
-        if (room.getThingById(controller.parent)) |parent| {
-            if (parent.isDeadCreature()) {
-                controller.state = .fizzle;
-            }
-        } else {
-            controller.state = .fizzle;
-        }
-
         switch (controller.state) {
             .loop => {
                 _ = self.renderer.sprite.playNormal(AnimRefs.loop, .{ .loop = true });
+                if (room.getThingById(controller.parent)) |parent| {
+                    if (parent.isDeadCreature()) {
+                        controller.fizzle();
+                    }
+                } else {
+                    controller.fizzle();
+                }
             },
             .fizzle => {
+                _ = controller.sound_fade_timer.tick(false);
                 if (self.renderer.sprite.playNormal(AnimRefs.fizzle, .{}).contains(.end)) {
                     self.deferFree(room);
+                    self.sound_player.stop();
+                    return;
                 }
             },
             .cast => {
+                _ = controller.sound_fade_timer.tick(false);
                 if (self.renderer.sprite.playNormal(AnimRefs.cast, .{}).contains(.end)) {
                     self.deferFree(room);
+                    self.sound_player.stop();
+                    return;
                 }
             },
         }
+        const f = 1 - controller.sound_fade_timer.remapTo0_1();
+        self.sound_player.play(&SoundRefs.loop, .{ .loop = true, .volume = 0.4 * f });
     }
 
     pub fn castingProto(caster: *Thing, color: Colorf) Thing {
