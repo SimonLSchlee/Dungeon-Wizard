@@ -113,6 +113,10 @@ pub fn spawnFiresInRadius(room: *Room, pos: V2f, radius: f32, comptime max_spawn
 const AnimRef = struct {
     var ball_projectile = Data.Ref(Data.SpriteAnim).init("spell-projectile-fire-boom");
 };
+const SoundRef = struct {
+    var woosh = Data.Ref(Data.Sound).init("long-woosh");
+    var crackle = Data.Ref(Data.Sound).init("crackle");
+};
 
 pub const Projectile = struct {
     pub const controller_enum_name = enum_name ++ "_projectile";
@@ -148,6 +152,7 @@ pub const Projectile = struct {
                         .poly_opt = .{ .fill_color = Colorf.orange },
                     },
                 };
+                _ = App.get().sfx_player.playSound(&SoundRef.woosh, .{});
             }
         } else {
             self.vel = .{};
@@ -198,6 +203,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     };
     ball.renderer.sprite.setNormalAnim(AnimRef.ball_projectile);
     _ = try room.queueSpawnThing(&ball, params.cast_orig.?);
+    _ = App.get().sfx_player.playSound(&SoundRef.crackle, .{});
 }
 
 pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {

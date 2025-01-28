@@ -67,6 +67,10 @@ max_speed: f32 = 3,
 const AnimRef = struct {
     var projectile_loop = Data.Ref(Data.SpriteAnim).init("spell-projectile-flare-dart");
 };
+const SoundRef = struct {
+    var woosh = Data.Ref(Data.Sound).init("long-woosh");
+    var crackle = Data.Ref(Data.Sound).init("crackle");
+};
 
 pub const Projectile = struct {
     pub const controller_enum_name = enum_name ++ "_projectile";
@@ -130,6 +134,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     };
     ball.renderer.sprite.setNormalAnim(AnimRef.projectile_loop);
     _ = try room.queueSpawnThing(&ball, caster.pos);
+    _ = App.get().sfx_player.playSound(&SoundRef.crackle, .{});
 }
 
 pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {

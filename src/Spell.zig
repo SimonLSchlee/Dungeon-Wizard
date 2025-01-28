@@ -886,6 +886,7 @@ rarity: Rarity = .pedestrian,
 obtainableness: Obtainableness.Mask = Obtainableness.Mask.initMany(&.{ .room_reward, .shop }),
 obtainable_modes: Run.Mode.Mask = Run.Mode.Mask.initFull(),
 color: Colorf = .black,
+cast_sound: Data.Ref(Data.Sound) = Data.Ref(Data.Sound).init("cast-end"),
 targeting_data: TargetingData = .{},
 cast_time: CastTime,
 cast_secs: f32 = 1, // time from spell starting to when it's cast() is called - caster can't move or do anything except buffer inputs

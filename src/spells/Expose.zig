@@ -42,7 +42,7 @@ pub const proto = Spell.makeProto(
         .cast_time = .medium,
         .mana_cost = Spell.ManaCost.num(2),
         .obtainableness = std.EnumSet(Spell.Obtainableness).initOne(.starter),
-        .color = StatusEffect.proto_array.get(.exposed).color,
+        .color = .purple,
         .targeting_data = .{
             .kind = .pos,
             .target_faction_mask = Thing.Faction.Mask.initOne(.enemy),
@@ -63,6 +63,9 @@ radius: f32 = base_radius,
 const AnimRef = struct {
     var loop = Data.Ref(Data.SpriteAnim).init("expose_circle-loop");
     var end = Data.Ref(Data.SpriteAnim).init("expose_circle-end");
+};
+const SoundRef = struct {
+    var chime = Data.Ref(Data.Sound).init("creep-chime");
 };
 
 pub const Projectile = struct {
@@ -93,6 +96,7 @@ pub const Projectile = struct {
                     self.renderer.sprite.scale = core.game_sprite_scaling * 0.5;
                     self.renderer.sprite.sprite_tint = Colorf.white;
                     self.renderer.sprite.setNormalAnim(AnimRef.end);
+                    _ = App.get().sfx_player.playSound(&SoundRef.chime, .{});
                 } else {
                     const f = projectile.timer.remapTo0_1();
                     self.renderer.sprite.scale = f * core.game_sprite_scaling * 0.5;

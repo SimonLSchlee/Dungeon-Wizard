@@ -21,6 +21,7 @@ const Room = @import("../Room.zig");
 const Thing = @import("../Thing.zig");
 const TileMap = @import("../TileMap.zig");
 const StatusEffect = @import("../StatusEffect.zig");
+const Data = @import("../Data.zig");
 
 const Collision = @import("../Collision.zig");
 const Spell = @import("../Spell.zig");
@@ -63,6 +64,10 @@ bonus_hit_effect: Thing.HitEffect = .{
     }),
 },
 
+const SoundRef = struct {
+    var crackle = Data.Ref(Data.Sound).init("crackle");
+};
+
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
     params.validate(.thing, caster);
     const ignite: @This() = self.kind.ignite;
@@ -82,6 +87,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
         }
         hurtbox.hit(target, room, hit_effect, null);
     }
+    _ = App.get().sfx_player.playSound(&SoundRef.crackle, .{});
 }
 
 pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {

@@ -22,6 +22,7 @@ const Thing = @import("../Thing.zig");
 const TileMap = @import("../TileMap.zig");
 const StatusEffect = @import("../StatusEffect.zig");
 const icon_text = @import("../icon_text.zig");
+const Data = @import("../Data.zig");
 
 const Collision = @import("../Collision.zig");
 const Spell = @import("../Spell.zig");
@@ -60,6 +61,10 @@ explode_hit_effect: Thing.HitEffect = .{
 bonus_damage_per_lit: f32 = 2,
 explode_radius: f32 = base_explode_radius,
 immune_stacks: i32 = 3,
+
+const SoundRef = struct {
+    var woosh = Data.Ref(Data.Sound).init("long-woosh");
+};
 
 pub const Projectile = struct {
     pub const controller_enum_name = enum_name ++ "_projectile";
@@ -117,6 +122,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
         },
     };
     _ = try room.queueSpawnThing(&ball, caster.pos);
+    _ = App.get().sfx_player.playSound(&SoundRef.woosh, .{});
 
     caster.statuses.getPtr(.moist).addStacks(caster, flame_purge.immune_stacks);
 }

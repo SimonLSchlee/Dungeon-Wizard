@@ -377,6 +377,22 @@ pub const Damage = struct {
             _ = ref.get();
             return ref.*;
         }
+        pub fn getHitSound(self: Damage.Kind, amount: f32) Data.Ref(Data.Sound) {
+            const SoundRef = Data.Ref(Data.Sound);
+            const Refs = struct {
+                var thwack = SoundRef.init("thwack");
+                var bash = SoundRef.init("hit-bash");
+                var crunch = SoundRef.init("hit-crunch");
+                var woosh = SoundRef.init("hit-woosh");
+            };
+            const ref = switch (self) {
+                //.water => .water,
+                .physical => if (amount < 8) &Refs.bash else &Refs.thwack,
+                else => &Refs.woosh,
+            };
+            _ = ref.get();
+            return ref.*;
+        }
 
         pub inline fn getIcon(self: Damage.Kind, aoe: bool) icon_text.Icon {
             return switch (self) {
@@ -725,11 +741,9 @@ pub const LoopVFXController = struct {
         const radius = (if (thing.selectable) |s| s.radius else thing.coll_radius) * 0.75;
         const rpos = center_pos.add(rdir.scale(radius));
         const anim = kind.getHitAnim(amount);
+        var sound = kind.getHitSound(amount);
 
-        const Refs = struct {
-            var thwack = Data.Ref(Data.Sound).init("thwack");
-        };
-        _ = App.get().sfx_player.playSound(&Refs.thwack, .{});
+        _ = App.get().sfx_player.playSound(&sound, .{});
 
         const p = proto(anim, 99, 0, false, .white, true);
         _ = room.queueSpawnThing(&p, rpos) catch {};
@@ -858,6 +872,7 @@ pub const CastVFXController = struct {
         var fizzle = Data.Ref(Data.Sound).init("crackle");
     };
     parent: Thing.Id,
+    cast_end_sound: Data.Ref(Data.Sound),
     sound_fade_timer: utl.TickCounter = utl.TickCounter.init(30),
     state: enum {
         loop,
@@ -868,13 +883,13 @@ pub const CastVFXController = struct {
     pub fn cast(controller: *CastVFXController) void {
         controller.state = .cast;
         const sfx_player = &App.get().sfx_player;
-        _ = sfx_player.playSound(&SoundRefs.cast, .{ .volume = 0.6 });
+        _ = sfx_player.playSound(&controller.cast_end_sound, .{ .volume = 0.6 });
     }
 
     pub fn fizzle(controller: *CastVFXController) void {
         controller.state = .fizzle;
         const sfx_player = &App.get().sfx_player;
-        _ = sfx_player.playSound(&SoundRefs.cast, .{});
+        _ = sfx_player.playSound(&SoundRefs.fizzle, .{});
     }
 
     pub fn update(self: *Thing, room: *Room) Error!void {
@@ -913,7 +928,7 @@ pub const CastVFXController = struct {
         self.sound_player.play(&SoundRefs.loop, .{ .loop = true, .volume = 0.3 * f });
     }
 
-    pub fn castingProto(caster: *Thing, color: Colorf) Thing {
+    pub fn castingProto(caster: *Thing, spell: *Spell) Thing {
         var cast_offset = V2f{};
         if (App.getData().getCreatureDirAnim(caster.creature_kind.?, .cast)) |dir_anim| {
             const anim = dir_anim.dirToSpriteAnim(caster.dir).getConst();
@@ -924,6 +939,7 @@ pub const CastVFXController = struct {
                 }
             }
         }
+        const cast_end_sound = spell.cast_sound.get().data_ref;
         const cast_pos = caster.pos.add(cast_offset);
         var ret = Thing{
             .kind = .vfx,
@@ -931,13 +947,14 @@ pub const CastVFXController = struct {
             .controller = .{
                 .cast_vfx = .{
                     .parent = caster.id,
+                    .cast_end_sound = cast_end_sound,
                 },
             },
             .renderer = .{
                 .sprite = .{
                     .draw_over = true,
                     .draw_normal = false,
-                    .sprite_tint = color,
+                    .sprite_tint = spell.color,
                 },
             },
         };

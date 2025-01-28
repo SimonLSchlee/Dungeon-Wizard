@@ -56,6 +56,9 @@ hit_effect: Thing.HitEffect = .{
 const AnimRef = struct {
     var projectile_loop = Data.Ref(Data.SpriteAnim).init("spell-projectile-unherring");
 };
+const SoundRef = struct {
+    var chime = Data.Ref(Data.Sound).init("crackle");
+};
 
 pub const Projectile = struct {
     pub const controller_enum_name = enum_name ++ "_projectile";
@@ -148,6 +151,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     };
     herring.renderer.sprite.setNormalAnim(AnimRef.projectile_loop);
     _ = try room.queueSpawnThing(&herring, caster.pos.add(caster.dir.scale(10)));
+    _ = App.get().sfx_player.playSound(&SoundRef.chime, .{});
 }
 
 pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
