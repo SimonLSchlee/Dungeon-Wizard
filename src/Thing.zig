@@ -910,7 +910,7 @@ pub const CastVFXController = struct {
             },
         }
         const f = 1 - controller.sound_fade_timer.remapTo0_1();
-        self.sound_player.play(&SoundRefs.loop, .{ .loop = true, .volume = 0.4 * f });
+        self.sound_player.play(&SoundRefs.loop, .{ .loop = true, .volume = 0.3 * f });
     }
 
     pub fn castingProto(caster: *Thing, color: Colorf) Thing {

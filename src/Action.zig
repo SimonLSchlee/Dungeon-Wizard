@@ -362,7 +362,7 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
             if (action.curr_tick == 30) {
                 if (spc.cast_vfx) |id| {
                     if (room.getThingById(id)) |cast| {
-                        cast.controller.cast_vfx.state = .cast;
+                        cast.controller.cast_vfx.cast();
                     }
                 }
                 spc.cast_vfx = null;
