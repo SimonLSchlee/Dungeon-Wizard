@@ -26,6 +26,61 @@ const Options = @This();
 
 const ui_el_text_padding: V2f = v2f(5, 5);
 
+pub const Slider = struct {
+    grabbed: bool = false,
+
+    pub fn update(self: *Slider, cmd_buf: *ImmUI.CmdBuf, pos: V2f, width: f32, curr: f32, min: f32, max: f32, step: f32) Error!?f32 {
+        const plat = App.getPlat();
+        const ui_scaling = plat.ui_scaling;
+        const mouse_pos = plat.getMousePosScreen();
+        const mouse_clicked = plat.input_buffer.mouseBtnIsJustPressed(.left);
+        const mouse_down = plat.input_buffer.mouseBtnIsDown(.left);
+        const range = max - min;
+        const f = curr / range;
+        const handle_radius: f32 = 7 * ui_scaling;
+        var handle_pos = v2f(pos.x + f * width, pos.y);
+        var new_val = curr;
+
+        if (!self.grabbed) {
+            if (mouse_clicked) {
+                const test_rect = geom.Rectf{ .pos = pos.sub(V2f.splat(handle_radius)), .dims = v2f(width + handle_radius, handle_radius * 2) };
+                if (mouse_pos.dist(handle_pos) <= handle_radius or geom.pointIsInRectf(mouse_pos, test_rect)) {
+                    self.grabbed = true;
+                }
+            }
+        }
+        if (self.grabbed) {
+            if (mouse_down) {
+                handle_pos.x = utl.clampf(mouse_pos.x, pos.x, pos.x + width);
+                const new_f = (handle_pos.x - pos.x) / width;
+                new_val = @round((new_f * range + min) / step) * step;
+            } else {
+                self.grabbed = false;
+            }
+        }
+        cmd_buf.appendAssumeCapacity(.{ .rect = .{
+            .pos = pos.sub(V2f.splat(handle_radius * 0.5)),
+            .dims = v2f(width + handle_radius, handle_radius),
+            .opt = .{
+                .fill_color = .gray,
+                .edge_radius = 1,
+            },
+        } });
+        cmd_buf.appendAssumeCapacity(.{ .circle = .{
+            .pos = handle_pos,
+            .radius = handle_radius,
+            .opt = .{
+                .fill_color = .lightgray,
+                .smoothing = .bilinear,
+            },
+        } });
+        if (new_val != curr) {
+            return new_val;
+        }
+        return null;
+    }
+};
+
 pub const DropdownMenu = struct {
     selected_idx: usize = 0,
     is_open: bool = false,
@@ -346,6 +401,7 @@ pub const Controls = struct {
 
 pub const Audio = struct {
     sfx_volume: f32 = 1,
+    sfx_slider: Slider = .{},
 
     pub const OptionSerialize = struct {
         sfx_volume: void,
@@ -693,8 +749,8 @@ fn updateAudio(self: *Options, cmd_buf: *ImmUI.CmdBuf, pos: V2f) Error!bool {
     var curr_row_pos = pos;
     const row_height: f32 = utl.as(f32, text_opt.size) + el_padding.y * 2;
 
-    { // cast method
-        const sfx_volume_text = try utl.bufPrintLocal("SFX Volume: {d}", .{audio.sfx_volume * 100});
+    {
+        const sfx_volume_text = try utl.bufPrintLocal("SFX Volume: {d:0.0}", .{audio.sfx_volume * 100});
         const sfx_volume_text_dims = try plat.measureText(sfx_volume_text, text_opt);
         cmd_buf.appendAssumeCapacity(.{ .label = .{
             .pos = curr_row_pos.add(el_padding),
@@ -702,9 +758,18 @@ fn updateAudio(self: *Options, cmd_buf: *ImmUI.CmdBuf, pos: V2f) Error!bool {
             .opt = text_opt,
         } });
 
-        const slider_pos = pos.add(v2f(sfx_volume_text_dims.x + 8 * ui_scaling, 0));
-        _ = slider_pos;
-        // TODO
+        const slider_pos = pos.add(v2f(150 * ui_scaling, sfx_volume_text_dims.y));
+        if (try self.audio.sfx_slider.update(
+            cmd_buf,
+            slider_pos,
+            200,
+            self.audio.sfx_volume * 100,
+            0,
+            100,
+            1,
+        )) |new_volume| {
+            self.audio.sfx_volume = utl.clampf(new_volume / 100, 0, 1);
+        }
         curr_row_pos.y += row_height;
     }
 
