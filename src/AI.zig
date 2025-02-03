@@ -509,34 +509,7 @@ pub const ActorController = struct {
                 const thing = _thing.?;
 
                 if (controller.flee_pos == null) {
-                    const flee_from_pos = thing.pos;
-                    controller.hiding_places = try getHidingPlaces(
-                        room,
-                        TileMap.PathLayer.Mask.initOne(self.pathing_layer),
-                        self.pos,
-                        flee_from_pos,
-                        flee.min_dist,
-                        flee.max_dist,
-                    );
-                    controller.to_enemy = flee_from_pos.sub(self.pos);
-                    if (controller.hiding_places.len > 0) {
-                        var best_score: f32 = -std.math.inf(f32);
-                        var best_pos: ?V2f = null;
-                        for (controller.hiding_places.constSlice()) |h| {
-                            const self_to_pos = h.pos.sub(self.pos).normalizedOrZero();
-                            const len = @max(controller.to_enemy.length() - flee.min_dist, 0);
-                            const to_enemy_n = controller.to_enemy.setLengthOrZero(len);
-                            const dir_f = self_to_pos.dot(to_enemy_n.neg());
-                            const score = h.flee_from_dist + dir_f;
-                            if (best_pos == null or score > best_score) {
-                                best_score = score;
-                                best_pos = h.pos;
-                            }
-                        }
-                        if (best_pos) |pos| {
-                            controller.flee_pos = pos;
-                        }
-                    }
+                    controller.flee_pos = try getFleePos(room, self.pos, thing.pos, flee.min_dist, flee.max_dist, self.pathing_layer);
                 }
                 if (controller.flee_pos) |pos| {
                     try self.findPath(room, pos);
@@ -594,4 +567,31 @@ pub fn getHidingPlaces(room: *const Room, mask: TileMap.PathLayer.Mask, fleer_po
         }
     }
     return places;
+}
+
+pub fn getFleePos(room: *const Room, fleer_pos: V2f, flee_from_pos: V2f, min_dist: f32, max_dist: f32, pathing_layer: TileMap.PathLayer) !?V2f {
+    const hiding_places = try getHidingPlaces(
+        room,
+        TileMap.PathLayer.Mask.initOne(pathing_layer),
+        fleer_pos,
+        flee_from_pos,
+        min_dist,
+        max_dist,
+    );
+    if (hiding_places.len == 0) return null;
+    const to_enemy = flee_from_pos.sub(fleer_pos);
+    var best_score: f32 = -std.math.inf(f32);
+    var best_pos: ?V2f = null;
+    for (hiding_places.constSlice()) |h| {
+        const self_to_pos = h.pos.sub(fleer_pos).normalizedOrZero();
+        const len = @max(to_enemy.length() - min_dist, 0);
+        const to_enemy_n = to_enemy.setLengthOrZero(len);
+        const dir_f = self_to_pos.dot(to_enemy_n.neg());
+        const score = h.flee_from_dist + dir_f;
+        if (best_pos == null or score > best_score) {
+            best_score = score;
+            best_pos = h.pos;
+        }
+    }
+    return best_pos;
 }
