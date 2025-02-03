@@ -90,6 +90,7 @@ pub const Slot = enum {
     spell_cast_thing_buff_1,
     spell_cast_thing_debuff_1,
     spell_cast_self_buff_1,
+    spell_cast_teleport_self,
     ability_1,
 
     pub const attacks = &[_]Slot{

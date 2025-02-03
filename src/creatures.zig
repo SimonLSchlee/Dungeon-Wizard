@@ -129,17 +129,17 @@ pub fn djinnProto() Thing {
         .kind = .{ .spell_cast = .{
             .spell = Spell.getProto(.crescent_throw),
         } },
-        .cooldown = utl.TickCounter.initStopped(4 * core.fups_per_sec),
+        .cooldown = utl.TickCounter.initStopped(5 * core.fups_per_sec),
     });
     ret.controller.ai_actor.actions.getPtr(.spell_cast_self_buff_1).* = (.{
         .kind = .{ .spell_cast = .{
             .spell = Spell.getProto(.protect_self),
         } },
-        .cooldown = utl.TickCounter.initStopped(3 * core.fups_per_sec),
+        .cooldown = utl.TickCounter.initStopped(12 * core.fups_per_sec),
     });
-    ret.controller.ai_actor.actions.getPtr(.spell_cast_summon_1).* = (.{
+    ret.controller.ai_actor.actions.getPtr(.spell_cast_teleport_self).* = (.{
         .kind = .{ .spell_cast = .{
-            .spell = Spell.getProto(.summon_bat),
+            .spell = Spell.getProto(.teleport_self),
         } },
         .cooldown = utl.TickCounter.initStopped(7 * core.fups_per_sec),
     });

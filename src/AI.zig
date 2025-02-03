@@ -312,65 +312,52 @@ pub const AIAcolyte = struct {
 pub const AIDjinn = struct {
     pub fn decide(_: *AIDjinn, self: *Thing, room: *Room) Decision {
         const controller = &self.controller.ai_actor;
-        const nearest_enemy: ?*Thing = getNearestOpposingThing(self, room);
+        const enemy: *Thing = getNearestOpposingThing(self, room) orelse return .{ .idle = .{} };
 
-        // we've been fleeing, set cooldown
-        if (std.meta.activeTag(controller.decision) == .flee) {
-            controller.flee_cooldown = utl.TickCounter.init(core.secsToTicks(1));
-        }
-        if (false) {
-            const attack = &controller.actions.getPtr(.spell_cast_thing_attack_1).*.?;
-            // prioritize attac
-            if (nearest_enemy) |enemy| {
-                if (!attack.cooldown.running) {
-                    if (enemy.pos.dist(self.pos) <= attack.kind.spell_cast.spell.targeting_data.max_range) {
-                        return .{ .action = .{
-                            .slot = .spell_cast_thing_attack_1,
-                            .params = .{ .target_kind = .pos, .pos = enemy.pos },
-                        } };
-                    }
-                }
-            }
-        }
-        const self_buff = &controller.actions.getPtr(.spell_cast_self_buff_1).*.?;
-        if (true) {
+        const teleport = &controller.actions.getPtr(.spell_cast_teleport_self).*.?;
+        const can_tp = !teleport.cooldown.running;
+        const attack_1 = &controller.actions.getPtr(.spell_cast_thing_attack_1).*.?;
+        const can_atk_1 = !attack_1.cooldown.running;
+        const shield = &controller.actions.getPtr(.spell_cast_self_buff_1).*.?;
+        const can_shield = !shield.cooldown.running;
 
-            // prioritize protec
-            if (!self_buff.cooldown.running) {
+        // prioritize attack, or teleport to attack
+        if (can_atk_1) {
+            if (enemy.pos.dist(self.pos) <= attack_1.kind.spell_cast.spell.targeting_data.max_range and room.tilemap.isLOSBetweenThicc(self.pos, enemy.pos, 10)) {
                 return .{ .action = .{
-                    .slot = .spell_cast_self_buff_1,
-                    .params = .{ .target_kind = .self, .thing = self.id },
+                    .slot = .spell_cast_thing_attack_1,
+                    .params = .{ .target_kind = .pos, .pos = enemy.pos },
+                } };
+            } else if (can_tp) {
+                const rand_dir = V2f.right.rotRadians(utl.tau * room.rng.random().float(f32));
+                const pos = enemy.pos.add(rand_dir.scale(self.coll_radius + enemy.coll_radius + 150));
+                return .{ .action = .{
+                    .slot = .spell_cast_teleport_self,
+                    .params = .{ .target_kind = .pos, .pos = pos },
                 } };
             }
         }
-        if (false) {
-            const summon = &controller.actions.getPtr(.spell_cast_summon_1).*.?;
-            // TODO track summons' ids?
-            if (!summon.cooldown.running and room.enemies_alive.len < 10) {
-                const dir = (if (nearest_enemy) |e| e.pos.sub(self.pos) else self.pos.neg()).normalizedOrZero();
-                const spawn_pos = self.pos.add(dir.scale(self.coll_radius * 2));
-                const params = Action.Params{ .target_kind = .pos, .pos = spawn_pos };
-                return .{ .action = .{
-                    .slot = .spell_cast_summon_1,
-                    .params = params,
-                } };
-            }
-            // otherwise fleee! (or idle)
-            if (nearest_enemy) |target| {
-                if (!controller.flee_cooldown.running) {
-                    if (target.pos.dist(self.pos) <= controller.flee_range) {
-                        return .{
-                            .flee = .{
-                                .min_dist = 50,
-                                .max_dist = controller.flee_range,
-                                .target_id = target.id,
-                                .at_least_secs = core.fups_to_secsf(self_buff.cooldown.num_ticks),
-                            },
-                        };
-                    }
-                }
-            }
+
+        // then protec
+        if (can_shield) {
+            return .{ .action = .{
+                .slot = .spell_cast_self_buff_1,
+                .params = .{ .target_kind = .self, .thing = self.id },
+            } };
         }
+
+        // otherwise fleee!
+        if (can_tp) {
+            if (getFleePos(room, self.pos, self.pos, 50, 300, self.pathing_layer)) |maybe_pos| {
+                if (maybe_pos) |flee_pos| {
+                    return .{ .action = .{
+                        .slot = .spell_cast_teleport_self,
+                        .params = .{ .target_kind = .pos, .pos = flee_pos },
+                    } };
+                }
+            } else |_| {}
+        }
+
         return .{ .idle = .{} };
     }
 };

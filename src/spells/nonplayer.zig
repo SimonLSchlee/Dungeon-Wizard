@@ -108,4 +108,25 @@ pub const spells = [_]type{
             _ = try room.queueSpawnThing(&cres, caster.pos.add(ccw.scale(offset)));
         }
     },
+    struct {
+        pub const title = "Teleport Self";
+        pub const enum_name = "teleport_self";
+        pub const proto = Spell.makeProto(
+            std.meta.stringToEnum(Spell.Kind, enum_name).?,
+            .{
+                .cast_time = .slow,
+                .obtainableness = Spell.Obtainableness.Mask.initEmpty(),
+                .targeting_data = .{
+                    .kind = .pos,
+                },
+            },
+        );
+        pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
+            params.validate(.pos, caster);
+            _ = self;
+            if (try room.tilemap.getClosestPathablePos(caster.pathing_layer, null, params.pos, caster.coll_radius)) |pos| {
+                caster.pos = pos;
+            }
+        }
+    },
 };
