@@ -22,6 +22,7 @@ const Thing = @import("../Thing.zig");
 const TileMap = @import("../TileMap.zig");
 const StatusEffect = @import("../StatusEffect.zig");
 const icon_text = @import("../icon_text.zig");
+const Data = @import("../Data.zig");
 
 const Spell = @import("../Spell.zig");
 const TargetKind = Spell.TargetKind;
@@ -50,6 +51,10 @@ pub const proto = Spell.makeProto(
     },
 );
 
+const SoundRef = struct {
+    var chime = Data.Ref(Data.Sound).init("creep-chime");
+};
+
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
     params.validate(.pos, caster);
     const impling = self.kind.impling;
@@ -57,6 +62,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     const target_pos = params.pos;
     const spawner = Thing.SpawnerController.prototypeSummon(.impling);
     _ = try room.queueSpawnThing(&spawner, target_pos);
+    _ = App.get().sfx_player.playSound(&SoundRef.chime, .{});
 }
 
 pub const description =
