@@ -1256,7 +1256,13 @@ pub const ManaPickupController = struct {
 };
 
 pub const SpawnerController = struct {
+    const SoundRef = struct {
+        var loop = Data.Ref(Data.Sound).init("spawning-loop");
+        var activate = Data.Ref(Data.Sound).init("activate");
+    };
+
     timer: utl.TickCounter = utl.TickCounter.init(1 * core.fups_per_sec / 2),
+    sound_fade_timer: utl.TickCounter = utl.TickCounter.init(1 * core.fups_per_sec),
     state: enum {
         fade_in_circle,
         fade_in_creature,
@@ -1282,16 +1288,22 @@ pub const SpawnerController = struct {
                     proto.is_summon = self.is_summon;
                     _ = try room.queueSpawnThing(&proto, self.pos);
                     spawner.state = .fade_out_circle;
+                    _ = App.get().sfx_player.playSound(&SoundRef.activate, .{ .volume = 0.5 });
                 }
             },
             .fade_out_circle => {
                 self.renderer.spawner.sprite_tint = .blank;
                 self.renderer.spawner.base_circle_color = Colorf.white.fade(1 - spawner.timer.remapTo0_1());
+                _ = spawner.sound_fade_timer.tick(false);
                 if (spawner.timer.tick(false)) {
                     self.deferFree(room);
+                    self.sound_player.stop();
+                    return;
                 }
             },
         }
+        const f = 1 - spawner.sound_fade_timer.remapTo0_1();
+        self.sound_player.play(&SoundRef.loop, .{ .loop = true, .volume = 0.3 * f });
     }
 
     pub fn prototype(creature_kind: CreatureKind) Thing {
