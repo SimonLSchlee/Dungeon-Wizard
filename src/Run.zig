@@ -175,6 +175,7 @@ ui_clicked: bool = false,
 ui_hovered: bool = false,
 exit_to_menu: bool = false,
 deck_ui: struct {
+    debug_select: bool = false,
     hover: DeckHover = .{},
     rect: geom.Rectf = .{},
     scroll_y: f32 = 0,
@@ -1200,6 +1201,7 @@ pub fn update(self: *Run) Error!void {
                     self.deck_ui.hover = .{};
                     self.deck_ui.scroll_y = 0;
                     self.screen = .deck;
+                    self.deck_ui.debug_select = false;
                 }
             }
             switch (self.screen) {
@@ -1209,7 +1211,21 @@ pub fn update(self: *Run) Error!void {
                 .dead => try self.deadUpdate(),
                 .win => try self.winUpdate(),
                 .deck => {
-                    _ = try self.deckUI(self.deck.constSlice(), &self.deck_ui.hover, &self.deck_ui.scroll_y);
+                    if (debug.enable_debug_controls and plat.input_buffer.keyIsJustPressed(.m)) {
+                        self.deck_ui.debug_select = !self.deck_ui.debug_select;
+                    }
+                    if (self.deck_ui.debug_select) {
+                        if (try self.deckUI(&Spell.all_spells, &self.deck_ui.hover, &self.deck_ui.scroll_y)) |interaction| {
+                            if (interaction.state == .clicked) {
+                                self.ui_slots.debug_spell.spell = Spell.all_spells[interaction.idx];
+                                self.ui_slots.debug_spell.spell.?.mana_cost = Spell.ManaCost.num(0);
+                                self.ui_slots.selectAction(.{ .action = .{ .kind = .spell } }, .left_click);
+                                self.screen = .room;
+                            }
+                        }
+                    } else {
+                        _ = try self.deckUI(self.deck.constSlice(), &self.deck_ui.hover, &self.deck_ui.scroll_y);
+                    }
                 },
             }
         },

@@ -79,7 +79,7 @@ pub const SpellTypes = blk: {
 
 pub const Kind = utl.EnumFromTypes(&SpellTypes, "enum_name");
 pub const KindData = utl.TaggedUnionFromTypes(&SpellTypes, "enum_name", Kind);
-const all_spells = blk: {
+pub const all_spells = blk: {
     const kind_info = @typeInfo(Kind).@"enum";
     var ret: [kind_info.fields.len]Spell = undefined;
     for (kind_info.fields, 0..) |f, i| {
