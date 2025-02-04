@@ -665,7 +665,7 @@ pub fn deckUI(self: *Run, deck: []const Spell, hover: *DeckHover, scroll_y: *f32
     if (hovered_idx) |hidx| {
         if (hover.long_hover.is) {
             // convert back to screen coords
-            const tooltip_pos = hovered_rect.pos.add(v2f(hovered_rect.dims.x, 0)).add(self.deck_ui.rect.pos);
+            const tooltip_pos = geom.clampPointToRect(hovered_rect.pos.add(v2f(hovered_rect.dims.x, 0)).add(self.deck_ui.rect.pos), self.deck_ui.rect);
             try deck[hidx].unqRenderTooltip(&self.tooltip_ui.commands, tooltip_pos, ui_scaling);
         }
     }
@@ -678,8 +678,29 @@ pub fn deckUI(self: *Run, deck: []const Spell, hover: *DeckHover, scroll_y: *f32
     if (wheel_y != 0) {
         scroll_y.* = scroll_y.* - wheel_y;
     }
+    // draw scroll bar/arrows
+    if (max_scroll_y > 0) {
+        const scrollbar_width = 10 * ui_scaling;
+        const scrollbar_full_rect = geom.Rectf{
+            .pos = self.deck_ui.rect.pos.add(v2f(self.deck_ui.rect.dims.x + 5 * ui_scaling, 0)),
+            .dims = v2f(scrollbar_width, self.deck_ui.rect.dims.y),
+        };
+        const scrollbar_btn_dims = V2f.splat(scrollbar_width);
+        const scrollbar_up_btn_pos = scrollbar_full_rect.pos;
+        const scrollbar_down_btn_pos = scrollbar_full_rect.pos.add(v2f(0, scrollbar_full_rect.dims.y - scrollbar_btn_dims.y));
+        self.imm_ui.commands.appendAssumeCapacity(.{ .rect = .{
+            .pos = scrollbar_full_rect.pos,
+            .dims = scrollbar_full_rect.dims,
+            .opt = .{ .fill_color = .gray },
+        } });
+        if (menuUI.scrollButton(&self.imm_ui.commands, scrollbar_up_btn_pos, scrollbar_btn_dims, .up, ui_scaling)) {
+            scroll_y.* = scroll_y.* - 5;
+        }
+        if (menuUI.scrollButton(&self.imm_ui.commands, scrollbar_down_btn_pos, scrollbar_btn_dims, .down, ui_scaling)) {
+            scroll_y.* = scroll_y.* + 5;
+        }
+    }
     scroll_y.* = u.clampf(scroll_y.*, 0, max_scroll_y);
-    // TODO draw scroll bar/arrows
 
     // anchor button to bottom left of modal
     const btn_dims = v2f(60, 25).scale(ui_scaling);
@@ -1265,7 +1286,8 @@ pub fn render(self: *Run, ui_render_texture: Platform.RenderTexture2D, game_rend
             .round_to_pixel = true,
             .flip_y = true,
         });
-        plat.rectf(self.deck_ui.rect.pos, self.deck_ui.rect.dims, .{ .fill_color = null, .outline = .{ .color = .red } });
+        // debug rect
+        //plat.rectf(self.deck_ui.rect.pos, self.deck_ui.rect.dims, .{ .fill_color = null, .outline = .{ .color = .red } });
     }
     try ImmUI.render(&self.tooltip_ui.commands);
     switch (self.load_state) {

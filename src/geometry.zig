@@ -221,3 +221,10 @@ test "lineSegsIntersect() - colinear opp direction, t1 < 0" {
     const expected: LineSegIntersection = .{ .colinear = null };
     try std.testing.expectEqual(expected, lineSegsIntersect(p, r, q, s));
 }
+
+pub fn clampPointToRect(point: V2f, rect: Rectf) V2f {
+    return v2f(
+        utl.clampf(point.x, rect.pos.x, rect.pos.x + rect.dims.x),
+        utl.clampf(point.y, rect.pos.y, rect.pos.y + rect.dims.y),
+    );
+}

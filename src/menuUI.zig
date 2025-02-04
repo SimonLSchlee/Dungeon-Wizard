@@ -252,3 +252,40 @@ pub fn textButtonEx(cmd_buf: *ImmUI.CmdBuf, pos: V2f, str: []const u8, dims: V2f
     }) catch @panic("Fail to append text cmd");
     return clicked;
 }
+
+pub fn scrollButton(cmd_buf: *ImmUI.CmdBuf, pos: V2f, dims: V2f, dir: enum { up, down }, scaling: f32) bool {
+    const plat = getPlat();
+    const mouse_pos = plat.getMousePosScreen();
+    const hovered = geom.pointIsInRectf(mouse_pos, .{ .pos = pos, .dims = dims });
+    const clicked = hovered and plat.input_buffer.mouseBtnIsDown(.left);
+    cmd_buf.append(.{
+        .rect = .{
+            .pos = pos,
+            .dims = dims,
+            .opt = .{
+                .fill_color = .orange,
+                .outline = if (hovered) .{ .color = .red, .thickness = 2 * scaling } else null,
+            },
+        },
+    }) catch @panic("Fail to append rect cmd");
+    const points = blk: {
+        const center = pos.add(dims.scale(0.5));
+        const dist = @min(dims.x, dims.y) * 0.33;
+        const diag_dist = 0.707 * dist;
+        break :blk if (dir == .down) .{
+            center.add(v2f(diag_dist, -diag_dist)),
+            center.add(v2f(-diag_dist, -diag_dist)),
+            center.add(v2f(0, diag_dist)),
+        } else .{
+            center.add(v2f(-diag_dist, diag_dist)),
+            center.add(v2f(diag_dist, diag_dist)),
+            center.add(v2f(0, -diag_dist)),
+        };
+    };
+    cmd_buf.appendAssumeCapacity(.{ .triangle = .{
+        .points = points,
+        .opt = .{ .fill_color = .black },
+    } });
+
+    return clicked;
+}

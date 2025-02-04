@@ -79,6 +79,14 @@ pub const Command = union(enum) {
             plat.circlef(self.pos, self.radius, self.opt);
         }
     },
+    triangle: struct {
+        points: [3]V2f,
+        opt: draw.PolyOpt,
+        pub fn render(self: *const @This()) Error!void {
+            const plat = getPlat();
+            plat.trianglef(self.points, self.opt);
+        }
+    },
     label: struct {
         pos: V2f,
         text: LabelString,
