@@ -60,7 +60,7 @@ pub inline fn as(comptime T: type, from: anytype) T {
                 else => @compileError(@typeName(@TypeOf(from)) ++ " can't be converted to " ++ @typeName(T)),
             }
         },
-        .int => {
+        .int, .comptime_int => {
             switch (@typeInfo(T)) {
                 .@"enum" => return @enumFromInt(from),
                 .int => return @intCast(from),
@@ -68,7 +68,7 @@ pub inline fn as(comptime T: type, from: anytype) T {
                 else => @compileError(@typeName(@TypeOf(from)) ++ " can't be converted to " ++ @typeName(T)),
             }
         },
-        .float => {
+        .float, .comptime_float => {
             switch (@typeInfo(T)) {
                 .float => return @floatCast(from),
                 .int => return @intFromFloat(from),
@@ -319,4 +319,14 @@ pub fn enumValueList(T: type) []const T {
     }
     const const_list = comptime list;
     return &const_list;
+}
+
+pub inline fn divAsFloat(FloatType: type, a: anytype, b: anytype) FloatType {
+    inline for (&[_]type{ @TypeOf(a), @TypeOf(b) }) |T| {
+        switch (@typeInfo(T)) {
+            .comptime_int, .comptime_float, .int, .float => {},
+            else => @compileError("a and b must be float or int type\n"),
+        }
+    }
+    return as(FloatType, a) / as(FloatType, b);
 }

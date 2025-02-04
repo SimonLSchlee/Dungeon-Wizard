@@ -99,7 +99,7 @@ pub const Command = union(enum) {
     },
 };
 
-pub const CmdBuf = std.BoundedArray(Command, 256);
+pub const CmdBuf = std.BoundedArray(Command, 512);
 
 pub fn render(cmd_buf: *const CmdBuf) Error!void {
     for (cmd_buf.slice()) |*command| {

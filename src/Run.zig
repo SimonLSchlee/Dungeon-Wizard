@@ -131,6 +131,15 @@ pub const Place = struct {
     room: RoomLoadParams,
 };
 
+pub const Screen = enum {
+    room,
+    reward,
+    shop,
+    dead,
+    win,
+    deck,
+};
+
 gold: i32 = 0,
 room: Room = undefined,
 // debug room history states
@@ -141,13 +150,7 @@ room_buf_size: usize = 0,
 
 reward_ui: ?Reward.UI = null,
 shop: ?Shop = null,
-screen: enum {
-    room,
-    reward,
-    shop,
-    dead,
-    win,
-} = .room,
+screen: Screen = .room,
 seed: u64,
 rng: std.Random.DefaultPrng = undefined,
 places: Place.Array = .{},
@@ -171,6 +174,14 @@ tooltip_ui: struct {
 ui_clicked: bool = false,
 ui_hovered: bool = false,
 exit_to_menu: bool = false,
+deck_ui: struct {
+    hover: DeckHover = .{},
+    rect: geom.Rectf = .{},
+    scroll_y: f32 = 0,
+    texture: Platform.RenderTexture2D = undefined,
+    commands: ImmUI.CmdBuf = .{},
+} = .{},
+prev_screen: Screen = undefined,
 
 pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
     const plat = getPlat();
@@ -181,6 +192,9 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
         .deck = makeStarterDeck(false),
         .mode = mode,
     };
+    const deck_dims = getDeckTextureDims();
+    run.deck_ui.rect.dims = deck_dims;
+    run.deck_ui.texture = plat.createRenderTexture("deck", deck_dims.toV2i());
 
     if (!config.is_release) {
         Log.info("Allocating debug room buf: {}KiB\n", .{(@sizeOf(Room) * 60) / 1024});
@@ -307,10 +321,12 @@ pub fn initRandom(run: *Run, mode: Mode) Error!*Run {
 }
 
 pub fn deinit(self: *Run) void {
+    const plat = getPlat();
     self.room.deinit();
     if (!config.is_release) {
-        getPlat().heap.free(self.room_buf);
+        plat.heap.free(self.room_buf);
     }
+    plat.destroyRenderTexture(self.deck_ui.texture);
 }
 
 pub fn reset(self: *Run) Error!void {
@@ -440,8 +456,13 @@ fn loadNextPlace(self: *Run) void {
 }
 
 pub fn resolutionChanged(self: *Run) void {
+    const plat = getPlat();
     self.room.resolutionChanged();
     self.ui_slots.reflowRects();
+    plat.destroyRenderTexture(self.deck_ui.texture);
+    const deck_dims = getDeckTextureDims();
+    self.deck_ui.rect.dims = deck_dims;
+    self.deck_ui.texture = plat.createRenderTexture("deck", deck_dims.toV2i());
 }
 
 pub fn roomUpdate(self: *Run) Error!void {
@@ -528,6 +549,149 @@ pub fn roomUpdate(self: *Run) Error!void {
     if (room.paused) {
         // TODO update game pause ui
     }
+}
+
+const DeckHover = struct {
+    idx: ?usize = null,
+    long_hover: menuUI.LongHover = .{},
+};
+const DeckInteraction = struct {
+    state: enum { hovered, clicked },
+    idx: usize,
+};
+
+pub fn getDeckTextureDims() V2f {
+    const plat = getPlat();
+    const ui_scaling: f32 = plat.ui_scaling;
+    const spell_dims = Spell.card_dims.scale(ui_scaling);
+    const spells_per_row = 4;
+    const spell_spacing = v2f(10, 10).scale(ui_scaling);
+    const row_width = (spell_dims.x + spell_spacing.x) * spells_per_row - spell_spacing.x;
+    const dims = v2f(row_width, plat.screen_dims_f.y * 0.75).round();
+    return dims;
+}
+
+pub fn deckUI(self: *Run, deck: []const Spell, hover: *DeckHover, scroll_y: *f32) Error!?DeckInteraction {
+    const plat = getPlat();
+    const data = App.getData();
+    const ui_scaling: f32 = plat.ui_scaling;
+    var interaction: ?DeckInteraction = null;
+
+    // modal background
+    const modal_dims = v2f(self.deck_ui.rect.dims.x + 20 * ui_scaling, plat.screen_dims_f.y * 0.9);
+    const modal_topleft = plat.screen_dims_f.sub(modal_dims).scale(0.5);
+
+    self.imm_ui.commands.appendAssumeCapacity(.{ .rect = .{
+        .pos = modal_topleft,
+        .dims = modal_dims,
+        .opt = .{
+            .fill_color = Colorf.rgba(0.1, 0.1, 0.1, 0.8),
+            .outline = .{ .color = Colorf.rgba(0.1, 0.1, 0.2, 0.8), .thickness = 4 },
+        },
+    } });
+
+    const modal_center_x = modal_topleft.x + modal_dims.x * 0.5;
+
+    // title
+    const title_font = data.fonts.get(.pixeloid);
+    const title_center = v2f(modal_center_x, modal_topleft.y + 20 * ui_scaling);
+    self.imm_ui.commands.appendAssumeCapacity(.{ .label = .{
+        .pos = title_center,
+        .text = ImmUI.initLabel("Spells"),
+        .opt = .{
+            .size = title_font.base_size * u.as(u32, ui_scaling + 1),
+            .font = title_font,
+            .smoothing = .none,
+            .color = .white,
+            .center = true,
+        },
+    } });
+    self.deck_ui.rect.pos = v2f(
+        modal_center_x - self.deck_ui.rect.dims.x * 0.5,
+        title_center.y + 20 * ui_scaling,
+    );
+
+    const mouse_pos = plat.getMousePosScreen();
+    const deck_mouse_pos = mouse_pos.sub(self.deck_ui.rect.pos);
+
+    // spells, rendered to deck texture
+    const spell_dims = Spell.card_dims.scale(ui_scaling);
+    const spells_per_row = 4;
+    const spells_spacing_y_unscaled = 10;
+    const spells_top_y_padding_unscaled = 5;
+    const spell_spacing = v2f(10, spells_spacing_y_unscaled).scale(ui_scaling);
+    const spells_topleft_pos: V2f = v2f(0, spells_top_y_padding_unscaled * ui_scaling - scroll_y.* * ui_scaling);
+    const mouse_in_deck_rect = geom.pointIsInRectf(mouse_pos, self.deck_ui.rect);
+    var curr_pos: V2f = spells_topleft_pos;
+    var col: usize = 0;
+    var hovered_idx: ?usize = null;
+    var hovered_rect: geom.Rectf = .{};
+    for (0..deck.len) |idx| {
+        const spell = &deck[idx];
+        var rect = geom.Rectf{
+            .pos = curr_pos,
+            .dims = spell_dims,
+        };
+        const hovered = mouse_in_deck_rect and geom.pointIsInRectf(deck_mouse_pos, rect);
+        const clicked = hovered and plat.input_buffer.mouseBtnIsJustPressed(.left);
+        if (hovered) {
+            rect.pos.y -= 4;
+            hovered_idx = idx;
+            hovered_rect = rect;
+            interaction = .{
+                .state = .hovered,
+                .idx = idx,
+            };
+        }
+        if (clicked) {
+            interaction = .{
+                .state = .clicked,
+                .idx = idx,
+            };
+        }
+        _ = spell.unqRenderCard(&self.deck_ui.commands, rect.pos, null, ui_scaling);
+
+        col += 1;
+        if (col == spells_per_row) {
+            curr_pos.x = spells_topleft_pos.x;
+            curr_pos.y += spell_dims.y + spell_spacing.y;
+            col = 0;
+        } else {
+            curr_pos.x += spell_dims.x + spell_spacing.x;
+        }
+    }
+    _ = hover.long_hover.update(hovered_idx != null);
+    hover.idx = hovered_idx;
+    if (hovered_idx) |hidx| {
+        if (hover.long_hover.is) {
+            // convert back to screen coords
+            const tooltip_pos = hovered_rect.pos.add(v2f(hovered_rect.dims.x, 0)).add(self.deck_ui.rect.pos);
+            try deck[hidx].unqRenderTooltip(&self.tooltip_ui.commands, tooltip_pos, ui_scaling);
+        }
+    }
+
+    // scrolling
+    const row_height = Spell.card_dims.y + spells_spacing_y_unscaled;
+    const total_height: f32 = spells_top_y_padding_unscaled + row_height * @ceil(u.divAsFloat(f32, deck.len, spells_per_row));
+    const max_scroll_y = @max(total_height - self.deck_ui.rect.dims.y / ui_scaling, 0);
+    const wheel_y = plat.mouseWheelY();
+    if (wheel_y != 0) {
+        scroll_y.* = scroll_y.* - wheel_y;
+    }
+    scroll_y.* = u.clampf(scroll_y.*, 0, max_scroll_y);
+    // TODO draw scroll bar/arrows
+
+    // anchor button to bottom left of modal
+    const btn_dims = v2f(60, 25).scale(ui_scaling);
+    const btn_topleft = v2f(
+        modal_topleft.x + modal_dims.x + 10 * ui_scaling,
+        modal_topleft.y + modal_dims.y - 7 * ui_scaling - btn_dims.y,
+    );
+    if (menuUI.textButton(&self.imm_ui.commands, btn_topleft, "Close", btn_dims, ui_scaling)) {
+        self.screen = self.prev_screen;
+    }
+
+    return interaction;
 }
 
 pub fn rewardSpellChoiceUI(self: *Run, idx: usize) Error!void {
@@ -955,6 +1119,7 @@ pub fn update(self: *Run) Error!void {
 
     self.imm_ui.commands.clear();
     self.tooltip_ui.commands.clear();
+    self.deck_ui.commands.clear();
 
     if (debug.enable_debug_controls) {
         if (plat.input_buffer.keyIsJustPressed(.f3)) {
@@ -1005,12 +1170,27 @@ pub fn update(self: *Run) Error!void {
     }
 
     switch (self.load_state) {
-        .none => switch (self.screen) {
-            .room => try self.roomUpdate(),
-            .reward => try self.rewardUpdate(),
-            .shop => try self.shopUpdate(),
-            .dead => try self.deadUpdate(),
-            .win => try self.winUpdate(),
+        .none => {
+            if (plat.input_buffer.keyIsJustPressed(.n)) {
+                if (self.screen == .deck) {
+                    self.screen = self.prev_screen;
+                } else {
+                    self.prev_screen = self.screen;
+                    self.deck_ui.hover = .{};
+                    self.deck_ui.scroll_y = 0;
+                    self.screen = .deck;
+                }
+            }
+            switch (self.screen) {
+                .room => try self.roomUpdate(),
+                .reward => try self.rewardUpdate(),
+                .shop => try self.shopUpdate(),
+                .dead => try self.deadUpdate(),
+                .win => try self.winUpdate(),
+                .deck => {
+                    _ = try self.deckUI(self.deck.constSlice(), &self.deck_ui.hover, &self.deck_ui.scroll_y);
+                },
+            }
         },
         .fade_in => {
             self.ui_slots.unselectAction(); // effectively disables UI while fading
@@ -1065,11 +1245,28 @@ pub fn render(self: *Run, ui_render_texture: Platform.RenderTexture2D, game_rend
         try self.room.render(ui_render_texture, game_render_texture);
     }
 
+    // deck
+    if (self.screen == .deck) {
+        plat.startRenderToTexture(self.deck_ui.texture);
+        plat.setBlend(.render_tex_alpha);
+        plat.clear(.blank);
+        try ImmUI.render(&self.deck_ui.commands);
+        plat.endRenderToTexture();
+    }
+
     // ui
     plat.startRenderToTexture(ui_render_texture);
     plat.setBlend(.render_tex_alpha);
 
     try ImmUI.render(&self.imm_ui.commands);
+    if (self.screen == .deck) {
+        // render deck texture in the right position
+        plat.texturef(self.deck_ui.rect.pos, self.deck_ui.texture.texture, .{
+            .round_to_pixel = true,
+            .flip_y = true,
+        });
+        plat.rectf(self.deck_ui.rect.pos, self.deck_ui.rect.dims, .{ .fill_color = null, .outline = .{ .color = .red } });
+    }
     try ImmUI.render(&self.tooltip_ui.commands);
     switch (self.load_state) {
         .none => {},

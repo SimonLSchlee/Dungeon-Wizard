@@ -649,7 +649,7 @@ pub const Slots = struct {
         return btn.clicked;
     }
 
-    pub fn unqItemRunUISlot(self: *Slots, slot: *ItemSlot, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf) Error!?RunItemAction {
+    pub fn unqItemRunUISlot(self: *Slots, slot: *ItemSlot, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, interact: bool) Error!?RunItemAction {
         const plat = App.getPlat();
         const ui_scaling: f32 = plat.ui_scaling;
         const ui_slot = &slot.ui_slot;
@@ -667,11 +667,13 @@ pub const Slots = struct {
             const tooltip_pos = slot.ui_slot.rect.pos.add(v2f(slot.ui_slot.rect.dims.x, 0));
 
             try item.unqRenderIcon(cmd_buf, slot.ui_slot.rect.pos, ui_scaling);
-            if (try unqTossBtn(&slot.toss_btn, cmd_buf, tooltip_cmd_buf)) {
-                ret = .toss;
-            }
-            if (tooltip_cmd_buf.len == 0 and ui_slot.long_hover.is) {
-                try item.unqRenderTooltip(tooltip_cmd_buf, tooltip_pos, tooltip_scaling);
+            if (interact) {
+                if (try unqTossBtn(&slot.toss_btn, cmd_buf, tooltip_cmd_buf)) {
+                    ret = .toss;
+                }
+                if (tooltip_cmd_buf.len == 0 and ui_slot.long_hover.is) {
+                    try item.unqRenderTooltip(tooltip_cmd_buf, tooltip_pos, tooltip_scaling);
+                }
             }
         }
         return ret;
@@ -1005,18 +1007,20 @@ pub const Slots = struct {
         run.ui_clicked = run.ui_clicked or clicked;
 
         for (self.items.slice()) |*slot| {
-            if (run.screen == .room) {
-                if (try self.unqItemRoomUISlot(&slot.ui_slot, cmd_buf, tooltip_cmd_buf, caster, slot.item)) |cast_method| {
+            switch (run.screen) {
+                .room => if (try self.unqItemRoomUISlot(&slot.ui_slot, cmd_buf, tooltip_cmd_buf, caster, slot.item)) |cast_method| {
                     self.selectAction(slot.ui_slot.command, cast_method);
-                }
-            } else {
-                if (try self.unqItemRunUISlot(slot, cmd_buf, tooltip_cmd_buf)) |run_item_action| {
+                },
+                .reward, .shop => if (try self.unqItemRunUISlot(slot, cmd_buf, tooltip_cmd_buf, true)) |run_item_action| {
                     switch (run_item_action) {
                         .toss => {
                             slot.item = null;
                         },
                     }
-                }
+                },
+                else => {
+                    _ = try self.unqItemRunUISlot(slot, cmd_buf, tooltip_cmd_buf, false);
+                },
             }
         }
         try self.updateHPandMana(cmd_buf, tooltip_cmd_buf, caster);
