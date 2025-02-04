@@ -227,6 +227,8 @@ pub const Slots = struct {
     spells: std.BoundedArray(SpellSlot, max_spell_slots) = .{},
     items: std.BoundedArray(ItemSlot, max_item_slots) = .{},
     discard_slot: ?UISlot = null,
+    debug_spell: SpellSlot = .{ .ui_slot = .{ .command = .{ .action = .{ .kind = .spell } } } },
+
     action_selected: ?struct {
         command: Options.Controls.InputBinding.Command,
         cast_method: Options.Controls.CastMethod = .left_click,
@@ -417,15 +419,16 @@ pub const Slots = struct {
         if (self.action_selected) |a| {
             if (a.select_state != select_state) return null;
             if (std.meta.activeTag(a.command) != .action) return null;
-            const slot_idx = a.command.action.slot_idx orelse 0;
+
             switch (a.command.action.kind) {
                 .spell => {
-                    const slot = &self.spells.buffer[slot_idx];
+                    const slot = if (a.command.action.slot_idx) |slot_idx| &self.spells.buffer[slot_idx] else &self.debug_spell;
                     if (slot.spell) |spell| {
                         return .{ .spell = spell };
                     }
                 },
                 .item => {
+                    const slot_idx = a.command.action.slot_idx orelse 0;
                     const slot = &self.items.buffer[slot_idx];
                     if (slot.item) |item| {
                         return .{ .item = item };
@@ -443,10 +446,13 @@ pub const Slots = struct {
         if (self.action_selected) |a| {
             if (a.select_state != .selected) return null;
             if (std.meta.activeTag(a.command) != .action) return null;
-            const slot_idx = a.command.action.slot_idx orelse 0;
+
             const ui_slot: *const UISlot = switch (a.command.action.kind) {
-                .spell => &self.spells.buffer[slot_idx].ui_slot,
-                .item => &self.items.buffer[slot_idx].ui_slot,
+                .spell => if (a.command.action.slot_idx) |slot_idx| &self.spells.buffer[slot_idx].ui_slot else &self.debug_spell.ui_slot,
+                .item => blk: {
+                    const slot_idx = a.command.action.slot_idx orelse 0;
+                    break :blk &self.items.buffer[slot_idx].ui_slot;
+                },
                 .discard => if (self.discard_slot) |*d| d else return null,
             };
             const plat = App.getPlat();
@@ -501,37 +507,42 @@ pub const Slots = struct {
         if (maybe_action == null) return null;
         const action = maybe_action.?;
         const params = self.action_selected.?.select_state.buffered;
-        const slot_idx = self.action_selected.?.command.action.slot_idx orelse 0;
 
         switch (action) {
             .spell => |spell| {
-                const slot = &self.spells.buffer[slot_idx];
-                slot.spell = null;
+                const maybe_slot_idx = self.action_selected.?.command.action.slot_idx;
+                if (maybe_slot_idx) |slot_idx| {
+                    const slot = &self.spells.buffer[slot_idx];
+                    slot.spell = null;
 
-                if (spell.mislay) {
-                    room.mislaySpell(spell);
-                } else {
-                    room.discardSpell(spell);
-                }
-                if (caster.mana) |*mana| {
-                    if (spell.mana_cost.getActualCost(caster)) |cost| {
-                        assert(mana.curr >= cost);
-                        mana.curr -= cost;
+                    if (spell.mislay) {
+                        room.mislaySpell(spell);
+                    } else {
+                        room.discardSpell(spell);
                     }
-                }
-                if (caster.statuses.get(.quickdraw).stacks > 0) {
-                    slot.ui_slot.cooldown_timer = utl.TickCounter.init(0);
-                    caster.statuses.getPtr(.quickdraw).addStacks(caster, -1);
-                } else if (spell.draw_immediate) {
-                    slot.ui_slot.cooldown_timer = utl.TickCounter.init(0);
-                } else if (room.init_params.mode == .mandy_3_mana) {
-                    slot.ui_slot.cooldown_timer = null;
-                } else {
-                    // otherwise normal cooldown
-                    slot.ui_slot.cooldown_timer = utl.TickCounter.init(spell.getSlotCooldownTicks());
+                    if (caster.mana) |*mana| {
+                        if (spell.mana_cost.getActualCost(caster)) |cost| {
+                            assert(mana.curr >= cost);
+                            mana.curr -= cost;
+                        }
+                    }
+                    if (caster.statuses.get(.quickdraw).stacks > 0) {
+                        slot.ui_slot.cooldown_timer = utl.TickCounter.init(0);
+                        caster.statuses.getPtr(.quickdraw).addStacks(caster, -1);
+                    } else if (spell.draw_immediate) {
+                        slot.ui_slot.cooldown_timer = utl.TickCounter.init(0);
+                    } else if (room.init_params.mode == .mandy_3_mana) {
+                        slot.ui_slot.cooldown_timer = null;
+                    } else {
+                        // otherwise normal cooldown
+                        slot.ui_slot.cooldown_timer = utl.TickCounter.init(spell.getSlotCooldownTicks());
+                    }
+                } else { // debug!
+                    self.debug_spell.spell = null;
                 }
             },
             .item => {
+                const slot_idx = self.action_selected.?.command.action.slot_idx orelse 0;
                 self.items.buffer[slot_idx].item = null;
             },
             else => {},
