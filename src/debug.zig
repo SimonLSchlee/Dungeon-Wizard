@@ -32,3 +32,4 @@ pub const show_exit_door = false;
 // stats n whatnot
 pub const show_num_enemies = false;
 pub const show_highest_num_things_in_room = false;
+pub const show_ups_fps = false;

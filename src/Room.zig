@@ -814,10 +814,10 @@ pub fn render(self: *const Room, ui_render_texture: Platform.RenderTexture2D, ga
         try plat.textf(p, "{s}", .{txt}, text_opt);
     }
     if (debug.show_num_enemies) {
-        try plat.textf(v2f(10, 10), "enemies_alive.len: {}. Difficulty left: {d:.1}", .{ self.enemies_alive.len, self.getCurrTotalDifficulty() }, .{ .color = .white });
+        plat.onScreenLog("enemies_alive.len: {}. Difficulty left: {d:.1}", .{ self.enemies_alive.len, self.getCurrTotalDifficulty() });
     }
     if (debug.show_highest_num_things_in_room) {
-        try plat.textf(v2f(10, 30), "highest_num_things: {} / {}", .{ self.highest_num_things, max_things_in_room }, .{ .color = .white });
+        plat.onScreenLog("highest_num_things: {} / {}", .{ self.highest_num_things, max_things_in_room });
     }
     plat.endRenderToTexture();
 }

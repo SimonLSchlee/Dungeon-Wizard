@@ -54,7 +54,10 @@ pub const RenderTexture2D = struct {
     r_render_tex: r.RenderTexture2D,
 };
 
+const OnScreenLogLine = u.BoundedString(256);
+
 log: Log = undefined,
+onscreen_log_buf_lines: std.BoundedArray(OnScreenLogLine, 32) = .{},
 stack_base: usize = 0,
 should_exit: bool = false,
 app_dll: ?std.DynLib = null,
@@ -315,6 +318,18 @@ fn loadStaticApp(self: *Platform) void {
     self.appReload = App.staticAppReload;
 }
 
+fn drawOnScreenLog(self: *Platform) void {
+    var y: f32 = 10;
+    for (self.onscreen_log_buf_lines.constSlice()) |line| {
+        const pos = v2f(10, y);
+        const dims = self.measureText(line.constSlice(), .{}) catch continue;
+        self.rectf(pos, dims, .{ .fill_color = Colorf.black.fade(0.5) });
+        self.textf(pos, "{s}", .{line.constSlice()}, .{ .color = .white }) catch {};
+        y += 20;
+    }
+    self.onscreen_log_buf_lines.clear();
+}
+
 pub fn run(self: *Platform) Error!void {
     @setRuntimeSafety(core.rt_safe_blocks);
 
@@ -333,6 +348,11 @@ pub fn run(self: *Platform) Error!void {
     const min_sleep_time_ns = 1500000;
     //std.debug.print("refresh rate: {}\n", .{refresh_rate});
     //std.debug.print("ns per refresh: {}\n", .{ns_per_refresh});
+    var tick_count_sec: f32 = 0;
+    var draw_count_sec: f32 = 0;
+    var avg_ups: f32 = 0;
+    var avg_fps: f32 = 0;
+    var sec_time_ns: i64 = 0;
 
     while (!r.WindowShouldClose() and !self.should_exit) {
         if (!config.static_lib and !config.is_release and r.IsKeyPressed(r.KEY_F5)) {
@@ -369,16 +389,33 @@ pub fn run(self: *Platform) Error!void {
             r.PollInputEvents();
             self.tickInputBuffer();
             self.appTick();
+            tick_count_sec += 1;
             self.accumulated_update_ns -= core.fixed_ns_per_update_lower;
             if (self.accumulated_update_ns < core.fixed_ns_per_update_lower - core.fixed_ns_per_update_upper) {
                 self.accumulated_update_ns = 0;
             }
         }
+        if (debug.show_ups_fps) {
+            self.onScreenLog("ups: {d:.3}", .{avg_ups});
+            self.onScreenLog("fps: {d:.3}", .{avg_fps});
+        }
 
         //const start_draw_ns = self.getGameTimeNanosecs();
         r.BeginDrawing();
         self.appRender();
+        self.drawOnScreenLog();
         r.EndDrawing();
+        draw_count_sec += 1;
+
+        sec_time_ns += delta_ns;
+        if (sec_time_ns >= core.ns_per_sec) {
+            const sec_time_secs = core.nsToSecs(sec_time_ns);
+            avg_fps = draw_count_sec / u.as(f32, sec_time_secs);
+            avg_ups = tick_count_sec / u.as(f32, sec_time_secs);
+            sec_time_ns = 0;
+            draw_count_sec = 0;
+            tick_count_sec = 0;
+        }
 
         //const end_draw_ns = self.getGameTimeNanosecs();
         //std.debug.print("update: {d:.5}\n", .{core.nsToSecs(start_draw_ns - curr_time_ns)});
@@ -397,6 +434,11 @@ pub fn run(self: *Platform) Error!void {
             }
         }
     }
+}
+
+pub fn onScreenLog(self: *Platform, comptime fmt: []const u8, args: anytype) void {
+    const s = u.bufPrintLocal(fmt, args) catch return;
+    self.onscreen_log_buf_lines.append(OnScreenLogLine.fromSlice(s) catch return) catch return;
 }
 
 const key_map = std.EnumArray(Key, c_int).init(.{
