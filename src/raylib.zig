@@ -355,7 +355,7 @@ pub fn run(self: *Platform) Error!void {
     var sec_time_ns: i64 = 0;
 
     while (!r.WindowShouldClose() and !self.should_exit) {
-        if (!config.static_lib and !config.is_release and r.IsKeyPressed(r.KEY_F5)) {
+        if (!config.static_lib and !config.is_release and self.input_buffer.keyIsJustPressed(.f5)) {
             self.unloadAppDll();
             try self.recompileAppDll();
             try self.loadAppDll();

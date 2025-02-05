@@ -677,7 +677,7 @@ pub fn deckUI(self: *Run, deck: []const Spell, hover: *DeckHover, scroll_y: *f32
     const max_scroll_y = @max(total_height - self.deck_ui.rect.dims.y / ui_scaling, 0);
     const wheel_y = plat.mouseWheelY();
     if (wheel_y != 0) {
-        scroll_y.* = scroll_y.* - wheel_y;
+        scroll_y.* = scroll_y.* - wheel_y * 1.2;
     }
     // draw scroll bar/arrows
     if (max_scroll_y > 0) {
