@@ -330,7 +330,7 @@ pub const AIDjinn = struct {
                 } };
             } else if (can_tp) {
                 const rand_dir = V2f.right.rotRadians(utl.tau * room.rng.random().float(f32));
-                const pos = enemy.pos.add(rand_dir.scale(self.coll_radius + enemy.coll_radius + 150));
+                const pos = enemy.pos.add(rand_dir.scale(self.coll_radius + enemy.coll_radius + 80));
                 return .{ .action = .{
                     .slot = .spell_cast_teleport_self,
                     .params = .{ .target_kind = .pos, .pos = pos },
