@@ -151,17 +151,41 @@ pub fn djinnProto() Thing {
 }
 
 pub fn djinn_smokeProto() Thing {
-    var ret = creatureProto(.djinn_smoke, .creature, .enemy, .{ .acolyte = .{} }, 80, .big, 26);
+    var ret = creatureProto(.djinn_smoke, .creature, .enemy, .{ .djinn_smoke = .{} }, 80, .big, 26);
     ret.accel_params = .{
         .accel = 0.0047 * TileMap.tile_sz_f,
         .max_speed = 0.0198 * TileMap.tile_sz_f,
     };
+    ret.pathing_layer = .flying;
     ret.controller.ai_actor.flee_range = 70;
     ret.controller.ai_actor.actions.getPtr(.spell_cast_summon_1).* = (.{
         .kind = .{ .spell_cast = .{
             .spell = Spell.getProto(.summon_bat),
         } },
         .cooldown = utl.TickCounter.initStopped(5 * core.fups_per_sec),
+    });
+    ret.controller.ai_actor.actions.getPtr(.melee_attack_1).* = (.{
+        .kind = .{
+            .melee_attack = .{
+                .lunge_accel = .{
+                    .accel = 3,
+                    .max_speed = 3.0,
+                    .friction = 0.01,
+                },
+                .hitbox = .{
+                    .mask = Thing.Faction.opposing_masks.get(.enemy),
+                    .radius = 9,
+                    .rel_pos = V2f.right.scale(20),
+                    .effect = .{ .damage = 9 },
+                    .deactivate_on_update = false,
+                    .deactivate_on_hit = true,
+                },
+                .hit_to_side_force = 2,
+                .range = 90,
+                .LOS_thiccness = ret.coll_radius * 0.5,
+            },
+        },
+        .cooldown = utl.TickCounter.initStopped(140),
     });
     ret.enemy_difficulty = 8;
     ret.is_boss = true;

@@ -362,6 +362,28 @@ pub const AIDjinn = struct {
     }
 };
 
+pub const AIDjinnSmoke = struct {
+    pub fn decide(_: *AIDjinnSmoke, self: *Thing, room: *Room) Decision {
+        const controller = &self.controller.ai_actor;
+        const enemy: *Thing = getNearestOpposingThing(self, room) orelse return .{ .idle = .{} };
+
+        const summon = &controller.actions.getPtr(.spell_cast_summon_1).*.?;
+        const can_summon = !summon.cooldown.running;
+
+        if (can_summon and room.enemies_alive.len < 10) {
+            const dir = enemy.pos.sub(self.pos).normalizedOrZero();
+            const spawn_pos = self.pos.add(dir.scale(self.coll_radius * 2));
+            const params = Action.Params{ .target_kind = .pos, .pos = spawn_pos };
+            return .{ .action = .{
+                .slot = .spell_cast_summon_1,
+                .params = params,
+            } };
+        }
+        var aggro = AIAggro{};
+        return aggro.decide(self, room);
+    }
+};
+
 pub const ActorController = struct {
     pub const Kind = enum {
         idle,
@@ -371,6 +393,7 @@ pub const ActorController = struct {
         ranged_flee,
         gobbomber,
         djinn,
+        djinn_smoke,
     };
     pub const KindData = union(Kind) {
         idle: AIIdle,
@@ -380,6 +403,7 @@ pub const ActorController = struct {
         ranged_flee: AIRangedFlee,
         gobbomber: AIGobbomber,
         djinn: AIDjinn,
+        djinn_smoke: AIDjinnSmoke,
     };
 
     actions: Action.Slot.Array = Action.Slot.Array.initFill(null),
