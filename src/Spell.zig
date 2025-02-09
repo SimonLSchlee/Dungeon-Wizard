@@ -211,6 +211,18 @@ pub const TargetingData = struct {
 
         return end_ray_pos;
     }
+    pub fn getTargetedThing(targeting_data: *const TargetingData, room: *Room, caster: *const Thing, mouse_pos: V2f) ?*Thing {
+        const thing = room.getMousedOverThing(targeting_data.target_faction_mask) orelse
+            room.getClosestThingToPoint(mouse_pos, targeting_data.target_faction_mask) orelse
+            return null;
+        if (!targeting_data.target_faction_mask.contains(thing.faction)) return null;
+        const range = @max(caster.pos.dist(thing.pos) - caster.coll_radius - thing.coll_radius, 0);
+        if (range > targeting_data.max_range) {
+            return null;
+        }
+        if (targeting_data.requires_los_to_thing and !room.tilemap.isLOSBetween(caster.pos, thing.pos)) return null;
+        return thing;
+    }
 
     pub fn getParams(targeting_data: *const TargetingData, room: *Room, caster: *const Thing, mouse_pos: V2f) ?Params {
         switch (targeting_data.kind) {
@@ -243,22 +255,13 @@ pub const TargetingData = struct {
                 };
             },
             .thing => {
-                if (room.getMousedOverThing(targeting_data.target_faction_mask)) |thing| {
-                    // TODO different range calculation? sort that out and make consistent
-                    const range = @max(caster.pos.dist(thing.pos) - caster.coll_radius - thing.coll_radius, 0);
-                    if (range > targeting_data.max_range) {
-                        return null;
-                    }
-                    if (targeting_data.requires_los_to_thing and !room.tilemap.isLOSBetween(caster.pos, thing.pos)) return null;
-                    if (targeting_data.target_faction_mask.contains(thing.faction)) {
-                        return .{
-                            .target_kind = .thing,
-                            .face_dir = thing.pos.sub(caster.pos).normalizedChecked() orelse caster.dir,
-                            .thing = thing.id,
-                            .pos = thing.pos,
-                        };
-                    }
-                }
+                const thing = targeting_data.getTargetedThing(room, caster, mouse_pos) orelse return null;
+                return .{
+                    .target_kind = .thing,
+                    .face_dir = thing.pos.sub(caster.pos).normalizedChecked() orelse caster.dir,
+                    .thing = thing.id,
+                    .pos = thing.pos,
+                };
             },
         }
         return null;
@@ -339,7 +342,7 @@ pub const TargetingData = struct {
                 const maybe_targeted_thing = if (params) |p|
                     room.getConstThingById(p.thing.?)
                 else
-                    @constCast(room).getMousedOverThing(targeting_data.target_faction_mask);
+                    targeting_data.getTargetedThing(@constCast(room), caster, plat.getMousePosWorld(room.camera));
 
                 // show all possible target...
                 // but only if params are not passed in

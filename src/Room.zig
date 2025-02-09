@@ -454,6 +454,26 @@ pub fn getMousedOverThing(self: *Room, faction_mask: Thing.Faction.Mask) ?*Thing
     return null;
 }
 
+pub fn getClosestThingToPoint(self: *Room, point: V2f, faction_mask: Thing.Faction.Mask) ?*Thing {
+    var best_thing: ?*Thing = null;
+    var best_dist = std.math.inf(f32);
+    for (&self.things.items) |*thing| {
+        if (!thing.isActive()) continue;
+        if (thing.selectable == null) continue;
+        if (!faction_mask.contains(thing.faction)) continue;
+
+        const dist = point.dist(thing.pos);
+        if (dist < best_dist) {
+            best_dist = dist;
+            best_thing = thing;
+        }
+    }
+    if (best_thing) |thing| {
+        return thing;
+    }
+    return null;
+}
+
 pub fn thingInteract(self: *Room, thing: *Thing) void {
     assert(thing.rmb_interactable != null);
     const interact = thing.rmb_interactable.?;
