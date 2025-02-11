@@ -1133,6 +1133,18 @@ pub fn winUpdate(self: *Run) Error!void {
     curr_btn_pos.y += btn_dims.y + btn_spacing;
 }
 
+pub fn toggleShowDeck(self: *Run) void {
+    if (self.screen == .deck) {
+        self.screen = self.prev_screen;
+    } else {
+        self.prev_screen = self.screen;
+        self.deck_ui.hover = .{};
+        self.deck_ui.scroll_y = 0;
+        self.screen = .deck;
+        self.deck_ui.debug_select = false;
+    }
+}
+
 pub fn update(self: *Run) Error!void {
     const plat = App.getPlat();
 
@@ -1193,17 +1205,6 @@ pub fn update(self: *Run) Error!void {
 
     switch (self.load_state) {
         .none => {
-            if (plat.input_buffer.keyIsJustPressed(.n)) {
-                if (self.screen == .deck) {
-                    self.screen = self.prev_screen;
-                } else {
-                    self.prev_screen = self.screen;
-                    self.deck_ui.hover = .{};
-                    self.deck_ui.scroll_y = 0;
-                    self.screen = .deck;
-                    self.deck_ui.debug_select = false;
-                }
-            }
             switch (self.screen) {
                 .room => try self.roomUpdate(),
                 .reward => try self.rewardUpdate(),
@@ -1235,25 +1236,6 @@ pub fn update(self: *Run) Error!void {
         .fade_out => {
             self.ui_slots.unselectAction(); // effectively disables UI while fading
         },
-    }
-
-    { // gold
-        const scaling = plat.ui_scaling + 1;
-        const padding = v2f(5, 5);
-        const gold_text = try u.bufPrintLocal("{any}{}", .{ icon_text.Icon.coin, self.gold });
-        const rect_dims = icon_text.measureIconText(gold_text).scale(scaling).add(padding.scale(2));
-        const topleft = v2f(
-            10,
-            10,
-        );
-        self.imm_ui.commands.appendAssumeCapacity(.{ .rect = .{
-            .pos = topleft,
-            .dims = rect_dims,
-            .opt = .{
-                .fill_color = Colorf.black.fade(0.7),
-            },
-        } });
-        try icon_text.unqRenderIconText(&self.imm_ui.commands, gold_text, topleft.add(padding), scaling);
     }
 
     self.curr_tick += 1;

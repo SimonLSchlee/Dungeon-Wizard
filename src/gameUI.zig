@@ -29,6 +29,7 @@ const player = @import("player.zig");
 const menuUI = @import("menuUI.zig");
 const ImmUI = @import("ImmUI.zig");
 const Tooltip = @import("Tooltip.zig");
+const icon_text = @import("icon_text.zig");
 
 const slot_bg_color = Colorf.rgb(0.07, 0.05, 0.05);
 
@@ -241,6 +242,12 @@ pub const Slots = struct {
 
     // Non-Action Commands
     pause_slot: UISlot = UISlot.init(.pause),
+    show_deck_slot: UISlot = UISlot.init(.show_deck),
+
+    gold: struct {
+        rect: geom.Rectf = .{},
+        padding: V2f = .{},
+    } = .{},
 
     pub fn init(self: *Slots, num_spell_slots: usize, items: []const ?Item, discard_button: bool) void {
         assert(num_spell_slots <= max_spell_slots);
@@ -381,6 +388,19 @@ pub const Slots = struct {
             };
             slot.key_rect_pos = slot.rect.pos.sub(v2f(5, 17).scale(ui_scaling));
         }
+
+        // top left. gold, show deck
+        self.gold.rect.pos = v2f(10, 10).scale(ui_scaling);
+        const gold_text = utl.bufPrintLocal("{any}999999", .{icon_text.Icon.coin}) catch "999999";
+        self.gold.padding = v2f(5, 5).scale(ui_scaling);
+        self.gold.rect.dims = icon_text.measureIconText(gold_text).scale(ui_scaling + 1).add(self.gold.padding.scale(2));
+
+        const show_deck_topleft = self.gold.rect.pos.add(v2f(0, self.gold.rect.dims.y + self.gold.padding.y * 3));
+        self.show_deck_slot.rect = .{
+            .pos = show_deck_topleft,
+            .dims = pause_discard_btn_dims,
+        };
+        self.show_deck_slot.key_rect_pos = self.show_deck_slot.rect.pos.sub(v2f(3, 10).scale(ui_scaling));
 
         // background rect covers everything at bottom of screen
         const room_bg_rect_pos = spells_topleft.sub(v2f(spell_item_margin, 10 * ui_scaling));
@@ -857,20 +877,30 @@ pub const Slots = struct {
         var slot_contents_pos = slot.rect.pos;
         if (slot.hovered) slot_contents_pos = slot_contents_pos.add(v2f(0, -5));
 
+        var tooltip_string: ?[]const u8 = null;
         switch (slot.command) {
             .pause => {
                 const room = &run.room;
                 const sprite_name = if (room.paused) Data.MiscIcon.hourglass_down else Data.MiscIcon.hourglass_up;
                 const info = sprites.RenderIconInfo{ .frame = data.misc_icons.getRenderFrame(sprite_name).? };
                 try info.unqRender(cmd_buf, slot_contents_pos, ui_scaling);
-                if (slot.long_hover.is) {
-                    const tt = Tooltip{
-                        .title = Tooltip.Title.fromSlice("Pause") catch unreachable,
-                    };
-                    try tt.unqRender(tooltip_cmd_buf, tooltip_pos, tooltip_scaling);
-                }
+                tooltip_string = "Pause";
+            },
+            .show_deck => {
+                const sprite_name = Data.MiscIcon.deck;
+                const info = sprites.RenderIconInfo{ .frame = data.misc_icons.getRenderFrame(sprite_name).? };
+                try info.unqRender(cmd_buf, slot_contents_pos, ui_scaling);
+                tooltip_string = if (run.screen == .deck) "Hide Deck" else "Show Deck";
             },
             else => {},
+        }
+        if (slot.long_hover.is) {
+            if (tooltip_string) |tt_str| {
+                const tt = Tooltip{
+                    .title = Tooltip.Title.fromSlice(tt_str) catch unreachable,
+                };
+                try tt.unqRender(tooltip_cmd_buf, tooltip_pos, tooltip_scaling);
+            }
         }
         if (try slot.unqHotKey(cmd_buf, true)) {
             activation = true;
@@ -966,6 +996,26 @@ pub const Slots = struct {
         }
     }
 
+    pub fn topLeftUpdate(self: *Slots, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, run: *Run) Error!void {
+        const plat = getPlat();
+        { // gold
+            const scaling = plat.ui_scaling + 1;
+            const gold_text = try utl.bufPrintLocal("{any}{}", .{ icon_text.Icon.coin, run.gold });
+            self.gold.rect.dims = icon_text.measureIconText(gold_text).scale(scaling).add(self.gold.padding.scale(2));
+            cmd_buf.appendAssumeCapacity(.{ .rect = .{
+                .pos = self.gold.rect.pos,
+                .dims = self.gold.rect.dims,
+                .opt = .{
+                    .fill_color = Colorf.black.fade(0.5),
+                },
+            } });
+            try icon_text.unqRenderIconText(cmd_buf, gold_text, self.gold.rect.pos.add(self.gold.padding), scaling);
+        }
+        if (try unqCommandUISlot(&self.show_deck_slot, cmd_buf, tooltip_cmd_buf, run, run.screen == .deck)) {
+            run.toggleShowDeck();
+        }
+    }
+
     pub fn roomOnlyUpdate(self: *Slots, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, run: *Run, caster: *const Thing) Error!void {
         const plat = getPlat();
         const room = &run.room;
@@ -1035,6 +1085,7 @@ pub const Slots = struct {
             }
         }
         try self.updateHPandMana(cmd_buf, tooltip_cmd_buf, caster);
+        try self.topLeftUpdate(cmd_buf, tooltip_cmd_buf, run);
     }
 
     pub fn roomUpdate(self: *Slots, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, run: *Run, caster: *const Thing) Error!void {

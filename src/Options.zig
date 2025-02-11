@@ -375,11 +375,11 @@ pub const Controls = struct {
                 &.{.{ .keyboard_key = .escape }},
                 .pause_menu,
             ),
-            //InputBinding.init(
-            //    "Show Deck",
-            //    &.{.{ .keyboard_key = .n }},
-            //    .show_deck,
-            //),
+            InputBinding.init(
+                "Show Deck",
+                &.{.{ .keyboard_key = .n }},
+                .show_deck,
+            ),
         });
         return input_bindings.items;
     }
