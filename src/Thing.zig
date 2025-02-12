@@ -2179,7 +2179,8 @@ pub inline fn isAttackableCreature(self: *const Thing) bool {
     return self.isActive() and self.isCreature() and self.hurtbox != null;
 }
 
-pub fn getApproxVisibleCircle(self: *const Thing) struct { pos: V2f, radius: f32 } {
+pub const VisibleCircle = struct { pos: V2f, radius: f32 };
+pub fn getApproxVisibleCircle(self: *const Thing) VisibleCircle {
     switch (self.controller) {
         .spawner => |s| {
             // TODO very hack for spawners - this leaves no frame gap where visible circle is different to spawning creature's
@@ -2191,7 +2192,7 @@ pub fn getApproxVisibleCircle(self: *const Thing) struct { pos: V2f, radius: f32
         },
         else => {},
     }
-    var ret = .{
+    var ret: VisibleCircle = .{
         .pos = self.pos,
         .radius = self.coll_radius,
     };
