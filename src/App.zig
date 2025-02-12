@@ -104,7 +104,7 @@ export fn appInit(plat: *Platform) *anyopaque {
     return app;
 }
 
-pub fn staticAppInit(plat: *Platform) *anyopaque {
+pub fn staticAppInit(plat: *Platform) callconv(.C) *anyopaque {
     return appInit(plat);
 }
 
@@ -116,7 +116,7 @@ pub export fn appReload(app_ptr: *anyopaque, plat: *Platform) void {
     app.data.reload() catch @panic("Failed to reload data");
 }
 
-pub fn staticAppReload(app_ptr: *anyopaque, plat: *Platform) void {
+pub fn staticAppReload(app_ptr: *anyopaque, plat: *Platform) callconv(.C) void {
     return appReload(app_ptr, plat);
 }
 
@@ -125,7 +125,7 @@ pub export fn appTick() void {
     app.update() catch @panic("fail appTick");
 }
 
-pub fn staticAppTick() void {
+pub fn staticAppTick() callconv(.C) void {
     appTick();
 }
 
@@ -134,7 +134,7 @@ pub export fn appRender() void {
     app.render() catch @panic("fail appRender");
 }
 
-pub fn staticAppRender() void {
+pub fn staticAppRender() callconv(.C) void {
     appRender();
 }
 
