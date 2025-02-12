@@ -4,7 +4,7 @@ const raylib_build = @import("raylib");
 const title = "Dungeon Wizard";
 const version = "v0.11.0";
 
-const raylib_config = "-DSUPPORT_CUSTOM_FRAME_CONTROL=1";
+const raylib_config: []const u8 = "-DSUPPORT_CUSTOM_FRAME_CONTROL=1";
 
 fn linkOSStuff(b: *std.Build, target: std.Build.ResolvedTarget, artifact: *std.Build.Step.Compile) void {
     switch (target.result.os.tag) {
@@ -53,15 +53,13 @@ pub fn buildDynamic(b: *std.Build, target: std.Build.ResolvedTarget, optimize: s
         },
     );
 
-    const raylib = try raylib_build.addRaylib(
-        b,
-        target,
-        optimize,
-        .{
-            .shared = true,
-            .config = raylib_config,
-        },
-    );
+    const raylib_dep = b.dependency("raylib", .{
+        .target = target,
+        .optimize = optimize,
+        .shared = true,
+        .config = raylib_config,
+    });
+    const raylib = raylib_dep.artifact("raylib");
 
     const app_lib = b.addSharedLibrary(.{
         .name = "game",
@@ -73,7 +71,7 @@ pub fn buildDynamic(b: *std.Build, target: std.Build.ResolvedTarget, optimize: s
     });
     app_lib.linkLibrary(raylib);
     app_lib.addIncludePath(b.path("raylib/src"));
-    addDynGameConfig(b, &app_lib.root_module, do_release);
+    addDynGameConfig(b, app_lib.root_module, do_release);
 
     if (!app_only) {
         const exe = b.addExecutable(.{
@@ -86,7 +84,7 @@ pub fn buildDynamic(b: *std.Build, target: std.Build.ResolvedTarget, optimize: s
         exe.linkLibrary(raylib);
         exe.addIncludePath(b.path("raylib/src"));
 
-        addExeConfig(b, &exe.root_module, false, do_release);
+        addExeConfig(b, exe.root_module, false, do_release);
 
         if (target.query.isNative()) {
             // This *creates* a Run step in the build graph, to be executed when another
@@ -123,15 +121,13 @@ pub fn buildDynamic(b: *std.Build, target: std.Build.ResolvedTarget, optimize: s
 pub fn buildStatic(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, do_release: bool) ![]*std.Build.Step.Compile {
     std.debug.print("Static linking\noptimize: {any}\n{s}", .{ optimize, if (do_release) "doing release\n" else "" });
 
-    const raylib = try raylib_build.addRaylib(
-        b,
-        target,
-        optimize,
-        .{
-            .shared = false,
-            .config = raylib_config,
-        },
-    );
+    const raylib_dep = b.dependency("raylib", .{
+        .target = target,
+        .optimize = optimize,
+        .shared = false,
+        .config = raylib_config,
+    });
+    const raylib = raylib_dep.artifact("raylib");
     const exe = b.addExecutable(.{
         .name = title,
         .root_source_file = b.path("src/main.zig"),
@@ -142,7 +138,7 @@ pub fn buildStatic(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
     exe.linkLibrary(raylib);
     exe.addIncludePath(b.path("raylib/src"));
 
-    addExeConfig(b, &exe.root_module, true, do_release);
+    addExeConfig(b, exe.root_module, true, do_release);
 
     if (target.query.isNative()) {
         const run_cmd = b.addRunArtifact(exe);
