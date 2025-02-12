@@ -304,11 +304,13 @@ pub fn typeFieldByName(T: type, comptime field_name: []const u8) switch (@typeIn
 pub fn typeBaseName(T: type) []const u8 {
     const full_name = @typeName(T);
     var it = std.mem.tokenizeScalar(u8, full_name, '.');
-    var name: []const u8 = "";
+    comptime var name: []const u8 = "";
     while (it.next()) |n| {
         name = n;
     }
-    return name;
+    // for comptime
+    const const_name = comptime name;
+    return const_name;
 }
 
 pub fn enumValueList(T: type) []const T {
