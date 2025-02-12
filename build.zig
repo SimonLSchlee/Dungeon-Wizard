@@ -1,8 +1,8 @@
 const std = @import("std");
 const raylib_build = @import("raylib");
 
-const title = "action-deckbuilder";
-const version = "v0.10.0";
+const title = "Dungeon Wizard";
+const version = "v0.11.0";
 
 const raylib_config = "-DSUPPORT_CUSTOM_FRAME_CONTROL=1";
 

@@ -162,7 +162,7 @@ fn menuUpdate(self: *App) Error!void {
     const plat = getPlat();
     const data = self.data;
     const ui_scaling = plat.ui_scaling;
-    const title_text = "Magic-Using Individual";
+    const title_text = "Dungeon Wizard";
     const title_font = data.fonts.get(.pixeloid);
     const title_opt = draw.TextOpt{
         .center = true,
