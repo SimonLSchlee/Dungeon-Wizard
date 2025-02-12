@@ -978,7 +978,7 @@ pub const SpriteRenderer = struct {
     animator: union(enum) {
         normal: sprites.SpriteAnimator,
         dir: sprites.DirectionalSpriteAnimator,
-    } = undefined,
+    } = .{ .normal = sprites.SpriteAnimator.init(Data.Ref(sprites.SpriteAnim).init("default")) },
 
     pub fn setNormalAnim(renderer: *SpriteRenderer, anim: Data.Ref(sprites.SpriteAnim)) void {
         switch (renderer.animator) {
