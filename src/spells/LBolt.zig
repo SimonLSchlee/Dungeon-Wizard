@@ -1,0 +1,192 @@
+const std = @import("std");
+const utl = @import("../util.zig");
+
+pub const Platform = @import("../raylib.zig");
+const core = @import("../core.zig");
+const Error = core.Error;
+const Key = core.Key;
+const debug = @import("../debug.zig");
+const assert = debug.assert;
+const draw = @import("../draw.zig");
+const Colorf = draw.Colorf;
+const geom = @import("../geometry.zig");
+const V2f = @import("../V2f.zig");
+const v2f = V2f.v2f;
+const V2i = @import("../V2i.zig");
+const v2i = V2i.v2i;
+
+const App = @import("../App.zig");
+const getPlat = App.getPlat;
+const Room = @import("../Room.zig");
+const Thing = @import("../Thing.zig");
+const TileMap = @import("../TileMap.zig");
+const StatusEffect = @import("../StatusEffect.zig");
+const Data = @import("../Data.zig");
+
+const Collision = @import("../Collision.zig");
+const Spell = @import("../Spell.zig");
+const TargetKind = Spell.TargetKind;
+const TargetingData = Spell.TargetingData;
+const Params = Spell.Params;
+
+pub const title = "L-Bolt";
+
+pub const enum_name = "l_bolt";
+pub const Controllers = [_]type{Projectile};
+
+const base_bolt_radius = 4.5;
+const base_range = 150;
+const base_duration_ticks = core.secsToTicks(3);
+
+pub const proto = Spell.makeProto(
+    std.meta.stringToEnum(Spell.Kind, enum_name).?,
+    .{
+        .cast_time = .fast,
+        .color = .white,
+        .targeting_data = .{
+            .kind = .pos,
+            .fixed_range = true,
+            .max_range = base_range,
+            .ray_to_mouse = .{
+                .ends_at_coll_mask = Collision.Mask.initMany(&.{.wall}),
+                .thickness = base_bolt_radius * 2, // TODO use radius below?
+                .cast_orig_dist = 10,
+            },
+        },
+    },
+);
+
+hit_effect: Thing.HitEffect = .{
+    .damage = 7,
+    .damage_kind = .lightning,
+    .status_stacks = StatusEffect.StacksArray.initDefault(0, .{ .stunned = 1 }),
+},
+range: f32 = base_range,
+duration_ticks: i64 = base_duration_ticks,
+max_speed: f32 = 2,
+
+const AnimRef = struct {
+    var projectile_loop = Data.Ref(Data.SpriteAnim).init("spell-projectile-flare-dart");
+};
+const SoundRef = struct {
+    var woosh = Data.Ref(Data.Sound).init("long-woosh");
+    var crackle = Data.Ref(Data.Sound).init("crackle");
+};
+
+pub const Projectile = struct {
+    pub const controller_enum_name = enum_name ++ "_projectile";
+    origin: V2f,
+    bounces: usize = 0,
+    expire_timer: utl.TickCounter,
+    lightning_timer: utl.TickCounter = utl.TickCounter.init(3),
+
+    pub fn update(self: *Thing, room: *Room) Error!void {
+        const spell_controller = &self.controller.spell;
+        const spell = spell_controller.spell;
+        const l_bolt = spell.kind.l_bolt;
+        const params = spell_controller.params;
+        const target_pos = params.pos;
+        _ = target_pos;
+        const projectile: *@This() = &spell_controller.controller.l_bolt_projectile;
+        //_ = AnimRef.projectile_loop.get();
+        //_ = self.renderer.sprite.playNormal(AnimRef.projectile_loop, .{ .loop = true });
+        if (self.last_coll) |coll| {
+            projectile.bounces += 1;
+            self.vel = self.vel.sub(coll.normal.scale(2 * self.vel.dot(coll.normal)));
+        }
+        self.hitbox.?.sweep_to_rel_pos = self.vel.normalized().neg().scale(self.hitbox.?.sweep_to_rel_pos.?.length());
+        if (projectile.lightning_timer.tick(true)) {
+            const rang = utl.tau * room.rng.random().float(f32);
+            const rdst = 2 + 4 * room.rng.random().float(f32);
+            const dir = V2f.fromAngleRadians(rang);
+            const point = self.pos.add(dir.scale(rdst));
+            const renderer = &self.renderer.lightning;
+            if (renderer.points.len >= 10) {
+                renderer.points.buffer[renderer.points_start] = point;
+                renderer.points_start = (renderer.points_start + 1) % 10;
+            } else {
+                renderer.points.appendAssumeCapacity(point);
+            }
+        }
+
+        // done?
+        var do_free = false;
+        if (projectile.bounces == 0) {
+            if (self.pos.dist(projectile.origin) > l_bolt.range) {
+                do_free = true;
+            }
+        }
+        if (projectile.expire_timer.tick(false) or !self.hitbox.?.active) {
+            do_free = true;
+        }
+        if (do_free) {
+            self.deferFree(room);
+        }
+    }
+};
+
+pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
+    params.validate(.pos, caster);
+    const l_bolt: @This() = self.kind.l_bolt;
+    const target_pos = params.pos;
+    const target_dir = if (target_pos.sub(caster.pos).normalizedChecked()) |d| d else V2f.right;
+
+    var ball = Thing{
+        .kind = .projectile,
+        .dir = target_dir,
+        .vel = target_dir.scale(l_bolt.max_speed),
+        .coll_radius = base_bolt_radius,
+        .coll_mask = Thing.Collision.Mask.initMany(&.{.wall}),
+        .controller = .{ .spell = .{
+            .spell = self.*,
+            .params = params,
+            .controller = .{
+                .l_bolt_projectile = .{
+                    .origin = caster.pos,
+                    .expire_timer = utl.TickCounter.init(l_bolt.duration_ticks),
+                },
+            },
+        } },
+        .renderer = .{
+            .lightning = .{},
+        },
+        .hitbox = .{
+            .active = true,
+            .mask = Thing.Faction.opposing_masks.get(caster.faction),
+            .deactivate_on_hit = true,
+            .deactivate_on_update = false,
+            .effect = l_bolt.hit_effect,
+            .radius = base_bolt_radius,
+            .sweep_to_rel_pos = v2f(-15, 0),
+        },
+    };
+    //ball.renderer.sprite.setNormalAnim(AnimRef.projectile_loop);
+    _ = try room.queueSpawnThing(&ball, caster.pos);
+    _ = App.get().sfx_player.playSound(&SoundRef.crackle, .{});
+}
+
+pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
+    const l_bolt: @This() = self.kind.l_bolt;
+    const hit_dmg = Thing.Damage{
+        .kind = .fire,
+        .amount = l_bolt.hit_effect.damage,
+    };
+    const fmt =
+        \\Projectile which bounces off walls
+        \\and deals {any} damage on impact.
+    ;
+    tt.desc = try Spell.Tooltip.Desc.fromSlice(
+        try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{
+            hit_dmg,
+        }),
+    );
+    tt.infos.appendAssumeCapacity(.{ .damage = .fire });
+    tt.infos.appendAssumeCapacity(.{ .status = .lit });
+}
+
+pub fn getNewTags(self: *const Spell) Error!Spell.NewTag.Array {
+    const l_bolt: @This() = self.kind.l_bolt;
+    return Spell.NewTag.Array.fromSlice(&.{
+        try Spell.NewTag.makeDamage(.lightning, l_bolt.hit_effect.damage, false),
+    }) catch unreachable;
+}

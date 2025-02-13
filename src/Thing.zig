@@ -156,6 +156,7 @@ renderer: union(enum) {
     shape: ShapeRenderer,
     spawner: SpawnerRenderer,
     sprite: SpriteRenderer,
+    lightning: LightningRenderer,
 } = .none,
 on_die: union(enum) {
     default: struct {},
@@ -1327,6 +1328,38 @@ pub const SpawnerController = struct {
         var ret = prototype(creature_kind);
         ret.is_summon = true;
         return ret;
+    }
+};
+
+pub const LightningRenderer = struct {
+    pub const PointArray = std.BoundedArray(V2f, 32);
+    points: PointArray = .{},
+    points_start: usize = 0,
+    draw_under: bool = false,
+    draw_normal: bool = true,
+    draw_over: bool = false,
+
+    fn _render(_: *const Thing, renderer: *const LightningRenderer, room: *const Room) void {
+        const plat = App.getPlat();
+        const opt = draw.LineOpt{
+            .color = .white,
+            .thickness = @max(0.66 * room.camera.zoom, 1),
+        };
+        if (renderer.points.len < 2) return;
+        const points_start = @min(renderer.points_start, renderer.points.len - 1);
+        for (0..(renderer.points.len - 1)) |i| {
+            const idx = (points_start + i) % renderer.points.len;
+            const idx_next = (idx + 1) % renderer.points.len;
+            const p0, const p1 = .{ renderer.points.buffer[idx], renderer.points.buffer[idx_next] };
+            plat.linef(p0, p1, opt);
+        }
+    }
+
+    pub fn render(self: *const Thing, room: *const Room) Error!void {
+        const renderer = &self.renderer.lightning;
+        if (renderer.draw_normal) {
+            _render(self, renderer, room);
+        }
     }
 };
 
