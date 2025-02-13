@@ -44,6 +44,7 @@ const State = enum {
     visible,
 };
 
+enabled: bool = true,
 visited: Map = undefined,
 render_tex: Platform.RenderTexture2D = undefined,
 

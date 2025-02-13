@@ -550,6 +550,9 @@ pub fn update(self: *Room) Error!void {
         if (plat.input_buffer.keyIsJustPressed(.backtick)) {
             self.edit_mode = !self.edit_mode;
         }
+        if (plat.input_buffer.keyIsJustPressed(.f)) {
+            self.fog.enabled = !self.fog.enabled;
+        }
         if (plat.input_buffer.keyIsJustPressed(.k)) {
             for (&self.things.items) |*thing| {
                 if (!thing.isActive()) continue;
@@ -706,7 +709,7 @@ pub fn update(self: *Room) Error!void {
 pub fn render(self: *const Room, ui_render_texture: Platform.RenderTexture2D, game_render_texture: Platform.RenderTexture2D) Error!void {
     const plat = getPlat();
 
-    const fog_enabled = !self.edit_mode;
+    const fog_enabled = !self.edit_mode and self.fog.enabled;
     if (fog_enabled) {
         try self.fog.renderToTexture(self.camera);
     }
