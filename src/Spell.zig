@@ -56,8 +56,8 @@ pub const SpellTypes = blk: {
         @import("spells/Unherring.zig"),
         @import("spells/Protec.zig"),
         @import("spells/FrostVom.zig"),
-        @import("spells/Blackmail.zig"),
-        @import("spells/Mint.zig"),
+        //@import("spells/Blackmail.zig"),
+        //@import("spells/Mint.zig"),
         @import("spells/Impling.zig"),
         @import("spells/Promptitude.zig"),
         @import("spells/FlameyExplodey.zig"),
@@ -214,7 +214,7 @@ pub const TargetingData = struct {
     }
     pub fn getTargetedThing(targeting_data: *const TargetingData, room: *Room, caster: *const Thing, mouse_pos: V2f) ?*Thing {
         const thing = room.getMousedOverThing(targeting_data.target_faction_mask) orelse
-            room.getClosestThingToPoint(mouse_pos, targeting_data.target_faction_mask) orelse
+            room.getClosestThingToPoint(mouse_pos, null, targeting_data.target_faction_mask) orelse
             return null;
         if (!targeting_data.target_faction_mask.contains(thing.faction)) return null;
         const range = @max(caster.pos.dist(thing.pos) - caster.coll_radius - thing.coll_radius, 0);
@@ -386,9 +386,6 @@ pub const TargetingData = struct {
                                 });
                             }
                         }
-                        if (targeting_data.radius_at_target) |r| {
-                            plat.circlef(caster.pos, r, .{ .fill_color = targeting_color.fade(0.4) });
-                        }
                         if (targeting_data.ray_to_mouse) |ray| {
                             const ray_radius = @max(@round(ray.thickness * 0.5), 1);
                             plat.linef(caster.pos, thing.pos, .{
@@ -404,7 +401,7 @@ pub const TargetingData = struct {
                             });
                         }
                         if (targeting_data.radius_at_target) |r| {
-                            plat.circlef(caster.pos, r, .{
+                            plat.circlef(thing.pos, r, .{
                                 .fill_color = targeting_color.fade(0.4),
                                 .round_to_pixel = true,
                             });

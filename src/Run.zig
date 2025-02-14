@@ -76,39 +76,18 @@ pub const DeadMenu = struct {
     quit_button: menuUI.Button,
 };
 
-pub fn makeStarterDeck(dbg: bool) Spell.SpellArray {
+pub fn makeStarterDeck() Spell.SpellArray {
     var ret = Spell.SpellArray{};
     // TODO placeholder
     const unherring = Spell.getProto(.unherring);
-    const protec = Spell.getProto(.protec);
-    const frost = Spell.getProto(.frost_vom);
-    const blackmail = Spell.getProto(.blackmail);
-    const mint = Spell.getProto(.mint);
-    const impling = Spell.getProto(.impling);
-    const promptitude = Spell.getProto(.promptitude);
-    const flamey_explodey = Spell.getProto(.flamey_explodey);
     const expose = Spell.getProto(.expose);
-    const zap_dash = Spell.getProto(.zap_dash);
     const shield_fu = Spell.getProto(.shield_fu);
 
-    const deck_cards = if (dbg)
-        &[_]struct { Spell, usize }{
-            .{ unherring, 1 },
-            .{ protec, 1 },
-            .{ frost, 1 },
-            .{ blackmail, 1 },
-            .{ mint, 1 },
-            .{ impling, 1 },
-            .{ promptitude, 1 },
-            .{ flamey_explodey, 1 },
-            .{ zap_dash, 1 },
-        }
-    else
-        &[_]struct { Spell, usize }{
-            .{ unherring, 4 },
-            .{ shield_fu, 2 },
-            .{ expose, 1 },
-        };
+    const deck_cards = &[_]struct { Spell, usize }{
+        .{ unherring, 4 },
+        .{ shield_fu, 2 },
+        .{ expose, 1 },
+    };
 
     deck: for (deck_cards) |t| {
         for (0..t[1]) |_| {
@@ -190,7 +169,7 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
     run.* = .{
         .rng = std.Random.DefaultPrng.init(seed),
         .seed = seed,
-        .deck = makeStarterDeck(false),
+        .deck = makeStarterDeck(),
         .mode = mode,
     };
     const deck_dims = getDeckTextureDims();

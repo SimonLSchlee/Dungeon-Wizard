@@ -40,7 +40,7 @@ pub const proto = Spell.makeProto(
         .color = .cyan,
         .targeting_data = .{
             .kind = .thing,
-            .target_faction_mask = Thing.Faction.Mask.initOne(.enemy),
+            .target_faction_mask = Thing.Faction.opposing_masks.get(.player),
             .max_range = 85,
             .show_max_range_ring = true,
             .ray_to_mouse = .{ .thickness = 1 },

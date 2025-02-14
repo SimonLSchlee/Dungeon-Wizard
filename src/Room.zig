@@ -454,11 +454,12 @@ pub fn getMousedOverThing(self: *Room, faction_mask: Thing.Faction.Mask) ?*Thing
     return null;
 }
 
-pub fn getClosestThingToPoint(self: *Room, point: V2f, faction_mask: Thing.Faction.Mask) ?*Thing {
+pub fn getClosestThingToPoint(self: *Room, point: V2f, exclude_id: ?Thing.Id, faction_mask: Thing.Faction.Mask) ?*Thing {
     var best_thing: ?*Thing = null;
     var best_dist = std.math.inf(f32);
     for (&self.things.items) |*thing| {
         if (!thing.isActive()) continue;
+        if (exclude_id) |excl| if (thing.id.eql(excl)) continue;
         if (thing.selectable == null) continue;
         if (!faction_mask.contains(thing.faction)) continue;
 
