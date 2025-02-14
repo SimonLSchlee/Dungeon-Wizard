@@ -1338,15 +1338,16 @@ pub const LightningRenderer = struct {
     draw_under: bool = false,
     draw_normal: bool = true,
     draw_over: bool = false,
+    color: Colorf = .white,
 
     fn _render(_: *const Thing, renderer: *const LightningRenderer, room: *const Room) void {
         const plat = App.getPlat();
         const opt = draw.LineOpt{
-            .color = .white,
+            .color = renderer.color,
             .thickness = @max(0.66 * room.camera.zoom, 1),
         };
         if (renderer.points.len < 2) return;
-        const points_start = @min(renderer.points_start, renderer.points.len - 1);
+        const points_start = renderer.points_start % renderer.points.len;
         for (0..(renderer.points.len - 1)) |i| {
             const idx = (points_start + i) % renderer.points.len;
             const idx_next = (idx + 1) % renderer.points.len;

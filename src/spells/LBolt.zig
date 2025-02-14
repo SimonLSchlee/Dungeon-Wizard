@@ -29,14 +29,14 @@ const TargetKind = Spell.TargetKind;
 const TargetingData = Spell.TargetingData;
 const Params = Spell.Params;
 
-pub const title = "L-Bolt";
+pub const title = "Le Bolt";
 
 pub const enum_name = "l_bolt";
 pub const Controllers = [_]type{Projectile};
 
 const base_bolt_radius = 4.5;
 const base_range = 150;
-const base_duration_ticks = core.secsToTicks(3);
+const base_duration_ticks = core.secsToTicks(2);
 
 pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
@@ -50,7 +50,7 @@ pub const proto = Spell.makeProto(
             .ray_to_mouse = .{
                 .ends_at_coll_mask = Collision.Mask.initMany(&.{.wall}),
                 .thickness = base_bolt_radius * 2, // TODO use radius below?
-                .cast_orig_dist = 10,
+                .cast_orig_dist = 15,
             },
         },
     },
@@ -63,7 +63,7 @@ hit_effect: Thing.HitEffect = .{
 },
 range: f32 = base_range,
 duration_ticks: i64 = base_duration_ticks,
-max_speed: f32 = 2,
+max_speed: f32 = 2.5,
 
 const AnimRef = struct {
     var projectile_loop = Data.Ref(Data.SpriteAnim).init("spell-projectile-flare-dart");
@@ -77,8 +77,13 @@ pub const Projectile = struct {
     pub const controller_enum_name = enum_name ++ "_projectile";
     origin: V2f,
     bounces: usize = 0,
+    state: enum {
+        moving,
+        expiring,
+    } = .moving,
     expire_timer: utl.TickCounter,
     lightning_timer: utl.TickCounter = utl.TickCounter.init(3),
+    hitbox_extended: bool = false,
 
     pub fn update(self: *Thing, room: *Room) Error!void {
         const spell_controller = &self.controller.spell;
@@ -88,37 +93,67 @@ pub const Projectile = struct {
         const target_pos = params.pos;
         _ = target_pos;
         const projectile: *@This() = &spell_controller.controller.l_bolt_projectile;
+        const renderer = &self.renderer.lightning;
         //_ = AnimRef.projectile_loop.get();
         //_ = self.renderer.sprite.playNormal(AnimRef.projectile_loop, .{ .loop = true });
-        if (self.last_coll) |coll| {
-            projectile.bounces += 1;
-            self.vel = self.vel.sub(coll.normal.scale(2 * self.vel.dot(coll.normal)));
-        }
-        self.hitbox.?.sweep_to_rel_pos = self.vel.normalized().neg().scale(self.hitbox.?.sweep_to_rel_pos.?.length());
-        if (projectile.lightning_timer.tick(true)) {
-            const rang = utl.tau * room.rng.random().float(f32);
-            const rdst = 2 + 4 * room.rng.random().float(f32);
-            const dir = V2f.fromAngleRadians(rang);
-            const point = self.pos.add(dir.scale(rdst));
-            const renderer = &self.renderer.lightning;
-            if (renderer.points.len >= 10) {
-                renderer.points.buffer[renderer.points_start] = point;
-                renderer.points_start = (renderer.points_start + 1) % 10;
-            } else {
-                renderer.points.appendAssumeCapacity(point);
-            }
+
+        var do_free = false;
+        switch (projectile.state) {
+            .moving => {
+                if (self.last_coll) |coll| {
+                    projectile.bounces += 1;
+                    self.vel = self.vel.sub(coll.normal.scale(2 * self.vel.dot(coll.normal)));
+                }
+                if (projectile.lightning_timer.tick(true)) {
+                    const rang = utl.tau * room.rng.random().float(f32);
+                    const rdst = 2 + 4 * room.rng.random().float(f32);
+                    const dir = V2f.fromAngleRadians(rang);
+                    const point = self.pos.add(dir.scale(rdst));
+                    if (renderer.points.len >= 10) {
+                        renderer.points.buffer[renderer.points_start] = point;
+                        renderer.points_start = (renderer.points_start + 1) % 10;
+                    } else {
+                        renderer.points.appendAssumeCapacity(point);
+                    }
+                }
+                const dist_from_origin = self.pos.dist(projectile.origin);
+                if (projectile.hitbox_extended) {
+                    self.hitbox.?.sweep_to_rel_pos = self.vel.normalized().neg().scale(self.hitbox.?.sweep_to_rel_pos.?.length());
+                } else {
+                    var len = dist_from_origin;
+                    if (dist_from_origin >= 15) {
+                        len = 15;
+                        projectile.hitbox_extended = true;
+                    }
+                    self.hitbox.?.sweep_to_rel_pos = self.vel.normalized().neg().scale(len);
+                }
+                if ((projectile.bounces == 0 and dist_from_origin > l_bolt.range) or
+                    projectile.expire_timer.tick(false) or
+                    !self.hitbox.?.active)
+                {
+                    self.hitbox.?.active = false;
+                    projectile.expire_timer = utl.TickCounter.init(15);
+                    projectile.state = .expiring;
+                    self.vel = .{};
+                }
+            },
+            .expiring => {
+                if (projectile.lightning_timer.tick(true)) {
+                    if (renderer.points.len > 0) {
+                        renderer.points_start = renderer.points_start % renderer.points.len;
+                        _ = renderer.points.orderedRemove(renderer.points_start);
+                    }
+                }
+                if (projectile.expire_timer.tick(false)) {
+                    do_free = true;
+                } else {
+                    const f = projectile.expire_timer.remapTo0_1();
+                    renderer.color = Colorf.rgba(1, 1, 1, 1 - f);
+                }
+            },
         }
 
         // done?
-        var do_free = false;
-        if (projectile.bounces == 0) {
-            if (self.pos.dist(projectile.origin) > l_bolt.range) {
-                do_free = true;
-            }
-        }
-        if (projectile.expire_timer.tick(false) or !self.hitbox.?.active) {
-            do_free = true;
-        }
         if (do_free) {
             self.deferFree(room);
         }
@@ -130,6 +165,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     const l_bolt: @This() = self.kind.l_bolt;
     const target_pos = params.pos;
     const target_dir = if (target_pos.sub(caster.pos).normalizedChecked()) |d| d else V2f.right;
+    const origin = caster.pos.add(target_dir.scale(self.targeting_data.ray_to_mouse.?.cast_orig_dist));
 
     var ball = Thing{
         .kind = .projectile,
@@ -142,7 +178,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             .params = params,
             .controller = .{
                 .l_bolt_projectile = .{
-                    .origin = caster.pos,
+                    .origin = origin,
                     .expire_timer = utl.TickCounter.init(l_bolt.duration_ticks),
                 },
             },
@@ -157,11 +193,10 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             .deactivate_on_update = false,
             .effect = l_bolt.hit_effect,
             .radius = base_bolt_radius,
-            .sweep_to_rel_pos = v2f(-15, 0),
         },
     };
     //ball.renderer.sprite.setNormalAnim(AnimRef.projectile_loop);
-    _ = try room.queueSpawnThing(&ball, caster.pos);
+    _ = try room.queueSpawnThing(&ball, origin);
     _ = App.get().sfx_player.playSound(&SoundRef.crackle, .{});
 }
 
