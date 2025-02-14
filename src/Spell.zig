@@ -53,6 +53,8 @@ var desc_buf: [2048]u8 = undefined;
 
 pub const SpellTypes = blk: {
     const player_spells = [_]type{
+        @import("spells/ArcBolt.zig"),
+        @import("spells/LBolt.zig"),
         @import("spells/Unherring.zig"),
         @import("spells/Protec.zig"),
         @import("spells/FrostVom.zig"),
@@ -72,7 +74,6 @@ pub const SpellTypes = blk: {
         @import("spells/MassIgnite.zig"),
         @import("spells/Hmmm.zig"),
         @import("spells/Switcharoo.zig"),
-        @import("spells/LBolt.zig"),
     };
     const nonplayer_spells = @import("spells/nonplayer.zig").spells;
     break :blk player_spells ++ nonplayer_spells;
