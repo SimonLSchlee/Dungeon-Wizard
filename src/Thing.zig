@@ -441,14 +441,14 @@ pub const Damage = struct {
                 //},
                 else => {},
             }
-            return try std.fmt.bufPrint(buf, "{any}{s}", .{ icon, dmg_type_string });
+            return try std.fmt.bufPrint(buf, "{any}{s} Damage", .{ icon, dmg_type_string });
         }
         pub fn fmtDesc(buf: []u8, kind: Damage.Kind) Error![]u8 {
             return switch (kind) {
                 .magic => try std.fmt.bufPrint(buf, "It's maaaagic", .{}),
                 .fire => try std.fmt.bufPrint(buf, "Applies a stack of {any}lit", .{StatusEffect.proto_array.get(.lit).icon}),
                 .ice => try std.fmt.bufPrint(buf, "Cold", .{}),
-                .lightning => try std.fmt.bufPrint(buf, "Zappy. Applies {any}stun", .{StatusEffect.proto_array.get(.lit).icon}),
+                .lightning => try std.fmt.bufPrint(buf, "Zappy. Applies {any}stun", .{StatusEffect.proto_array.get(.stunned).icon}),
                 else => try std.fmt.bufPrint(buf, "It hurts", .{}),
             };
         }
@@ -1335,10 +1335,10 @@ pub const LightningRenderer = struct {
     pub const PointArray = std.BoundedArray(V2f, 32);
     points: PointArray = .{},
     points_start: usize = 0,
+    color: Colorf = .white,
     draw_under: bool = false,
     draw_normal: bool = true,
     draw_over: bool = false,
-    color: Colorf = .white,
 
     fn _render(_: *const Thing, renderer: *const LightningRenderer, room: *const Room) void {
         const plat = App.getPlat();

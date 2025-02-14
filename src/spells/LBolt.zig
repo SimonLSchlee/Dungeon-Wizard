@@ -203,7 +203,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
 pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
     const l_bolt: @This() = self.kind.l_bolt;
     const hit_dmg = Thing.Damage{
-        .kind = .fire,
+        .kind = l_bolt.hit_effect.damage_kind,
         .amount = l_bolt.hit_effect.damage,
     };
     const fmt =
@@ -215,8 +215,8 @@ pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
             hit_dmg,
         }),
     );
-    tt.infos.appendAssumeCapacity(.{ .damage = .fire });
-    tt.infos.appendAssumeCapacity(.{ .status = .lit });
+    tt.infos.appendAssumeCapacity(.{ .damage = .lightning });
+    tt.infos.appendAssumeCapacity(.{ .status = .stunned });
 }
 
 pub fn getNewTags(self: *const Spell) Error!Spell.NewTag.Array {
