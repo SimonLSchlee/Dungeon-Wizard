@@ -53,6 +53,7 @@ var desc_buf: [2048]u8 = undefined;
 
 pub const SpellTypes = blk: {
     const player_spells = [_]type{
+        @import("spells/Snowfren.zig"),
         @import("spells/Rimefrost.zig"),
         @import("spells/ArcBolt.zig"),
         @import("spells/LBolt.zig"),
@@ -103,6 +104,7 @@ const spell_names = blk: {
 };
 
 pub fn GetKindType(kind: Kind) type {
+    @setEvalBranchQuota(2000);
     const fields: []const std.builtin.Type.UnionField = std.meta.fields(KindData);
     if (std.meta.fieldIndex(KindData, @tagName(kind))) |i| {
         return fields[i].type;
@@ -366,7 +368,10 @@ pub const TargetingData = struct {
                         plat.circlef(
                             thing.pos,
                             selectable.radius - 5,
-                            .{ .fill_color = targeting_data.color.fade(0.4) },
+                            .{
+                                .fill_color = null,
+                                .outline = .{ .color = targeting_data.color.fade(0.5) },
+                            },
                         );
                     }
                 }

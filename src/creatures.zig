@@ -43,6 +43,7 @@ pub const Kind = enum {
     shopspider,
     djinn,
     djinn_smoke,
+    snowfren,
 
     pub fn getIcon(self: Kind) icon_text.Icon {
         if (self == .player) {
@@ -226,6 +227,28 @@ pub fn implingProto() Thing {
             },
         },
         .cooldown = utl.TickCounter.initStopped(60),
+    });
+    return ret;
+}
+
+pub fn snowfrenProto() Thing {
+    var ret = creatureProto(.snowfren, .snowfren, .ally, .{ .aggro = .{} }, 7, .smol, 11);
+
+    const status = ret.statuses.getPtr(.snowy);
+    status.addStacks(&ret, 1);
+
+    ret.accel_params = .{
+        .max_speed = 0,
+    };
+    ret.controller.ai_actor.actions.getPtr(.projectile_attack_1).* = (.{
+        .kind = .{
+            .projectile_attack = .{
+                .projectile = .snowball,
+                .range = 85,
+                .LOS_thiccness = 5,
+            },
+        },
+        .cooldown = utl.TickCounter.initStopped(core.secsToTicks(1.5)),
     });
     return ret;
 }

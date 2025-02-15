@@ -169,6 +169,14 @@ const protos = [_]Proto{
         .color = Colorf.rgb(0.3, 0.9, 0.2),
         .icon = .slime,
     },
+    .{
+        .enum_name = "snowy",
+        .name = "Snowy",
+        .cd = 0,
+        .cd_type = .no_cd,
+        .color = Colorf.rgb(0.5, 0.8, 1),
+        .icon = .ice_ball,
+    },
 };
 
 pub const Kind = blk: {
@@ -229,6 +237,10 @@ pub fn setStacks(self: *StatusEffect, thing: *Thing, num: i32) void {
     if (num > 0) {
         switch (self.kind) {
             .lit => {
+                // yer snow!
+                if (thing.statuses.get(.snowy).stacks > 0) {
+                    return;
+                }
                 // thaw cold
                 if (thing.statuses.get(.cold).stacks > 0) {
                     thing.statuses.getPtr(.cold).addStacks(thing, -num);
@@ -241,8 +253,8 @@ pub fn setStacks(self: *StatusEffect, thing: *Thing, num: i32) void {
                 }
             },
             .cold => {
-                // can't get any colder if frozen
-                if (thing.statuses.get(.frozen).stacks > 0) {
+                // can't get any colder if frozen or snowy
+                if (thing.statuses.get(.frozen).stacks > 0 or thing.statuses.get(.snowy).stacks > 0) {
                     return;
                 }
                 // completely put out lit
@@ -254,6 +266,9 @@ pub fn setStacks(self: *StatusEffect, thing: *Thing, num: i32) void {
                 }
             },
             .frozen => {
+                if (thing.statuses.get(.snowy).stacks > 0) {
+                    return;
+                }
                 // completely put out lit
                 thing.statuses.getPtr(.lit).setStacks(thing, 0);
             },
@@ -433,6 +448,7 @@ pub fn fmtDesc(buf: []u8, kind: StatusEffect.Kind) Error![]u8 {
         .shield => try std.fmt.bufPrint(buf, "Prevents damage for a duration", .{}),
         .slimetrail => try std.fmt.bufPrint(buf, "Leave a trail of slime. Immune to said slime", .{}),
         .slimed => try std.fmt.bufPrint(buf, "Slowed movement, take damage when this is applied. Expires in 1 sec", .{}),
+        .snowy => try std.fmt.bufPrint(buf, "Immune to cold, frozen, lit", .{}),
         //else => try std.fmt.bufPrint(buf, "<Placeholder for status: {s}>", .{status.name}),
     };
 }

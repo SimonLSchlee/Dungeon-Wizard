@@ -283,7 +283,7 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                                 const range = @max(dist - hurtbox.radius, 0);
                                 var ticks_til_hit = utl.as(f32, ticks_til_hit_event);
                                 switch (atk.projectile) {
-                                    .gobarrow => {
+                                    .gobarrow, .snowball => {
                                         ticks_til_hit += range / projectile.accel_params.max_speed;
                                     },
                                     .gobbomb => {
@@ -293,7 +293,7 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                                 }
                                 const predicted_target_pos = target.pos.add(target.vel.scale(ticks_til_hit));
                                 switch (atk.projectile) {
-                                    .gobarrow => {
+                                    .gobarrow, .snowball => {
                                         const not_too_fast = target.vel.length() < 0.022 * TileMap.tile_sz_f;
                                         // make sure we can actually still get past nearby walls with this new angle!
                                         if (not_too_fast and room.tilemap.isLOSBetweenThicc(self.pos, predicted_target_pos, atk.LOS_thiccness)) {
@@ -334,7 +334,7 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
             if (events.contains(.hit)) {
                 projectile.dir = self.dir;
                 switch (atk.projectile) {
-                    .gobarrow => {
+                    .gobarrow, .snowball => {
                         projectile.hitbox.?.rel_pos = self.dir.scale(projectile.hitbox.?.rel_pos.length());
                         projectile.hitbox.?.mask = Thing.Faction.opposing_masks.get(self.faction);
                     },

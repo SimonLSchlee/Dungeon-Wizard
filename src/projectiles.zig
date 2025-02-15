@@ -389,12 +389,87 @@ pub const DjinnCrescent = struct {
     }
 };
 
+pub const Snowball = struct {
+    pub const enum_name = "snowball";
+    const AnimRef = struct {
+        var ball_projectile = Data.Ref(Data.SpriteAnim).init("spell-projectile-snowball");
+    };
+    state: enum {
+        in_flight,
+        hitting,
+        destroyed,
+    } = .in_flight,
+
+    pub fn update(self: *Thing, room: *Room) Error!void {
+        assert(self.spawn_state == .spawned);
+        var controller = &self.controller.projectile.kind.snowball;
+        switch (controller.state) {
+            .in_flight => {
+                const done = self.last_coll != null or if (self.hitbox) |h| !h.active else false;
+                if (done) {
+                    controller.state = .hitting;
+                    self.vel = .{};
+                    return;
+                }
+                self.updateVel(self.dir, self.accel_params);
+            },
+            .hitting => {
+                // TODO anim
+                self.deferFree(room);
+                return;
+            },
+            .destroyed => {
+                // TODO anim
+                self.deferFree(room);
+                return;
+            },
+        }
+    }
+
+    fn proto() Thing {
+        var ball = Thing{
+            .kind = .projectile,
+            .coll_radius = 2,
+            .accel_params = .{
+                .accel = 2,
+                .friction = 0,
+                .max_speed = 2.4,
+            },
+            .coll_mask = Thing.Collision.Mask.initMany(&.{.wall}),
+            .controller = .{ .projectile = .{ .kind = .{
+                .snowball = .{},
+            } } },
+            .renderer = .{ .sprite = .{
+                .draw_over = false,
+                .draw_normal = true,
+                .rotate_to_dir = true,
+                .flip_x_to_dir = true,
+                .rel_pos = v2f(0, -10),
+            } },
+            .hitbox = .{
+                .active = true,
+                .deactivate_on_hit = true,
+                .deactivate_on_update = false,
+                .effect = .{
+                    .damage = 3,
+                    .status_stacks = StatusEffect.StacksArray.initDefault(0, .{ .cold = 1 }),
+                },
+                .radius = 2,
+            },
+            .shadow_radius_x = 2,
+        };
+        ball.renderer.sprite.setNormalAnim(AnimRef.ball_projectile);
+        return ball;
+    }
+};
+
 pub const ProjectileTypes = [_]type{
     FireBlaze,
     Gobarrow,
     Gobbomb,
     SlimePuddle,
     DjinnCrescent,
+    Snowball,
 };
 
 pub const Kind = utl.EnumFromTypes(&ProjectileTypes, "enum_name");

@@ -337,11 +337,6 @@ pub const Sound = struct {
     }
 };
 
-pub const CreatureAnimArray = std.EnumArray(sprites.AnimName, ?sprites.CreatureAnim);
-pub const AllCreatureAnimArrays = std.EnumArray(sprites.CreatureAnim.Kind, CreatureAnimArray);
-pub const CreatureSpriteSheetArray = std.EnumArray(sprites.AnimName, ?SpriteSheet);
-pub const AllCreatureSpriteSheetArrays = std.EnumArray(sprites.CreatureAnim.Kind, CreatureSpriteSheetArray);
-
 pub const CreatureSpriteName = enum {
     creature, // misc anim
     wizard,
@@ -357,6 +352,7 @@ pub const CreatureSpriteName = enum {
     shopspider,
     djinn,
     djinn_smoke,
+    snowfren,
 };
 pub const ActionAnimName = enum {
     idle,
