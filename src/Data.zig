@@ -597,7 +597,6 @@ creature_dir_anims: CreatureDirAnimCache,
 spell_icons: EnumSpriteSheet(Spell.Kind),
 item_icons: EnumSpriteSheet(Item.Kind),
 misc_icons: EnumSpriteSheet(MiscIcon),
-spell_tags_icons: EnumSpriteSheet(Spell.Tag.SpriteEnum),
 text_icons: EnumSpriteSheet(icon_text.Icon),
 card_sprites: EnumSpriteSheet(Spell.CardSpriteEnum),
 card_mana_cost: EnumSpriteSheet(Spell.ManaCost.SpriteEnum),
@@ -781,7 +780,6 @@ pub fn reloadSpriteSheets(self: *Data) Error!void {
     self.item_icons = try @TypeOf(self.item_icons).init(self.getByName(SpriteSheet, "item_icons").?);
     self.misc_icons = try @TypeOf(self.misc_icons).init(self.getByName(SpriteSheet, "misc-icons").?);
     self.spell_icons = try @TypeOf(self.spell_icons).init(self.getByName(SpriteSheet, "spell-icons").?);
-    self.spell_tags_icons = try @TypeOf(self.spell_tags_icons).initCropped(self.getByName(SpriteSheet, "spell-tags-icons").?, .magenta);
     self.text_icons = try @TypeOf(self.text_icons).initCropped(self.getByName(SpriteSheet, "small_text_icons").?, .magenta);
     self.card_sprites = try @TypeOf(self.card_sprites).init(self.getByName(SpriteSheet, "card").?);
     self.card_mana_cost = try @TypeOf(self.card_mana_cost).initCropped(self.getByName(SpriteSheet, "card-mana-cost").?, .magenta);
