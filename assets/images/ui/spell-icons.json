@@ -187,6 +187,15 @@
     "spriteSourceSize": { "x": 0, "y": 0, "w": 65, "h": 46 },
     "sourceSize": { "w": 65, "h": 46 },
     "duration": 100
+   },
+   {
+    "filename": "rimefrost  0",
+    "frame": { "x": 0, "y": 966, "w": 65, "h": 46 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 65, "h": 46 },
+    "sourceSize": { "w": 65, "h": 46 },
+    "duration": 100
    }
  ],
  "meta": {
@@ -194,7 +203,7 @@
   "version": "1.3.6-arm64",
   "image": "spell-icons.png",
   "format": "RGBA8888",
-  "size": { "w": 65, "h": 966 },
+  "size": { "w": 65, "h": 1012 },
   "scale": "1",
   "frameTags": [
    { "name": "promptitude", "from": 0, "to": 0, "direction": "forward", "color": "#000000ff" },
@@ -217,7 +226,8 @@
    { "name": "hmmm", "from": 17, "to": 17, "direction": "forward", "color": "#000000ff" },
    { "name": "switcharoo", "from": 18, "to": 18, "direction": "forward", "color": "#000000ff" },
    { "name": "l_bolt", "from": 19, "to": 19, "direction": "forward", "color": "#000000ff" },
-   { "name": "arc_bolt", "from": 20, "to": 20, "direction": "forward", "color": "#000000ff" }
+   { "name": "arc_bolt", "from": 20, "to": 20, "direction": "forward", "color": "#000000ff" },
+   { "name": "rimefrost", "from": 21, "to": 21, "direction": "forward", "color": "#000000ff" }
   ],
   "layers": [
    { "name": "art bg", "opacity": 255, "blendMode": "normal" },
