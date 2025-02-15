@@ -61,7 +61,7 @@ pub const Gobarrow = struct {
         }
     }
 
-    fn proto() Thing {
+    pub fn proto() Thing {
         const arrow = Thing{
             .kind = .projectile,
             .coll_radius = 2.5,
@@ -426,14 +426,14 @@ pub const Snowball = struct {
         }
     }
 
-    fn proto() Thing {
+    pub fn proto() Thing {
         var ball = Thing{
             .kind = .projectile,
-            .coll_radius = 2,
+            .coll_radius = 3,
             .accel_params = .{
-                .accel = 2,
+                .accel = 2.5,
                 .friction = 0,
-                .max_speed = 2.4,
+                .max_speed = 2.5,
             },
             .coll_mask = Thing.Collision.Mask.initMany(&.{.wall}),
             .controller = .{ .projectile = .{ .kind = .{
@@ -444,7 +444,7 @@ pub const Snowball = struct {
                 .draw_normal = true,
                 .rotate_to_dir = true,
                 .flip_x_to_dir = true,
-                .rel_pos = v2f(0, -10),
+                .rel_pos = v2f(0, -12),
             } },
             .hitbox = .{
                 .active = true,
@@ -452,11 +452,12 @@ pub const Snowball = struct {
                 .deactivate_on_update = false,
                 .effect = .{
                     .damage = 3,
+                    .damage_kind = .ice,
                     .status_stacks = StatusEffect.StacksArray.initDefault(0, .{ .cold = 1 }),
                 },
-                .radius = 2,
+                .radius = 4,
             },
-            .shadow_radius_x = 2,
+            .shadow_radius_x = 4,
         };
         ball.renderer.sprite.setNormalAnim(AnimRef.ball_projectile);
         return ball;

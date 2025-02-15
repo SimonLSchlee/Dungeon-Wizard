@@ -245,7 +245,7 @@ pub fn snowfrenProto() Thing {
             .projectile_attack = .{
                 .projectile = .snowball,
                 .range = 85,
-                .LOS_thiccness = 5,
+                .LOS_thiccness = 3.5,
             },
         },
         .cooldown = utl.TickCounter.initStopped(core.secsToTicks(1.5)),
@@ -352,7 +352,7 @@ pub fn gobbowProto() Thing {
         .kind = .{ .projectile_attack = .{
             .projectile = .gobarrow,
             .range = 110,
-            .LOS_thiccness = 5,
+            .LOS_thiccness = 3,
         } },
         .cooldown = utl.TickCounter.initStopped(60),
     });
