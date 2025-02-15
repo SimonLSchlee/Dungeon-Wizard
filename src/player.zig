@@ -41,7 +41,7 @@ pub fn modePrototype(mode: Run.Mode) Thing {
                 .max = 5,
                 .curr = 3,
                 .regen = .{
-                    .timer = utl.TickCounter.init(core.secsToTicks(2)),
+                    .timer = utl.TickCounter.init(core.secsToTicks(6)),
                     .max_threshold = 3,
                 },
             };
@@ -284,22 +284,23 @@ pub const Controller = struct {
         if (self.mana) |*mana| {
             if (mana.regen) |*mrgn| {
                 if (mana.curr < mrgn.max_threshold) {
+                    var looped = mrgn.timer.tick(true);
                     if (self.vel.isAlmostZero()) {
-                        if (mrgn.timer.tick(true)) {
-                            mana.curr += 1;
-                        }
-                        if (@mod(mrgn.timer.curr_tick, @divFloor(mrgn.timer.num_ticks, 4)) == 0) {
-                            _ = AnimRefs.swirlies.get();
-                            const proto = Thing.LoopVFXController.proto(
-                                AnimRefs.swirlies,
-                                0.66,
-                                0.66,
-                                false,
-                                draw.Coloru.rgb(119, 87, 255).toColorf(),
-                                false,
-                            );
-                            _ = room.queueSpawnThing(&proto, self.pos.add(v2f(0, 1))) catch {};
-                        }
+                        looped = mrgn.timer.tick(true) or looped;
+                        looped = mrgn.timer.tick(true) or looped;
+                    }
+                    if (looped) {
+                        mana.curr += 1;
+                        _ = AnimRefs.swirlies.get();
+                        const proto = Thing.LoopVFXController.proto(
+                            AnimRefs.swirlies,
+                            0.66,
+                            0.66,
+                            false,
+                            draw.Coloru.rgb(119, 87, 255).toColorf(),
+                            false,
+                        );
+                        _ = room.queueSpawnThing(&proto, self.pos.add(v2f(0, 1))) catch {};
                     }
                 }
             }
