@@ -31,7 +31,7 @@ const TargetingData = Spell.TargetingData;
 const Params = Spell.Params;
 
 const FlamePurge = @This();
-pub const title = "Flame Purge";
+pub const title = "Flame Burst";
 
 pub const enum_name = "flame_purge";
 pub const Controllers = [_]type{Projectile};
@@ -58,7 +58,6 @@ explode_hit_effect: Thing.HitEffect = .{
     .status_stacks = StatusEffect.StacksArray.initDefault(0, .{ .lit = 1 }),
     .force = .{ .from_center = 2 },
 },
-bonus_damage_per_lit: f32 = 2,
 explode_radius: f32 = base_explode_radius,
 immune_stacks: i32 = 3,
 
@@ -89,13 +88,7 @@ pub const Projectile = struct {
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
     params.validate(.self, caster);
     const flame_purge: @This() = self.kind.flame_purge;
-    // purrgeu
-    const caster_lit_status = caster.statuses.getPtr(.lit);
-    const transferred_stacks: i32 = caster_lit_status.stacks;
-    caster_lit_status.stacks = 0;
-    var updated_hit_effect = flame_purge.explode_hit_effect;
-    //updated_hit_effect.status_stacks.getPtr(.lit).* += transferred_stacks;
-    updated_hit_effect.damage += utl.as(f32, transferred_stacks) * flame_purge.bonus_damage_per_lit;
+    caster.statuses.getPtr(.lit).addStacks(caster, 1);
 
     const ball = Thing{
         .kind = .projectile,
@@ -117,14 +110,12 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             .mask = Thing.Faction.opposing_masks.get(caster.faction),
             .deactivate_on_update = true,
             .deactivate_on_hit = false,
-            .effect = updated_hit_effect,
+            .effect = flame_purge.explode_hit_effect,
             .radius = flame_purge.explode_radius,
         },
     };
     _ = try room.queueSpawnThing(&ball, caster.pos);
     _ = App.get().sfx_player.playSound(&SoundRef.woosh, .{});
-
-    caster.statuses.getPtr(.moist).addStacks(caster, flame_purge.immune_stacks);
 }
 
 pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
@@ -133,44 +124,34 @@ pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
         .kind = .fire,
         .amount = flame_purge.explode_hit_effect.damage,
     };
-    const bonus_damage = Thing.Damage{
-        .kind = .fire,
-        .amount = flame_purge.bonus_damage_per_lit,
-    };
     const fmt =
         \\Deal {any} damage and knock back
         \\surrounding enemies.
-        \\Deal an additional {any} for each
-        \\{any}lit stack you have.
-        \\Gain {any}moist for {d:.0} seconds.
+        \\Light yourself on fire! Ouch!
     ;
     tt.desc = try Spell.Tooltip.Desc.fromSlice(
         try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{
             hit_damage,
-            bonus_damage,
-            StatusEffect.getIcon(.lit),
-            StatusEffect.getIcon(.moist),
-            @floor(StatusEffect.getDurationSeconds(.moist, flame_purge.immune_stacks).?),
         }),
     );
     tt.infos.appendAssumeCapacity(.{ .damage = .fire });
     tt.infos.appendAssumeCapacity(.{ .status = .lit });
-    tt.infos.appendAssumeCapacity(.{ .status = .moist });
 }
 
 pub fn getNewTags(self: *const Spell) Error!Spell.NewTag.Array {
     var buf: [64]u8 = undefined;
     const flame_purge: @This() = self.kind.flame_purge;
     return Spell.NewTag.Array.fromSlice(&.{
-        try Spell.NewTag.makeDamage(.fire, flame_purge.explode_hit_effect.damage, false),
-        try Spell.NewTag.makeStatus(.moist, flame_purge.immune_stacks),
+        try Spell.NewTag.makeDamage(.fire, flame_purge.explode_hit_effect.damage, true),
         .{
             .card_label = try Spell.NewTag.CardLabel.fromSlice(
-                try std.fmt.bufPrint(&buf, "Bonus/{any}:", .{icon_text.Icon.burn}),
+                try std.fmt.bufPrint(&buf, "{any}{any}{any}{any}", .{
+                    icon_text.Fmt{ .tint = .orange },
+                    icon_text.Icon.wizard,
+                    icon_text.Fmt{ .tint = .white },
+                    icon_text.Icon.burn,
+                }),
             ),
-            .start_on_new_line = true,
         },
-        try Spell.NewTag.makeStatus(.lit, 1),
-        try Spell.NewTag.makeDamage(.fire, flame_purge.bonus_damage_per_lit, false),
     }) catch unreachable;
 }

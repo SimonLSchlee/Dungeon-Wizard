@@ -122,11 +122,12 @@ const protos = [_]Proto{
         .icon = .burn,
     },
     .{
-        .enum_name = "moist",
-        .name = "Moist",
+        .enum_name = "cold",
+        .name = "Cold",
+        .cd = 3 * core.fups_per_sec,
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(0.5, 0.8, 1),
-        .icon = .water,
+        .icon = .ice_ball,
     },
     .{
         .enum_name = "trailblaze",
@@ -228,12 +229,17 @@ pub fn setStacks(self: *StatusEffect, thing: *Thing, num: i32) void {
     if (num > 0) {
         switch (self.kind) {
             .lit => {
-                if (thing.statuses.get(.moist).stacks > 0) {
+                if (thing.statuses.get(.cold).stacks > 0) {
                     return;
                 }
             },
-            .moist => {
+            .cold => {
                 thing.statuses.getPtr(.lit).stacks = 0;
+                if (num >= 3) {
+                    thing.statuses.getPtr(.stunned).addStacks(thing, 5);
+                    self.stacks = 1;
+                    return;
+                }
             },
             .slimed => {
                 // can only have 1 slime stack at a time, and wait for it to expire
@@ -328,7 +334,7 @@ pub fn update(status: *StatusEffect, thing: *Thing, room: *Room) Error!void {
     switch (status.kind) {
         // activate at start of each second
         .lit => if (@mod(status.cooldown.curr_tick, core.fups_per_sec) == core.fups_per_sec - 1) {
-            assert(thing.statuses.get(.moist).stacks == 0);
+            assert(thing.statuses.get(.cold).stacks == 0);
             if (thing.hurtbox) |*hurtbox| {
                 const lit_effect = Thing.HitEffect{
                     .damage = utl.as(f32, status.stacks),
@@ -397,11 +403,12 @@ pub fn fmtDesc(buf: []u8, kind: StatusEffect.Kind) Error![]u8 {
                 proto.max_stacks,
             },
         ),
-        .moist => try std.fmt.bufPrint(
+        .cold => try std.fmt.bufPrint(
             buf,
-            "Remove all stacks of {any}lit.\nImmune to {any}lit until duration\nexpires",
+            "Move speed reduced by half per stack.\nRemove 1 stack every {} seconds\nAt 3 stacks, {any}stun for 5 seconds\nImmune to {any}lit.\n",
             .{
-                icon_text.Icon.burn,
+                utl.as(i32, @floor(core.fups_to_secsf(proto.cd))),
+                icon_text.Icon.spiral_yellow,
                 icon_text.Icon.burn,
             },
         ),
@@ -442,18 +449,18 @@ pub fn fmtName(buf: []u8, kind: StatusEffect.Kind) Error![]u8 {
 
 pub fn getInfos(buf: []Tooltip.Info, kind: StatusEffect.Kind) Error![]Tooltip.Info {
     assert(buf.len >= 1);
-    var idx: usize = 0;
-    buf[idx] = .{ .status = kind };
-    idx += 1;
+    var arr = std.ArrayListUnmanaged(Tooltip.Info).initBuffer(buf);
+    arr.appendAssumeCapacity(.{ .status = kind });
+
     switch (kind) {
-        .moist => {
-            assert(buf.len >= 2);
-            buf[idx] = .{ .status = .lit };
-            idx += 1;
+        .cold => {
+            assert(buf.len >= 3);
+            arr.appendAssumeCapacity(.{ .status = .lit });
+            arr.appendAssumeCapacity(.{ .status = .stunned });
         },
         else => {},
     }
-    return buf[0..idx];
+    return arr.items;
 }
 
 inline fn sEnding(num: i32) []const u8 {
