@@ -53,9 +53,9 @@ pub const proto = Spell.makeProto(
 );
 
 hit_effect: Thing.HitEffect = .{
-    .damage = 9,
+    .damage = 7,
     .damage_kind = .ice,
-    .status_stacks = StatusEffect.StacksArray.initDefault(0, .{ .frozen = 3 }),
+    .status_stacks = StatusEffect.StacksArray.initDefault(0, .{ .cold = 2 }),
 },
 radius: f32 = cone_radius,
 arc_rads: f32 = cone_rads,
@@ -175,17 +175,19 @@ pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
         .amount = frost_vom.hit_effect.damage,
     };
     const fmt =
-        \\Deal {any} damage in a
-        \\cone, {any}freezing creatures
-        \\for {d:0.} seconds.
+        \\Deal {any} damage and {}
+        \\{any}cold to all creatures
+        \\in a cone.
     ;
     tt.desc = try Spell.Tooltip.Desc.fromSlice(
         try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{
             hit_dmg,
-            StatusEffect.getIcon(.frozen),
-            StatusEffect.getDurationSeconds(.frozen, frost_vom.hit_effect.status_stacks.get(.frozen)).?,
+            frost_vom.hit_effect.status_stacks.get(.cold),
+            StatusEffect.getIcon(.cold),
         }),
     );
+    tt.infos.appendAssumeCapacity(.{ .damage = .ice });
+    tt.infos.appendAssumeCapacity(.{ .status = .cold });
     tt.infos.appendAssumeCapacity(.{ .status = .frozen });
 }
 
@@ -193,6 +195,6 @@ pub fn getNewTags(self: *const Spell) Error!Spell.NewTag.Array {
     const frost_vom: @This() = self.kind.frost_vom;
     return Spell.NewTag.Array.fromSlice(&.{
         try Spell.NewTag.makeDamage(.ice, frost_vom.hit_effect.damage, true),
-        try Spell.NewTag.makeStatus(.frozen, frost_vom.hit_effect.status_stacks.get(.frozen)),
+        try Spell.NewTag.makeStatus(.cold, frost_vom.hit_effect.status_stacks.get(.cold)),
     }) catch unreachable;
 }

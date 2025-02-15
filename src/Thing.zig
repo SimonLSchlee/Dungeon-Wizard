@@ -1479,6 +1479,7 @@ pub fn getStatusTint(self: *const Thing) Colorf {
     var tint: Colorf = blk: {
         if (self.isAliveCreature()) {
             if (self.statuses.get(.frozen).stacks > 0) break :blk StatusEffect.proto_array.get(.frozen).color;
+            if (self.statuses.get(.cold).stacks > 0) break :blk StatusEffect.proto_array.get(.cold).color;
             if (self.statuses.get(.exposed).stacks > 0) break :blk StatusEffect.proto_array.get(.exposed).color.lerp(.white, 0.25);
         }
         break :blk .white;
@@ -2162,6 +2163,11 @@ pub fn getEffectiveAccelParams(self: *Thing) AccelParams {
         if (self.statuses.get(.slimed).stacks > 0) {
             accel_params.max_speed *= 0.5;
         }
+    }
+    var cold_stacks = self.statuses.get(.cold).stacks;
+    while (cold_stacks > 0) {
+        accel_params.max_speed *= 0.5;
+        cold_stacks -= 1;
     }
     return accel_params;
 }

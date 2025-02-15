@@ -229,17 +229,33 @@ pub fn setStacks(self: *StatusEffect, thing: *Thing, num: i32) void {
     if (num > 0) {
         switch (self.kind) {
             .lit => {
+                // thaw cold
                 if (thing.statuses.get(.cold).stacks > 0) {
+                    thing.statuses.getPtr(.cold).addStacks(thing, -num);
+                    return;
+                }
+                // thaw frozen
+                if (thing.statuses.get(.frozen).stacks > 0) {
+                    thing.statuses.getPtr(.frozen).addStacks(thing, -num);
                     return;
                 }
             },
             .cold => {
-                thing.statuses.getPtr(.lit).stacks = 0;
-                if (num >= 3) {
-                    thing.statuses.getPtr(.stunned).addStacks(thing, 5);
-                    self.stacks = 1;
+                // can't get any colder if frozen
+                if (thing.statuses.get(.frozen).stacks > 0) {
                     return;
                 }
+                // completely put out lit
+                thing.statuses.getPtr(.lit).setStacks(thing, 0);
+                if (num >= 3) {
+                    thing.statuses.getPtr(.frozen).addStacks(thing, 4);
+                    self.stacks = 0;
+                    return;
+                }
+            },
+            .frozen => {
+                // completely put out lit
+                thing.statuses.getPtr(.lit).setStacks(thing, 0);
             },
             .slimed => {
                 // can only have 1 slime stack at a time, and wait for it to expire
@@ -387,7 +403,7 @@ pub fn fmtDesc(buf: []u8, kind: StatusEffect.Kind) Error![]u8 {
     const proto = proto_array.get(kind);
     return switch (kind) {
         .protected => try std.fmt.bufPrint(buf, "The next enemy attack is blocked", .{}),
-        .frozen => try std.fmt.bufPrint(buf, "Cannot move or act", .{}),
+        .frozen => try std.fmt.bufPrint(buf, "Cannot move or act. Thawed by {}Fire", .{Thing.Damage.Kind.fire}),
         .blackmailed => try std.fmt.bufPrint(buf, "Fights for the blackmailer", .{}),
         .mint => try std.fmt.bufPrint(buf, "On death, drops 1 gold per stack", .{}),
         .promptitude => try std.fmt.bufPrint(buf, "Moves and acts at double speed", .{}),
@@ -405,11 +421,11 @@ pub fn fmtDesc(buf: []u8, kind: StatusEffect.Kind) Error![]u8 {
         ),
         .cold => try std.fmt.bufPrint(
             buf,
-            "Move speed reduced by half per stack.\nRemove 1 stack every {} seconds\nAt 3 stacks, {any}stun for 5 seconds\nImmune to {any}lit.\n",
+            "Move speed reduced by half per stack.\nExtinguish {any}lit\nRemove 1 stack every {} seconds\nAt 3 stacks, {any}freeze for 4 seconds",
             .{
-                utl.as(i32, @floor(core.fups_to_secsf(proto.cd))),
-                icon_text.Icon.spiral_yellow,
                 icon_text.Icon.burn,
+                utl.as(i32, @floor(core.fups_to_secsf(proto.cd))),
+                icon_text.Icon.ice_ball,
             },
         ),
         .trailblaze => try std.fmt.bufPrint(buf, "Moves faster.\nLeaves behind a trail of fire", .{}),
@@ -456,7 +472,7 @@ pub fn getInfos(buf: []Tooltip.Info, kind: StatusEffect.Kind) Error![]Tooltip.In
         .cold => {
             assert(buf.len >= 3);
             arr.appendAssumeCapacity(.{ .status = .lit });
-            arr.appendAssumeCapacity(.{ .status = .stunned });
+            arr.appendAssumeCapacity(.{ .status = .frozen });
         },
         else => {},
     }
