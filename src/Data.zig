@@ -479,6 +479,7 @@ pub const MiscIcon = enum {
     gold_stacks,
     knife,
     deck,
+    gearwheel,
 };
 
 pub const TileMapIdxBuf = std.BoundedArray(usize, 16);

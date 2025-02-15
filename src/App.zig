@@ -60,6 +60,9 @@ run: Run = undefined,
 menu_ui: struct {
     commands: ImmUI.CmdBuf = .{},
 } = .{},
+tooltip_ui: struct {
+    commands: ImmUI.CmdBuf = .{},
+} = .{},
 game_render_texture: Platform.RenderTexture2D = undefined,
 ui_render_texture: Platform.RenderTexture2D = undefined,
 
@@ -277,7 +280,6 @@ fn pauseMenuUpdate(self: *App) Error!void {
         title_dims.y + title_padding.y * 2 + btn_dims.y * num_buttons + btn_spacing * (num_buttons - 1) + bottom_spacing,
     );
     const panel_topleft = plat.screen_dims_f.sub(panel_dims).scale(0.5);
-    self.menu_ui.commands.clear();
     self.menu_ui.commands.append(.{
         .rect = .{
             .pos = panel_topleft,
@@ -352,6 +354,8 @@ fn pauseMenuUpdate(self: *App) Error!void {
 
 fn update(self: *App) Error!void {
     self.menu_ui.commands.clear();
+    self.tooltip_ui.commands.clear();
+
     if (self.options_open) {
         switch (try self.options.update(&self.menu_ui.commands)) {
             .close => self.options_open = false,
@@ -363,9 +367,10 @@ fn update(self: *App) Error!void {
                 try self.menuUpdate();
             },
             .run => {
-                if (getPlat().input_buffer.keyIsJustPressed(.escape)) {
-                    self.paused = !self.paused;
-                }
+                try self.run.ui_slots.appUpdate(&self.menu_ui.commands, &self.tooltip_ui.commands, &self.run);
+                //if (getPlat().input_buffer.keyIsJustPressed(.escape)) {
+                //    self.paused = !self.paused;
+                //}
                 if (self.paused) {
                     try self.pauseMenuUpdate();
                 } else {
@@ -393,12 +398,16 @@ fn render(self: *App) Error!void {
         },
         .run => {
             try self.run.render(self.ui_render_texture, self.game_render_texture);
+
+            plat.startRenderToTexture(self.ui_render_texture);
+            plat.setBlend(.render_tex_alpha);
             if (self.paused) {
-                plat.startRenderToTexture(self.ui_render_texture);
-                plat.setBlend(.render_tex_alpha);
-                try ImmUI.render(&self.menu_ui.commands);
-                plat.endRenderToTexture();
+                plat.rectf(.{}, plat.screen_dims_f, .{ .fill_color = Colorf.black.fade(0.5) });
             }
+            try ImmUI.render(&self.menu_ui.commands);
+            try ImmUI.render(&self.tooltip_ui.commands);
+            plat.endRenderToTexture();
+
             plat.texturef(plat.game_canvas_screen_topleft_offset, self.game_render_texture.texture, .{
                 .flip_y = true,
                 .smoothing = .none,

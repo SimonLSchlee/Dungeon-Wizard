@@ -243,6 +243,7 @@ pub const Slots = struct {
     // Non-Action Commands
     pause_slot: UISlot = UISlot.init(.pause),
     show_deck_slot: UISlot = UISlot.init(.show_deck),
+    pause_menu_slot: UISlot = UISlot.init(.pause_menu),
 
     gold: struct {
         rect: geom.Rectf = .{},
@@ -401,6 +402,14 @@ pub const Slots = struct {
             .dims = pause_discard_btn_dims,
         };
         self.show_deck_slot.key_rect_pos = self.show_deck_slot.rect.pos.sub(v2f(3, 10).scale(ui_scaling));
+
+        const pause_menu_topright = v2f(plat.screen_dims_f.x, 0).add(v2f(-10, 10).scale(ui_scaling));
+        const pause_menu_topleft = pause_menu_topright.sub(v2f(pause_discard_btn_dims.x, 0));
+        self.pause_menu_slot.rect = .{
+            .pos = pause_menu_topleft,
+            .dims = pause_discard_btn_dims,
+        };
+        self.pause_menu_slot.key_rect_pos = self.pause_menu_slot.rect.pos.sub(v2f(3, 10).scale(ui_scaling));
 
         // background rect covers everything at bottom of screen
         const room_bg_rect_pos = spells_topleft.sub(v2f(spell_item_margin, 10 * ui_scaling));
@@ -892,6 +901,12 @@ pub const Slots = struct {
                 try info.unqRender(cmd_buf, slot_contents_pos, ui_scaling);
                 tooltip_string = if (run.screen == .deck) "Hide Deck" else "Show Deck";
             },
+            .pause_menu => {
+                const sprite_name = Data.MiscIcon.gearwheel;
+                const info = sprites.RenderIconInfo{ .frame = data.misc_icons.getRenderFrame(sprite_name).? };
+                try info.unqRender(cmd_buf, slot_contents_pos, ui_scaling);
+                tooltip_string = "Menu";
+            },
             else => {},
         }
         if (slot.long_hover.is) {
@@ -1119,6 +1134,14 @@ pub const Slots = struct {
                 }
             },
             else => {},
+        }
+    }
+
+    // only call from App!
+    pub fn appUpdate(self: *Slots, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, run: *Run) Error!void {
+        const app = App.get();
+        if (try unqCommandUISlot(&self.pause_menu_slot, cmd_buf, tooltip_cmd_buf, run, app.paused)) {
+            app.paused = !app.paused;
         }
     }
 };
