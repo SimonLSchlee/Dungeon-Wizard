@@ -232,7 +232,7 @@ pub fn implingProto() Thing {
 }
 
 pub fn snowfrenProto() Thing {
-    var ret = creatureProto(.snowfren, .snowfren, .ally, .{ .aggro = .{} }, 7, .smol, 11);
+    var ret = creatureProto(.snowfren, .snowfren, .ally, .{ .aggro = .{} }, 8, .smol, 11);
 
     const status = ret.statuses.getPtr(.snowy);
     status.addStacks(&ret, 1);

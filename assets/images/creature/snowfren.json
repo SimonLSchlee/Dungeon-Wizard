@@ -48,7 +48,7 @@
    { "name": "attack-E", "from": 2, "to": 3, "direction": "forward", "color": "#000000ff" }
   ],
   "layers": [
-   { "name": "data", "opacity": 255, "blendMode": "normal", "cels": [{ "frame": 4, "data": "pivot-y=13;commit=0;hit=1" }] },
+   { "name": "data", "opacity": 255, "blendMode": "normal", "cels": [{ "frame": 4, "data": "pivot-y=13;commit=1;hit=1" }] },
    { "name": "legs", "opacity": 255, "blendMode": "normal" },
    { "name": "water", "opacity": 255, "blendMode": "normal" },
    { "name": "body", "opacity": 255, "blendMode": "normal" },
