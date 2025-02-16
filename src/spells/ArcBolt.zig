@@ -213,20 +213,20 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
 pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
     const arc_bolt: @This() = self.kind.arc_bolt;
     const hit_dmg = Thing.Damage{
-        .kind = .fire,
+        .kind = .lightning,
         .amount = arc_bolt.hit_effect.damage,
     };
     const fmt =
-        \\Projectile which bounces off walls
-        \\and deals {any} damage on impact.
+        \\Lightning arc which deals {any} damage
+        \\and bounces between enemies up to 4 times.
     ;
     tt.desc = try Spell.Tooltip.Desc.fromSlice(
         try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{
             hit_dmg,
         }),
     );
-    tt.infos.appendAssumeCapacity(.{ .damage = .fire });
-    tt.infos.appendAssumeCapacity(.{ .status = .lit });
+    tt.infos.appendAssumeCapacity(.{ .damage = .lightning });
+    tt.infos.appendAssumeCapacity(.{ .status = .stunned });
 }
 
 pub fn getNewTags(self: *const Spell) Error!Spell.NewTag.Array {

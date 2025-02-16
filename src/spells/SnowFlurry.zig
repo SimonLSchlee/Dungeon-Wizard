@@ -33,8 +33,8 @@ pub const title = "Snow Flurry";
 pub const enum_name = "snow_flurry";
 pub const Controllers = [_]type{Projectile};
 
-const cone_radius = 120;
-const cone_rads: f32 = utl.pi / 5;
+const cone_radius = 200;
+const cone_rads: f32 = utl.pi / 6;
 
 pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
@@ -120,15 +120,12 @@ pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
         .amount = snow_flurry.hit_effect.damage,
     };
     const fmt =
-        \\Deal {any} damage and {}
-        \\{any}cold to all creatures
-        \\in a cone.
+        \\Fling 3 snowballs, each dealing
+        \\{any} damage.
     ;
     tt.desc = try Spell.Tooltip.Desc.fromSlice(
         try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{
             hit_dmg,
-            snow_flurry.hit_effect.status_stacks.get(.cold),
-            StatusEffect.getIcon(.cold),
         }),
     );
     tt.infos.appendAssumeCapacity(.{ .damage = .ice });
@@ -137,8 +134,15 @@ pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
 }
 
 pub fn getNewTags(self: *const Spell) Error!Spell.NewTag.Array {
+    var buf: [64]u8 = undefined;
     const snow_flurry: @This() = self.kind.snow_flurry;
     return Spell.NewTag.Array.fromSlice(&.{
+        .{
+            .card_label = try Spell.NewTag.CardLabel.fromSlice(
+                try std.fmt.bufPrint(&buf, "3x", .{}),
+            ),
+            .start_on_new_line = true,
+        },
         try Spell.NewTag.makeDamage(.ice, snow_flurry.hit_effect.damage, true),
         try Spell.NewTag.makeStatus(.cold, snow_flurry.hit_effect.status_stacks.get(.cold)),
     }) catch unreachable;

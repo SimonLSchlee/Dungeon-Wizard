@@ -74,7 +74,7 @@ pub const description =
 pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
     _ = self;
     const fmt =
-        \\{any}Summon an {any}.
+        \\{any}Summon a {any}.
         \\{any}.
     ;
     tt.desc = try Spell.Tooltip.Desc.fromSlice(

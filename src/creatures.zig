@@ -238,7 +238,7 @@ pub fn snowfrenProto() Thing {
     status.addStacks(&ret, 1);
 
     ret.accel_params = .{
-        .max_speed = 0,
+        .max_speed = 0.1,
     };
     ret.controller.ai_actor.actions.getPtr(.projectile_attack_1).* = (.{
         .kind = .{
@@ -248,7 +248,7 @@ pub fn snowfrenProto() Thing {
                 .LOS_thiccness = 3.5,
             },
         },
-        .cooldown = utl.TickCounter.initStopped(core.secsToTicks(1.5)),
+        .cooldown = utl.TickCounter.initStopped(core.secsToTicks(1)),
     });
     return ret;
 }

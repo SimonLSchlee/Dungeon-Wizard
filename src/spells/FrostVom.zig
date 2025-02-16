@@ -27,7 +27,7 @@ const TargetKind = Spell.TargetKind;
 const TargetingData = Spell.TargetingData;
 const Params = Spell.Params;
 
-pub const title = "Frost Vom";
+pub const title = "Frost Cone";
 
 pub const enum_name = "frost_vom";
 pub const Controllers = [_]type{Projectile};
@@ -175,9 +175,8 @@ pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
         .amount = frost_vom.hit_effect.damage,
     };
     const fmt =
-        \\Deal {any} damage and {}
-        \\{any}cold to all creatures
-        \\in a cone.
+        \\Deal {any} damage and apply {} {any}cold
+        \\to all creatures in a cone.
     ;
     tt.desc = try Spell.Tooltip.Desc.fromSlice(
         try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{

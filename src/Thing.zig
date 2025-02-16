@@ -447,7 +447,7 @@ pub const Damage = struct {
             return switch (kind) {
                 .magic => try std.fmt.bufPrint(buf, "It's maaaagic", .{}),
                 .fire => try std.fmt.bufPrint(buf, "Applies a stack of {any}lit", .{StatusEffect.proto_array.get(.lit).icon}),
-                .ice => try std.fmt.bufPrint(buf, "Cold", .{}),
+                .ice => try std.fmt.bufPrint(buf, "Applies {any}cold", .{StatusEffect.proto_array.get(.cold).icon}),
                 .lightning => try std.fmt.bufPrint(buf, "Zappy. Applies {any}stun", .{StatusEffect.proto_array.get(.stunned).icon}),
                 else => try std.fmt.bufPrint(buf, "It hurts", .{}),
             };

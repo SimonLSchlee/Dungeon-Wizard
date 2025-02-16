@@ -516,7 +516,7 @@ fn _fmtStacksLong(kind: StatusEffect.Kind, stacks: i32) Error![]u8 {
 fn _fmtStacksShort(kind: StatusEffect.Kind, stacks: i32) Error![]u8 {
     const dur_secs = if (StatusEffect.getDurationSeconds(kind, stacks)) |secs_f| utl.as(i32, @floor(secs_f)) else null;
     return switch (kind) {
-        .lit => try utl.bufPrintLocal("{}", .{stacks}),
+        .lit, .cold => try utl.bufPrintLocal("{}", .{stacks}),
         else => if (dur_secs) |secs|
             try utl.bufPrintLocal("{}sec{s}", .{ secs, sEnding(secs) })
         else
