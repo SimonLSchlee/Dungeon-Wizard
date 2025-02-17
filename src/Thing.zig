@@ -487,7 +487,10 @@ pub const Damage = struct {
     }
 };
 
+pub const HitId = u32;
+
 pub const HitEffect = struct {
+    hit_id: ?HitId = null,
     damage_kind: Damage.Kind = .physical,
     damage: f32 = 1,
     status_stacks: StatusEffect.StacksArray = StatusEffect.StacksArray.initDefault(0, .{}),
@@ -516,6 +519,11 @@ pub const HitBox = struct {
         } = .fade_in,
         timer: utl.TickCounter,
     } = null,
+
+    pub fn activate(self: *HitBox, room: *Room) void {
+        self.active = true;
+        self.effect.hit_id = room.getHitId();
+    }
 
     pub fn update(_: *HitBox, self: *Thing, room: *Room) void {
         const hitbox = &self.hitbox.?;
@@ -579,8 +587,31 @@ pub const HitBox = struct {
 pub const HurtBox = struct {
     rel_pos: V2f = .{},
     radius: f32 = 0,
+    recently_hit: utl.BoundedRingBuffer(struct { id: HitId, tick: i64 }, 8) = .{},
 
-    pub fn hit(_: *HurtBox, self: *Thing, room: *Room, effect: HitEffect, maybe_hitter: ?*Thing) void {
+    pub fn hit(hurtbox: *HurtBox, self: *Thing, room: *Room, effect: HitEffect, maybe_hitter: ?*Thing) void {
+        if (effect.hit_id) |hit_id| {
+            var i: usize = 0;
+            // check if we were already hit by this, and clean up old hits
+            while (i < hurtbox.recently_hit.len) {
+                const s = hurtbox.recently_hit.getPtr(i);
+                // throw away hits more than a few seconds old
+                if (s.tick < (room.curr_tick - core.fups_per_sec * 5)) {
+                    hurtbox.recently_hit.swapRemove(i);
+                    continue;
+                }
+                // ignore this hit, we already got hit by it!
+                if (s.id == hit_id) {
+                    return;
+                }
+                i += 1;
+            }
+            // record it in case we get hit by the same thing
+            hurtbox.recently_hit.appendOverwrite(.{
+                .id = hit_id,
+                .tick = room.curr_tick,
+            });
+        }
         // TODO put in StatusEffect/PricklyPotion?
         const prickly_stacks = self.statuses.get(.prickly).stacks;
         if (prickly_stacks > 0) {

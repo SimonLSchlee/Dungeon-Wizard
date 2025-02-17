@@ -216,6 +216,7 @@ edit_mode: bool = false,
 next_pool_id: u32 = 0, // i hate this, can we change it?
 highest_num_things: usize = 0,
 rng: std.Random.DefaultPrng = undefined,
+next_hit_id: u32 = 0,
 // NOTE: hack. update it every frame!
 parent_run_this_frame: *Run = undefined,
 // fields to save/load for level loading
@@ -271,6 +272,7 @@ pub fn reset(self: *Room) Error!void {
     self.progress_state = .none;
     self.paused = false;
     self.draw_pile = self.init_params.deck;
+    self.next_hit_id = 0;
     const tilemap = self.init_params.tilemap_ref.get();
     self.tilemap = tilemap.*;
 
@@ -322,6 +324,12 @@ pub fn resolutionChanged(self: *Room) void {
     self.camera.offset = plat.game_canvas_dims_f.scale(0.5);
     self.camera.zoom = plat.game_zoom_levels;
     self.fog.resolutionChanged();
+}
+
+pub fn getHitId(self: *Room) Thing.HitId {
+    const ret = self.next_hit_id;
+    self.next_hit_id += 1;
+    return ret;
 }
 
 pub fn queueSpawnThing(self: *Room, proto: *const Thing, pos: V2f) Error!?pool.Id {
