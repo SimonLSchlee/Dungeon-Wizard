@@ -161,78 +161,160 @@ pub fn deinit(self: *App) void {
     plat.heap.destroy(self);
 }
 
+pub fn mainMenuButton(cmd_buf: *ImmUI.CmdBuf, center_pos: V2f, dims: V2f, sprite_anim: *Data.SpriteAnim) bool {
+    const plat = getPlat();
+    const ui_scaling = plat.ui_scaling;
+    const mouse_pos = plat.getMousePosScreen();
+    const topleft = center_pos.sub(dims.scale(0.5));
+    const hovered = geom.pointIsInRectf(mouse_pos, .{ .pos = topleft, .dims = dims });
+    const clicked = hovered and plat.input_buffer.mouseBtnIsJustPressed(.left);
+
+    const rf = sprite_anim.getRenderFrame(if (hovered) 1 else 0);
+    var opt = rf.toTextureOpt(ui_scaling);
+    opt.origin = .center;
+    cmd_buf.append(.{
+        .texture = .{
+            .pos = center_pos.add(v2f(0, if (hovered) -1 * ui_scaling else 0)),
+            .texture = rf.texture,
+            .opt = opt,
+        },
+    }) catch unreachable;
+
+    return clicked;
+}
+
 fn menuUpdate(self: *App) Error!void {
+    const SpriteRef = Data.Ref(Data.SpriteAnim);
+    const AnimRef = struct {
+        var bg = SpriteRef.init("game-main-bg-loop");
+        var title = SpriteRef.init("game-title-loop");
+        var title_bg = SpriteRef.init("game-title-bg-loop");
+        var title_hat = SpriteRef.init("game-title-hat-loop");
+        var menu_bg = SpriteRef.init("game-menu-bg-loop");
+        var btn_new_run = SpriteRef.init("game-menu-buttons-new-run");
+        var btn_options = SpriteRef.init("game-menu-buttons-options");
+        var btn_exit = SpriteRef.init("game-menu-buttons-exit");
+    };
+    inline for (std.meta.fields(AnimRef)) |f| {
+        _ = @field(AnimRef, f.name).get();
+    }
     const plat = getPlat();
     const data = self.data;
     const ui_scaling = plat.ui_scaling;
-    const title_text = "Dungeon Wizard";
-    const title_font = data.fonts.get(.pixeloid);
-    const title_opt = draw.TextOpt{
+
+    // main bg
+    const bg_sprite = AnimRef.bg.get();
+    const bg_rf = bg_sprite.getRenderFrame(0);
+    const bg_pos = plat.screen_dims_f.sub(bg_rf.size.toV2f().scale(ui_scaling)).scale(0.5);
+    self.menu_ui.commands.append(.{
+        .texture = .{
+            .pos = bg_pos,
+            .texture = bg_rf.texture,
+            .opt = bg_rf.toTextureOpt(ui_scaling),
+        },
+    }) catch unreachable;
+
+    const center_x = plat.screen_dims_f.x * 0.5;
+
+    // stones bgs
+    {
+        const sprite = AnimRef.title_bg.get();
+        const rf = sprite.getRenderFrame(0);
+        const pos = v2f(center_x, bg_pos.y + 98 * ui_scaling);
+        var opt = rf.toTextureOpt(ui_scaling);
+        opt.origin = .center;
+        self.menu_ui.commands.append(.{
+            .texture = .{
+                .pos = pos,
+                .texture = rf.texture,
+                .opt = opt,
+            },
+        }) catch unreachable;
+    }
+    {
+        const sprite = AnimRef.menu_bg.get();
+        const rf = sprite.getRenderFrame(0);
+        const pos = v2f(center_x, bg_pos.y + 242 * ui_scaling);
+        var opt = rf.toTextureOpt(ui_scaling);
+        opt.origin = .center;
+        self.menu_ui.commands.append(.{
+            .texture = .{
+                .pos = pos,
+                .texture = rf.texture,
+                .opt = opt,
+            },
+        }) catch unreachable;
+    }
+
+    { // title
+        const sprite = AnimRef.title.get();
+        const rf = sprite.getRenderFrame(0);
+        const pos = v2f(center_x, bg_pos.y + 94 * ui_scaling);
+        var opt = rf.toTextureOpt(ui_scaling);
+        opt.origin = .center;
+        self.menu_ui.commands.append(.{
+            .texture = .{
+                .pos = pos,
+                .texture = rf.texture,
+                .opt = opt,
+            },
+        }) catch unreachable;
+    }
+
+    // btns
+    if (mainMenuButton(
+        &self.menu_ui.commands,
+        v2f(center_x, bg_pos.y + 196 * ui_scaling),
+        v2f(123, 38).scale(ui_scaling),
+        AnimRef.btn_new_run.get(),
+    )) {
+        try self.startNewRun(.crispin_picker);
+    }
+    if (mainMenuButton(
+        &self.menu_ui.commands,
+        v2f(center_x, bg_pos.y + 250 * ui_scaling),
+        v2f(111, 41).scale(ui_scaling),
+        AnimRef.btn_options.get(),
+    )) {
+        self.options_open = true;
+    }
+    if (mainMenuButton(
+        &self.menu_ui.commands,
+        v2f(center_x, bg_pos.y + 300 * ui_scaling),
+        v2f(96, 42).scale(ui_scaling),
+        AnimRef.btn_exit.get(),
+    )) {
+        plat.exit();
+    }
+
+    const font = data.fonts.get(.pixeloid);
+    const text_opt = draw.TextOpt{
         .center = true,
         .color = .white,
-        .font = title_font,
-        .size = title_font.base_size * utl.as(u32, ui_scaling + 2),
+        .font = font,
+        .size = font.base_size * utl.as(u32, ui_scaling + 2),
     };
-    const title_dims = try plat.measureText(title_text, title_opt);
-    const btn_dims = v2f(85, 45).scale(ui_scaling);
-    const title_padding = v2f(55, 25).scale(ui_scaling);
-    const btn_spacing: f32 = 10 * ui_scaling;
-    const bottom_spacing: f32 = 20 * ui_scaling;
-    const num_buttons = 4;
-    const panel_dims = v2f(
-        title_dims.x + title_padding.x * 2,
-        title_dims.y + title_padding.y * 2 + btn_dims.y * num_buttons + btn_spacing * (num_buttons - 1) + bottom_spacing,
-    );
-    const panel_topleft = plat.screen_dims_f.sub(panel_dims).scale(0.5);
-    self.menu_ui.commands.append(.{
-        .rect = .{
-            .pos = panel_topleft,
-            .dims = panel_dims,
-            .opt = .{
-                .fill_color = Colorf.rgb(0.1, 0.1, 0.1),
-            },
-        },
-    }) catch unreachable;
+    _ = text_opt;
 
-    const title_topleft = panel_topleft.add(title_padding);
-    const title_center = title_topleft.add(title_dims.scale(0.5));
-
-    self.menu_ui.commands.append(.{
-        .label = .{
-            .pos = title_center,
-            .text = ImmUI.initLabel(title_text),
-            .opt = title_opt,
-        },
-    }) catch unreachable;
     const version_text = config.version;
     const version_opt = draw.TextOpt{
         .color = .white,
-        .font = title_font,
-        .size = title_font.base_size * utl.as(u32, ui_scaling),
+        .font = font,
+        .size = font.base_size * utl.as(u32, ui_scaling),
     };
-    self.menu_ui.commands.append(.{
-        .label = .{
-            .pos = title_center.add(v2f(title_dims.x * 0.5 + 5 * ui_scaling, 0)),
-            .text = ImmUI.initLabel(version_text),
-            .opt = version_opt,
-        },
-    }) catch unreachable;
+    _ = version_text;
+    _ = version_opt;
 
-    const btns_topleft = v2f(
-        panel_topleft.x + (panel_dims.x - btn_dims.x) * 0.5,
-        title_topleft.y + title_dims.y + title_padding.y,
-    );
-    var curr_btn_pos = btns_topleft;
+    const btn_dims = v2f(200, 100);
+    const btn_spacing = 50;
+    var curr_btn_pos = v2f(200, 200);
 
-    if (menuUI.textButtonEx(&self.menu_ui.commands, curr_btn_pos, "   New Run\n(Harriet\nHoarder)", btn_dims, ui_scaling, .yellow)) {
-        try self.startNewRun(.harriet_hoarder);
+    if (false) {
+        if (menuUI.textButtonEx(&self.menu_ui.commands, curr_btn_pos, "   New Run\n(Harriet\nHoarder)", btn_dims, ui_scaling, .yellow)) {
+            try self.startNewRun(.harriet_hoarder);
+        }
+        curr_btn_pos.y += btn_dims.y + btn_spacing;
     }
-    curr_btn_pos.y += btn_dims.y + btn_spacing;
-
-    if (menuUI.textButtonEx(&self.menu_ui.commands, curr_btn_pos, "   New Run\n(Crispin\nCrystal-picker)", btn_dims, ui_scaling, .orange)) {
-        try self.startNewRun(.crispin_picker);
-    }
-    curr_btn_pos.y += btn_dims.y + btn_spacing;
 
     if (false) {
         if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "    New Run\n(Frank 4-slot)", btn_dims, ui_scaling)) {
@@ -244,15 +326,6 @@ fn menuUpdate(self: *App) Error!void {
             try self.startNewRun(.mandy_3_mana);
         }
         curr_btn_pos.y += btn_dims.y + btn_spacing;
-    }
-
-    if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "Options", btn_dims, ui_scaling)) {
-        self.options_open = true;
-    }
-    curr_btn_pos.y += btn_dims.y + btn_spacing;
-
-    if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "Exit", btn_dims, ui_scaling)) {
-        plat.exit();
     }
 }
 
@@ -390,9 +463,10 @@ fn render(self: *App) Error!void {
 
     switch (self.screen) {
         .menu => {
+            const menu_bg_color = draw.Coloru.rgb(31, 14, 91).toColorf();
             plat.startRenderToTexture(self.ui_render_texture);
             plat.setBlend(.render_tex_alpha);
-            plat.clear(.gray);
+            plat.clear(menu_bg_color);
             try ImmUI.render(&self.menu_ui.commands);
             plat.endRenderToTexture();
         },
