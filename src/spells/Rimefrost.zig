@@ -56,7 +56,7 @@ hit_effect: Thing.HitEffect = .{
     }),
 },
 shield_amount: f32 = 5,
-duration_secs: f32 = 5,
+duration_secs: f32 = 7,
 
 const SoundRef = struct {
     var crackle = Data.Ref(Data.Sound).init("crackle");

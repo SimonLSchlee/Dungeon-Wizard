@@ -45,7 +45,7 @@ pub const proto = Spell.makeProto(
 );
 
 shield_amount: f32 = 9,
-duration_secs: f32 = 5,
+duration_secs: f32 = 7,
 
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
     params.validate(.self, caster);
