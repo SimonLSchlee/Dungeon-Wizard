@@ -332,3 +332,42 @@ pub inline fn divAsFloat(FloatType: type, a: anytype, b: anytype) FloatType {
     }
     return as(FloatType, a) / as(FloatType, b);
 }
+
+pub fn BoundedRingBuffer(T: type, capacity: usize) type {
+    if (capacity < 2) {
+        @compileError("capacity must be at least 2\n");
+    }
+    return struct {
+        const Self = @This();
+
+        start: usize = 0, // element 0 position
+        len: usize = 0,
+        buf: [capacity]T align(@alignOf(T)) = undefined,
+
+        pub inline fn normalizeIdx(idx: usize) usize {
+            return idx % capacity;
+        }
+        pub fn appendOverwrite(self: *Self, item: T) void {
+            std.debug.assert(self.len <= capacity);
+            const insert_pos = normalizeIdx(self.start + self.len);
+            if (self.len == capacity) {
+                self.start = normalizeIdx(self.start + 1);
+            } else {
+                self.len += 1;
+            }
+            self.buf[insert_pos] = item;
+        }
+        pub fn getPtr(self: *Self, idx: usize) *T {
+            std.debug.assert(idx < self.len);
+            return &self.buf[normalizeIdx(self.start + idx)];
+        }
+        pub fn swapRemove(self: *Self, idx: usize) void {
+            std.debug.assert(idx < self.len);
+            std.debug.assert(self.len > 0);
+            self.len -= 1;
+            const item_idx = normalizeIdx(self.start + idx);
+            const last_idx = normalizeIdx(self.start + self.len);
+            self.buf[item_idx] = self.buf[last_idx];
+        }
+    };
+}
