@@ -172,6 +172,7 @@ pub fn mainMenuButton(cmd_buf: *ImmUI.CmdBuf, center_pos: V2f, dims: V2f, sprite
     const rf = sprite_anim.getRenderFrame(if (hovered) 1 else 0);
     var opt = rf.toTextureOpt(ui_scaling);
     opt.origin = .center;
+    opt.round_to_pixel = true;
     cmd_buf.append(.{
         .texture = .{
             .pos = center_pos.add(v2f(0, if (hovered) -1 * ui_scaling else 0)),
@@ -223,6 +224,7 @@ fn menuUpdate(self: *App) Error!void {
         const pos = v2f(center_x, bg_pos.y + 98 * ui_scaling);
         var opt = rf.toTextureOpt(ui_scaling);
         opt.origin = .center;
+        opt.round_to_pixel = true;
         self.menu_ui.commands.append(.{
             .texture = .{
                 .pos = pos,
@@ -237,6 +239,7 @@ fn menuUpdate(self: *App) Error!void {
         const pos = v2f(center_x, bg_pos.y + 242 * ui_scaling);
         var opt = rf.toTextureOpt(ui_scaling);
         opt.origin = .center;
+        opt.round_to_pixel = true;
         self.menu_ui.commands.append(.{
             .texture = .{
                 .pos = pos,
@@ -252,6 +255,7 @@ fn menuUpdate(self: *App) Error!void {
         const pos = v2f(center_x, bg_pos.y + 94 * ui_scaling);
         var opt = rf.toTextureOpt(ui_scaling);
         opt.origin = .center;
+        opt.round_to_pixel = true;
         self.menu_ui.commands.append(.{
             .texture = .{
                 .pos = pos,
@@ -304,29 +308,6 @@ fn menuUpdate(self: *App) Error!void {
     };
     _ = version_text;
     _ = version_opt;
-
-    const btn_dims = v2f(200, 100);
-    const btn_spacing = 50;
-    var curr_btn_pos = v2f(200, 200);
-
-    if (false) {
-        if (menuUI.textButtonEx(&self.menu_ui.commands, curr_btn_pos, "   New Run\n(Harriet\nHoarder)", btn_dims, ui_scaling, .yellow)) {
-            try self.startNewRun(.harriet_hoarder);
-        }
-        curr_btn_pos.y += btn_dims.y + btn_spacing;
-    }
-
-    if (false) {
-        if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "    New Run\n(Frank 4-slot)", btn_dims, ui_scaling)) {
-            try self.startNewRun(.frank_4_slot);
-        }
-
-        curr_btn_pos.y += btn_dims.y + btn_spacing;
-        if (menuUI.textButton(&self.menu_ui.commands, curr_btn_pos, "      New Run\n(Mandy 3-mana)", btn_dims, ui_scaling)) {
-            try self.startNewRun(.mandy_3_mana);
-        }
-        curr_btn_pos.y += btn_dims.y + btn_spacing;
-    }
 }
 
 fn pauseMenuUpdate(self: *App) Error!void {

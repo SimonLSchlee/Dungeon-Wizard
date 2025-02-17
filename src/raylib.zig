@@ -908,7 +908,13 @@ pub fn texturef(self: *Platform, pos: V2f, tex: Texture2D, opt: draw.TextureOpt)
     //std.debug.print("{any}", .{dest});
     const origin = switch (opt.origin) {
         .topleft => V2f{},
-        .center => v2f(dest.width, dest.height).scale(0.5),
+        .center => blk: {
+            const p = v2f(dest.width, dest.height).scale(0.5);
+            if (opt.round_to_pixel) {
+                break :blk p.round();
+            }
+            break :blk p;
+        },
         .offset => |o| o.scale(opt.uniform_scaling),
     };
     const r_filter = switch (opt.smoothing) {
