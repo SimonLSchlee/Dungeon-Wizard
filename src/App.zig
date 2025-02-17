@@ -56,6 +56,7 @@ screen: enum {
 } = .menu,
 paused: bool = false,
 options_open: bool = false,
+credits_open: bool = false,
 run: Run = undefined,
 menu_ui: struct {
     commands: ImmUI.CmdBuf = .{},
@@ -190,7 +191,8 @@ fn menuUpdate(self: *App) Error!void {
         var bg = SpriteRef.init("game-main-bg-loop");
         var title = SpriteRef.init("game-title-loop");
         var title_bg = SpriteRef.init("game-title-bg-loop");
-        var title_hat = SpriteRef.init("game-title-hat-loop");
+        var title_hat_closed = SpriteRef.init("game-title-hat-closed");
+        var title_hat_open = SpriteRef.init("game-title-hat-open");
         var menu_bg = SpriteRef.init("game-menu-bg-loop");
         var btn_new_run = SpriteRef.init("game-menu-buttons-new-run");
         var btn_options = SpriteRef.init("game-menu-buttons-options");
@@ -202,6 +204,7 @@ fn menuUpdate(self: *App) Error!void {
     const plat = getPlat();
     const data = self.data;
     const ui_scaling = plat.ui_scaling;
+    const font = data.fonts.get(.pixeloid);
 
     // main bg
     const bg_sprite = AnimRef.bg.get();
@@ -265,6 +268,48 @@ fn menuUpdate(self: *App) Error!void {
         }) catch unreachable;
     }
 
+    // hat and credits
+    if (self.credits_open) {
+        if (mainMenuButton(
+            &self.menu_ui.commands,
+            bg_pos.add(v2f(316, 34).scale(ui_scaling)),
+            v2f(76, 71).scale(ui_scaling),
+            AnimRef.title_hat_open.get(),
+        )) {
+            self.credits_open = false;
+        }
+        const credits_opt = draw.TextOpt{
+            .color = .white,
+            .font = font,
+            .size = font.base_size * utl.as(u32, ui_scaling),
+            .round_to_pixel = true,
+            .smoothing = .none,
+        };
+        self.menu_ui.commands.append(.{
+            .label = .{
+                .text = ImmUI.initLabel("Created by Nuno Das Neves"),
+                .pos = bg_pos.add(v2f(170, 17).scale(ui_scaling)),
+                .opt = credits_opt,
+            },
+        }) catch unreachable;
+        self.menu_ui.commands.append(.{
+            .label = .{
+                .text = ImmUI.initLabel("Additional sound design by Ethan Kelly"),
+                .pos = bg_pos.add(v2f(122, 29).scale(ui_scaling)),
+                .opt = credits_opt,
+            },
+        }) catch unreachable;
+    } else {
+        if (mainMenuButton(
+            &self.menu_ui.commands,
+            bg_pos.add(v2f(316, 34).scale(ui_scaling)),
+            v2f(76, 71).scale(ui_scaling),
+            AnimRef.title_hat_closed.get(),
+        )) {
+            self.credits_open = true;
+        }
+    }
+
     // btns
     if (mainMenuButton(
         &self.menu_ui.commands,
@@ -291,7 +336,6 @@ fn menuUpdate(self: *App) Error!void {
         plat.exit();
     }
 
-    const font = data.fonts.get(.pixeloid);
     const text_opt = draw.TextOpt{
         .center = true,
         .color = .white,
