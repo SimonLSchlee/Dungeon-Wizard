@@ -208,7 +208,8 @@ pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
     };
     const fmt =
         \\Projectile which bounces off walls
-        \\and deals {any} damage on impact.
+        \\and deals {any} damage if it hits
+        \\an enemy creature.
     ;
     tt.desc = try Spell.Tooltip.Desc.fromSlice(
         try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{

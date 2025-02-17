@@ -43,7 +43,7 @@ pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
     .{
         .cast_time = .fast,
-        .mana_cost = Spell.ManaCost.num(2),
+        .mana_cost = Spell.ManaCost.num(1),
         .color = .white,
         .rarity = .exceptional,
         .targeting_data = .{
@@ -218,7 +218,8 @@ pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
     };
     const fmt =
         \\Lightning arc which deals {any} damage
-        \\and bounces between enemies up to 4 times.
+        \\to an enemy, and then bounces between
+        \\enemies up to 4 more times.
     ;
     tt.desc = try Spell.Tooltip.Desc.fromSlice(
         try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{

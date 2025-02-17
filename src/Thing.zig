@@ -590,9 +590,9 @@ pub const HurtBox = struct {
     recently_hit: utl.BoundedRingBuffer(struct { id: HitId, tick: i64 }, 8) = .{},
 
     pub fn hit(hurtbox: *HurtBox, self: *Thing, room: *Room, effect: HitEffect, maybe_hitter: ?*Thing) void {
+        // check if we were already hit by this, and clean up old hits
         if (effect.hit_id) |hit_id| {
             var i: usize = 0;
-            // check if we were already hit by this, and clean up old hits
             while (i < hurtbox.recently_hit.len) {
                 const s = hurtbox.recently_hit.getPtr(i);
                 // throw away hits more than a few seconds old
