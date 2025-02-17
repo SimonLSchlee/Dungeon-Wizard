@@ -86,7 +86,15 @@ pub const Projectile = struct {
         if (projectile.fade_timer.tick(false)) {
             self.deferFree(room);
         }
-        self.renderer.shape.poly_opt.fill_color = Colorf.white.fade(1 - projectile.fade_timer.remapTo0_1());
+        switch (self.renderer) {
+            .shape => |*shape| {
+                shape.poly_opt.fill_color = Colorf.white.fade(1 - projectile.fade_timer.remapTo0_1());
+            },
+            .lightning => |*lightning| {
+                lightning.color = Colorf.white.fade(1 - projectile.fade_timer.remapTo0_1());
+            },
+            else => {},
+        }
     }
 };
 
@@ -94,7 +102,8 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     params.validate(.pos, caster);
     const zap_dash = self.kind.zap_dash;
     const param_target_pos = params.pos;
-    const target_dir = if (param_target_pos.sub(caster.pos).normalizedChecked()) |d| d else V2f.right;
+    const to_target = param_target_pos.sub(caster.pos);
+    const target_dir = if (to_target.normalizedChecked()) |d| d else V2f.right;
     const orig_target_pos = caster.pos.add(target_dir.scale(zap_dash.range));
     const target_pos = self.targeting_data.getRayEnd(room, caster, self.targeting_data.ray_to_mouse.?, orig_target_pos);
 
@@ -108,12 +117,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
                 .zap_dash_projectile = .{},
             },
         } },
-        .renderer = .{ .shape = .{ .kind = .{
-            .arrow = .{
-                .length = target_pos.sub(caster.pos).length(),
-                .thickness = zap_dash.line_thickness,
-            },
-        }, .poly_opt = .{ .fill_color = Colorf.white } } },
+        .renderer = .{ .lightning = .{} },
         .hitbox = .{
             .sweep_to_rel_pos = target_pos.sub(caster.pos),
             .mask = Thing.Faction.opposing_masks.get(caster.faction),
@@ -124,6 +128,23 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
         },
     };
     line.hitbox.?.activate(room);
+    {
+        const renderer = &line.renderer.lightning;
+        const dist = @max(to_target.length(), 1);
+        const approx_section_length: f32 = 6;
+        const num_sections = @round(dist / approx_section_length);
+        const section_length = dist / num_sections;
+        var i: f32 = 0;
+        while (i < num_sections) {
+            const curr_pos = caster.pos.add(target_dir.scale(section_length * i));
+            const rang = utl.tau * room.rng.random().float(f32);
+            const rdst = 2 + 4 * room.rng.random().float(f32);
+            const dir = V2f.fromAngleRadians(rang);
+            const point = curr_pos.add(dir.scale(rdst));
+            renderer.points.append(point) catch break;
+            i += 1;
+        }
+    }
     var circle = line;
     circle.hitbox = .{
         .active = true, // copy hit id from line
@@ -134,12 +155,12 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
         .radius = zap_dash.end_radius,
     };
     circle.hitbox.?.effect.hit_id = line.hitbox.?.effect.hit_id;
-    circle.renderer.shape = .{
+    circle.renderer = .{ .shape = .{
         .draw_normal = false,
         .draw_under = true,
         .kind = .{ .circle = .{ .radius = zap_dash.end_radius } },
         .poly_opt = .{ .fill_color = .white },
-    };
+    } };
     _ = try room.queueSpawnThing(&line, caster.pos);
     _ = try room.queueSpawnThing(&circle, target_pos);
     caster.pos = target_pos;
