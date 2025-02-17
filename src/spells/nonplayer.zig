@@ -94,7 +94,7 @@ pub const spells = [_]type{
         pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
             params.validate(.pos, caster);
             _ = self;
-            var cres = projectiles.DjinnCrescent.proto();
+            var cres = projectiles.DjinnCrescent.proto(room);
             cres.controller.projectile.kind.djinncrescent.target_pos = params.pos;
             cres.hitbox.?.mask = Thing.Faction.opposing_masks.get(caster.faction);
             const to_target = params.pos.sub(caster.pos).normalizedChecked() orelse V2f.right;

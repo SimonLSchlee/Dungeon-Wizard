@@ -187,7 +187,6 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             .lightning = .{},
         },
         .hitbox = .{
-            .active = true,
             .mask = Thing.Faction.opposing_masks.get(caster.faction),
             .deactivate_on_hit = true,
             .deactivate_on_update = false,
@@ -195,6 +194,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             .radius = base_bolt_radius,
         },
     };
+    ball.hitbox.?.activate(room);
     //ball.renderer.sprite.setNormalAnim(AnimRef.projectile_loop);
     _ = try room.queueSpawnThing(&ball, origin);
     _ = App.get().sfx_player.playSound(&SoundRef.crackle, .{});

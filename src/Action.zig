@@ -246,7 +246,7 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                 const hitbox = &self.hitbox.?;
                 //std.debug.print("hit targetu\n", .{});
                 hitbox.mask = Thing.Faction.opposing_masks.get(self.faction);
-                hitbox.active = true;
+                hitbox.activate(room);
                 if (maybe_target_thing) |target_thing| {
                     if (melee.hit_to_side_force > 0) {
                         const d = if (self.dir.cross(target_thing.pos.sub(self.pos)) > 0) self.dir.rotRadians(-utl.pi / 3) else self.dir.rotRadians(utl.pi / 3);
@@ -269,7 +269,7 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                 doing.can_turn = false;
             }
             // face/track target
-            var projectile: Thing = projectiles.proto(atk.projectile);
+            var projectile: Thing = projectiles.proto(room, atk.projectile);
             if (doing.can_turn) {
                 // default to original target pos
                 self.dir = doing.params.pos.sub(self.pos).normalizedChecked() orelse self.dir;

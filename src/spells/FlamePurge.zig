@@ -90,7 +90,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     const flame_purge: @This() = self.kind.flame_purge;
     caster.statuses.getPtr(.lit).addStacks(caster, 1);
 
-    const ball = Thing{
+    var ball = Thing{
         .kind = .projectile,
         .controller = .{ .spell = .{
             .spell = self.*,
@@ -106,7 +106,6 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             },
         },
         .hitbox = .{
-            .active = true,
             .mask = Thing.Faction.opposing_masks.get(caster.faction),
             .deactivate_on_update = true,
             .deactivate_on_hit = false,
@@ -114,6 +113,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             .radius = flame_purge.explode_radius,
         },
     };
+    ball.hitbox.?.activate(room);
     _ = try room.queueSpawnThing(&ball, caster.pos);
     _ = App.get().sfx_player.playSound(&SoundRef.woosh, .{});
 }

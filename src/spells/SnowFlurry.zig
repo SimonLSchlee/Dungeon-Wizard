@@ -80,7 +80,7 @@ pub const Projectile = struct {
         if (projectile.delay_timer.tick(true)) {
             var target_dir = if (target_pos.sub(self.pos).normalizedChecked()) |d| d else V2f.right;
             target_dir = target_dir.rotRadians(room.rng.random().float(f32) * cone_rads - cone_rads * 0.5);
-            var ball = projectiles.Snowball.proto();
+            var ball = projectiles.Snowball.proto(room);
             ball.dir = target_dir;
             ball.hitbox.?.mask = projectile.target_mask;
             _ = try room.queueSpawnThing(&ball, self.pos);

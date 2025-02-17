@@ -61,8 +61,8 @@ pub const Gobarrow = struct {
         }
     }
 
-    pub fn proto() Thing {
-        const arrow = Thing{
+    pub fn proto(room: *Room) Thing {
+        var arrow = Thing{
             .kind = .projectile,
             .coll_radius = 2.5,
             .accel_params = .{
@@ -82,7 +82,6 @@ pub const Gobarrow = struct {
                 .poly_opt = .{ .fill_color = draw.Coloru.rgb(220, 172, 89).toColorf() },
             } },
             .hitbox = .{
-                .active = true,
                 .deactivate_on_hit = true,
                 .deactivate_on_update = false,
                 .effect = .{ .damage = 6 },
@@ -90,6 +89,7 @@ pub const Gobarrow = struct {
                 .rel_pos = V2f.right.scale(14),
             },
         };
+        arrow.hitbox.?.activate(room);
         return arrow;
     }
 };
@@ -119,7 +119,7 @@ pub const FireBlaze = struct {
                         controller.state = .end;
                     }
                 } else if (events.contains(.hit)) {
-                    self.hitbox.?.active = true;
+                    self.hitbox.?.activate(room);
                 }
             },
             .end => {
@@ -130,7 +130,7 @@ pub const FireBlaze = struct {
         }
     }
 
-    pub fn proto() Thing {
+    pub fn proto(_: *Room) Thing {
         var ret = Thing{
             .kind = .projectile,
             .spawn_state = .instance,
@@ -185,7 +185,7 @@ pub const Gobbomb = struct {
                 if (self.pos.dist(controller.target_pos) < self.accel_params.max_speed) {
                     self.vel = .{};
                     if (self.hitbox) |*h| {
-                        h.active = true;
+                        h.activate(room);
                     }
                     controller.state = .hitting;
                 } else {
@@ -206,7 +206,7 @@ pub const Gobbomb = struct {
         }
     }
 
-    fn proto() Thing {
+    fn proto(_: *Room) Thing {
         const flight_ticks = core.secsToTicks(2);
         const max_y: f32 = 150;
         const v0: f32 = 2 * max_y / utl.as(f32, flight_ticks);
@@ -281,7 +281,7 @@ pub const SlimePuddle = struct {
         }
     }
 
-    pub fn proto() Thing {
+    pub fn proto(_: *Room) Thing {
         var ret = Thing{
             .kind = .projectile,
             .spawn_state = .instance,
@@ -293,7 +293,7 @@ pub const SlimePuddle = struct {
                 .draw_under = true,
             } },
             .hitbox = .{
-                .active = true,
+                .active = true, // id-less hit effect
                 .deactivate_on_hit = false,
                 .deactivate_on_update = false,
                 .mask = Thing.Faction.Mask.initFull(),
@@ -353,7 +353,7 @@ pub const DjinnCrescent = struct {
         }
     }
 
-    pub fn proto() Thing {
+    pub fn proto(room: *Room) Thing {
         var crescent = Thing{
             .kind = .projectile,
             .coll_radius = 2.5,
@@ -376,7 +376,6 @@ pub const DjinnCrescent = struct {
                 },
             },
             .hitbox = .{
-                .active = true,
                 .deactivate_on_hit = true,
                 .deactivate_on_update = false,
                 .effect = .{ .damage = 7 },
@@ -384,6 +383,7 @@ pub const DjinnCrescent = struct {
             },
             .shadow_radius_x = 8,
         };
+        crescent.hitbox.?.activate(room);
         crescent.renderer.sprite.setNormalAnim(AnimRef.crescent_projectile);
         return crescent;
     }
@@ -426,7 +426,7 @@ pub const Snowball = struct {
         }
     }
 
-    pub fn proto() Thing {
+    pub fn proto(room: *Room) Thing {
         var ball = Thing{
             .kind = .projectile,
             .coll_radius = 3,
@@ -447,7 +447,6 @@ pub const Snowball = struct {
                 .rel_pos = v2f(0, -12),
             } },
             .hitbox = .{
-                .active = true,
                 .deactivate_on_hit = true,
                 .deactivate_on_update = false,
                 .effect = .{
@@ -459,6 +458,7 @@ pub const Snowball = struct {
             },
             .shadow_radius_x = 4,
         };
+        ball.hitbox.?.activate(room);
         ball.renderer.sprite.setNormalAnim(AnimRef.ball_projectile);
         return ball;
     }
@@ -484,10 +484,10 @@ pub fn GetKindType(kind: Kind) type {
     @compileError("No Projectile kind: " ++ @tagName(kind));
 }
 
-pub fn proto(kind: Kind) Thing {
+pub fn proto(room: *Room, kind: Kind) Thing {
     switch (kind) {
         inline else => |k| {
-            return GetKindType(k).proto();
+            return GetKindType(k).proto(room);
         },
     }
 }

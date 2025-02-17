@@ -79,7 +79,7 @@ pub fn spawnFiresInRadius(room: *Room, pos: V2f, radius: f32, comptime max_spawn
     if (max_spawned > 100) {
         @compileError("too many firess");
     }
-    const fire_proto: Thing = projectiles.proto(.fire_blaze);
+    const fire_proto: Thing = projectiles.proto(room, .fire_blaze);
     const top_left = pos.sub(V2f.splat(radius));
     const sq_size = radius * 2;
     const rnd = room.rng.random();
@@ -138,7 +138,7 @@ pub const Projectile = struct {
             _ = self.renderer.sprite.playNormal(AnimRef.ball_projectile, .{ .loop = true });
             if (!hitbox.active or self.pos.dist(target_pos) < self.vel.length() * 2 or self.last_coll != null) {
                 projectile.exploded = true;
-                hitbox.active = true;
+                hitbox.activate(room);
                 hitbox.deactivate_on_update = true;
                 hitbox.deactivate_on_hit = false;
                 hitbox.radius = flamey_explodey.explode_radius;
@@ -192,7 +192,6 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             },
         },
         .hitbox = .{
-            .active = true,
             .mask = Thing.Faction.opposing_masks.get(caster.faction),
             .deactivate_on_hit = true,
             .deactivate_on_update = false,
@@ -201,6 +200,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
         },
         .shadow_radius_x = flamey_explodey.ball_radius,
     };
+    ball.hitbox.?.activate(room);
     ball.renderer.sprite.setNormalAnim(AnimRef.ball_projectile);
     _ = try room.queueSpawnThing(&ball, params.cast_orig.?);
     _ = App.get().sfx_player.playSound(&SoundRef.crackle, .{});

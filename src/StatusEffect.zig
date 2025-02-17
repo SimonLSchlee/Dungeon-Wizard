@@ -380,7 +380,7 @@ pub fn update(status: *StatusEffect, thing: *Thing, room: *Room) Error!void {
             const len = vec.length();
             const spawn_dist: f32 = 12.5;
             if (len > spawn_dist) {
-                const thing_proto: Thing = projectiles.proto(.fire_blaze);
+                const thing_proto: Thing = projectiles.proto(room, .fire_blaze);
                 const vec_n = vec.scale(1 / len);
                 const num_to_spawn: usize = utl.as(usize, len / spawn_dist);
                 for (0..num_to_spawn) |i| {
@@ -393,7 +393,7 @@ pub fn update(status: *StatusEffect, thing: *Thing, room: *Room) Error!void {
             status.prev_pos = thing.pos;
         },
         .slimetrail => if (status.timer.tick(true)) {
-            const thing_proto: Thing = projectiles.proto(.slimepuddle);
+            const thing_proto: Thing = projectiles.proto(room, .slimepuddle);
             const vec = thing.pos.sub(status.prev_pos.?);
             var pos = status.prev_pos.?.add(vec.scale(0.66));
             const rand_dir = V2f.fromAngleRadians(room.rng.random().float(f32) * utl.tau);

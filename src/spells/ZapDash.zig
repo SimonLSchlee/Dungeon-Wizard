@@ -98,7 +98,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
     const orig_target_pos = caster.pos.add(target_dir.scale(zap_dash.range));
     const target_pos = self.targeting_data.getRayEnd(room, caster, self.targeting_data.ray_to_mouse.?, orig_target_pos);
 
-    const line = Thing{
+    var line = Thing{
         .kind = .projectile,
         .dir = target_dir,
         .controller = .{ .spell = .{
@@ -115,7 +115,6 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             },
         }, .poly_opt = .{ .fill_color = Colorf.white } } },
         .hitbox = .{
-            .active = true,
             .sweep_to_rel_pos = target_pos.sub(caster.pos),
             .mask = Thing.Faction.opposing_masks.get(caster.faction),
             .deactivate_on_hit = false,
@@ -124,15 +123,17 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             .radius = zap_dash.line_thickness * 0.5,
         },
     };
+    line.hitbox.?.activate(room);
     var circle = line;
     circle.hitbox = .{
-        .active = true,
+        .active = true, // copy hit id from line
         .mask = Thing.Faction.opposing_masks.get(caster.faction),
         .deactivate_on_hit = false,
         .deactivate_on_update = true,
         .effect = zap_dash.end_hit_effect,
         .radius = zap_dash.end_radius,
     };
+    circle.hitbox.?.effect.hit_id = line.hitbox.?.effect.hit_id;
     circle.renderer.shape = .{
         .draw_normal = false,
         .draw_under = true,

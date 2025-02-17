@@ -92,7 +92,7 @@ pub const Projectile = struct {
                 if (!projectile.timer.running) {
                     projectile.timer = utl.TickCounter.init(60);
                     projectile.state = .fading;
-                    self.hitbox.?.active = true;
+                    self.hitbox.?.activate(room);
                     self.renderer.sprite.scale = core.game_sprite_scaling * 0.5;
                     self.renderer.sprite.sprite_tint = Colorf.white;
                     self.renderer.sprite.setNormalAnim(AnimRef.end);

@@ -118,7 +118,6 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             },
         },
         .hitbox = .{
-            .active = true,
             .mask = Thing.Faction.opposing_masks.get(caster.faction),
             .deactivate_on_hit = true,
             .deactivate_on_update = false,
@@ -126,6 +125,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             .radius = mint.radius,
         },
     };
+    coin.hitbox.?.activate(room);
     _ = try room.queueSpawnThing(&coin, caster.pos);
 }
 
