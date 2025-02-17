@@ -34,9 +34,9 @@ pub const title = "Zap Dash";
 pub const enum_name = "zap_dash";
 pub const Controllers = [_]type{Projectile};
 
-const base_line_thickness = 6;
+const base_line_thickness = 7;
 const base_end_radius = 25;
-const base_range = 100;
+const base_range = 90;
 
 pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
@@ -58,11 +58,8 @@ pub const proto = Spell.makeProto(
     },
 );
 
-line_hit_effect: Thing.HitEffect = .{
-    .damage = 5,
-},
-end_hit_effect: Thing.HitEffect = .{
-    .damage = 5,
+hit_effect: Thing.HitEffect = .{
+    .damage = 6,
     .status_stacks = StatusEffect.StacksArray.initDefault(0, .{ .stunned = 1 }),
 },
 line_thickness: f32 = base_line_thickness,
@@ -123,7 +120,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             .mask = Thing.Faction.opposing_masks.get(caster.faction),
             .deactivate_on_hit = false,
             .deactivate_on_update = true,
-            .effect = zap_dash.line_hit_effect,
+            .effect = zap_dash.hit_effect,
             .radius = zap_dash.line_thickness * 0.5,
         },
     };
@@ -151,7 +148,7 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
         .mask = Thing.Faction.opposing_masks.get(caster.faction),
         .deactivate_on_hit = false,
         .deactivate_on_update = true,
-        .effect = zap_dash.end_hit_effect,
+        .effect = zap_dash.hit_effect,
         .radius = zap_dash.end_radius,
     };
     circle.hitbox.?.effect.hit_id = line.hitbox.?.effect.hit_id;
@@ -168,30 +165,23 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
 
 pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
     const zap_dash: @This() = self.kind.zap_dash;
-    const line_hit_damage = Thing.Damage{
+    const hit_damage = Thing.Damage{
         .kind = .lightning,
-        .amount = zap_dash.line_hit_effect.damage,
-    };
-    const end_hit_damage = Thing.Damage{
-        .kind = .lightning,
-        .amount = zap_dash.end_hit_effect.damage,
+        .amount = zap_dash.hit_effect.damage,
     };
     const fmt =
         \\Teleport a short distance.
-        \\Deal {any} damage to creatures
-        \\in a line. Deal an additional
-        \\{any} damage and {any}stun
-        \\for {d:.0} seconds near the
-        \\destination.
+        \\Deal {any} damage to enemies
+        \\on the way, and near the target
+        \\location.
     ;
     tt.desc = try Spell.Tooltip.Desc.fromSlice(
         try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{
-            line_hit_damage,
-            end_hit_damage,
-            StatusEffect.getIcon(.stunned),
-            StatusEffect.getDurationSeconds(.stunned, zap_dash.end_hit_effect.status_stacks.get(.stunned)).?,
+            hit_damage,
         }),
     );
+    tt.infos.appendAssumeCapacity(.{ .damage = .lightning });
+    tt.infos.appendAssumeCapacity(.{ .status = .stunned });
 }
 
 pub fn getNewTags(self: *const Spell) Error!Spell.NewTag.Array {
@@ -209,8 +199,7 @@ pub fn getNewTags(self: *const Spell) Error!Spell.NewTag.Array {
                 }),
             ),
         },
-        try Spell.NewTag.makeDamage(.lightning, zap_dash.line_hit_effect.damage, false),
-        try Spell.NewTag.makeDamage(.lightning, zap_dash.end_hit_effect.damage, false),
-        try Spell.NewTag.makeStatus(.stunned, zap_dash.end_hit_effect.status_stacks.get(.stunned)),
+        try Spell.NewTag.makeDamage(.lightning, zap_dash.hit_effect.damage, false),
+        try Spell.NewTag.makeStatus(.stunned, zap_dash.hit_effect.status_stacks.get(.stunned)),
     }) catch unreachable;
 }

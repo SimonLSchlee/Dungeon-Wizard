@@ -224,5 +224,6 @@ pub fn getNewTags(self: *const Spell) Error!Spell.NewTag.Array {
     const l_bolt: @This() = self.kind.l_bolt;
     return Spell.NewTag.Array.fromSlice(&.{
         try Spell.NewTag.makeDamage(.lightning, l_bolt.hit_effect.damage, false),
+        try Spell.NewTag.makeStatus(.stunned, l_bolt.hit_effect.status_stacks.get(.stunned)),
     }) catch unreachable;
 }
