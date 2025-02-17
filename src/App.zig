@@ -146,13 +146,6 @@ fn startNewRun(self: *App, mode: Run.Mode) Error!void {
     _ = try Run.initRandom(&self.run, mode);
     try self.run.startRun();
     self.screen = .run;
-    if (false) {
-        const Ref = struct {
-            var dungongnu = Data.Ref(Data.Sound).init("dungongnu");
-        };
-        const plat = getPlat();
-        plat.playSound(Ref.dungongnu.get().sound);
-    }
 }
 
 pub fn deinit(self: *App) void {
@@ -462,9 +455,11 @@ fn update(self: *App) Error!void {
     } else {
         switch (self.screen) {
             .menu => {
+                self.music_player.setMusic(&self.sfx_player, .menu);
                 try self.menuUpdate();
             },
             .run => {
+                self.music_player.setMusic(&self.sfx_player, null);
                 try self.run.ui_slots.appUpdate(&self.menu_ui.commands, &self.tooltip_ui.commands, &self.run);
                 //if (getPlat().input_buffer.keyIsJustPressed(.escape)) {
                 //    self.paused = !self.paused;
@@ -479,6 +474,7 @@ fn update(self: *App) Error!void {
     }
     self.options.alwaysUpdate();
     self.sfx_player.update();
+    self.music_player.update(&self.sfx_player);
     self.curr_tick += 1;
 }
 

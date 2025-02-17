@@ -1158,11 +1158,6 @@ pub fn loadSound(self: *Platform, path: []const u8) Error!Sound {
     return self._loadSound(path, path_z);
 }
 
-pub fn loadMusic(self: *Platform, path: []const u8) Error!Sound {
-    const path_z = try std.fmt.bufPrintZ(self.str_fmt_buf, "{s}/music/{s}", .{ self.assets_path, path });
-    return self._loadSound(path, path_z);
-}
-
 pub fn exit(self: *Platform) void {
     self.should_exit = true;
 }
@@ -1297,7 +1292,7 @@ pub const FileWalkerIterator = struct {
                 //getPlat().log.err("Failed to open \"{s}\"", .{entry.path});
                 continue;
             };
-            const str = file.readToEndAlloc(self.allocator, 8 * 1024 * 1024) catch {
+            const str = file.readToEndAlloc(self.allocator, 100 * 1024 * 1024) catch {
                 // can't be used from dynlib
                 //getPlat().log.err("Failed to read \"{s}\"", .{entry.path});
                 continue;
