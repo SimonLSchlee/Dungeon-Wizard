@@ -402,9 +402,12 @@ pub const Controls = struct {
 pub const Audio = struct {
     sfx_volume: f32 = 1,
     sfx_slider: Slider = .{},
+    music_volume: f32 = 1,
+    music_slider: Slider = .{},
 
     pub const OptionSerialize = struct {
         sfx_volume: void,
+        music_volume: void,
     };
 };
 
@@ -722,6 +725,7 @@ pub fn initTryLoad(plat: *App.Platform) Options {
     // fix up audio
     {
         ret.audio.sfx_volume = utl.clampf(ret.audio.sfx_volume, 0, 1);
+        ret.audio.music_volume = utl.clampf(ret.audio.music_volume, 0, 1);
     }
 
     return ret;
@@ -758,7 +762,7 @@ fn updateAudio(self: *Options, cmd_buf: *ImmUI.CmdBuf, pos: V2f) Error!bool {
             .opt = text_opt,
         } });
 
-        const slider_pos = pos.add(v2f(150 * ui_scaling, sfx_volume_text_dims.y));
+        const slider_pos = curr_row_pos.add(v2f(150 * ui_scaling, sfx_volume_text_dims.y));
         if (try self.audio.sfx_slider.update(
             cmd_buf,
             slider_pos,
@@ -769,6 +773,29 @@ fn updateAudio(self: *Options, cmd_buf: *ImmUI.CmdBuf, pos: V2f) Error!bool {
             1,
         )) |new_volume| {
             self.audio.sfx_volume = utl.clampf(new_volume / 100, 0, 1);
+        }
+        curr_row_pos.y += row_height;
+    }
+    {
+        const music_volume_text = try utl.bufPrintLocal("Music Volume: {d:0.0}", .{audio.music_volume * 100});
+        const music_volume_text_dims = try plat.measureText(music_volume_text, text_opt);
+        cmd_buf.appendAssumeCapacity(.{ .label = .{
+            .pos = curr_row_pos.add(el_padding),
+            .text = ImmUI.initLabel(music_volume_text),
+            .opt = text_opt,
+        } });
+
+        const slider_pos = curr_row_pos.add(v2f(150 * ui_scaling, music_volume_text_dims.y));
+        if (try self.audio.music_slider.update(
+            cmd_buf,
+            slider_pos,
+            200,
+            self.audio.music_volume * 100,
+            0,
+            100,
+            1,
+        )) |new_volume| {
+            self.audio.music_volume = utl.clampf(new_volume / 100, 0, 1);
         }
         curr_row_pos.y += row_height;
     }
