@@ -224,6 +224,14 @@ pub const Faction = enum {
         .enemy = Faction.Mask.initMany(&.{ .player, .ally, .bezerk }),
         .bezerk = Faction.Mask.initMany(&.{ .neutral, .player, .ally, .enemy, .bezerk }),
     });
+    pub const allied_masks = std.EnumArray(Faction, Faction.Mask).init(.{
+        .object = .{},
+        .neutral = .{},
+        .player = Faction.Mask.initMany(&.{ .ally, .player }),
+        .ally = Faction.Mask.initMany(&.{ .ally, .player }),
+        .enemy = Faction.Mask.initMany(&.{.enemy}),
+        .bezerk = .{},
+    });
 };
 
 pub const HP = struct {
@@ -969,6 +977,9 @@ pub const CastVFXController = struct {
                 if (caster.dir.x < 0) {
                     cast_offset.x *= -1;
                 }
+                if (caster.renderer == .sprite) {
+                    cast_offset = cast_offset.add(caster.renderer.sprite.rel_pos);
+                }
             }
         }
         const cast_end_sound = spell.cast_sound.get().data_ref;
@@ -1122,6 +1133,7 @@ pub const SpriteRenderer = struct {
 pub const SpawnerRenderer = struct {
     sprite_tint: Colorf = .blank,
     base_circle_color: Colorf = .blank,
+    rel_pos: V2f = .{},
 
     pub fn renderUnder(self: *const Thing, _: *const Room) Error!void {
         const renderer = &self.renderer.spawner;
@@ -1144,7 +1156,7 @@ pub const SpawnerRenderer = struct {
         const frame = anim.dirToSpriteAnim(self.dir).getConst().getRenderFrame(0);
         var opt = frame.toTextureOpt(core.game_sprite_scaling);
         opt.tint = renderer.sprite_tint;
-        plat.texturef(self.pos, frame.texture, opt);
+        plat.texturef(self.pos.add(renderer.rel_pos), frame.texture, opt);
     }
 };
 
@@ -1340,6 +1352,7 @@ pub const SpawnerController = struct {
 
     pub fn prototype(creature_kind: CreatureKind) Thing {
         const proto: Thing = App.get().data.creature_protos.get(creature_kind);
+        const rel_pos: V2f = if (proto.renderer == .sprite) proto.renderer.sprite.rel_pos else .{};
         return .{
             .kind = .spawner,
             .dir = proto.dir,
@@ -1350,7 +1363,9 @@ pub const SpawnerController = struct {
                 },
             },
             .renderer = .{
-                .spawner = .{},
+                .spawner = .{
+                    .rel_pos = rel_pos,
+                },
             },
             .faction = proto.faction, // to ensure num_enemies_alive > 0
         };
@@ -1842,8 +1857,15 @@ pub fn render(self: *const Thing, room: *const Room) Error!void {
     const protected = self.statuses.get(.protected);
     if (self.isAliveCreature() and protected.stacks > 0) {
         // TODO dont use select radius
-        const h = if (self.selectable) |s| s.height else self.coll_radius * 2.5;
-        const shield_center = self.pos.sub(v2f(0, h * 0.5));
+        var h = if (self.selectable) |s| s.height else self.coll_radius * 2.5;
+        var shield_center = self.pos.sub(v2f(0, h * 0.5));
+        if (self.renderer == .sprite) {
+            if (App.getData().getCreatureDirAnim(self.creature_kind.?, .idle)) |anim| {
+                const sprite_anim = anim.dirToSpriteAnim(V2f.right).getConst();
+                h = utl.as(f32, sprite_anim.getRenderFrame(0).size.y);
+                shield_center = self.pos.add(v2f(0, self.renderer.sprite.rel_pos.y - h * 0.5));
+            }
+        }
         const popt = draw.PolyOpt{
             .fill_color = null,
             .outline = .{ .color = StatusEffect.proto_array.get(.protected).color },
