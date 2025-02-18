@@ -177,6 +177,13 @@ const protos = [_]Proto{
         .color = Colorf.rgb(0.5, 0.8, 1),
         .icon = .ice_ball,
     },
+    .{
+        .enum_name = "slimeballed",
+        .name = "Slimeballed",
+        .cd_type = .remove_one_stack,
+        .color = Colorf.rgb(0.3, 0.9, 0.2),
+        .icon = .slime,
+    },
 };
 
 pub const Kind = blk: {
@@ -275,6 +282,12 @@ pub fn setStacks(self: *StatusEffect, thing: *Thing, num: i32) void {
             .slimed => {
                 // can only have 1 slime stack at a time, and wait for it to expire
                 // slimetrail is immune from slime
+                if (thing.statuses.get(.slimed).stacks > 0 or thing.statuses.get(.slimetrail).stacks > 0) {
+                    return;
+                }
+            },
+            .slimeballed => {
+                // yeee
                 if (thing.statuses.get(.slimed).stacks > 0 or thing.statuses.get(.slimetrail).stacks > 0) {
                     return;
                 }
@@ -449,6 +462,7 @@ pub fn fmtDesc(buf: []u8, kind: StatusEffect.Kind) Error![]u8 {
         .slimetrail => try std.fmt.bufPrint(buf, "Leave a trail of slime. Immune to said slime", .{}),
         .slimed => try std.fmt.bufPrint(buf, "Slowed movement, take damage when this is applied. Expires in 1 sec", .{}),
         .snowy => try std.fmt.bufPrint(buf, "Immune to cold, frozen, lit", .{}),
+        .slimeballed => try std.fmt.bufPrint(buf, "Slowed movement", .{}),
         //else => try std.fmt.bufPrint(buf, "<Placeholder for status: {s}>", .{status.name}),
     };
 }

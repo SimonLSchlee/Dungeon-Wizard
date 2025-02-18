@@ -464,6 +464,91 @@ pub const Snowball = struct {
     }
 };
 
+pub const FairySlimeBall = struct {
+    pub const enum_name = "fairy_slime_ball";
+
+    const AnimRef = struct {
+        var projectile_loop = Data.Ref(Data.SpriteAnim).init("spell-projectile-slimeball");
+    };
+
+    target_pos: V2f = .{},
+    target_thing: Thing.Id = undefined,
+    target_radius: f32 = 30,
+    state: enum {
+        loop,
+        end,
+    } = .loop,
+
+    pub fn update(self: *Thing, room: *Room) Error!void {
+        var controller = &self.controller.projectile.kind.fairy_slime_ball;
+
+        const target_id = controller.target_thing;
+        const maybe_target_thing = room.getThingById(target_id);
+        if (maybe_target_thing) |thing| {
+            controller.target_pos = thing.pos;
+        }
+        const target_dir = if (controller.target_pos.sub(self.pos).normalizedChecked()) |d| d else V2f.right;
+
+        switch (controller.state) {
+            .loop => {
+                self.updateVel(target_dir, self.accel_params);
+                if (self.vel.normalizedChecked()) |n| {
+                    self.dir = n;
+                }
+                self.accel_params.accel += 0.01;
+                _ = AnimRef.projectile_loop.get();
+                _ = self.renderer.sprite.playNormal(AnimRef.projectile_loop, .{ .loop = true });
+
+                const dist_to_target = self.pos.dist(controller.target_pos);
+                if (dist_to_target <= @max(10, self.accel_params.accel)) {
+                    if (maybe_target_thing) |target| {
+                        if (target.hurtbox) |*hurtbox| {
+                            hurtbox.hit(target, room, self.hitbox.?.effect, null);
+                        }
+                    }
+                    controller.state = .end;
+                    self.vel = .{};
+                }
+            },
+            .end => {
+                self.deferFree(room);
+            },
+        }
+    }
+    pub fn proto(_: *Room) Thing {
+        var ball = Thing{
+            .kind = .projectile,
+            .accel_params = .{
+                .accel = 3.5,
+                .friction = 0.001,
+                .max_speed = 3.5,
+            },
+            .controller = .{ .projectile = .{ .kind = .{
+                .fairy_slime_ball = .{},
+            } } },
+            .renderer = .{ .sprite = .{
+                .draw_over = false,
+                .draw_normal = true,
+                .rotate_to_dir = true,
+                .flip_x_to_dir = true,
+                .rel_pos = v2f(0, -12),
+            } },
+            .hitbox = .{
+                .active = false,
+                .effect = .{
+                    .damage = 0,
+                    .damage_kind = .acid,
+                    .status_stacks = StatusEffect.StacksArray.initDefault(0, .{ .slimeballed = 1 }),
+                },
+                .radius = 4,
+            },
+            .shadow_radius_x = 4,
+        };
+        ball.renderer.sprite.setNormalAnim(AnimRef.projectile_loop);
+        return ball;
+    }
+};
+
 pub const ProjectileTypes = [_]type{
     FireBlaze,
     Gobarrow,
@@ -471,6 +556,7 @@ pub const ProjectileTypes = [_]type{
     SlimePuddle,
     DjinnCrescent,
     Snowball,
+    FairySlimeBall,
 };
 
 pub const Kind = utl.EnumFromTypes(&ProjectileTypes, "enum_name");
