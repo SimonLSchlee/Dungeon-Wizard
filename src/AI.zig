@@ -40,15 +40,15 @@ pub fn getThingsInRadius(self: *Thing, room: *Room, radius: f32, buf: []*Thing) 
     return num;
 }
 
-pub fn getNearestOpposingThing(self: *Thing, room: *Room) ?*Thing {
+pub fn getNearestThing(self: *Thing, room: *Room, only_attackable: bool, only_visible: bool, faction_mask: Thing.Faction.Mask) ?*Thing {
     var closest_dist = std.math.inf(f32);
     var closest: ?*Thing = null;
     for (&room.things.items) |*other| {
         if (!other.isActive()) continue;
         if (other.id.eql(self.id)) continue;
-        if (!Thing.Faction.opposing_masks.get(self.faction).contains(other.faction)) continue;
-        if (other.isInvisible()) continue;
-        if (!other.isAttackableCreature()) continue;
+        if (!faction_mask.contains(other.faction)) continue;
+        if (only_visible and other.isInvisible()) continue;
+        if (only_attackable and !other.isAttackableCreature()) continue;
         const dist = other.pos.dist(self.pos);
         if (dist < closest_dist) {
             closest_dist = dist;
@@ -56,6 +56,14 @@ pub fn getNearestOpposingThing(self: *Thing, room: *Room) ?*Thing {
         }
     }
     return closest;
+}
+
+pub fn getNearestOpposingThing(self: *Thing, room: *Room) ?*Thing {
+    return getNearestThing(self, room, true, true, Thing.Faction.opposing_masks.get(self.faction));
+}
+
+pub fn getNearestAlliedThing(self: *Thing, room: *Room) ?*Thing {
+    return getNearestThing(self, room, false, false, Thing.Faction.allied_masks.get(self.faction));
 }
 
 pub fn inAttackRangeAndLOS(self: *const Thing, room: *const Room, action: *const Action, params: Action.Params) bool {
