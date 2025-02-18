@@ -53,6 +53,7 @@ var desc_buf: [2048]u8 = undefined;
 
 pub const SpellTypes = blk: {
     const player_spells = [_]type{
+        @import("spells/SlimeFairy.zig"),
         @import("spells/SnowFlurry.zig"),
         @import("spells/Snowfren.zig"),
         @import("spells/Rimefrost.zig"),

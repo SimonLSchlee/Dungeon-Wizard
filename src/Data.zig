@@ -353,6 +353,10 @@ pub const CreatureSpriteName = enum {
     djinn,
     djinn_smoke,
     snowfren,
+    @"fairy-blue",
+    @"fairy-green",
+    @"fairy-red",
+    @"fairy-gold",
 };
 pub const ActionAnimName = enum {
     idle,

@@ -129,4 +129,27 @@ pub const spells = [_]type{
             }
         }
     },
+    struct {
+        pub const title = "Fairy Slime";
+        pub const enum_name = "fairy_slime";
+        pub const proto = Spell.makeProto(
+            std.meta.stringToEnum(Spell.Kind, enum_name).?,
+            .{
+                .cast_time = .fast,
+                .obtainableness = Spell.Obtainableness.Mask.initEmpty(),
+                .targeting_data = .{
+                    .kind = .thing,
+                    .max_range = 70,
+                    .show_max_range_ring = true,
+                },
+            },
+        );
+        pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
+            params.validate(.thing, caster);
+            _ = self;
+            var ball = projectiles.FairySlimeBall.proto(room);
+            ball.controller.projectile.kind.fairy_slime_ball.target_thing = params.thing.?;
+            _ = try room.queueSpawnThing(&ball, caster.pos);
+        }
+    },
 };

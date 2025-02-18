@@ -115,6 +115,9 @@ pub const Decision = union(enum) {
         at_least_secs: f32 = 1, // flee for at least this long (unless we reach the destination)
         cooldown_secs: f32 = 1,
     },
+    move_to: struct {
+        target_pos: V2f,
+    },
     action: Action.Doing,
 };
 
@@ -392,6 +395,37 @@ pub const AIDjinnSmoke = struct {
     }
 };
 
+pub const AIFairy = struct {
+    pub fn decide(_: *AIFairy, self: *Thing, room: *Room) Decision {
+        const controller = &self.controller.ai_actor;
+        const ally: *Thing = getNearestAlliedThing(self, room) orelse return .{ .idle = .{} };
+        const enemy: *Thing = getNearestOpposingThing(self, room) orelse return .{ .idle = .{} };
+
+        if (self.pos.dist(ally.pos) > 80) {
+            return .{ .move_to = .{
+                .target_pos = ally.pos,
+            } };
+        }
+
+        const debuff_1 = &controller.actions.getPtr(.spell_cast_thing_debuff_1).*.?;
+        const can_debuff_1 = !debuff_1.cooldown.running;
+
+        if (can_debuff_1 and enemy.pos.dist(self.pos) <= debuff_1.kind.spell_cast.spell.targeting_data.max_range) {
+            return .{ .action = .{
+                .slot = .spell_cast_thing_debuff_1,
+                .params = .{ .target_kind = .thing, .pos = enemy.pos, .thing = enemy.id },
+            } };
+        }
+
+        const dir_to_ally = ally.pos.sub(self.pos).normalizedChecked() orelse V2f.right;
+        const rot_dir = dir_to_ally.rot90CCW();
+
+        return .{ .move_to = .{
+            .target_pos = ally.pos.add(rot_dir.scale(20)),
+        } };
+    }
+};
+
 pub const ActorController = struct {
     pub const Kind = enum {
         idle,
@@ -402,6 +436,7 @@ pub const ActorController = struct {
         gobbomber,
         djinn,
         djinn_smoke,
+        fairy,
     };
     pub const KindData = union(Kind) {
         idle: AIIdle,
@@ -412,6 +447,7 @@ pub const ActorController = struct {
         gobbomber: AIGobbomber,
         djinn: AIDjinn,
         djinn_smoke: AIDjinnSmoke,
+        fairy: AIFairy,
     };
 
     actions: Action.Slot.Array = Action.Slot.Array.initFill(null),
@@ -473,6 +509,9 @@ pub const ActorController = struct {
                             const doing = &controller.decision.action;
                             try controller.actions.getPtr(doing.slot).*.?.begin(self, room, doing);
                         },
+                        .move_to => {
+                            controller.non_action_decision_cooldown = utl.TickCounter.init(10);
+                        },
                     }
                 },
             }
@@ -490,6 +529,16 @@ pub const ActorController = struct {
                     controller.decision = .{ .idle = .{} };
                     // make sure we make a new decision next update
                     controller.non_action_decision_cooldown.stop();
+                }
+            },
+            .move_to => |move| {
+                _ = renderer.playCreatureAnim(self, .move, .{ .loop = true });
+                try self.findPath(room, move.target_pos);
+                const p = self.followPathGetNextPoint(5);
+                self.move(p.sub(self.pos).normalizedOrZero());
+
+                if (!self.vel.isAlmostZero()) {
+                    self.dir = self.vel.normalized();
                 }
             },
             .pursue_to_attack => |s| {

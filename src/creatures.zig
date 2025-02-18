@@ -44,19 +44,35 @@ pub const Kind = enum {
     djinn,
     djinn_smoke,
     snowfren,
+    @"fairy-blue",
+    @"fairy-green",
+    @"fairy-red",
+    @"fairy-gold",
 
     pub fn getIcon(self: Kind) icon_text.Icon {
         if (self == .player) {
             return .wizard;
         }
         const enum_name = utl.enumToString(Thing.CreatureKind, self);
+        if (std.mem.startsWith(u8, enum_name, "fairy")) {
+            return .fairy;
+        }
         if (std.meta.stringToEnum(icon_text.Icon, enum_name)) |icon| {
             return icon;
         }
         return .skull;
     }
+    pub fn getName(self: Kind) []const u8 {
+        return switch (self) {
+            .@"fairy-green" => "slime fairy",
+            .@"fairy-blue" => "sky fairy",
+            .@"fairy-red" => "heart fairy",
+            .@"fairy-gold" => "golden fairy",
+            else => utl.enumToString(Thing.CreatureKind, self),
+        };
+    }
     pub fn fmtName(self: Kind, buf: []u8) Error![]const u8 {
-        return std.fmt.bufPrint(buf, "{any}", .{self});
+        return std.fmt.bufPrint(buf, "{s}", .{self.getName()});
     }
     pub fn fmtDesc(self: Kind, buf: []u8) Error![]const u8 {
         const proto = App.get().data.creature_protos.get(self);
@@ -83,7 +99,7 @@ pub const Kind = enum {
     pub fn format(self: Kind, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) Error!void {
         _ = fmt;
         _ = options;
-        const enum_name = utl.enumToString(Thing.CreatureKind, self);
+        const enum_name = self.getName();
         const first_letter = [1]u8{std.ascii.toUpper(enum_name[0])};
         writer.print("{any}{s}{s}", .{
             self.getIcon(),
@@ -250,6 +266,82 @@ pub fn snowfrenProto() Thing {
         },
         .cooldown = utl.TickCounter.initStopped(core.secsToTicks(1)),
     });
+    return ret;
+}
+
+pub fn fairyBaseProto() Thing {
+    var ret = creatureProto(.@"fairy-blue", .@"fairy-blue", .ally, .{ .fairy = .{} }, 2, .smol, 17);
+    ret.pathing_layer = .flying;
+    ret.accel_params = .{
+        .max_speed = 0.03 * TileMap.tile_sz_f,
+    };
+    ret.renderer.sprite.rel_pos.y = -10;
+    ret.statuses.getPtr(.protected).addStacks(&ret, 1);
+    return ret;
+}
+
+pub fn @"fairy-blueProto"() Thing {
+    var ret = fairyBaseProto();
+    ret.creature_kind = .@"fairy-blue";
+    ret.controller.ai_actor.actions.getPtr(.melee_attack_1).* = (.{
+        .kind = .{
+            .melee_attack = .{
+                .hitbox = .{
+                    .radius = 10,
+                    .rel_pos = V2f.right.scale(10),
+                    .effect = .{ .damage = 3 },
+                },
+                .range = 12.5,
+            },
+        },
+        .cooldown = utl.TickCounter.initStopped(70),
+    });
+    ret.enemy_difficulty = 0.5;
+    return ret;
+}
+
+pub fn @"fairy-greenProto"() Thing {
+    var ret = fairyBaseProto();
+    ret.creature_kind = .@"fairy-green";
+    ret.controller.ai_actor.actions.getPtr(.spell_cast_thing_debuff_1).* = (.{
+        .kind = .{
+            .spell_cast = .{
+                .spell = Spell.getProto(.fairy_slime),
+            },
+        },
+        .cooldown = utl.TickCounter.initStopped(80),
+    });
+    ret.enemy_difficulty = 0.5;
+    return ret;
+}
+
+pub fn @"fairy-redProto"() Thing {
+    var ret = fairyBaseProto();
+    ret.creature_kind = .@"fairy-red";
+    ret.controller.ai_actor.actions.getPtr(.spell_cast_thing_debuff_1).* = (.{
+        .kind = .{
+            .spell_cast = .{
+                .spell = Spell.getProto(.fairy_slime),
+            },
+        },
+        .cooldown = utl.TickCounter.initStopped(80),
+    });
+    ret.enemy_difficulty = 0.5;
+    return ret;
+}
+
+pub fn @"fairy-goldProto"() Thing {
+    var ret = fairyBaseProto();
+    ret.creature_kind = .@"fairy-red";
+    ret.controller.ai_actor.actions.getPtr(.spell_cast_thing_debuff_1).* = (.{
+        .kind = .{
+            .spell_cast = .{
+                .spell = Spell.getProto(.fairy_slime),
+            },
+        },
+        .cooldown = utl.TickCounter.initStopped(80),
+    });
+    ret.enemy_difficulty = 0.5;
     return ret;
 }
 

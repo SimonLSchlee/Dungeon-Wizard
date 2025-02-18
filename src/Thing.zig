@@ -2213,9 +2213,9 @@ pub fn getEffectiveAccelParams(self: *Thing) AccelParams {
             accel_params.friction = 0.15;
             accel_params.max_speed *= 2;
         }
-        if (self.statuses.get(.slimed).stacks > 0) {
-            accel_params.max_speed *= 0.5;
-        }
+    }
+    if (self.statuses.get(.slimed).stacks > 0 or self.statuses.get(.slimeballed).stacks > 0) {
+        accel_params.max_speed *= 0.5;
     }
     var cold_stacks = self.statuses.get(.cold).stacks;
     while (cold_stacks > 0) {
@@ -2308,4 +2308,10 @@ pub fn getRangeToHurtBox(self: *const Thing, pos: V2f) f32 {
     // default to coll_radius
     const dist = self.pos.dist(pos);
     return @max(dist - self.coll_radius, 0);
+}
+
+pub fn isFairy(self: *const Thing) bool {
+    if (!self.isAliveCreature()) return false;
+    const kind = self.creature_kind.?;
+    return kind == .@"fairy-green" or kind == .@"fairy-blue" or kind == .@"fairy-red" or kind == .@"fairy-gold";
 }

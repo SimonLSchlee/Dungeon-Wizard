@@ -352,7 +352,16 @@ pub fn update(status: *StatusEffect, thing: *Thing, room: *Room) Error!void {
         }
     }
     if (status.stacks == 0) {
-        return;
+        switch (status.kind) {
+            .protected => {
+                if (thing.isFairy()) {
+                    status.addStacks(thing, 1);
+                }
+            },
+            else => {
+                return;
+            },
+        }
     }
 
     // prev pos will only be null if status was just applied (from 0 stacks)
