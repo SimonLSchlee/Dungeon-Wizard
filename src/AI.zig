@@ -40,7 +40,7 @@ pub fn getThingsInRadius(self: *Thing, room: *Room, radius: f32, buf: []*Thing) 
     return num;
 }
 
-pub fn getNearestThing(self: *Thing, room: *Room, only_attackable: bool, only_visible: bool, faction_mask: Thing.Faction.Mask) ?*Thing {
+pub fn getNearestThing(self: *Thing, room: *Room, only_attackable: bool, only_visible: bool, allow_fairy: bool, faction_mask: Thing.Faction.Mask) ?*Thing {
     var closest_dist = std.math.inf(f32);
     var closest: ?*Thing = null;
     for (&room.things.items) |*other| {
@@ -49,6 +49,7 @@ pub fn getNearestThing(self: *Thing, room: *Room, only_attackable: bool, only_vi
         if (!faction_mask.contains(other.faction)) continue;
         if (only_visible and other.isInvisible()) continue;
         if (only_attackable and !other.isAttackableCreature()) continue;
+        if (!allow_fairy and other.isFairy()) continue;
         const dist = other.pos.dist(self.pos);
         if (dist < closest_dist) {
             closest_dist = dist;
@@ -59,11 +60,11 @@ pub fn getNearestThing(self: *Thing, room: *Room, only_attackable: bool, only_vi
 }
 
 pub fn getNearestOpposingThing(self: *Thing, room: *Room) ?*Thing {
-    return getNearestThing(self, room, true, true, Thing.Faction.opposing_masks.get(self.faction));
+    return getNearestThing(self, room, true, true, true, Thing.Faction.opposing_masks.get(self.faction));
 }
 
-pub fn getNearestAlliedThing(self: *Thing, room: *Room) ?*Thing {
-    return getNearestThing(self, room, false, false, Thing.Faction.allied_masks.get(self.faction));
+pub fn getNearestAlliedNonFairy(self: *Thing, room: *Room) ?*Thing {
+    return getNearestThing(self, room, true, false, false, Thing.Faction.allied_masks.get(self.faction));
 }
 
 pub fn inAttackRangeAndLOS(self: *const Thing, room: *const Room, action: *const Action, params: Action.Params) bool {
@@ -398,31 +399,55 @@ pub const AIDjinnSmoke = struct {
 pub const AIFairy = struct {
     pub fn decide(_: *AIFairy, self: *Thing, room: *Room) Decision {
         const controller = &self.controller.ai_actor;
-        const ally: *Thing = getNearestAlliedThing(self, room) orelse return .{ .idle = .{} };
-        const enemy: *Thing = getNearestOpposingThing(self, room) orelse return .{ .idle = .{} };
+        const maybe_ally: ?*Thing = getNearestAlliedNonFairy(self, room);
 
-        if (self.pos.dist(ally.pos) > 80) {
+        if (maybe_ally) |ally| {
+            if (self.pos.dist(ally.pos) > 90) {
+                return .{ .move_to = .{
+                    .target_pos = ally.pos,
+                } };
+            }
+        }
+
+        if (controller.actions.getPtr(.spell_cast_thing_debuff_1).*) |debuff_1| {
+            const can_debuff_1 = !debuff_1.cooldown.running;
+
+            if (can_debuff_1) {
+                if (getNearestOpposingThing(self, room)) |enemy| {
+                    if (enemy.pos.dist(self.pos) <= debuff_1.kind.spell_cast.spell.targeting_data.max_range) {
+                        return .{ .action = .{
+                            .slot = .spell_cast_thing_debuff_1,
+                            .params = .{ .target_kind = .thing, .pos = enemy.pos, .thing = enemy.id },
+                        } };
+                    }
+                }
+            }
+        }
+
+        if (controller.actions.getPtr(.spell_cast_thing_buff_1).*) |buff_1| {
+            const can_buff_1 = !buff_1.cooldown.running;
+            if (maybe_ally) |ally| {
+                if (can_buff_1) {
+                    if (ally.pos.dist(self.pos) <= buff_1.kind.spell_cast.spell.targeting_data.max_range) {
+                        return .{ .action = .{
+                            .slot = .spell_cast_thing_buff_1,
+                            .params = .{ .target_kind = .thing, .pos = ally.pos, .thing = ally.id },
+                        } };
+                    }
+                }
+            }
+        }
+
+        if (maybe_ally) |ally| {
+            const dir_to_ally = ally.pos.sub(self.pos).normalizedChecked() orelse V2f.right;
+            const rot_dir = dir_to_ally.rot90CCW();
+
             return .{ .move_to = .{
-                .target_pos = ally.pos,
+                .target_pos = ally.pos.add(rot_dir.scale(20)),
             } };
         }
 
-        const debuff_1 = &controller.actions.getPtr(.spell_cast_thing_debuff_1).*.?;
-        const can_debuff_1 = !debuff_1.cooldown.running;
-
-        if (can_debuff_1 and enemy.pos.dist(self.pos) <= debuff_1.kind.spell_cast.spell.targeting_data.max_range) {
-            return .{ .action = .{
-                .slot = .spell_cast_thing_debuff_1,
-                .params = .{ .target_kind = .thing, .pos = enemy.pos, .thing = enemy.id },
-            } };
-        }
-
-        const dir_to_ally = ally.pos.sub(self.pos).normalizedChecked() orelse V2f.right;
-        const rot_dir = dir_to_ally.rot90CCW();
-
-        return .{ .move_to = .{
-            .target_pos = ally.pos.add(rot_dir.scale(20)),
-        } };
+        return .{ .idle = .{} };
     }
 };
 

@@ -283,20 +283,14 @@ pub fn fairyBaseProto() Thing {
 pub fn @"fairy-blueProto"() Thing {
     var ret = fairyBaseProto();
     ret.creature_kind = .@"fairy-blue";
-    ret.controller.ai_actor.actions.getPtr(.melee_attack_1).* = (.{
+    ret.controller.ai_actor.actions.getPtr(.spell_cast_thing_buff_1).* = (.{
         .kind = .{
-            .melee_attack = .{
-                .hitbox = .{
-                    .radius = 10,
-                    .rel_pos = V2f.right.scale(10),
-                    .effect = .{ .damage = 3 },
-                },
-                .range = 12.5,
+            .spell_cast = .{
+                .spell = Spell.getProto(.fairy_air),
             },
         },
-        .cooldown = utl.TickCounter.initStopped(70),
+        .cooldown = utl.TickCounter.initStopped(core.secsToTicks(5)),
     });
-    ret.enemy_difficulty = 0.5;
     return ret;
 }
 
@@ -309,24 +303,22 @@ pub fn @"fairy-greenProto"() Thing {
                 .spell = Spell.getProto(.fairy_slime),
             },
         },
-        .cooldown = utl.TickCounter.initStopped(80),
+        .cooldown = utl.TickCounter.initStopped(core.secsToTicks(5)),
     });
-    ret.enemy_difficulty = 0.5;
     return ret;
 }
 
 pub fn @"fairy-redProto"() Thing {
     var ret = fairyBaseProto();
     ret.creature_kind = .@"fairy-red";
-    ret.controller.ai_actor.actions.getPtr(.spell_cast_thing_debuff_1).* = (.{
+    ret.controller.ai_actor.actions.getPtr(.spell_cast_thing_buff_1).* = (.{
         .kind = .{
             .spell_cast = .{
-                .spell = Spell.getProto(.fairy_slime),
+                .spell = Spell.getProto(.fairy_heart),
             },
         },
-        .cooldown = utl.TickCounter.initStopped(80),
+        .cooldown = utl.TickCounter.initStopped(core.secsToTicks(7)),
     });
-    ret.enemy_difficulty = 0.5;
     return ret;
 }
 

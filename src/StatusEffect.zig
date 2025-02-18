@@ -50,7 +50,7 @@ const protos = [_]Proto{
     .{
         .enum_name = "protected",
         .name = "Protected",
-        .cd = 10 * core.fups_per_sec,
+        .cd = 4 * core.fups_per_sec,
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(0.7, 0.7, 0.4),
         .icon = .ouchy_skull, // TODO
@@ -183,6 +183,13 @@ const protos = [_]Proto{
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(0.3, 0.9, 0.2),
         .icon = .slime,
+    },
+    .{
+        .enum_name = "hasted",
+        .name = "Hasted",
+        .cd_type = .remove_one_stack,
+        .color = Colorf.rgb(0.3, 0.9, 0.2),
+        .icon = .trailblaze,
     },
 };
 
@@ -472,6 +479,7 @@ pub fn fmtDesc(buf: []u8, kind: StatusEffect.Kind) Error![]u8 {
         .slimed => try std.fmt.bufPrint(buf, "Slowed movement, take damage when this is applied. Expires in 1 sec", .{}),
         .snowy => try std.fmt.bufPrint(buf, "Immune to cold, frozen, lit", .{}),
         .slimeballed => try std.fmt.bufPrint(buf, "Slowed movement", .{}),
+        .hasted => try std.fmt.bufPrint(buf, "Increased movement", .{}),
         //else => try std.fmt.bufPrint(buf, "<Placeholder for status: {s}>", .{status.name}),
     };
 }

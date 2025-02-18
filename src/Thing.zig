@@ -638,7 +638,7 @@ pub const HurtBox = struct {
         // TODO put in StatusEffect/Protec?
         if (effect.can_be_blocked) {
             const protect_stacks = &self.statuses.getPtr(.protected).stacks;
-            if (protect_stacks.* > 0) {
+            if (protect_stacks.* > 0 and effect.damage > 0) {
                 protect_stacks.* -= 1;
                 return;
             }
@@ -2214,8 +2214,14 @@ pub fn getEffectiveAccelParams(self: *Thing) AccelParams {
             accel_params.max_speed *= 2;
         }
     }
-    if (self.statuses.get(.slimed).stacks > 0 or self.statuses.get(.slimeballed).stacks > 0) {
+    if (self.statuses.get(.slimed).stacks > 0) {
         accel_params.max_speed *= 0.5;
+    } else if (self.statuses.get(.slimeballed).stacks > 0) {
+        accel_params.max_speed *= 0.66;
+    }
+    if (self.statuses.get(.hasted).stacks > 0) {
+        accel_params.accel *= 1.5;
+        accel_params.max_speed *= 1.5;
     }
     var cold_stacks = self.statuses.get(.cold).stacks;
     while (cold_stacks > 0) {

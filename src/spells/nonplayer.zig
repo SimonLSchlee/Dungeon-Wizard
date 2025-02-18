@@ -22,6 +22,7 @@ const Thing = @import("../Thing.zig");
 const TileMap = @import("../TileMap.zig");
 const StatusEffect = @import("../StatusEffect.zig");
 const projectiles = @import("../projectiles.zig");
+const Data = @import("../Data.zig");
 
 const Spell = @import("../Spell.zig");
 const TargetKind = Spell.TargetKind;
@@ -144,11 +145,96 @@ pub const spells = [_]type{
                 },
             },
         );
+        const AnimRef = struct {
+            var projectile_loop = Data.Ref(Data.SpriteAnim).init("spell-projectile-slimeball");
+        };
         pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
             params.validate(.thing, caster);
             _ = self;
-            var ball = projectiles.FairySlimeBall.proto(room);
-            ball.controller.projectile.kind.fairy_slime_ball.target_thing = params.thing.?;
+            var ball = projectiles.FairyBall.proto(room);
+            ball.controller.projectile.kind.fairy_ball.target_pos = params.pos;
+            ball.controller.projectile.kind.fairy_ball.target_thing = params.thing.?;
+            _ = AnimRef.projectile_loop.get();
+            ball.renderer.sprite.setNormalAnim(AnimRef.projectile_loop);
+            ball.hitbox.?.effect = .{
+                .damage = 0,
+                .status_stacks = StatusEffect.StacksArray.initDefault(0, .{
+                    .slimeballed = 3,
+                    .exposed = 3,
+                }),
+            };
+            _ = try room.queueSpawnThing(&ball, caster.pos);
+        }
+    },
+    struct {
+        pub const title = "Fairy Heart";
+        pub const enum_name = "fairy_heart";
+        pub const proto = Spell.makeProto(
+            std.meta.stringToEnum(Spell.Kind, enum_name).?,
+            .{
+                .cast_time = .fast,
+                .obtainableness = Spell.Obtainableness.Mask.initEmpty(),
+                .targeting_data = .{
+                    .kind = .thing,
+                    .max_range = 60,
+                    .show_max_range_ring = true,
+                },
+            },
+        );
+        const AnimRef = struct {
+            var projectile_loop = Data.Ref(Data.SpriteAnim).init("spell-projectile-heart");
+        };
+        pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
+            params.validate(.thing, caster);
+            _ = self;
+            var ball = projectiles.FairyBall.proto(room);
+            ball.controller.projectile.kind.fairy_ball.target_thing = params.thing.?;
+            ball.controller.projectile.kind.fairy_ball.target_pos = params.pos;
+            _ = AnimRef.projectile_loop.get();
+            ball.renderer.sprite.setNormalAnim(AnimRef.projectile_loop);
+            ball.hitbox.?.effect = .{
+                .damage = 0,
+                .status_stacks = StatusEffect.StacksArray.initDefault(0, .{
+                    .protected = 1,
+                    .promptitude = 3,
+                }),
+            };
+            _ = try room.queueSpawnThing(&ball, caster.pos);
+        }
+    },
+    struct {
+        pub const title = "Fairy Air";
+        pub const enum_name = "fairy_air";
+        pub const proto = Spell.makeProto(
+            std.meta.stringToEnum(Spell.Kind, enum_name).?,
+            .{
+                .cast_time = .fast,
+                .obtainableness = Spell.Obtainableness.Mask.initEmpty(),
+                .targeting_data = .{
+                    .kind = .thing,
+                    .max_range = 60,
+                    .show_max_range_ring = true,
+                },
+            },
+        );
+        const AnimRef = struct {
+            var projectile_loop = Data.Ref(Data.SpriteAnim).init("spell-projectile-skyball");
+        };
+        pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
+            params.validate(.thing, caster);
+            _ = self;
+            var ball = projectiles.FairyBall.proto(room);
+            ball.controller.projectile.kind.fairy_ball.target_thing = params.thing.?;
+            ball.controller.projectile.kind.fairy_ball.target_pos = params.pos;
+            _ = AnimRef.projectile_loop.get();
+            ball.renderer.sprite.setNormalAnim(AnimRef.projectile_loop);
+            ball.hitbox.?.effect = .{
+                .damage = 0,
+                .status_stacks = StatusEffect.StacksArray.initDefault(0, .{
+                    .unseeable = 3,
+                    .hasted = 3,
+                }),
+            };
             _ = try room.queueSpawnThing(&ball, caster.pos);
         }
     },

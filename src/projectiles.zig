@@ -464,12 +464,8 @@ pub const Snowball = struct {
     }
 };
 
-pub const FairySlimeBall = struct {
-    pub const enum_name = "fairy_slime_ball";
-
-    const AnimRef = struct {
-        var projectile_loop = Data.Ref(Data.SpriteAnim).init("spell-projectile-slimeball");
-    };
+pub const FairyBall = struct {
+    pub const enum_name = "fairy_ball";
 
     target_pos: V2f = .{},
     target_thing: Thing.Id = undefined,
@@ -480,7 +476,7 @@ pub const FairySlimeBall = struct {
     } = .loop,
 
     pub fn update(self: *Thing, room: *Room) Error!void {
-        var controller = &self.controller.projectile.kind.fairy_slime_ball;
+        var controller = &self.controller.projectile.kind.fairy_ball;
 
         const target_id = controller.target_thing;
         const maybe_target_thing = room.getThingById(target_id);
@@ -496,8 +492,7 @@ pub const FairySlimeBall = struct {
                     self.dir = n;
                 }
                 self.accel_params.accel += 0.01;
-                _ = AnimRef.projectile_loop.get();
-                _ = self.renderer.sprite.playNormal(AnimRef.projectile_loop, .{ .loop = true });
+                _ = self.renderer.sprite.tickCurrAnim(.{ .loop = true });
 
                 const dist_to_target = self.pos.dist(controller.target_pos);
                 if (dist_to_target <= @max(10, self.accel_params.accel)) {
@@ -516,7 +511,7 @@ pub const FairySlimeBall = struct {
         }
     }
     pub fn proto(_: *Room) Thing {
-        var ball = Thing{
+        const ball = Thing{
             .kind = .projectile,
             .accel_params = .{
                 .accel = 3.5,
@@ -524,7 +519,7 @@ pub const FairySlimeBall = struct {
                 .max_speed = 3.5,
             },
             .controller = .{ .projectile = .{ .kind = .{
-                .fairy_slime_ball = .{},
+                .fairy_ball = .{},
             } } },
             .renderer = .{ .sprite = .{
                 .draw_over = false,
@@ -537,14 +532,11 @@ pub const FairySlimeBall = struct {
                 .active = false,
                 .effect = .{
                     .damage = 0,
-                    .damage_kind = .acid,
-                    .status_stacks = StatusEffect.StacksArray.initDefault(0, .{ .slimeballed = 1 }),
                 },
                 .radius = 4,
             },
             .shadow_radius_x = 4,
         };
-        ball.renderer.sprite.setNormalAnim(AnimRef.projectile_loop);
         return ball;
     }
 };
@@ -556,7 +548,7 @@ pub const ProjectileTypes = [_]type{
     SlimePuddle,
     DjinnCrescent,
     Snowball,
-    FairySlimeBall,
+    FairyBall,
 };
 
 pub const Kind = utl.EnumFromTypes(&ProjectileTypes, "enum_name");
