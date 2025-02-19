@@ -128,34 +128,33 @@ pub const Params = struct {
     }
 };
 
-pub const Doing = struct {
-    slot: Action.Slot,
-    params: Params,
-    can_turn: bool = true,
-};
 kind: KindData,
 curr_tick: i64 = 0,
+params: Params = .{ .target_kind = .self },
 cooldown: utl.TickCounter = utl.TickCounter.initStopped(60),
+can_turn: bool = true,
 
-pub fn begin(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) Error!void {
+pub fn begin(action: *Action, self: *Thing, room: *Room, params: Params) Error!void {
+    action.params = params;
+    action.can_turn = true;
     const maybe_target_thing: ?*const Thing =
-        if (doing.params.thing) |target_id|
+        if (action.params.thing) |target_id|
         if (room.getConstThingById(target_id)) |t| t else null
     else
         null;
     // make sure we always have a pos in the params, if we have a Thing
     if (maybe_target_thing) |t| {
-        doing.params.pos = t.pos;
+        action.params.pos = t.pos;
     }
     // TODO other stuff - maybe set pos to self.pos by default? idk
     // face what we're doing
-    self.dir = doing.params.pos.sub(self.pos).normalizedChecked() orelse self.dir;
+    self.dir = action.params.pos.sub(self.pos).normalizedChecked() orelse self.dir;
     switch (action.kind) {
         .melee_attack => |*melee| {
             _ = melee;
         },
         .projectile_attack => |*proj| {
-            proj.target_pos = doing.params.pos;
+            proj.target_pos = action.params.pos;
         },
         .spell_cast => |*sp| {
             _ = sp;
@@ -172,10 +171,10 @@ pub fn begin(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) E
 }
 
 // return true if done
-pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) Error!bool {
+pub fn update(action: *Action, self: *Thing, room: *Room) Error!bool {
     const renderer = &self.renderer.sprite;
     const maybe_target_thing: ?*const Thing =
-        if (doing.params.thing) |target_id|
+        if (action.params.thing) |target_id|
         if (room.getConstThingById(target_id)) |t| t else null
     else
         null;
@@ -185,7 +184,7 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
             self.updateVel(.{}, .{});
             const events = renderer.playCreatureAnim(self, .attack, .{ .loop = true });
             if (events.contains(.commit)) {
-                doing.can_turn = false;
+                action.can_turn = false;
                 self.hitbox = melee.hitbox;
                 const hitbox = &self.hitbox.?;
                 const dir_ang = self.dir.toAngleRadians();
@@ -200,7 +199,7 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                 }
             }
             // predict hit
-            if (doing.can_turn) {
+            if (action.can_turn) {
                 if (maybe_target_thing) |target| {
                     if (!target.isInvisible()) {
                         if (renderer.getTicksUntilEvent(.hit)) |ticks_til_hit_event| {
@@ -266,14 +265,14 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
             self.updateVel(.{}, .{});
             const events = renderer.playCreatureAnim(self, .attack, .{ .loop = true });
             if (events.contains(.commit)) {
-                doing.can_turn = false;
+                action.can_turn = false;
             }
             // face/track target
             var projectile: Thing = projectiles.proto(room, atk.projectile);
-            if (doing.can_turn) {
+            if (action.can_turn) {
                 // default to original target pos
-                self.dir = doing.params.pos.sub(self.pos).normalizedChecked() orelse self.dir;
-                atk.target_pos = doing.params.pos;
+                self.dir = action.params.pos.sub(self.pos).normalizedChecked() orelse self.dir;
+                atk.target_pos = action.params.pos;
 
                 if (maybe_target_thing) |target| {
                     if (!target.isInvisible()) {
@@ -369,7 +368,7 @@ pub fn update(action: *Action, self: *Thing, room: *Room, doing: *Action.Doing) 
                 spc.cast_vfx = null;
             }
             if (action.curr_tick == 60) {
-                try spc.spell.cast(self, room, doing.params);
+                try spc.spell.cast(self, room, action.params);
                 return true;
             }
             self.updateVel(.{}, .{});

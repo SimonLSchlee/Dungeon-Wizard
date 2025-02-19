@@ -119,7 +119,10 @@ pub const Decision = union(enum) {
     move_to: struct {
         target_pos: V2f,
     },
-    action: Action.Doing,
+    action: struct {
+        slot: Action.Slot,
+        params: Action.Params,
+    },
 };
 
 pub const AIIdle = struct {
@@ -532,7 +535,7 @@ pub const ActorController = struct {
                         },
                         .action => {
                             const doing = &controller.decision.action;
-                            try controller.actions.getPtr(doing.slot).*.?.begin(self, room, doing);
+                            try controller.actions.getPtr(doing.slot).*.?.begin(self, room, doing.params);
                         },
                         .move_to => {
                             controller.non_action_decision_cooldown = utl.TickCounter.init(10);
@@ -547,9 +550,9 @@ pub const ActorController = struct {
                 self.updateVel(.{}, .{});
                 _ = self.renderer.sprite.playCreatureAnim(self, .idle, .{ .loop = true });
             },
-            .action => |*doing| {
+            .action => |doing| {
                 const action = &controller.actions.getPtr(doing.slot).*.?;
-                if (try action.update(self, room, doing)) {
+                if (try action.update(self, room)) {
                     action.cooldown.restart();
                     controller.decision = .{ .idle = .{} };
                     // make sure we make a new decision next update
