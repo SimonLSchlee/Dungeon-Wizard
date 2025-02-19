@@ -244,16 +244,20 @@ pub const HP = struct {
         max: f32,
         timer: ?utl.TickCounter,
     };
+    pub const Bubble = struct {
+        timer: ?utl.TickCounter,
+    };
 
     curr: f32 = 10,
     max: f32 = 10,
     total_damage_done: f32 = 0,
     shields: std.BoundedArray(Shield, 8) = .{},
+    bubbles: std.BoundedArray(Bubble, 8) = .{},
 
     pub const faction_colors = std.EnumArray(Faction, Colorf).init(.{
         .object = Colorf.gray,
         .neutral = Colorf.gray,
-        .player = Colorf.green,
+        .player = Colorf.yellow,
         .ally = Colorf.rgb(0, 0.5, 1),
         .enemy = Colorf.red,
         .bezerk = Colorf.orange,
@@ -272,6 +276,17 @@ pub const HP = struct {
             if (shield.timer) |*timer| {
                 if (timer.tick(false)) {
                     _ = self.shields.orderedRemove(i);
+                    continue;
+                }
+            }
+            i += 1;
+        }
+        i = 0;
+        while (i < self.bubbles.len) {
+            const bubble = &self.bubbles.buffer[i];
+            if (bubble.timer) |*timer| {
+                if (timer.tick(false)) {
+                    _ = self.bubbles.orderedRemove(i);
                     continue;
                 }
             }
@@ -318,16 +333,19 @@ pub const HP = struct {
         // damage hits the outermost shield, continuing inwards until it hits the actual current hp
         while (self.shields.len > 0 and damage_left > 0) {
             const last = &self.shields.buffer[self.shields.len - 1];
-            // this shield blocked all the remaining damage
-            if (damage_left < last.curr) {
-                last.curr -= damage_left;
+
+            const dmg = damage_left;
+            damage_left -= last.curr; // could go < 0
+            last.curr -= dmg; // could go < 0
+
+            if (last.curr <= 0) {
+                _ = self.shields.pop();
+            }
+            // this shield blocked all the remaining damage; we're done
+            if (damage_left <= 0) {
                 return;
             }
-            // too much damage - pop the shield and continue
-            damage_left -= last.curr;
-            _ = self.shields.pop();
         }
-        if (damage_left <= 0) return;
         // shield are all popped
         const final_damage_amount = @min(self.curr, damage_left);
 
@@ -635,15 +653,13 @@ pub const HurtBox = struct {
                 }
             }
         }
-        // TODO put in StatusEffect/Protec?
-        if (effect.can_be_blocked) {
-            const protect_stacks = &self.statuses.getPtr(.protected).stacks;
-            if (protect_stacks.* > 0 and effect.damage > 0) {
-                protect_stacks.* -= 1;
+        damage_blk: { // compute and apply the damage
+            const hp = &(self.hp orelse break :damage_blk);
+            // protec bubbles block entire effect
+            if (effect.can_be_blocked and hp.bubbles.len > 0) {
+                _ = hp.bubbles.pop();
                 return;
             }
-        }
-        { // compute and apply the damage
             var damage = effect.damage;
             switch (effect.damage_kind) {
                 .fire => if (self.statuses.get(.fireresistant).stacks > 0) {
@@ -660,21 +676,20 @@ pub const HurtBox = struct {
             if (self.statuses.get(.exposed).stacks > 0) {
                 damage *= 1.3;
             }
-            if (self.hp) |*hp| {
-                const pre_damage_done = hp.total_damage_done;
-                hp.doDamage(effect.damage_kind, damage, self, room);
-                const post_damage_done = hp.total_damage_done;
-                if ((room.init_params.mode == .crispin_picker or room.init_params.mode == .harriet_hoarder) and self.isEnemy() and !self.is_summon) {
-                    const total_manas = @max(@ceil(self.enemy_difficulty * 2.5), 1);
-                    const manas_left = total_manas - utl.as(f32, self.manas_given);
-                    if (manas_left > 0) {
-                        const damage_per_mana = hp.max / total_manas;
-                        const post_manas = @floor(post_damage_done / damage_per_mana);
-                        const pre_manas = @floor(pre_damage_done / damage_per_mana);
-                        const num_manas = utl.as(usize, @min(post_manas - pre_manas, manas_left));
-                        ManaPickupController.spawnSome(num_manas, self.pos, room);
-                        self.manas_given += utl.as(i32, num_manas);
-                    }
+            const pre_damage_done = hp.total_damage_done;
+            hp.doDamage(effect.damage_kind, damage, self, room);
+            const post_damage_done = hp.total_damage_done;
+            // drop mana
+            if ((room.init_params.mode == .crispin_picker or room.init_params.mode == .harriet_hoarder) and self.isEnemy() and !self.is_summon) {
+                const total_manas = @max(@ceil(self.enemy_difficulty * 2.5), 1);
+                const manas_left = total_manas - utl.as(f32, self.manas_given);
+                if (manas_left > 0) {
+                    const damage_per_mana = hp.max / total_manas;
+                    const post_manas = @floor(post_damage_done / damage_per_mana);
+                    const pre_manas = @floor(pre_damage_done / damage_per_mana);
+                    const num_manas = utl.as(usize, @min(post_manas - pre_manas, manas_left));
+                    ManaPickupController.spawnSome(num_manas, self.pos, room);
+                    self.manas_given += utl.as(i32, num_manas);
                 }
             }
         }

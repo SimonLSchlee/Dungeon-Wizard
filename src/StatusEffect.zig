@@ -50,8 +50,8 @@ const protos = [_]Proto{
     .{
         .enum_name = "protected",
         .name = "Protected",
-        .cd = 4 * core.fups_per_sec,
-        .cd_type = .remove_one_stack,
+        .cd = 0,
+        .cd_type = .no_cd,
         .color = Colorf.rgb(0.7, 0.7, 0.4),
         .icon = .ouchy_skull, // TODO
     },
@@ -321,6 +321,17 @@ pub fn setStacks(self: *StatusEffect, thing: *Thing, num: i32) void {
             else => {},
         }
     }
+    switch (self.kind) {
+        .protected => {
+            if (thing.hp) |*hp| {
+                // HACK kinda
+                hp.bubbles.append(.{
+                    .timer = if (num < 0) null else utl.TickCounter.init(core.secsToTicks(utl.as(f32, num))),
+                }) catch return;
+            }
+        },
+        else => {},
+    }
 
     self.stacks = utl.clamp(i32, num, 0, proto.max_stacks);
 
@@ -361,6 +372,9 @@ pub fn update(status: *StatusEffect, thing: *Thing, room: *Room) Error!void {
                 status.stacks += utl.as(i32, @ceil(shield.curr));
             }
         },
+        .protected => if (thing.hp) |hp| {
+            status.stacks = utl.as(i32, hp.bubbles.len);
+        },
         else => {},
     }
     if (status.stacks == 0) {
@@ -379,11 +393,6 @@ pub fn update(status: *StatusEffect, thing: *Thing, room: *Room) Error!void {
     }
     if (status.stacks == 0) {
         switch (status.kind) {
-            .protected => {
-                if (thing.isFairy()) {
-                    status.addStacks(thing, 1);
-                }
-            },
             else => {
                 return;
             },

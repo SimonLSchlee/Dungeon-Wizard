@@ -272,7 +272,7 @@ pub fn fairyBaseProto() Thing {
         .max_speed = 0.03 * TileMap.tile_sz_f,
     };
     ret.renderer.sprite.rel_pos.y = -10;
-    ret.statuses.getPtr(.protected).addStacks(&ret, 1);
+    ret.statuses.getPtr(.protected).addStacks(&ret, -1);
     return ret;
 }
 
@@ -321,7 +321,8 @@ pub fn @"fairy-redProto"() Thing {
 pub fn @"fairy-goldProto"() Thing {
     var ret = fairyBaseProto();
     ret.creature_kind = .@"fairy-gold";
-    ret.statuses.getPtr(.protected).setStacks(&ret, 3);
+    ret.statuses.getPtr(.protected).addStacks(&ret, -1);
+    ret.statuses.getPtr(.protected).addStacks(&ret, -1);
     ret.controller.ai_actor.actions.getPtr(.spell_cast_thing_debuff_1).* = (.{
         .kind = .{
             .spell_cast = .{

@@ -74,7 +74,7 @@ pub const spells = [_]type{
             params.validate(.self, caster);
             _ = self;
             _ = room;
-            caster.statuses.getPtr(.protected).addStacks(caster, 1);
+            caster.statuses.getPtr(.protected).addStacks(caster, 5);
         }
     },
     struct {
@@ -197,7 +197,7 @@ pub const spells = [_]type{
             ball.hitbox.?.effect = .{
                 .damage = 0,
                 .status_stacks = StatusEffect.StacksArray.initDefault(0, .{
-                    .protected = 1,
+                    .protected = 3,
                     .hasted = 3,
                 }),
             };
@@ -269,7 +269,7 @@ pub const spells = [_]type{
             ball.hitbox.?.effect = .{
                 .damage = 0,
                 .status_stacks = StatusEffect.StacksArray.initDefault(0, .{
-                    .protected = 1,
+                    .protected = 3,
                     .promptitude = 3,
                 }),
             };

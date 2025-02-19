@@ -44,7 +44,7 @@ pub const proto = Spell.makeProto(
     },
 );
 
-num_stacks: i32 = 1,
+num_stacks: i32 = 5,
 max_stacks: i32 = 5,
 
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
