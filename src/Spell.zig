@@ -52,8 +52,11 @@ pub const card_hourglass_offset = v2f(48, 1);
 var desc_buf: [2048]u8 = undefined;
 
 pub const colors = .{
-    .shield = draw.Coloru.rgb(255, 235, 196).toColorf(),
-    .magic = draw.Coloru.rgb(255, 235, 196).toColorf(),
+    .shield = draw.Coloru.rgb(238, 229, 170).toColorf(),
+    .magic = draw.Coloru.rgb(184, 151, 255).toColorf(),
+    .lightning = draw.Coloru.rgb(255, 253, 234).toColorf(),
+    .fire = draw.Coloru.rgb(255, 123, 80).toColorf(),
+    .ice = draw.Coloru.rgb(178, 220, 255).toColorf(),
 };
 
 pub const SpellTypes = blk: {

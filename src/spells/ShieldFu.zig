@@ -37,7 +37,7 @@ pub const proto = Spell.makeProto(
     .{
         .cast_time = .fast,
         .obtainableness = std.EnumSet(Spell.Obtainableness).initOne(.starter),
-        .color = draw.Coloru.rgb(204, 188, 157).toColorf(),
+        .color = Spell.colors.shield,
         .targeting_data = .{
             .kind = .self,
         },

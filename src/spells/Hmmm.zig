@@ -36,7 +36,7 @@ pub const proto = Spell.makeProto(
     .{
         .rarity = .interesting,
         .cast_time = .fast,
-        .color = draw.Coloru.rgb(143, 56, 165).toColorf(),
+        .color = Spell.colors.magic,
         .targeting_data = .{
             .kind = .self,
         },
