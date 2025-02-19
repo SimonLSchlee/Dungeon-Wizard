@@ -373,7 +373,10 @@ pub fn update(action: *Action, self: *Thing, room: *Room) Error!bool {
                     spc.cast_vfx = id;
                 }
             }
-            if (action.curr_tick == 30) {
+            self.move(.{});
+            _ = renderer.playCreatureAnim(self, .cast, .{ .loop = true });
+            const ticks_left = spc.timer.num_ticks - spc.timer.curr_tick;
+            if (ticks_left <= 30) {
                 if (spc.cast_vfx) |id| {
                     if (room.getThingById(id)) |cast| {
                         cast.controller.cast_vfx.cast();
@@ -381,12 +384,10 @@ pub fn update(action: *Action, self: *Thing, room: *Room) Error!bool {
                 }
                 spc.cast_vfx = null;
             }
-            if (action.curr_tick == 60) {
+            if (spc.timer.tick(false)) {
                 try spc.spell.cast(self, room, action.params);
                 return true;
             }
-            self.move(.{});
-            _ = renderer.playCreatureAnim(self, .cast, .{ .loop = true });
         },
         .regen_hp => |*r| {
             if (r.timer.tick(true)) {
