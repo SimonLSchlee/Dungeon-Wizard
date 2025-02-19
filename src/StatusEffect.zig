@@ -191,6 +191,22 @@ const protos = [_]Proto{
         .color = Colorf.rgb(0.3, 0.9, 0.2),
         .icon = .trailblaze,
     },
+    .{
+        .enum_name = "fireresistant",
+        .name = "Fireresistant",
+        .cd = 0,
+        .cd_type = .no_cd,
+        .color = Colorf.rgb(0.5, 0.8, 1),
+        .icon = .fireproof,
+    },
+    .{
+        .enum_name = "lightningresistant",
+        .name = "Lightningresistant",
+        .cd = 0,
+        .cd_type = .no_cd,
+        .color = Colorf.rgb(0.5, 0.8, 1),
+        .icon = .lightningproof,
+    },
 };
 
 pub const Kind = blk: {
@@ -251,6 +267,9 @@ pub fn setStacks(self: *StatusEffect, thing: *Thing, num: i32) void {
     if (num > 0) {
         switch (self.kind) {
             .lit => {
+                if (thing.statuses.get(.fireresistant).stacks > 0) {
+                    return;
+                }
                 // yer snow!
                 if (thing.statuses.get(.snowy).stacks > 0) {
                     return;
@@ -477,9 +496,11 @@ pub fn fmtDesc(buf: []u8, kind: StatusEffect.Kind) Error![]u8 {
         .shield => try std.fmt.bufPrint(buf, "Prevent damage for a duration", .{}),
         .slimetrail => try std.fmt.bufPrint(buf, "Leave a trail of slime. Immune to said slime", .{}),
         .slimed => try std.fmt.bufPrint(buf, "Slowed movement, take damage when this is applied. Expires in 1 sec", .{}),
-        .snowy => try std.fmt.bufPrint(buf, "Immune to cold, frozen, lit", .{}),
+        .snowy => try std.fmt.bufPrint(buf, "Immune to ice damage, and cold, frozen, lit statuses", .{}),
         .slimeballed => try std.fmt.bufPrint(buf, "Slowed movement", .{}),
         .hasted => try std.fmt.bufPrint(buf, "Increased movement", .{}),
+        .fireresistant => try std.fmt.bufPrint(buf, "Take half fire damage. Immune to lit status", .{}),
+        .lightningresistant => try std.fmt.bufPrint(buf, "Take half lighning damage", .{}),
         //else => try std.fmt.bufPrint(buf, "<Placeholder for status: {s}>", .{status.name}),
     };
 }

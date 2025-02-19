@@ -342,7 +342,7 @@ pub fn @"fairy-goldProto"() Thing {
 }
 
 pub fn slimeProto() Thing {
-    var c = creatureProto(.slime, .slime, .enemy, .{ .aggro = .{} }, 14, .big, 13);
+    var c = creatureProto(.slime, .slime, .enemy, .{ .aggro = .{} }, 12, .big, 13);
     c.accel_params = .{
         .max_speed = 0.0119 * TileMap.tile_sz_f,
     };

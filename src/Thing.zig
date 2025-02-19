@@ -645,6 +645,18 @@ pub const HurtBox = struct {
         }
         { // compute and apply the damage
             var damage = effect.damage;
+            switch (effect.damage_kind) {
+                .fire => if (self.statuses.get(.fireresistant).stacks > 0) {
+                    damage *= 0.5;
+                },
+                .lightning => if (self.statuses.get(.lightningresistant).stacks > 0) {
+                    damage *= 0.5;
+                },
+                .ice => if (self.statuses.get(.snowy).stacks > 0) {
+                    damage = 0;
+                },
+                else => {},
+            }
             if (self.statuses.get(.exposed).stacks > 0) {
                 damage *= 1.3;
             }
