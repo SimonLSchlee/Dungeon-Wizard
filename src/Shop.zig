@@ -29,8 +29,9 @@ const ImmUI = @import("ImmUI.zig");
 const icon_text = @import("icon_text.zig");
 const Shop = @This();
 
-const max_num_spells = 4;
-const num_spells = 4;
+const max_num_spells = 5;
+const num_nonrare_spells = 4;
+const num_rare_spells = 1;
 const spells_spacing: f32 = 16;
 
 const max_num_items = 4;
@@ -70,8 +71,22 @@ pub fn init(seed: u64, run: *Run) Error!Shop {
         .rng = std.Random.DefaultPrng.init(seed),
     };
 
+    const rarity_nonrare = Spell.RarityWeights.init(.{
+        .pedestrian = 0.60,
+        .interesting = 0.40,
+        .exceptional = 0.00,
+        .brilliant = 0.00,
+    });
+    const rarity_rare = Spell.RarityWeights.init(.{
+        .pedestrian = 0.0,
+        .interesting = 0.0,
+        .exceptional = 1.0,
+        .brilliant = 0.0,
+    });
     var spells_buf: [max_num_spells]Spell = undefined;
-    const spells_generated = Spell.makeShopSpells(ret.rng.random(), run.mode, spells_buf[0..num_spells]);
+    const nonrare_spells_generated = Spell.makeShopSpells(ret.rng.random(), run.mode, &rarity_nonrare, spells_buf[0..num_nonrare_spells]);
+    const rare_spells_generated = Spell.makeShopSpells(ret.rng.random(), run.mode, &rarity_rare, spells_buf[nonrare_spells_generated.len .. nonrare_spells_generated.len + num_rare_spells]);
+    const spells_generated = spells_buf[0 .. nonrare_spells_generated.len + rare_spells_generated.len];
     for (spells_generated) |spell| {
         ret.spells.appendAssumeCapacity(.{
             .product = .{

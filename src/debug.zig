@@ -14,6 +14,7 @@ pub const show_mouse_pos = false;
 pub const hide_ui = false;
 pub const show_game_canvas_size = false;
 pub const allow_room_retry = true;
+pub const show_rarity_weights = false;
 
 // ai stuff
 pub const show_thing_paths = false;

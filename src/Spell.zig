@@ -151,6 +151,8 @@ pub const CardSpriteEnum = enum {
 };
 
 pub const Rarity = enum {
+    pub const Mask = std.EnumSet(Rarity);
+
     pedestrian,
     interesting,
     exceptional,
@@ -482,47 +484,97 @@ pub const Controller = struct {
 pub const max_spells_in_array = 256;
 pub const SpellArray = std.BoundedArray(Spell, max_spells_in_array);
 const WeightsArray = std.BoundedArray(f32, max_spells_in_array);
-
-const rarity_weight_base = std.EnumArray(Rarity, f32).init(.{
-    .pedestrian = 0.5,
-    .interesting = 0.30,
-    .exceptional = 0.15,
-    .brilliant = 0.05,
+pub const RarityWeights = std.EnumArray(Rarity, f32);
+pub const rarity_weight_offsets_base = RarityWeights.init(.{
+    .pedestrian = 0.0,
+    .interesting = 0.0,
+    .exceptional = 0.0,
+    .brilliant = 0.0,
 });
 
-pub fn getSpellWeights(spells: []const Spell) WeightsArray {
+pub fn getSpellWeights(rarity_weights: RarityWeights, spells: []const Spell) WeightsArray {
     var ret = WeightsArray{};
     for (spells) |spell| {
-        ret.append(rarity_weight_base.get(spell.rarity)) catch unreachable;
+        ret.append(rarity_weights.get(spell.rarity)) catch unreachable;
     }
     return ret;
 }
 
-pub fn generateRandom(rng: std.Random, mask: Obtainableness.Mask, mode: Run.Mode, allow_duplicates: bool, buf: []Spell) []Spell {
+pub fn makeRoomReward(rng: std.Random, mode: Run.Mode, rarity_weight_offsets: *RarityWeights, buf: []Spell) []Spell {
+    const rarity_weight_base = RarityWeights.init(.{
+        .pedestrian = 0.60,
+        .interesting = 0.40,
+        .exceptional = -0.08,
+        .brilliant = 0.00,
+    });
     var num: usize = 0;
     var spell_pool = SpellArray{};
     for (all_spells) |spell| {
-        if (spell.obtainable_modes.contains(mode) and spell.obtainableness.intersectWith(mask).count() > 0) {
+        if (spell.obtainable_modes.contains(mode) and spell.obtainableness.intersectWith(Obtainableness.Mask.initOne(.room_reward)).count() > 0) {
             spell_pool.append(spell) catch unreachable;
         }
     }
+    var rarity_weights = rarity_weight_base;
+    for (utl.enumValueList(Rarity)) |r| {
+        rarity_weights.getPtr(r).* += rarity_weight_offsets.get(r);
+    }
+
     for (0..buf.len) |i| {
         if (spell_pool.len == 0) break;
-        const weights = getSpellWeights(spell_pool.constSlice());
+        // fix up negative rare value
+        var adjusted_weights = rarity_weights;
+        {
+            const rare_weight = rarity_weights.get(.exceptional);
+            if (rare_weight < 0) {
+                adjusted_weights.set(.exceptional, 0);
+            }
+        }
+        const weights = getSpellWeights(adjusted_weights, spell_pool.constSlice());
         const idx = rng.weightedIndex(f32, weights.constSlice());
-        const spell = if (allow_duplicates) spell_pool.get(idx) else spell_pool.swapRemove(idx);
+        // no duplicates! remove from pool
+        const spell = spell_pool.swapRemove(idx);
         buf[i] = spell;
+        buf[i].debug_rarity_weight = rarity_weights.get(spell.rarity);
+        {
+            const rare_weight = rarity_weights.get(.exceptional);
+            switch (spell.rarity) {
+                .pedestrian, .interesting => if (rare_weight <= 0.40) {
+                    rarity_weight_offsets.getPtr(.pedestrian).* -= 0.02;
+                    rarity_weight_offsets.getPtr(.interesting).* -= 0.02;
+                    rarity_weight_offsets.getPtr(.exceptional).* += 0.04;
+                },
+                .exceptional, .brilliant => {
+                    rarity_weight_offsets.* = rarity_weight_offsets_base;
+                },
+            }
+            rarity_weights = rarity_weight_base;
+            for (utl.enumValueList(Rarity)) |r| {
+                rarity_weights.getPtr(r).* += rarity_weight_offsets.get(r);
+            }
+        }
         num += 1;
     }
     return buf[0..num];
 }
 
-pub fn makeRoomReward(rng: std.Random, mode: Run.Mode, buf: []Spell) []Spell {
-    return generateRandom(rng, Obtainableness.Mask.initOne(.room_reward), mode, false, buf);
-}
-
-pub fn makeShopSpells(rng: std.Random, mode: Run.Mode, buf: []Spell) []Spell {
-    return generateRandom(rng, Obtainableness.Mask.initOne(.shop), mode, false, buf);
+pub fn makeShopSpells(rng: std.Random, mode: Run.Mode, rarity_weights: *const RarityWeights, buf: []Spell) []Spell {
+    var num: usize = 0;
+    var spell_pool = SpellArray{};
+    for (all_spells) |spell| {
+        if (spell.obtainable_modes.contains(mode) and spell.obtainableness.intersectWith(Obtainableness.Mask.initOne(.shop)).count() > 0) {
+            spell_pool.append(spell) catch unreachable;
+        }
+    }
+    for (0..buf.len) |i| {
+        if (spell_pool.len == 0) break;
+        const weights = getSpellWeights(rarity_weights.*, spell_pool.constSlice());
+        const idx = rng.weightedIndex(f32, weights.constSlice());
+        // no duplicates! remove from pool
+        const spell = spell_pool.swapRemove(idx);
+        buf[i] = spell;
+        num += 1;
+    }
+    return buf[0..num];
 }
 
 pub const Obtainableness = enum {
@@ -689,6 +741,7 @@ after_cast_slot_cooldown_ticks: i32 = 4 * 60,
 mislay: bool = false,
 draw_immediate: bool = false,
 mana_cost: ManaCost = .{ .number = 1 },
+debug_rarity_weight: f32 = 0,
 
 pub fn getSlotCooldownTicks(self: *const Spell) i32 {
     return self.cast_ticks + self.after_cast_slot_cooldown_ticks;
@@ -770,16 +823,16 @@ pub fn getNewTags(self: *const Spell) Error!NewTag.Array {
 }
 
 const rarity_price_base = std.EnumArray(Rarity, i32).init(.{
-    .pedestrian = 7,
-    .interesting = 10,
+    .pedestrian = 5,
+    .interesting = 9,
     .exceptional = 15,
     .brilliant = 27,
 });
 
 const rarity_price_variance = std.EnumArray(Rarity, i32).init(.{
-    .pedestrian = 3,
-    .interesting = 5,
-    .exceptional = 5,
+    .pedestrian = 1,
+    .interesting = 3,
+    .exceptional = 4,
     .brilliant = 5,
 });
 
@@ -971,6 +1024,15 @@ pub fn unqRenderCard(self: *const Spell, cmd_buf: *ImmUI.CmdBuf, pos: V2f, caste
                 },
             } });
         }
+    }
+    if (debug.show_rarity_weights) {
+        cmd_buf.appendAssumeCapacity(.{ .label = .{
+            .pos = pos,
+            .text = ImmUI.initLabel(utl.bufPrintLocal("rarity: {d:0.3}", .{self.debug_rarity_weight}) catch "rarity: ?"),
+            .opt = .{
+                .color = .white,
+            },
+        } });
     }
 }
 

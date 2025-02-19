@@ -137,6 +137,7 @@ curr_place_idx: usize = 0,
 ui_slots: gameUI.Slots = .{},
 mode: Mode = undefined,
 deck: Spell.SpellArray = .{},
+spell_rarity_weight_offsets: Spell.RarityWeights = Spell.rarity_weight_offsets_base,
 load_timer: u.TickCounter = u.TickCounter.init(20),
 load_state: enum {
     none,
@@ -376,7 +377,7 @@ pub fn makeRewards(self: *Run, difficulty: f32) void {
         const num_spells = Reward.base_spells;
         var reward: Reward = .{ .kind = .{ .spell_choice = .{} } };
         var buf: [Reward.max_spells]Spell = undefined;
-        const spells = Spell.makeRoomReward(random, self.mode, buf[0..num_spells]);
+        const spells = Spell.makeRoomReward(random, self.mode, &self.spell_rarity_weight_offsets, buf[0..num_spells]);
         for (spells) |spell| {
             reward.kind.spell_choice.appendAssumeCapacity(.{ .spell = spell });
         }
