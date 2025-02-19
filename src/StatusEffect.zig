@@ -53,7 +53,7 @@ const protos = [_]Proto{
         .cd = 0,
         .cd_type = .no_cd,
         .color = Colorf.rgb(0.7, 0.7, 0.4),
-        .icon = .ouchy_skull, // TODO
+        .icon = .bubble,
     },
     .{
         .enum_name = "frozen",
@@ -578,6 +578,7 @@ fn _fmtStacksShort(kind: StatusEffect.Kind, stacks: i32) Error![]u8 {
     const dur_secs = if (StatusEffect.getDurationSeconds(kind, stacks)) |secs_f| utl.as(i32, @floor(secs_f)) else null;
     return switch (kind) {
         .lit, .cold => try utl.bufPrintLocal("{}", .{stacks}),
+        .protected => try utl.bufPrintLocal("{}sec{s}", .{ stacks, sEnding(stacks) }),
         else => if (dur_secs) |secs|
             try utl.bufPrintLocal("{}sec{s}", .{ secs, sEnding(secs) })
         else

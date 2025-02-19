@@ -36,41 +36,44 @@ pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
     .{
         .cast_time = .fast,
-        .obtainableness = Spell.Obtainableness.Mask.initEmpty(), // TODO reenable?
-        .color = draw.Coloru.rgb(204, 188, 157).toColorf(),
+        .color = Spell.colors.shield,
         .targeting_data = .{
-            .kind = .self,
+            .kind = .thing,
+            .max_range = 100,
+            .show_max_range_ring = true,
+            .target_faction_mask = Thing.Faction.Mask.initFull(),
         },
     },
 );
 
-num_stacks: i32 = 5,
-max_stacks: i32 = 5,
+num_stacks: i32 = 7,
 
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
-    params.validate(.self, caster);
+    params.validate(.thing, caster);
     const protec: @This() = self.kind.protec;
-    caster.statuses.getPtr(.protected).addStacks(caster, protec.num_stacks);
-
-    _ = room;
+    if (room.getThingById(params.thing.?)) |thing| {
+        thing.statuses.getPtr(.protected).addStacks(thing, protec.num_stacks);
+    }
 }
 
-pub const description =
-    \\Conjure a personal shield
-    \\that renders you invulnerable
-    \\to the next hit.
-;
-
-pub fn getDescription(self: *const Spell, buf: []u8) Error![]u8 {
+pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
     const protec: @This() = self.kind.protec;
     const fmt =
-        \\Duration: {} secs
-        \\
-        \\{s}
-        \\Stacks up to {} times.
-        \\
+        \\Protect{any} the target creature
+        \\from the next attack. Lasts {} seconds.
     ;
-    const dur_secs: i32 = protec.num_stacks * utl.as(i32, @divFloor(StatusEffect.proto_array.get(.protected).cooldown.num_ticks, core.fups_per_sec));
-    const b = try std.fmt.bufPrint(buf, fmt, .{ dur_secs, description, protec.max_stacks });
-    return b;
+    tt.desc = try Spell.Tooltip.Desc.fromSlice(
+        try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{
+            StatusEffect.getIcon(.protected),
+            protec.num_stacks,
+        }),
+    );
+    tt.infos.appendAssumeCapacity(.{ .status = .protected });
+}
+
+pub fn getNewTags(self: *const Spell) Error!Spell.NewTag.Array {
+    const protec: @This() = self.kind.protec;
+    return Spell.NewTag.Array.fromSlice(&.{
+        try Spell.NewTag.makeStatus(.protected, utl.as(i32, protec.num_stacks)),
+    }) catch unreachable;
 }

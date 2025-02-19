@@ -80,6 +80,7 @@ pub const Icon = enum(u8) {
     fairy,
     fireproof,
     lightningproof,
+    bubble,
 
     pub const codepoint_start: u21 = pua_codepoint_start;
     pub const codepoint_end: u21 = codepoint_start + std.math.maxInt(@typeInfo(Icon).@"enum".tag_type);

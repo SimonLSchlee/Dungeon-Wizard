@@ -35,7 +35,7 @@ pub const enum_name = "arc_bolt";
 pub const Controllers = [_]type{Projectile};
 
 const base_bolt_radius = 4.5;
-const base_range = 125;
+const base_range = 100;
 const base_chain_range = 75;
 const base_duration_ticks = core.secsToTicks(2);
 

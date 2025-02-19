@@ -51,18 +51,23 @@ pub const card_hourglass_offset = v2f(48, 1);
 
 var desc_buf: [2048]u8 = undefined;
 
+pub const colors = .{
+    .shield = draw.Coloru.rgb(255, 235, 196).toColorf(),
+    .magic = draw.Coloru.rgb(255, 235, 196).toColorf(),
+};
+
 pub const SpellTypes = blk: {
     const player_spells = [_]type{
         @import("spells/SkyFairy.zig"),
         @import("spells/HeartFairy.zig"),
         @import("spells/SlimeFairy.zig"),
+        @import("spells/Protec.zig"),
         @import("spells/SnowFlurry.zig"),
         @import("spells/Snowfren.zig"),
         @import("spells/Rimefrost.zig"),
         @import("spells/ArcBolt.zig"),
         @import("spells/LBolt.zig"),
         @import("spells/Unherring.zig"),
-        @import("spells/Protec.zig"),
         @import("spells/FrostVom.zig"),
         //@import("spells/Blackmail.zig"),
         //@import("spells/Mint.zig"),
