@@ -39,9 +39,9 @@ pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
     .{
         .cast_time = .medium,
-        .mana_cost = Spell.ManaCost.num(3),
+        .mana_cost = Spell.ManaCost.num(2),
         .rarity = .interesting,
-        .color = StatusEffect.proto_array.get(.frozen).color,
+        .color = draw.Coloru.rgb(119, 158, 241).toColorf(),
         .targeting_data = .{
             .kind = .pos,
             .cone_from_self_to_mouse = .{

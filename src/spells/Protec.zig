@@ -37,7 +37,7 @@ pub const proto = Spell.makeProto(
     .{
         .cast_time = .fast,
         .obtainableness = Spell.Obtainableness.Mask.initEmpty(), // TODO reenable?
-        .color = StatusEffect.proto_array.get(.protected).color,
+        .color = draw.Coloru.rgb(204, 188, 157).toColorf(),
         .targeting_data = .{
             .kind = .self,
         },

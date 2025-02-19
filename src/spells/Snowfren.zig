@@ -39,8 +39,8 @@ pub const proto = Spell.makeProto(
     .{
         .cast_time = .slow,
         .mana_cost = Spell.ManaCost.num(2),
-        .rarity = .interesting,
-        .color = draw.Coloru.rgb(188, 230, 243).toColorf(),
+        .rarity = .exceptional,
+        .color = draw.Coloru.rgb(119, 158, 241).toColorf(),
         .targeting_data = .{
             .kind = .pos,
             .target_mouse_pos = true,

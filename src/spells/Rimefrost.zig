@@ -37,7 +37,7 @@ pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
     .{
         .cast_time = .fast,
-        .color = .cyan,
+        .color = draw.Coloru.rgb(119, 158, 241).toColorf(),
         .targeting_data = .{
             .kind = .thing,
             .target_faction_mask = Thing.Faction.Mask.initFull(),

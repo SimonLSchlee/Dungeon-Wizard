@@ -67,7 +67,7 @@ pub const spells = [_]type{
                 .targeting_data = .{
                     .kind = .self,
                 },
-                .color = Colorf.yellow.lerp(.white, 0.3),
+                .color = Colorf.yellow.lerp(.white, 0.6),
             },
         );
         pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
@@ -85,6 +85,7 @@ pub const spells = [_]type{
             .{
                 .cast_time = .slow,
                 .obtainableness = Spell.Obtainableness.Mask.initEmpty(),
+                .color = draw.Coloru.rgb(143, 56, 165).toColorf(),
                 .targeting_data = .{
                     .kind = .pos,
                     .max_range = 100,
@@ -117,6 +118,7 @@ pub const spells = [_]type{
             .{
                 .cast_time = .slow,
                 .obtainableness = Spell.Obtainableness.Mask.initEmpty(),
+                .color = draw.Coloru.rgb(143, 56, 165).toColorf(),
                 .targeting_data = .{
                     .kind = .pos,
                 },
@@ -196,7 +198,7 @@ pub const spells = [_]type{
                 .damage = 0,
                 .status_stacks = StatusEffect.StacksArray.initDefault(0, .{
                     .protected = 1,
-                    .promptitude = 3,
+                    .hasted = 3,
                 }),
             };
             _ = try room.queueSpawnThing(&ball, caster.pos);
@@ -232,7 +234,79 @@ pub const spells = [_]type{
                 .damage = 0,
                 .status_stacks = StatusEffect.StacksArray.initDefault(0, .{
                     .unseeable = 3,
-                    .hasted = 3,
+                    .promptitude = 3,
+                }),
+            };
+            _ = try room.queueSpawnThing(&ball, caster.pos);
+        }
+    },
+    struct {
+        pub const title = "Fairy Gold Buff";
+        pub const enum_name = "fairy_gold_buff";
+        pub const proto = Spell.makeProto(
+            std.meta.stringToEnum(Spell.Kind, enum_name).?,
+            .{
+                .cast_time = .fast,
+                .obtainableness = Spell.Obtainableness.Mask.initEmpty(),
+                .targeting_data = .{
+                    .kind = .thing,
+                    .max_range = 60,
+                    .show_max_range_ring = true,
+                },
+            },
+        );
+        const AnimRef = struct {
+            var projectile_loop = Data.Ref(Data.SpriteAnim).init("spell-projectile-goldball");
+        };
+        pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
+            params.validate(.thing, caster);
+            _ = self;
+            var ball = projectiles.FairyBall.proto(room);
+            ball.controller.projectile.kind.fairy_ball.target_thing = params.thing.?;
+            ball.controller.projectile.kind.fairy_ball.target_pos = params.pos;
+            _ = AnimRef.projectile_loop.get();
+            ball.renderer.sprite.setNormalAnim(AnimRef.projectile_loop);
+            ball.hitbox.?.effect = .{
+                .damage = 0,
+                .status_stacks = StatusEffect.StacksArray.initDefault(0, .{
+                    .protected = 1,
+                    .promptitude = 3,
+                }),
+            };
+            _ = try room.queueSpawnThing(&ball, caster.pos);
+        }
+    },
+    struct {
+        pub const title = "Fairy Gold Debuff";
+        pub const enum_name = "fairy_gold_debuff";
+        pub const proto = Spell.makeProto(
+            std.meta.stringToEnum(Spell.Kind, enum_name).?,
+            .{
+                .cast_time = .fast,
+                .obtainableness = Spell.Obtainableness.Mask.initEmpty(),
+                .targeting_data = .{
+                    .kind = .thing,
+                    .max_range = 70,
+                    .show_max_range_ring = true,
+                },
+            },
+        );
+        const AnimRef = struct {
+            var projectile_loop = Data.Ref(Data.SpriteAnim).init("spell-projectile-goldball");
+        };
+        pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
+            params.validate(.thing, caster);
+            _ = self;
+            var ball = projectiles.FairyBall.proto(room);
+            ball.controller.projectile.kind.fairy_ball.target_thing = params.thing.?;
+            ball.controller.projectile.kind.fairy_ball.target_pos = params.pos;
+            _ = AnimRef.projectile_loop.get();
+            ball.renderer.sprite.setNormalAnim(AnimRef.projectile_loop);
+            ball.hitbox.?.effect = .{
+                .damage = 0,
+                .status_stacks = StatusEffect.StacksArray.initDefault(0, .{
+                    .exposed = 3,
+                    .stunned = 3,
                 }),
             };
             _ = try room.queueSpawnThing(&ball, caster.pos);

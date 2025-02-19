@@ -50,7 +50,7 @@ pub const proto = Spell.makeProto(
 );
 
 hit_effect: Thing.HitEffect = .{
-    .damage = 6,
+    .damage = 5,
 },
 
 const AnimRef = struct {

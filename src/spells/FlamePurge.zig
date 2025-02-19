@@ -41,10 +41,10 @@ const base_explode_radius = 50;
 pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
     .{
-        .mana_cost = Spell.ManaCost.num(2),
+        .mana_cost = Spell.ManaCost.num(1),
         .cast_time = .fast,
         .rarity = .pedestrian,
-        .color = .red,
+        .color = draw.Coloru.rgb(236, 98, 43).toColorf(),
         .targeting_data = .{
             .kind = .self,
             .radius_at_target = base_explode_radius,

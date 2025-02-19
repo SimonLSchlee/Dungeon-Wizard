@@ -44,8 +44,8 @@ pub const proto = Spell.makeProto(
     .{
         .cast_time = .fast,
         .mana_cost = Spell.ManaCost.num(1),
-        .color = .white,
-        .rarity = .exceptional,
+        .color = draw.Coloru.rgb(255, 253, 231).toColorf(),
+        .rarity = .interesting,
         .targeting_data = .{
             .kind = .thing,
             .target_faction_mask = Thing.Faction.opposing_masks.get(.player),

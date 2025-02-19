@@ -42,7 +42,7 @@ pub const proto = Spell.makeProto(
         .cast_time = .medium,
         .mana_cost = Spell.ManaCost.num(2),
         .obtainableness = std.EnumSet(Spell.Obtainableness).initOne(.starter),
-        .color = .purple,
+        .color = draw.Coloru.rgb(143, 56, 165).toColorf(),
         .targeting_data = .{
             .kind = .pos,
             .target_faction_mask = Thing.Faction.Mask.initOne(.enemy),
@@ -54,7 +54,7 @@ pub const proto = Spell.makeProto(
 );
 
 hit_effect: Thing.HitEffect = .{
-    .damage = 7,
+    .damage = 6,
     .damage_kind = .magic,
     .status_stacks = StatusEffect.StacksArray.initDefault(0, .{ .exposed = 5 }),
 },

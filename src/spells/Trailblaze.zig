@@ -37,7 +37,7 @@ pub const proto = Spell.makeProto(
         .cast_time = .medium,
         .mana_cost = Spell.ManaCost.num(2),
         .rarity = .interesting,
-        .color = StatusEffect.proto_array.get(.promptitude).color,
+        .color = draw.Coloru.rgb(236, 98, 43).toColorf(),
         .targeting_data = .{
             .kind = .self,
         },

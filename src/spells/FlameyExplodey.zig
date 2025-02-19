@@ -43,9 +43,9 @@ pub const proto = Spell.makeProto(
     std.meta.stringToEnum(Spell.Kind, enum_name).?,
     .{
         .cast_time = .medium,
-        .mana_cost = Spell.ManaCost.num(3),
+        .mana_cost = Spell.ManaCost.num(2),
         .rarity = .interesting,
-        .color = .red,
+        .color = draw.Coloru.rgb(236, 98, 43).toColorf(),
         .targeting_data = .{
             .kind = .pos,
             .fixed_range = false,

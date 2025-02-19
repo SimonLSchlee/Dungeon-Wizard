@@ -40,13 +40,14 @@ pub const proto = Spell.makeProto(
         .cast_time = .medium,
         .mana_cost = Spell.ManaCost.num(1),
         .rarity = .exceptional,
-        .color = draw.Coloru.rgb(84, 167, 73).toColorf(),
+        .color = draw.Coloru.rgb(103, 206, 247).toColorf(),
         .targeting_data = .{
             .kind = .pos,
             .target_mouse_pos = true,
             .max_range = 100,
             .show_max_range_ring = true,
         },
+        .mislay = true,
     },
 );
 

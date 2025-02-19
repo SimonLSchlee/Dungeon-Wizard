@@ -226,7 +226,6 @@ pub fn shopspiderProto() Thing {
 
 pub fn implingProto() Thing {
     var ret = creatureProto(.impling, .impling, .ally, .{ .aggro = .{} }, 15, .medium, 13);
-
     ret.accel_params = .{
         .max_speed = 0.0166 * TileMap.tile_sz_f,
     };
@@ -248,13 +247,10 @@ pub fn implingProto() Thing {
 }
 
 pub fn snowfrenProto() Thing {
-    var ret = creatureProto(.snowfren, .snowfren, .ally, .{ .aggro = .{} }, 8, .smol, 11);
-
-    const status = ret.statuses.getPtr(.snowy);
-    status.addStacks(&ret, 1);
-
+    var ret = creatureProto(.snowfren, .snowfren, .ally, .{ .aggro = .{} }, 12, .smol, 11);
+    ret.statuses.getPtr(.snowy).setStacks(&ret, 1);
     ret.accel_params = .{
-        .max_speed = 0.1,
+        .max_speed = 0.15,
     };
     ret.controller.ai_actor.actions.getPtr(.projectile_attack_1).* = (.{
         .kind = .{
@@ -324,16 +320,24 @@ pub fn @"fairy-redProto"() Thing {
 
 pub fn @"fairy-goldProto"() Thing {
     var ret = fairyBaseProto();
-    ret.creature_kind = .@"fairy-red";
+    ret.creature_kind = .@"fairy-gold";
+    ret.statuses.getPtr(.protected).setStacks(&ret, 3);
     ret.controller.ai_actor.actions.getPtr(.spell_cast_thing_debuff_1).* = (.{
         .kind = .{
             .spell_cast = .{
-                .spell = Spell.getProto(.fairy_slime),
+                .spell = Spell.getProto(.fairy_gold_debuff),
             },
         },
-        .cooldown = utl.TickCounter.initStopped(80),
+        .cooldown = utl.TickCounter.initStopped(core.secsToTicks(7)),
     });
-    ret.enemy_difficulty = 0.5;
+    ret.controller.ai_actor.actions.getPtr(.spell_cast_thing_buff_1).* = (.{
+        .kind = .{
+            .spell_cast = .{
+                .spell = Spell.getProto(.fairy_gold_buff),
+            },
+        },
+        .cooldown = utl.TickCounter.initStopped(core.secsToTicks(7)),
+    });
     return ret;
 }
 
@@ -435,7 +439,7 @@ pub fn gobbowProto() Thing {
     ret.controller.ai_actor.actions.getPtr(.projectile_attack_1).* = (.{
         .kind = .{ .projectile_attack = .{
             .projectile = .gobarrow,
-            .range = 110,
+            .range = 105,
             .LOS_thiccness = 3,
         } },
         .cooldown = utl.TickCounter.initStopped(60),
