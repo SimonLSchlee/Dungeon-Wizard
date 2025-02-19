@@ -53,6 +53,7 @@ pub const SpellCast = struct {
     spell: Spell,
     cast_vfx: ?Thing.Id = null,
     timer: utl.TickCounter = utl.TickCounter.init(60),
+    wind_down: bool = false,
 };
 
 pub const RegenHp = struct {
@@ -170,6 +171,7 @@ pub fn begin(action: *Action, self: *Thing, room: *Room, params: Params) Error!v
         },
         .spell_cast => |*sp| {
             sp.timer = utl.TickCounter.init(sp.spell.cast_ticks);
+            sp.wind_down = false;
         },
         .regen_hp => |*r| {
             r.amount_regened = 0;
@@ -385,8 +387,13 @@ pub fn update(action: *Action, self: *Thing, room: *Room) Error!bool {
                 spc.cast_vfx = null;
             }
             if (spc.timer.tick(false)) {
-                try spc.spell.cast(self, room, action.params);
-                return true;
+                if (spc.wind_down) {
+                    return true;
+                } else {
+                    try spc.spell.cast(self, room, action.params);
+                    spc.wind_down = true;
+                    spc.timer = utl.TickCounter.init(20);
+                }
             }
         },
         .regen_hp => |*r| {
