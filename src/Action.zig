@@ -52,6 +52,7 @@ pub const SpellCast = struct {
     pub const enum_name = "spell_cast";
     spell: Spell,
     cast_vfx: ?Thing.Id = null,
+    timer: utl.TickCounter = utl.TickCounter.init(60),
 };
 
 pub const RegenHp = struct {
@@ -68,12 +69,23 @@ pub const ShieldUp = struct {
     timer: utl.TickCounter = utl.TickCounter.init(60),
 };
 
+pub const PlayerDiscard = struct {
+    pub const enum_name = "player_discard";
+};
+
+pub const UseItem = struct {
+    pub const enum_name = "use_item";
+    item: Item,
+};
+
 pub const ActionTypes = [_]type{
     MeleeAttack,
     ProjectileAttack,
     SpellCast,
     RegenHp,
     ShieldUp,
+    PlayerDiscard,
+    UseItem,
 };
 
 pub const Kind = utl.EnumFromTypes(&ActionTypes, "enum_name");
@@ -157,7 +169,7 @@ pub fn begin(action: *Action, self: *Thing, room: *Room, params: Params) Error!v
             proj.target_pos = action.params.pos;
         },
         .spell_cast => |*sp| {
-            _ = sp;
+            sp.timer = utl.TickCounter.init(sp.spell.cast_ticks);
         },
         .regen_hp => |*r| {
             r.amount_regened = 0;
@@ -166,6 +178,8 @@ pub fn begin(action: *Action, self: *Thing, room: *Room, params: Params) Error!v
         .shield_up => |*r| {
             r.timer.restart();
         },
+        .player_discard => {},
+        .use_item => {},
     }
     action.curr_tick = 0;
 }
@@ -371,7 +385,7 @@ pub fn update(action: *Action, self: *Thing, room: *Room) Error!bool {
                 try spc.spell.cast(self, room, action.params);
                 return true;
             }
-            self.updateVel(.{}, .{});
+            self.move(.{});
             _ = renderer.playCreatureAnim(self, .cast, .{ .loop = true });
         },
         .regen_hp => |*r| {
@@ -388,7 +402,7 @@ pub fn update(action: *Action, self: *Thing, room: *Room) Error!bool {
                     return true;
                 }
             }
-            self.updateVel(.{}, .{});
+            self.move(.{});
             _ = renderer.playCreatureAnim(self, .idle, .{ .loop = true });
         },
         .shield_up => |*r| {
@@ -398,8 +412,21 @@ pub fn update(action: *Action, self: *Thing, room: *Room) Error!bool {
                     return true;
                 }
             }
-            self.updateVel(.{}, .{});
+            self.move(.{});
             _ = renderer.playCreatureAnim(self, .idle, .{ .loop = true });
+        },
+        .player_discard => { // actual discarding happens in player code
+            // mana mandy gets all her mana back
+            if (self.mana) |*mana| {
+                if (room.init_params.mode == .mandy_3_mana) {
+                    mana.curr = mana.max;
+                }
+            }
+            return true;
+        },
+        .use_item => |*it| {
+            try it.item.use(self, room, action.params);
+            return true;
         },
     }
     action.curr_tick += 1;

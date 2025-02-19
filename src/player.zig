@@ -69,6 +69,7 @@ pub const Action = struct {
         item: Item,
         discard: struct {}, // @hasField etc doesn't work with void, so empty struct
     };
+    pub const Params = Spell.Params;
     // identifies an Action (in context - e.g. a player action, a particular NPC's action, not a universal lookup (yet))
     pub const Id = struct {
         kind: Action.Kind,
@@ -140,41 +141,56 @@ pub const Input = struct {
         const controller = &self.controller.player;
         const ui_slots = &run.ui_slots;
 
-        if (controller.action_casting == null) {
-            controller.action_casting = ui_slots.tryUnbufferAction(run, self);
-            if (controller.action_casting) |b| {
+        var doing_discard = false;
+        if (controller.action_doing == null) {
+            if (ui_slots.tryUnbufferAction(run, self)) |b| {
+                controller.action_doing = .{
+                    .slot = .ability_1,
+                    .params = b.params orelse .{ .target_kind = .self },
+                };
                 switch (b.action) {
                     .spell => |spell| {
-                        controller.cast_counter = utl.TickCounter.init(spell.cast_ticks);
+                        controller.action_slots.getPtr(.ability_1).* = .{ .kind = .{
+                            .spell_cast = .{
+                                .spell = spell,
+                            },
+                        } };
                     },
-                    else => {},
+                    .item => |item| {
+                        controller.action_slots.getPtr(.ability_1).* = .{ .kind = .{
+                            .use_item = .{
+                                .item = item,
+                            },
+                        } };
+                    },
+                    .discard => {
+                        controller.action_slots.getPtr(.ability_1).* = .{ .kind = .{
+                            .player_discard = .{},
+                        } };
+                        doing_discard = true;
+                    },
                 }
             }
         }
-        // TODO ?? I don't think this applies anymore
-        // make sure selected action is still valid! It may be selected but not buffered, bypassing the canUse check in gameUI.Slots
-        // ui_slots.cancelSelectedActionSlotIfInvalid(run, self);
 
-        if (controller.action_casting) |action| {
-            if (action.action == .discard) {
-                // how long to wait if discarding...
-                const discard_secs = if (self.mana) |*mana| blk: {
-                    const max_extra_mana_cooldown_secs: f32 = 1.33;
-                    const per_mana_secs = max_extra_mana_cooldown_secs / utl.as(f32, mana.max);
-                    const num_secs: f32 = 0.66 + per_mana_secs * utl.as(f32, mana.curr);
-                    break :blk num_secs;
-                } else 3;
-                const num_ticks = core.secsToTicks(discard_secs);
-                for (ui_slots.spells.slice()) |*slot| {
-                    if (slot.spell) |spell| {
-                        room.discardSpell(spell);
-                    }
-                    slot.spell = null;
-                    slot.ui_slot.cooldown_timer = utl.TickCounter.init(num_ticks);
+        if (doing_discard) {
+            // how long to wait if discarding...
+            const discard_secs = if (self.mana) |*mana| blk: {
+                const max_extra_mana_cooldown_secs: f32 = 1.33;
+                const per_mana_secs = max_extra_mana_cooldown_secs / utl.as(f32, mana.max);
+                const num_secs: f32 = 0.66 + per_mana_secs * utl.as(f32, mana.curr);
+                break :blk num_secs;
+            } else 3;
+            const num_ticks = core.secsToTicks(discard_secs);
+            for (ui_slots.spells.slice()) |*slot| {
+                if (slot.spell) |spell| {
+                    room.discardSpell(spell);
                 }
-                ui_slots.discard_slot.?.cooldown_timer = utl.TickCounter.init(num_ticks);
-                ui_slots.unselectAction();
+                slot.spell = null;
+                slot.ui_slot.cooldown_timer = utl.TickCounter.init(num_ticks);
             }
+            ui_slots.discard_slot.?.cooldown_timer = utl.TickCounter.init(num_ticks);
+            ui_slots.unselectAction();
         }
     }
 
@@ -211,11 +227,16 @@ pub const Input = struct {
                     break :blk action;
                 }
             }
-            if (controller.action_casting) |b| {
-                if (actionHasTargeting(b.action)) {
-                    params = b.params;
-                    break :blk b.action;
-                }
+            if (controller.action_doing) |doing| {
+                const ai_action = controller.action_slots.get(doing.slot).?;
+                const action: Action.KindData = switch (ai_action.kind) {
+                    .player_discard => .{ .discard = .{} },
+                    .spell_cast => |sc| .{ .spell = sc.spell },
+                    .use_item => |it| .{ .item = it.item },
+                    else => break :blk null,
+                };
+                params = doing.params;
+                break :blk action;
             }
             break :blk null;
         };
@@ -269,12 +290,18 @@ pub const Controller = struct {
         none,
         action,
         walk,
+        Action,
     };
 
     state: State = .none,
     action_casting: ?Action.Buffered = null,
     cast_counter: utl.TickCounter = .{},
     cast_vfx: ?Thing.Id = null,
+    action_slots: @import("Action.zig").Slot.Array = @import("Action.zig").Slot.Array.initFill(null),
+    action_doing: ?struct {
+        slot: @import("Action.zig").Slot,
+        params: Action.Params,
+    } = null,
     ticks_in_state: i64 = 0,
 
     pub fn update(self: *Thing, room: *Room) Error!void {
@@ -315,9 +342,9 @@ pub const Controller = struct {
 
             controller.state = state: switch (controller.state) {
                 .none => {
-                    if (controller.action_casting != null) {
+                    if (controller.action_doing != null) {
                         controller.ticks_in_state = 0;
-                        continue :state .action;
+                        continue :state .Action;
                     }
                     if (!input_dir.isZero()) {
                         controller.ticks_in_state = 0;
@@ -329,9 +356,9 @@ pub const Controller = struct {
                     break :state .none;
                 },
                 .walk => {
-                    if (controller.action_casting != null) {
+                    if (controller.action_doing != null) {
                         controller.ticks_in_state = 0;
-                        continue :state .action;
+                        continue :state .Action;
                     }
                     if (input_dir.isZero()) {
                         controller.ticks_in_state = 0;
@@ -414,6 +441,20 @@ pub const Controller = struct {
                     _ = AnimRefs.cast.get();
                     _ = renderer.playDir(AnimRefs.cast, .{ .loop = true, .dir = self.dir });
                     break :state .action;
+                },
+                .Action => {
+                    assert(controller.action_doing != null);
+                    const doing = controller.action_doing.?;
+                    const action = &controller.action_slots.getPtr(doing.slot).*.?;
+                    if (controller.ticks_in_state == 0) {
+                        try action.begin(self, room, doing.params);
+                    }
+                    if (try action.update(self, room)) {
+                        action.cooldown.restart();
+                        controller.action_doing = null;
+                        continue :state .none;
+                    }
+                    break :state .Action;
                 },
             };
 
