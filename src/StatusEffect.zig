@@ -44,6 +44,8 @@ const Proto = struct {
     max_stacks: i32 = 9999,
     icon: icon_text.Icon,
     timer_ticks: i64 = 0,
+    show_stacks: bool = true,
+    show_in_bar: bool = true,
 };
 
 const protos = [_]Proto{
@@ -60,7 +62,7 @@ const protos = [_]Proto{
         .name = "Frozen",
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(0.3, 0.4, 0.9),
-        .icon = .ice_ball,
+        .icon = .ice_cube,
     },
     .{
         .enum_name = "blackmailed",
@@ -161,6 +163,8 @@ const protos = [_]Proto{
         .color = Colorf.rgb(0.2, 0.7, 0.1),
         .icon = .slime,
         .timer_ticks = 45,
+        .show_stacks = false,
+        .show_in_bar = false,
     },
     .{
         .enum_name = "slimed",
@@ -168,6 +172,7 @@ const protos = [_]Proto{
         .cd_type = .remove_all_stacks,
         .color = Colorf.rgb(0.3, 0.9, 0.2),
         .icon = .slime,
+        .show_stacks = false,
     },
     .{
         .enum_name = "snowy",
@@ -176,6 +181,8 @@ const protos = [_]Proto{
         .cd_type = .no_cd,
         .color = Colorf.rgb(0.5, 0.8, 1),
         .icon = .ice_ball,
+        .show_stacks = false,
+        .show_in_bar = false,
     },
     .{
         .enum_name = "slimeballed",
@@ -189,7 +196,7 @@ const protos = [_]Proto{
         .name = "Hasted",
         .cd_type = .remove_one_stack,
         .color = Colorf.rgb(0.3, 0.9, 0.2),
-        .icon = .trailblaze,
+        .icon = .hasted,
     },
     .{
         .enum_name = "fireresistant",
@@ -198,6 +205,7 @@ const protos = [_]Proto{
         .cd_type = .no_cd,
         .color = Colorf.rgb(0.5, 0.8, 1),
         .icon = .fireproof,
+        .show_stacks = false,
     },
     .{
         .enum_name = "lightningresistant",
@@ -206,6 +214,7 @@ const protos = [_]Proto{
         .cd_type = .no_cd,
         .color = Colorf.rgb(0.5, 0.8, 1),
         .icon = .lightningproof,
+        .show_stacks = false,
     },
 };
 
@@ -514,21 +523,19 @@ pub fn fmtDesc(buf: []u8, kind: StatusEffect.Kind) Error![]u8 {
     };
 }
 
-pub fn fmtLong(buf: []u8, kind: StatusEffect.Kind, stacks: i32) Error![]u8 {
+pub fn fmtBar(buf: []u8, kind: StatusEffect.Kind, stacks: i32) Error![]u8 {
     const proto = proto_array.get(kind);
     return try icon_text.partsToUtf8(buf, &.{
         .{ .icon = proto.icon },
-        .{ .text = proto.name },
-        .{ .text = ": " },
-        .{ .text = try _fmtStacksLong(kind, stacks) },
+        .{ .text = try _fmtStacksBar(kind, stacks) },
     });
 }
 
-pub fn fmtShort(buf: []u8, kind: StatusEffect.Kind, stacks: i32) Error![]u8 {
+pub fn fmtTag(buf: []u8, kind: StatusEffect.Kind, stacks: i32) Error![]u8 {
     const proto = proto_array.get(kind);
     return try icon_text.partsToUtf8(buf, &.{
         .{ .icon = proto.icon },
-        .{ .text = try _fmtStacksShort(kind, stacks) },
+        .{ .text = try _fmtStacksTag(kind, stacks) },
     });
 }
 
@@ -563,18 +570,15 @@ inline fn sEnding(num: i32) []const u8 {
     return "";
 }
 
-fn _fmtStacksLong(kind: StatusEffect.Kind, stacks: i32) Error![]u8 {
-    const dur_secs = if (StatusEffect.getDurationSeconds(kind, stacks)) |secs_f| utl.as(i32, @floor(secs_f)) else null;
-    return switch (kind) {
-        .lit => try utl.bufPrintLocal("{} stack{s}", .{ stacks, sEnding(stacks) }),
-        else => if (dur_secs) |secs|
-            try utl.bufPrintLocal("{} sec{s}", .{ secs, sEnding(secs) })
-        else
-            try utl.bufPrintLocal("{} stack{s}", .{ stacks, sEnding(stacks) }),
-    };
+fn _fmtStacksBar(kind: StatusEffect.Kind, stacks: i32) Error![]u8 {
+    const proto = proto_array.get(kind);
+    if (proto.show_stacks) {
+        return try utl.bufPrintLocal("{}", .{stacks});
+    }
+    return "";
 }
 
-fn _fmtStacksShort(kind: StatusEffect.Kind, stacks: i32) Error![]u8 {
+fn _fmtStacksTag(kind: StatusEffect.Kind, stacks: i32) Error![]u8 {
     const dur_secs = if (StatusEffect.getDurationSeconds(kind, stacks)) |secs_f| utl.as(i32, @floor(secs_f)) else null;
     return switch (kind) {
         .lit, .cold => try utl.bufPrintLocal("{}", .{stacks}),

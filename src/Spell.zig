@@ -678,7 +678,7 @@ pub const NewTag = struct {
     pub fn makeStatus(kind: StatusEffect.Kind, stacks: i32) Error!NewTag {
         var buf: [64]u8 = undefined;
         var ret = NewTag{};
-        ret.card_label = try CardLabel.fromSlice(try StatusEffect.fmtShort(&buf, kind, stacks));
+        ret.card_label = try CardLabel.fromSlice(try StatusEffect.fmtTag(&buf, kind, stacks));
         return ret;
     }
 };

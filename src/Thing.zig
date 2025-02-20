@@ -36,6 +36,7 @@ const Action = @import("Action.zig");
 const icon_text = @import("icon_text.zig");
 const projectiles = @import("projectiles.zig");
 const sounds = @import("sounds.zig");
+const ImmUI = @import("ImmUI.zig");
 
 pub const Kind = enum {
     creature,
@@ -1658,27 +1659,21 @@ pub fn renderStatusBars(self: *const Thing, _: *const Room) Error!void {
             }
         }
         // debug draw statuses
-        const font = App.get().data.fonts.get(.seven_x_five);
-        const status_height: f32 = utl.as(f32, font.base_size);
         var status_pos = shields_topleft.add(v2f(0, shields_height));
+        var buf: [64]u8 = undefined;
+        const cmd_buf = &App.get().scratch_ui.commands;
+        cmd_buf.clear();
         for (self.statuses.values) |status| {
-            if (status.stacks == 0) continue;
-            const text = try utl.bufPrintLocal("{}", .{status.stacks});
-            const text_dims = try plat.measureText(text, .{ .size = font.base_size });
-            const status_box_width = text_dims.x + 2;
-            const text_color = Colorf.getContrasting(status.getColor());
-            plat.rectf(status_pos, v2f(status_box_width, status_height), .{
-                .fill_color = status.getColor(),
+            if (status.stacks == 0 or StatusEffect.proto_array.get(status.kind).show_in_bar == false) continue;
+            const text = try StatusEffect.fmtBar(&buf, status.kind, status.stacks);
+            const text_dims = icon_text.measureIconText(text);
+            plat.rectf(status_pos, text_dims.add(V2f.splat(1)), .{
+                .fill_color = Colorf.black.fade(0.5),
             });
-
-            try plat.textf(status_pos.add(V2f.splat(1)), "{s}", .{text}, .{
-                .size = font.base_size,
-                .color = text_color,
-                .font = font,
-                .smoothing = .none,
-            });
-            status_pos.x += status_box_width;
+            try icon_text.unqRenderIconText(cmd_buf, text, status_pos.add(V2f.splat(1)), 1);
+            status_pos.x += text_dims.x;
         }
+        try ImmUI.render(cmd_buf);
     }
 }
 

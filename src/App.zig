@@ -64,6 +64,12 @@ menu_ui: struct {
 tooltip_ui: struct {
     commands: ImmUI.CmdBuf = .{},
 } = .{},
+// used for drawing ui stuff where it isn't normally drawn...
+// e.g. icon_text in status bar
+// don't rely on it being in any particular state
+scratch_ui: struct {
+    commands: ImmUI.CmdBuf = .{},
+} = .{},
 game_render_texture: Platform.RenderTexture2D = undefined,
 ui_render_texture: Platform.RenderTexture2D = undefined,
 
