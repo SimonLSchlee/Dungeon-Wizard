@@ -1359,7 +1359,8 @@ pub const SpawnerController = struct {
                     proto.is_summon = self.is_summon;
                     _ = try room.queueSpawnThing(&proto, self.pos);
                     spawner.state = .fade_out_circle;
-                    _ = App.get().sfx_player.playSound(&SoundRef.activate, .{ .volume = 0.5 });
+                    // TODO better sound
+                    //_ = App.get().sfx_player.playSound(&SoundRef.activate, .{ .volume = 0.5 });
                 }
             },
             .fade_out_circle => {
@@ -1373,8 +1374,9 @@ pub const SpawnerController = struct {
                 }
             },
         }
-        const f = 1 - spawner.sound_fade_timer.remapTo0_1();
-        self.sound_player.play(&SoundRef.loop, .{ .loop = true, .volume = 0.3 * f });
+        // TODO better sound
+        //const f = 1 - spawner.sound_fade_timer.remapTo0_1();
+        //self.sound_player.play(&SoundRef.loop, .{ .loop = true, .volume = 0.3 * f });
     }
 
     pub fn prototype(creature_kind: CreatureKind) Thing {
