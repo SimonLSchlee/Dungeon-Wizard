@@ -960,12 +960,9 @@ pub fn howToPlayUpdate(self: *Run) Error!void {
     const ui_scaling: f32 = plat.ui_scaling;
 
     // modal background
-    var modal_dims = plat.screen_dims_f.scale(0.6);
-    var modal_topleft = plat.screen_dims_f.sub(modal_dims).scale(0.5);
-
     const game_rect_dims = self.ui_slots.getGameScreenRect();
-    modal_dims = v2f(game_rect_dims.x * 0.6, game_rect_dims.y * 0.9);
-    modal_topleft = game_rect_dims.sub(modal_dims).scale(0.5);
+    const modal_dims = v2f(game_rect_dims.x * 0.62, game_rect_dims.y * 0.95);
+    const modal_topleft = game_rect_dims.sub(modal_dims).scale(0.5);
 
     self.imm_ui.commands.appendAssumeCapacity(.{ .rect = .{
         .pos = modal_topleft,
@@ -1005,9 +1002,9 @@ pub fn howToPlayUpdate(self: *Run) Error!void {
             \\progress, you must slay the waves of monsters in each
             \\room.
             \\
-            \\Each time you complete a room, you will be rewarded
-            \\with a chest of goodies, including spells, items and
-            \\gold to spend.
+            \\Each time you complete a room you will be rewarded
+            \\with a chest of goodies: new spells, items and gold
+            \\to spend.
             \\
             \\Can you survive until the end?
             ,
@@ -1027,8 +1024,8 @@ pub fn howToPlayUpdate(self: *Run) Error!void {
             \\they are drawn at random from your Deck!
             \\
             \\Whenever you cast a Spell, that part of your mind goes
-            \\blank (the card is discarded). Don't worry, another
-            \\spell will soon take its place!
+            \\blank (it is discarded). Don't worry, another Spell
+            \\will soon take its place!
             \\
             \\When you have exhausted all the Spells in your Deck,
             \\they will recycle, so you won't run out.
@@ -1072,16 +1069,17 @@ pub fn howToPlayUpdate(self: *Run) Error!void {
         .{
             \\Oh, you want more? Here are some {}hot{} tips:
             \\
-            \\1. You can enable "quickcast" from the options if you
-            \\prefer to cast the spells and items instantly on pressing
-            \\the key.
+            \\1. You can enable "quickcast" from the options, which
+            \\lets you cast spells and items by just pressing the
+            \\keyboard shortcut (without left-clicking).
             \\
-            \\2. Some spells only target monsters, or yourself, or the
-            \\ground.
-            \\
-            \\3. Your mana crystals{} will regenerate automatically
+            \\2. Your mana crystals{} will regenerate automatically
             \\up to 3 mana, but if you pick up mana flames{}, you can
             \\hold up to 5 mana!
+            \\
+            \\3. Remember, you can pause at any time with spacebar!
+            \\Stop and think about what to do next, or carefully aim
+            \\your more dangerous spells.
             \\
             \\4. If you feel stuck, remember you're a {}{}{}Wizard{}{}{}, baby!
             \\What would a {}{}{}Wizard{}{}{} do?
@@ -1130,7 +1128,7 @@ pub fn howToPlayUpdate(self: *Run) Error!void {
     const modal_topcenter = v2f(modal_center_x, modal_topleft.y);
     if (self.how_to_play_ui.screen < text_fmts.len - 1) {
         const next_btn_text: []const u8 = "Next >";
-        const next_btn_pos = modal_topcenter.add(v2f(70, 200).scale(ui_scaling));
+        const next_btn_pos = modal_topcenter.add(v2f(70, 205).scale(ui_scaling));
         if (menuUI.textButtonEx(
             &self.imm_ui.commands,
             next_btn_pos,
@@ -1144,7 +1142,7 @@ pub fn howToPlayUpdate(self: *Run) Error!void {
     }
     if (self.how_to_play_ui.screen > 0) {
         const next_btn_text: []const u8 = "< Prev";
-        const next_btn_pos = modal_topcenter.add(v2f(-70, 200).scale(ui_scaling).sub(v2f(btn_dims.x, 0)));
+        const next_btn_pos = modal_topcenter.add(v2f(-70, 205).scale(ui_scaling).sub(v2f(btn_dims.x, 0)));
         if (menuUI.textButtonEx(
             &self.imm_ui.commands,
             next_btn_pos,
@@ -1159,7 +1157,7 @@ pub fn howToPlayUpdate(self: *Run) Error!void {
 
     const close_btn_dims = v2f(60, 25).scale(ui_scaling);
     const close_btn_text: []const u8 = "Close";
-    const close_btn_pos = modal_topcenter.add(v2f(-close_btn_dims.x * 0.5, 200 * ui_scaling));
+    const close_btn_pos = modal_topcenter.add(v2f(-close_btn_dims.x * 0.5, 205 * ui_scaling));
     if (menuUI.textButton(&self.imm_ui.commands, close_btn_pos, close_btn_text, close_btn_dims, ui_scaling)) {
         self.screen = .room;
     }
