@@ -480,6 +480,7 @@ pub const MiscIcon = enum {
     knife,
     deck,
     gearwheel,
+    help,
 };
 
 pub const TileMapIdxBuf = std.BoundedArray(usize, 16);

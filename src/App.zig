@@ -154,7 +154,7 @@ pub fn staticAppRender() callconv(.C) void {
 
 fn startNewRun(self: *App, mode: Run.Mode) Error!void {
     _ = try Run.initRandom(&self.run, mode);
-    try self.run.startRun();
+    try self.run.startRun(self.options.other.is_first_play);
     self.screen = .run;
 }
 
@@ -469,14 +469,12 @@ fn update(self: *App) Error!void {
             },
             .run => {
                 self.music_player.setMusic(&self.sfx_player, null);
-                try self.run.ui_slots.appUpdate(&self.menu_ui.commands, &self.tooltip_ui.commands, &self.run);
-                //if (getPlat().input_buffer.keyIsJustPressed(.escape)) {
-                //    self.paused = !self.paused;
-                //}
                 if (self.paused) {
                     try self.pauseMenuUpdate();
+                    try self.run.ui_slots.appUpdate(&self.menu_ui.commands, &self.tooltip_ui.commands, &self.run);
                 } else {
                     try self.run.update();
+                    try self.run.ui_slots.appUpdate(&self.run.imm_ui.commands, &self.run.tooltip_ui.commands, &self.run);
                 }
             },
         }

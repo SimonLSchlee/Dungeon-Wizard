@@ -244,6 +244,7 @@ pub const Slots = struct {
     pause_slot: UISlot = UISlot.init(.pause),
     show_deck_slot: UISlot = UISlot.init(.show_deck),
     pause_menu_slot: UISlot = UISlot.init(.pause_menu),
+    how_to_play_slot: UISlot = UISlot.init(.show_help),
 
     gold: struct {
         rect: geom.Rectf = .{},
@@ -410,6 +411,13 @@ pub const Slots = struct {
             .dims = pause_discard_btn_dims,
         };
         self.pause_menu_slot.key_rect_pos = self.pause_menu_slot.rect.pos.sub(v2f(3, 10).scale(ui_scaling));
+
+        const how_to_play_topleft = pause_menu_topleft.sub(v2f(pause_discard_btn_dims.x + 10 * ui_scaling, 0));
+        self.how_to_play_slot.rect = .{
+            .pos = how_to_play_topleft,
+            .dims = pause_discard_btn_dims,
+        };
+        self.how_to_play_slot.key_rect_pos = self.how_to_play_slot.rect.pos.sub(v2f(3, 10).scale(ui_scaling));
 
         // background rect covers everything at bottom of screen
         const room_bg_rect_pos = spells_topleft.sub(v2f(spell_item_margin, 10 * ui_scaling));
@@ -760,7 +768,7 @@ pub const Slots = struct {
         return activation;
     }
 
-    pub fn unqSpellUISlot(self: *Slots, slot: *UISlot, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, caster: *const Thing, maybe_spell: ?Spell) Error!?Options.Controls.CastMethod {
+    pub fn unqSpellUISlot(self: *Slots, slot: *UISlot, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, caster: *const Thing, maybe_spell: ?Spell, allow_interact: bool) Error!?Options.Controls.CastMethod {
         const plat = App.getPlat();
         const ui_scaling: f32 = plat.ui_scaling;
         const enabled = if (maybe_spell) |spell| spell.canUse(caster) else false;
@@ -772,7 +780,7 @@ pub const Slots = struct {
         };
         opt.outline = self.getActionBorder(slot.command);
 
-        if (try slot.unqRectHoverClick(cmd_buf, enabled, opt)) {
+        if (allow_interact and try slot.unqRectHoverClick(cmd_buf, enabled, opt)) {
             activation = .left_click;
         }
 
@@ -789,14 +797,14 @@ pub const Slots = struct {
             if (enabled and slot.hovered) slot_contents_pos = slot_contents_pos.add(v2f(0, -5));
 
             spell.unqRenderCard(cmd_buf, slot_contents_pos, caster, ui_scaling);
-            if (slot.long_hover.is) {
+            if (allow_interact and slot.long_hover.is) {
                 try spell.unqRenderTooltip(tooltip_cmd_buf, tooltip_pos, tooltip_scaling);
             }
         } else if (slot.cooldown_timer) |_| {
             try slot.unqCooldownTimer(cmd_buf);
         }
 
-        if (try slot.unqHotKey(cmd_buf, enabled)) {
+        if (allow_interact and try slot.unqHotKey(cmd_buf, enabled)) {
             activation = default_cast_method;
         }
 
@@ -821,7 +829,7 @@ pub const Slots = struct {
         return null;
     }
 
-    pub fn unqDiscardUISlot(self: *Slots, slot: *UISlot, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, user: *const Thing) Error!bool {
+    pub fn unqDiscardUISlot(self: *Slots, slot: *UISlot, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, user: *const Thing, allow_interact: bool) Error!bool {
         const plat = App.getPlat();
         const data = App.getData();
         const ui_scaling: f32 = plat.ui_scaling;
@@ -833,7 +841,7 @@ pub const Slots = struct {
         };
         opt.outline = self.getActionBorder(slot.command);
 
-        if (try slot.unqRectHoverClick(cmd_buf, enabled, opt)) {
+        if (allow_interact and try slot.unqRectHoverClick(cmd_buf, enabled, opt)) {
             activation = true;
         }
 
@@ -848,7 +856,7 @@ pub const Slots = struct {
             const sprite_name = Data.MiscIcon.discard;
             const info = sprites.RenderIconInfo{ .frame = data.misc_icons.getRenderFrame(sprite_name).? };
             try info.unqRender(cmd_buf, slot_contents_pos, ui_scaling);
-            if (slot.long_hover.is) {
+            if (allow_interact and slot.long_hover.is) {
                 const tt = Tooltip{
                     .title = Tooltip.Title.fromSlice("Discard hand") catch unreachable,
                 };
@@ -856,13 +864,13 @@ pub const Slots = struct {
             }
         }
 
-        if (try slot.unqHotKey(cmd_buf, enabled)) {
+        if (allow_interact and try slot.unqHotKey(cmd_buf, enabled)) {
             activation = true;
         }
         return activation;
     }
 
-    pub fn unqCommandUISlot(slot: *UISlot, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, run: *Run, selected: bool) Error!bool {
+    pub fn unqCommandUISlot(slot: *UISlot, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, run: *Run, selected: bool, allow_interact: bool) Error!bool {
         const plat = App.getPlat();
         const data = App.getData();
         const ui_scaling: f32 = plat.ui_scaling;
@@ -877,7 +885,7 @@ pub const Slots = struct {
                 .thickness = 3,
             };
         }
-        if (try slot.unqRectHoverClick(cmd_buf, true, opt)) {
+        if (allow_interact and try slot.unqRectHoverClick(cmd_buf, true, opt)) {
             activation = true;
         }
 
@@ -907,9 +915,15 @@ pub const Slots = struct {
                 try info.unqRender(cmd_buf, slot_contents_pos, ui_scaling);
                 tooltip_string = "Menu";
             },
+            .show_help => {
+                const sprite_name = Data.MiscIcon.help;
+                const info = sprites.RenderIconInfo{ .frame = data.misc_icons.getRenderFrame(sprite_name).? };
+                try info.unqRender(cmd_buf, slot_contents_pos, ui_scaling);
+                tooltip_string = "How to Play";
+            },
             else => {},
         }
-        if (slot.long_hover.is) {
+        if (allow_interact and slot.long_hover.is) {
             if (tooltip_string) |tt_str| {
                 const tt = Tooltip{
                     .title = Tooltip.Title.fromSlice(tt_str) catch unreachable,
@@ -917,7 +931,7 @@ pub const Slots = struct {
                 try tt.unqRender(tooltip_cmd_buf, tooltip_pos, tooltip_scaling);
             }
         }
-        if (try slot.unqHotKey(cmd_buf, true)) {
+        if (allow_interact and try slot.unqHotKey(cmd_buf, true)) {
             activation = true;
         }
         return activation;
@@ -1026,12 +1040,12 @@ pub const Slots = struct {
             } });
             try icon_text.unqRenderIconText(cmd_buf, gold_text, self.gold.rect.pos.add(self.gold.padding), scaling);
         }
-        if (try unqCommandUISlot(&self.show_deck_slot, cmd_buf, tooltip_cmd_buf, run, run.screen == .deck)) {
+        if (try unqCommandUISlot(&self.show_deck_slot, cmd_buf, tooltip_cmd_buf, run, run.screen == .deck, true)) {
             run.toggleShowDeck();
         }
     }
 
-    pub fn roomOnlyUpdate(self: *Slots, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, run: *Run, caster: *const Thing) Error!void {
+    pub fn cardsUpdate(self: *Slots, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, run: *Run, caster: *const Thing, allow_interact: bool) Error!void {
         const plat = getPlat();
         const room = &run.room;
 
@@ -1051,16 +1065,16 @@ pub const Slots = struct {
         run.ui_clicked = run.ui_clicked or clicked;
 
         for (self.spells.slice()) |*slot| {
-            if (try self.unqSpellUISlot(&slot.ui_slot, cmd_buf, tooltip_cmd_buf, caster, slot.spell)) |cast_method| {
+            if (try self.unqSpellUISlot(&slot.ui_slot, cmd_buf, tooltip_cmd_buf, caster, slot.spell, allow_interact)) |cast_method| {
                 self.selectAction(slot.ui_slot.command, cast_method);
             }
         }
         if (self.discard_slot) |*d| {
-            if (try self.unqDiscardUISlot(d, cmd_buf, tooltip_cmd_buf, caster)) {
+            if (try self.unqDiscardUISlot(d, cmd_buf, tooltip_cmd_buf, caster, allow_interact)) {
                 self.selectAction(.{ .action = .{ .kind = .discard } }, .quick_release);
             }
         }
-        if (try unqCommandUISlot(&self.pause_slot, cmd_buf, tooltip_cmd_buf, run, run.room.paused)) {
+        if (try unqCommandUISlot(&self.pause_slot, cmd_buf, tooltip_cmd_buf, run, run.room.paused, allow_interact)) {
             room.paused = !room.paused;
         }
     }
@@ -1101,12 +1115,19 @@ pub const Slots = struct {
         }
         try self.updateHPandMana(cmd_buf, tooltip_cmd_buf, caster);
         try self.topLeftUpdate(cmd_buf, tooltip_cmd_buf, run);
+        if (try unqCommandUISlot(&self.how_to_play_slot, cmd_buf, tooltip_cmd_buf, run, run.screen == .how_to_play, true)) {
+            if (run.screen == .how_to_play) {
+                run.screen = .room;
+            } else {
+                run.screen = .how_to_play;
+            }
+        }
     }
 
     pub fn roomUpdate(self: *Slots, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, run: *Run, caster: *const Thing) Error!void {
         const plat = getPlat();
 
-        try self.roomOnlyUpdate(cmd_buf, tooltip_cmd_buf, run, caster);
+        try self.cardsUpdate(cmd_buf, tooltip_cmd_buf, run, caster, run.screen == .room);
         try self.runUpdate(cmd_buf, tooltip_cmd_buf, run, caster);
         // casting progress bar
         const ui_scaling: f32 = plat.ui_scaling;
@@ -1140,7 +1161,7 @@ pub const Slots = struct {
     // only call from App!
     pub fn appUpdate(self: *Slots, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, run: *Run) Error!void {
         const app = App.get();
-        if (try unqCommandUISlot(&self.pause_menu_slot, cmd_buf, tooltip_cmd_buf, run, app.paused)) {
+        if (try unqCommandUISlot(&self.pause_menu_slot, cmd_buf, tooltip_cmd_buf, run, app.paused, true)) {
             app.paused = !app.paused;
         }
     }

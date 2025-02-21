@@ -117,6 +117,7 @@ pub const Screen = enum {
     dead,
     win,
     deck,
+    how_to_play,
 };
 
 gold: i32 = 0,
@@ -161,6 +162,9 @@ deck_ui: struct {
     scroll_y: f32 = 0,
     texture: Platform.RenderTexture2D = undefined,
     commands: ImmUI.CmdBuf = .{},
+} = .{},
+how_to_play_ui: struct {
+    screen: usize = 0,
 } = .{},
 prev_screen: Screen = undefined,
 
@@ -315,8 +319,11 @@ pub fn reset(self: *Run) Error!void {
     _ = try initRandom(self, self.mode);
 }
 
-pub fn startRun(self: *Run) Error!void {
+pub fn startRun(self: *Run, play_tutorial: bool) Error!void {
     try self.loadPlaceFromCurrIdx();
+    if (play_tutorial) {
+        self.screen = .how_to_play;
+    }
 }
 
 pub fn initRoom(self: *Run, room: *Room, player_thing: *const Thing, params: RoomLoadParams) Error!void {
@@ -947,6 +954,217 @@ pub fn rewardUpdate(self: *Run) Error!void {
     }
 }
 
+pub fn howToPlayUpdate(self: *Run) Error!void {
+    const data = App.get().data;
+    const plat = getPlat();
+    const ui_scaling: f32 = plat.ui_scaling;
+
+    // modal background
+    var modal_dims = plat.screen_dims_f.scale(0.6);
+    var modal_topleft = plat.screen_dims_f.sub(modal_dims).scale(0.5);
+
+    const game_rect_dims = self.ui_slots.getGameScreenRect();
+    modal_dims = v2f(game_rect_dims.x * 0.6, game_rect_dims.y * 0.9);
+    modal_topleft = game_rect_dims.sub(modal_dims).scale(0.5);
+
+    self.imm_ui.commands.appendAssumeCapacity(.{ .rect = .{
+        .pos = modal_topleft,
+        .dims = modal_dims,
+        .opt = .{
+            .fill_color = Colorf.rgba(0.1, 0.1, 0.1, 0.8),
+            .outline = .{
+                .color = Colorf.rgba(0.1, 0.1, 0.2, 0.8),
+                .thickness = 2 * ui_scaling,
+            },
+        },
+    } });
+
+    var curr_row_y = modal_topleft.y + 10 * ui_scaling;
+    const modal_center_x = modal_topleft.x + modal_dims.x * 0.5;
+
+    // title
+    const title_font = data.fonts.get(.pixeloid);
+    const title_center = v2f(modal_center_x, curr_row_y + 10 * ui_scaling);
+    self.imm_ui.commands.appendAssumeCapacity(.{ .label = .{
+        .pos = title_center,
+        .text = ImmUI.initLabel("How to play"),
+        .opt = .{
+            .size = title_font.base_size * u.as(u32, ui_scaling + 1),
+            .font = title_font,
+            .smoothing = .none,
+            .color = .white,
+            .center = true,
+        },
+    } });
+    curr_row_y += 30 * ui_scaling;
+    const text_fmts = .{
+        .{
+            \\Welcome to Dungeon Wizard! *You* are the Wizard{}{}{}.
+            \\
+            \\But, you are trapped in a Dungeon! To survive and
+            \\progress, you must slay the waves of monsters in each
+            \\room.
+            \\
+            \\Each time you complete a room, you will be rewarded
+            \\with a chest of goodies, including spells, items and
+            \\gold to spend.
+            \\
+            \\Can you survive until the end?
+            ,
+            .{
+                icon_text.Fmt{ .tint = .orange },
+                icon_text.Icon.wizard,
+                icon_text.Fmt{ .tint = .white },
+            },
+        },
+        .{
+            \\Listen up, {}{}{}, this is important!
+            \\
+            \\As a Wizard, you have a mental "Deck" of Spells, but
+            \\unfortunately your memory isn't what it used to be...
+            \\
+            \\You can only hold 4 Spells in your mind at a time, and
+            \\they are drawn at random from your Deck!
+            \\
+            \\Whenever you cast a Spell, that part of your mind goes
+            \\blank (the card is discarded). Don't worry, another
+            \\spell will soon take its place!
+            \\
+            \\When you have exhausted all the Spells in your Deck,
+            \\they will recycle, so you won't run out.
+            ,
+            .{
+                icon_text.Fmt{ .tint = .orange },
+                icon_text.Icon.wizard,
+                icon_text.Fmt{ .tint = .white },
+            },
+        },
+        .{
+            \\{}{}{}: (But how do I actually...?)
+            \\
+            \\Move around by clicking the right mouse button anywhere.
+            \\
+            \\Cast spells by pressing Q,W,E or R on the keyboard, then
+            \\aim with the mouse and left-click to target the spell.
+            \\
+            \\Most spells cost some mana{} to cast, so keep an eye on
+            \\it, and pick up mana flames{} when you can.
+            \\
+            \\Items function similarly to Spells, but are one-time-use
+            \\only! Use them by pressing the number keys 1-4.
+            \\
+            \\You can pause with spacebar. While paused you can give a
+            \\command and it will be executed once you unpause.
+            ,
+            .{
+                icon_text.Fmt{ .tint = .orange },
+                icon_text.Icon.wizard,
+                icon_text.Fmt{ .tint = .white },
+                icon_text.Icon.mana_crystal_smol,
+                icon_text.Icon.mana_flame,
+            },
+        },
+        .{
+            \\Ready? Let's goooo
+            ,
+            .{},
+        },
+        .{
+            \\Oh, you want more? Here are some {}hot{} tips:
+            \\
+            \\1. You can enable "quickcast" from the options if you
+            \\prefer to cast the spells and items instantly on pressing
+            \\the key.
+            \\
+            \\2. Some spells only target monsters, or yourself, or the
+            \\ground.
+            \\
+            \\3. Your mana crystals{} will regenerate automatically
+            \\up to 3 mana, but if you pick up mana flames{}, you can
+            \\hold up to 5 mana!
+            \\
+            \\4. If you feel stuck, remember you're a {}{}{}Wizard{}{}{}, baby!
+            \\What would a {}{}{}Wizard{}{}{} do?
+            ,
+            .{
+                icon_text.Icon.fire,
+                icon_text.Icon.fire,
+                icon_text.Icon.mana_crystal_smol,
+                icon_text.Icon.mana_flame,
+                icon_text.Fmt{ .tint = .orange },
+                icon_text.Icon.wizard,
+                icon_text.Fmt{ .tint = .white },
+                icon_text.Fmt{ .tint = .orange },
+                icon_text.Icon.wizard,
+                icon_text.Fmt{ .tint = .white },
+                icon_text.Fmt{ .tint = .orange },
+                icon_text.Icon.wizard,
+                icon_text.Fmt{ .tint = .white },
+                icon_text.Fmt{ .tint = .orange },
+                icon_text.Icon.wizard,
+                icon_text.Fmt{ .tint = .white },
+            },
+        },
+    };
+    const thing = .{
+        .{ 5, 4 },
+        .{ "heyo", "lets goo" },
+    };
+    _ = thing;
+    const text = blk: {
+        inline for (0..text_fmts.len) |i| {
+            if (i == self.how_to_play_ui.screen) {
+                break :blk try u.bufPrintLocal(text_fmts[i][0], text_fmts[i][1]);
+            }
+        }
+        unreachable;
+    };
+    const text_dims = icon_text.measureIconText(text);
+    const text_pos = v2f(
+        modal_center_x - text_dims.x * ui_scaling * 0.5,
+        curr_row_y,
+    );
+    try icon_text.unqRenderIconText(&self.imm_ui.commands, text, text_pos, ui_scaling);
+
+    const btn_dims = v2f(45, 22).scale(ui_scaling);
+    const modal_topcenter = v2f(modal_center_x, modal_topleft.y);
+    if (self.how_to_play_ui.screen < text_fmts.len - 1) {
+        const next_btn_text: []const u8 = "Next >";
+        const next_btn_pos = modal_topcenter.add(v2f(70, 200).scale(ui_scaling));
+        if (menuUI.textButtonEx(
+            &self.imm_ui.commands,
+            next_btn_pos,
+            next_btn_text,
+            btn_dims,
+            ui_scaling,
+            .yellow,
+        )) {
+            self.how_to_play_ui.screen += 1;
+        }
+    }
+    if (self.how_to_play_ui.screen > 0) {
+        const next_btn_text: []const u8 = "< Prev";
+        const next_btn_pos = modal_topcenter.add(v2f(-70, 200).scale(ui_scaling).sub(v2f(btn_dims.x, 0)));
+        if (menuUI.textButtonEx(
+            &self.imm_ui.commands,
+            next_btn_pos,
+            next_btn_text,
+            btn_dims,
+            ui_scaling,
+            .yellow,
+        )) {
+            self.how_to_play_ui.screen -= 1;
+        }
+    }
+
+    const close_btn_dims = v2f(60, 25).scale(ui_scaling);
+    const close_btn_text: []const u8 = "Close";
+    const close_btn_pos = modal_topcenter.add(v2f(-close_btn_dims.x * 0.5, 200 * ui_scaling));
+    if (menuUI.textButton(&self.imm_ui.commands, close_btn_pos, close_btn_text, close_btn_dims, ui_scaling)) {
+        self.screen = .room;
+    }
+}
+
 pub fn shopUpdate(self: *Run) Error!void {
     const plat = App.getPlat();
     assert(self.shop != null);
@@ -1023,7 +1241,7 @@ pub fn deadUpdate(self: *Run) Error!void {
 
     if (menuUI.textButton(&self.imm_ui.commands, curr_btn_pos, "New Run", btn_dims, ui_scaling)) {
         try self.reset();
-        try self.startRun();
+        try self.startRun(false);
     }
     curr_btn_pos.y += btn_dims.y + btn_spacing;
 
@@ -1098,7 +1316,7 @@ pub fn winUpdate(self: *Run) Error!void {
 
     if (menuUI.textButton(&self.imm_ui.commands, curr_btn_pos, "New Run", btn_dims, ui_scaling)) {
         try self.reset();
-        try self.startRun();
+        try self.startRun(false);
     }
     curr_btn_pos.y += btn_dims.y + btn_spacing;
 
@@ -1138,7 +1356,7 @@ pub fn update(self: *Run) Error!void {
     if (debug.enable_debug_controls) {
         if (plat.input_buffer.keyIsJustPressed(.f3)) {
             try self.reset();
-            try self.startRun();
+            try self.startRun(false);
             return;
         }
         if (plat.input_buffer.keyIsJustPressed(.o)) {
@@ -1176,11 +1394,11 @@ pub fn update(self: *Run) Error!void {
     }
 
     if (self.room.getPlayer()) |thing| {
-        if (self.screen == .room) {
-            try self.ui_slots.roomUpdate(&self.imm_ui.commands, &self.tooltip_ui.commands, self, thing);
-        } else {
-            try self.ui_slots.runUpdate(&self.imm_ui.commands, &self.tooltip_ui.commands, self, thing);
-        }
+        //switch (self.screen) {
+        //    .room => try self.ui_slots.roomUpdate(&self.imm_ui.commands, &self.tooltip_ui.commands, self, thing),
+        //    else => try self.ui_slots.runUpdate(&self.imm_ui.commands, &self.tooltip_ui.commands, self, thing),
+        // }
+        try self.ui_slots.roomUpdate(&self.imm_ui.commands, &self.tooltip_ui.commands, self, thing);
     }
 
     switch (self.load_state) {
@@ -1208,6 +1426,7 @@ pub fn update(self: *Run) Error!void {
                         _ = try self.deckUI(self.deck.constSlice(), &self.deck_ui.hover, &self.deck_ui.scroll_y);
                     }
                 },
+                .how_to_play => try self.howToPlayUpdate(),
             }
         },
         .fade_in => {

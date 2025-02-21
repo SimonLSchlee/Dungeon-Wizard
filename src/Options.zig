@@ -273,6 +273,7 @@ pub const Controls = struct {
             pause,
             pause_menu,
             show_deck,
+            show_help,
             // etc..?
             pub fn eql(self: Command, other: Command) bool {
                 const my_tag = std.meta.activeTag(self);
