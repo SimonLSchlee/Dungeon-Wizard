@@ -230,7 +230,7 @@ pub const TargetingData = struct {
 
         return end_ray_pos;
     }
-    pub fn getTargetedThing(targeting_data: *const TargetingData, room: *Room, caster: *const Thing, mouse_pos: V2f) ?*Thing {
+    pub fn getTargetedThing(targeting_data: *const TargetingData, room: *Room, caster: *const Thing, mouse_pos: V2f, require_los: bool) ?*Thing {
         const thing = room.getMousedOverThing(targeting_data.target_faction_mask) orelse
             room.getClosestThingToPoint(mouse_pos, null, targeting_data.target_faction_mask) orelse
             return null;
@@ -239,7 +239,7 @@ pub const TargetingData = struct {
         if (range > targeting_data.max_range) {
             return null;
         }
-        if (targeting_data.requires_los_to_thing and !room.tilemap.isLOSBetween(caster.pos, thing.pos)) return null;
+        if (require_los and !room.tilemap.isLOSBetween(caster.pos, thing.pos)) return null;
         return thing;
     }
 
@@ -274,7 +274,12 @@ pub const TargetingData = struct {
                 };
             },
             .thing => {
-                const thing = targeting_data.getTargetedThing(room, caster, mouse_pos) orelse return null;
+                const thing = targeting_data.getTargetedThing(
+                    room,
+                    caster,
+                    mouse_pos,
+                    targeting_data.requires_los_to_thing,
+                ) orelse return null;
                 return .{
                     .target_kind = .thing,
                     .face_dir = thing.pos.sub(caster.pos).normalizedChecked() orelse caster.dir,
@@ -361,7 +366,7 @@ pub const TargetingData = struct {
                 const maybe_targeted_thing = if (params) |p|
                     room.getConstThingById(p.thing.?)
                 else
-                    targeting_data.getTargetedThing(@constCast(room), caster, plat.getMousePosWorld(room.camera));
+                    targeting_data.getTargetedThing(@constCast(room), caster, plat.getMousePosWorld(room.camera), false);
 
                 // show all possible target...
                 // but only if params are not passed in
