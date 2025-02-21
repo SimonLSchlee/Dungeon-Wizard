@@ -420,6 +420,12 @@ pub const Kind = enum {
 controls: Controls = .{},
 display: Display = .{},
 audio: Audio = .{},
+other: struct {
+    is_first_play: bool = true,
+    pub const OptionSerialize = struct {
+        is_first_play: void,
+    };
+} = .{},
 kind_selected: Kind = .controls,
 
 pub fn serialize(data: anytype, prefix: []const u8, file: std.fs.File, _: *Platform) void {
@@ -427,6 +433,10 @@ pub fn serialize(data: anytype, prefix: []const u8, file: std.fs.File, _: *Platf
     inline for (std.meta.fields(T.OptionSerialize)) |s_field| {
         const field = utl.typeFieldByName(T, s_field.name);
         switch (@typeInfo(field.type)) {
+            .bool => {
+                const line = utl.bufPrintLocal("{s}.{s}={}\n", .{ prefix, field.name, @field(data, field.name) }) catch break;
+                file.writeAll(line) catch break;
+            },
             .float => {
                 const line = utl.bufPrintLocal("{s}.{s}={d:0.2}\n", .{ prefix, field.name, @field(data, field.name) }) catch break;
                 file.writeAll(line) catch break;
@@ -442,7 +452,7 @@ pub fn serialize(data: anytype, prefix: []const u8, file: std.fs.File, _: *Platf
                 file.writeAll(line) catch break;
             },
             .@"struct" => {
-                if (@hasDecl(field.type, "Serialize")) {
+                if (@hasDecl(field.type, "OptionSerialize")) {
                     serialize(@field(data, field.name), prefix ++ "." ++ field.name, file);
                 } else if (comptime std.mem.eql(u8, utl.typeBaseName(field.type), "V2i")) {
                     const v: V2i = @field(data, field.name);
@@ -466,6 +476,7 @@ pub fn writeToTxt(self: *const Options, plat: *Platform) void {
     serialize(self.controls, "controls", options_file, plat);
     serialize(self.display, "display", options_file, plat);
     serialize(self.audio, "audio", options_file, plat);
+    serialize(self.other, "other", options_file, plat);
 }
 
 pub fn initDefault(plat: *Platform) Options {
@@ -557,6 +568,15 @@ fn setValByName(plat: *Platform, T: type, data: *T, key: []const u8, val: []cons
     }
 
     switch (@typeInfo(T)) {
+        .bool => {
+            if (std.mem.eql(u8, val, "true")) {
+                data.* = true;
+            } else if (std.mem.eql(u8, val, "false")) {
+                data.* = false;
+            } else {
+                plat.log.warn("{s}: Couldn't parse bool. key: \"{s}\", val: \"{s}\", type \"{s}\"", .{ @src().fn_name, key, val, @typeName(T) });
+            }
+        },
         .float => {
             if (std.fmt.parseFloat(T, val)) |f| {
                 data.* = f;
