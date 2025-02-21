@@ -196,9 +196,9 @@ pub const Controls = struct {
             .quick_press = "Press hotkey",
         });
     };
-    cast_method: CastMethod = .quick_release,
+    cast_method: CastMethod = .left_click,
     dropdown: DropdownMenu = .{
-        .selected_idx = @intFromEnum(CastMethod.quick_release),
+        .selected_idx = @intFromEnum(CastMethod.left_click),
     },
     //auto_self_cast: bool = true, // TODO?
     input_bindings: std.BoundedArray(InputBinding, 32) = .{},
