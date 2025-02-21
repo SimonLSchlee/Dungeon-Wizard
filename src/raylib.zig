@@ -802,7 +802,10 @@ pub fn loadFont(self: *Platform, path: []const u8) Error!Font {
 pub fn loadPixelFont(self: *Platform, path: []const u8, sz: u32) Error!Font {
     @setRuntimeSafety(core.rt_safe_blocks);
     const path_z = try std.fmt.bufPrintZ(self.str_fmt_buf, "{s}/fonts/{s}", .{ self.assets_path, path });
-    var r_font = r.LoadFontEx(path_z, u.as(c_int, sz), 0, 250);
+    var r_font = if (std.mem.endsWith(u8, path, ".png")) r.LoadFont(path_z) else r.LoadFontEx(path_z, u.as(c_int, sz), 0, 0);
+    if (!r.IsFontValid(r_font)) {
+        return Error.FileSystemFail;
+    }
     r.GenTextureMipmaps(&r_font.texture);
     const ret: Font = .{
         .name = path,

@@ -1283,10 +1283,18 @@ pub fn reloadSpriteAnims(self: *Data) Error!void {
 pub fn loadFonts(self: *Data) Error!void {
     const plat = App.getPlat();
     // TODO deinit?
-
-    self.fonts.getPtr(.alagard).* = try plat.loadPixelFont("alagard.png", 16);
-    self.fonts.getPtr(.pixeloid).* = try plat.loadPixelFont("PixeloidSans.ttf", 11);
-    self.fonts.getPtr(.seven_x_five).* = try plat.loadPixelFont("7x5.ttf", 8);
+    const fontsu = [_]struct { FontName, []const u8, u32 }{
+        .{ .alagard, "alagard.png", 16 },
+        .{ .pixeloid, "PixeloidSans.ttf", 11 },
+        .{ .seven_x_five, "7x5.ttf", 8 },
+    };
+    for (fontsu) |f| {
+        self.fonts.getPtr(f[0]).* = plat.loadPixelFont(f[1], f[2]) catch {
+            Log.err("Failed to load font: {any}", .{f[0]});
+            continue;
+        };
+        Log.info("Loaded font: {any}", .{f[0]});
+    }
 }
 
 pub fn reload(self: *Data) Error!void {
