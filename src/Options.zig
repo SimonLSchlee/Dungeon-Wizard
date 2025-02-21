@@ -794,6 +794,7 @@ fn updateAudio(self: *Options, cmd_buf: *ImmUI.CmdBuf, pos: V2f) Error!bool {
             1,
         )) |new_volume| {
             self.audio.sfx_volume = utl.clampf(new_volume / 100, 0, 1);
+            dirty = true;
         }
         curr_row_pos.y += row_height;
     }
@@ -817,6 +818,7 @@ fn updateAudio(self: *Options, cmd_buf: *ImmUI.CmdBuf, pos: V2f) Error!bool {
             1,
         )) |new_volume| {
             self.audio.music_volume = utl.clampf(new_volume / 100, 0, 1);
+            dirty = true;
         }
         curr_row_pos.y += row_height;
     }
