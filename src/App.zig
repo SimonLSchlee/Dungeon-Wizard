@@ -203,7 +203,6 @@ fn menuUpdate(self: *App) Error!void {
     const plat = getPlat();
     const data = self.data;
     const ui_scaling = plat.ui_scaling;
-    const font = data.fonts.get(.pixeloid);
 
     // main bg
     const bg_sprite = AnimRef.bg.get();
@@ -277,10 +276,11 @@ fn menuUpdate(self: *App) Error!void {
         )) {
             self.credits_open = false;
         }
+        const credits_font = data.fonts.get(.pixeloid);
         const credits_opt = draw.TextOpt{
             .color = .white,
-            .font = font,
-            .size = font.base_size * utl.as(u32, ui_scaling),
+            .font = credits_font,
+            .size = credits_font.base_size * utl.as(u32, ui_scaling),
             .round_to_pixel = true,
             .smoothing = .none,
         };
@@ -334,23 +334,22 @@ fn menuUpdate(self: *App) Error!void {
     )) {
         plat.exit();
     }
-
-    const text_opt = draw.TextOpt{
-        .center = true,
-        .color = .white,
-        .font = font,
-        .size = font.base_size * utl.as(u32, ui_scaling + 2),
-    };
-    _ = text_opt;
-
-    const version_text = config.version;
-    const version_opt = draw.TextOpt{
-        .color = .white,
-        .font = font,
-        .size = font.base_size * utl.as(u32, ui_scaling),
-    };
-    _ = version_text;
-    _ = version_opt;
+    { // version
+        const version_font = data.fonts.get(.pixeloid);
+        const version_opt = draw.TextOpt{
+            .color = .white,
+            .font = version_font,
+            .size = version_font.base_size * utl.as(u32, ui_scaling),
+            .smoothing = .none,
+        };
+        self.menu_ui.commands.append(.{
+            .label = .{
+                .text = ImmUI.initLabel(config.version),
+                .pos = bg_pos.add(v2f(285, 137).scale(ui_scaling)),
+                .opt = version_opt,
+            },
+        }) catch unreachable;
+    }
 }
 
 fn pauseMenuUpdate(self: *App) Error!void {
