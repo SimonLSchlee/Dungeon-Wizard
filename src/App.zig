@@ -109,7 +109,11 @@ export fn appInit(plat: *Platform) *anyopaque {
     app.game_render_texture = plat.createRenderTexture("app_game", plat.game_canvas_dims);
     app.ui_render_texture = plat.createRenderTexture("app_ui", plat.screen_dims);
 
-    //app.startNewRun(._4_slot_frank) catch @panic("Failed to go straight into run");
+    if (app.options.other.is_first_play) {
+        app.startNewRun(.crispin_picker) catch @panic("Failed to go straight into run");
+        app.options.other.is_first_play = false;
+        app.options.writeToTxt(plat);
+    }
 
     return app;
 }
