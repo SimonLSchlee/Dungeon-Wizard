@@ -533,8 +533,10 @@ pub fn initDefault(plat: *Platform) Options {
             }
         };
         std.sort.pdq(V2i, ret.display.resolutions.slice(), {}, Sort.cmp);
-        // just pick the first one by default
-        ret.display.selected_resolution = ret.display.resolutions.get(0);
+        // Pick the third one if possible by default, i.e. not the smallest cos thats really small
+        for (0..@min(ret.display.resolutions.len, 3)) |j| {
+            ret.display.selected_resolution = ret.display.resolutions.get(j);
+        }
 
         for (ret.display.resolutions.constSlice()) |res| {
             ret.display.resolutions_strings.append(
