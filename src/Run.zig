@@ -275,7 +275,8 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
 
         boss_params.boss = .djinn;
     }
-    try places.insert(0, places.buffer[places.len]);
+    // put boss room at start for testing
+    //try places.insert(0, places.buffer[places.len]);
 
     //try places.append(.{ .room = .{ .difficulty = 4, .idx = 0, .kind = .testu } });
     run.places = places;
