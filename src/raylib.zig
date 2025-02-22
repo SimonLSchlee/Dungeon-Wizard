@@ -86,6 +86,7 @@ prev_frame_time_ns: i64 = 0,
 input_buffer: core.InputBuffer = .{},
 str_fmt_buf: []u8 = undefined,
 assets_path: []const u8 = undefined,
+cwd_path: []const u8 = undefined,
 
 // move where the game is drawn so it's centered, e.g. if the UI is blocking some part of the screen
 pub fn centerGameRect(self: *Platform, screen_rect_pos: V2f, screen_rect_dims: V2f) void {
@@ -157,13 +158,20 @@ pub fn init(title: []const u8) Error!*Platform {
     var ret = try heap.create(Platform);
     ret.* = .{};
     ret.heap = gpa.allocator();
-    ret.log = Log.init(std.fs.cwd(), heap) catch |e| {
+    // need string buf to do following stuff
+    ret.str_fmt_buf = try ret.heap.alloc(u8, str_fmt_buf_size);
+    // need our cwd and assets path!
+    try ret.findAssetsPath();
+    // okay need logging
+    var cwd = std.fs.openDirAbsolute(ret.cwd_path, .{}) catch return Error.FileSystemFail;
+    defer cwd.close();
+    ret.log = Log.init(cwd, heap) catch |e| {
         std.debug.print("ERROR: init logger: {any}\n", .{e});
         return Error.FileSystemFail;
     };
+    // okay main stuff is done
     ret.log.info("Allocated Platform: {}KiB\n", .{@sizeOf(Platform) / 1024});
-    ret.str_fmt_buf = try ret.heap.alloc(u8, str_fmt_buf_size);
-    ret.assets_path = try ret.getAssetsPath();
+    // useful if we want to compare it later
     ret.stack_base = ret.getStackPointer();
 
     // only useable by code statically linked to raylib.zig
@@ -204,7 +212,7 @@ pub fn printStackSize(self: *Platform) void {
     std.debug.print("stack size: {x}\n", .{self.stack_base - self.getStackPointer()});
 }
 
-pub fn getAssetsPath(self: *Platform) Error![]const u8 {
+pub fn findAssetsPath(self: *Platform) Error!void {
     if (config.is_release) {
         switch (builtin.os.tag) {
             .macos => {
@@ -220,7 +228,9 @@ pub fn getAssetsPath(self: *Platform) Error![]const u8 {
                 const c_buf: [*c]u8 = @ptrCast(self.str_fmt_buf);
                 if (CF.CFStringGetCString(cf_str_ref, c_buf, str_fmt_buf_size, CF.kCFStringEncodingASCII) != 0) {
                     const slice = std.mem.span(c_buf);
-                    return try std.fmt.allocPrint(self.heap, "{s}/assets", .{slice});
+                    self.cwd_path = try std.fmt.allocPrint(self.heap, "{s}", .{slice});
+                    self.assets_path = try std.fmt.allocPrint(self.heap, "{s}/assets", .{self.cwd_path});
+                    return;
                 } else {
                     return Error.NoSpaceLeft;
                 }
@@ -229,7 +239,8 @@ pub fn getAssetsPath(self: *Platform) Error![]const u8 {
             else => {},
         }
     }
-    return "assets";
+    self.cwd_path = std.fs.realpathAlloc(self.heap, ".") catch return Error.OutOfMemory;
+    self.assets_path = try std.fmt.allocPrint(self.heap, "{s}/assets", .{self.cwd_path});
 }
 
 pub fn setTargetFPS(_: *Platform, fps: u32) void {
