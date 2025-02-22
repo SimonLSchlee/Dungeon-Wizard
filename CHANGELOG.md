@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.11.0 (2025-02-22)
+
+***Misc***
+- Pretty title screen
+- Title screen music and lots of sounds, by Ethan Kelly!
+- Volume controls!
+- Name the game "Dungeon Wizard"
+- More stuff probably, I forgot
+
+***Features***
+- You can view your deck by pressing 'N'
+- You can stop moving by pressing 'S'
+- There's a "How to Play" tutorial, ("???" button in the top right)
+- Add several new spells, including 4 new summons, several more ice and lightning spells
+
+***Balance***
+- Various tweaks to spell damage, rarity, effect
+- Various tweaks to creature damage and HP
+- Regenerate mana faster by standing still (or grab the crystals)
+- Wave spawning - next wave can now spawn if you've defeated only half the current wave, if you take too long
+- Easier spell targeting for e.g. unherring
+- Rare (blue) spells appear less frequently
+- Shop prices and selection adjusted. Shop always has a rare spell for sale
+
 ## v0.10.0 (2025-01-04)
 
 ***Misc***
