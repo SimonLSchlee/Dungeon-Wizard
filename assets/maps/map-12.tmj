@@ -282,7 +282,7 @@
         {
          "name":"room_kind",
          "type":"string",
-         "value":"boss"
+         "value":"big"
         }],
  "renderorder":"right-down",
  "tiledversion":"1.11.0",
