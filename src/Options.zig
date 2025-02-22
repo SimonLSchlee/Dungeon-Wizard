@@ -469,8 +469,13 @@ pub fn serialize(data: anytype, prefix: []const u8, file: std.fs.File, _: *Platf
 }
 
 pub fn writeToTxt(self: *const Options, plat: *Platform) void {
-    const options_file = std.fs.cwd().createFile("options.txt", .{}) catch {
-        plat.log.warn("WARNING: Failed to open options.txt for writing\n", .{});
+    var cwd = std.fs.openDirAbsolute(plat.cwd_path, .{}) catch {
+        plat.log.warn("WARNING: Failed to open cwd {s}", .{plat.cwd_path});
+        return;
+    };
+    defer cwd.close();
+    const options_file = cwd.createFile("options.txt", .{}) catch {
+        plat.log.warn("WARNING: Failed to open options.txt for writing", .{});
         return;
     };
     defer options_file.close();
