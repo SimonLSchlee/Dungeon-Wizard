@@ -160,6 +160,13 @@ pub const FireBlaze = struct {
 
 pub const Gobbomb = struct {
     pub const enum_name = "gobbomb";
+
+    const AnimRef = struct {
+        var loop = Data.Ref(Data.SpriteAnim).init("bomb-loop");
+        var explode = Data.Ref(Data.SpriteAnim).init("gobbomb-explode");
+        var got: bool = false;
+    };
+
     state: enum {
         in_flight,
         hitting,
@@ -173,15 +180,18 @@ pub const Gobbomb = struct {
     pub fn update(self: *Thing, room: *Room) Error!void {
         assert(self.spawn_state == .spawned);
         var controller = &self.controller.projectile.kind.gobbomb;
+        const renderer = &self.renderer.sprite;
+        renderer.scale = core.game_sprite_scaling * 0.5;
 
         switch (controller.state) {
             .in_flight => {
+                _ = renderer.playNormal(AnimRef.loop, .{ .loop = true });
                 if (self.hitbox) |*h| {
                     h.rel_pos = controller.target_pos.sub(self.pos);
                 }
                 _ = controller.timer.tick(false);
                 controller.z_vel += controller.z_accel;
-                self.renderer.shape.rel_pos.y += -controller.z_vel;
+                renderer.rel_pos.y += -controller.z_vel;
                 if (self.pos.dist(controller.target_pos) < self.accel_params.max_speed) {
                     self.vel = .{};
                     if (self.hitbox) |*h| {
@@ -193,8 +203,7 @@ pub const Gobbomb = struct {
                 }
             },
             .hitting => {
-                const done = if (self.hitbox) |h| !h.active else false;
-                if (done) {
+                if (renderer.playNormal(AnimRef.explode, .{}).contains(.end)) {
                     self.deferFree(room);
                     return;
                 }
@@ -211,7 +220,7 @@ pub const Gobbomb = struct {
         const max_y: f32 = 150;
         const v0: f32 = 2 * max_y / utl.as(f32, flight_ticks);
         const g = -2 * v0 / utl.as(f32, flight_ticks);
-        const bomb = Thing{
+        var bomb = Thing{
             .kind = .projectile,
             .accel_params = .{
                 .accel = 2,
@@ -225,12 +234,7 @@ pub const Gobbomb = struct {
                     .z_accel = g,
                 },
             } } },
-            .renderer = .{ .shape = .{
-                .kind = .{ .circle = .{
-                    .radius = 4,
-                } },
-                .poly_opt = .{ .fill_color = Colorf.rgb(0.2, 0.18, 0.2) },
-            } },
+            .renderer = .{ .sprite = .{} },
             .hitbox = .{
                 .active = false,
                 .deactivate_on_hit = false,
@@ -239,6 +243,9 @@ pub const Gobbomb = struct {
                 .radius = 17.5,
             },
         };
+        _ = AnimRef.loop.get();
+        _ = AnimRef.explode.get();
+        bomb.renderer.sprite.setNormalAnim(AnimRef.loop);
         return bomb;
     }
 };
