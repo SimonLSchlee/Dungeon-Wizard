@@ -200,6 +200,8 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
         .shadow_radius_x = flamey_explodey.ball_radius,
     };
     ball.hitbox.?.activate(room);
+    _ = AnimRef.ball_projectile.get();
+    _ = AnimRef.explode.get();
     ball.renderer.sprite.setNormalAnim(AnimRef.ball_projectile);
     _ = try room.queueSpawnThing(&ball, params.cast_orig.?);
     _ = App.get().sfx_player.playSound(&SoundRef.crackle, .{});

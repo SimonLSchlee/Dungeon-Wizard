@@ -64,11 +64,12 @@ immune_stacks: i32 = 3,
 const SoundRef = struct {
     var woosh = Data.Ref(Data.Sound).init("long-woosh");
 };
+const AnimRef = struct {
+    var explode = Data.Ref(Data.SpriteAnim).init("big-explosion-50px-explode");
+};
 
 pub const Projectile = struct {
     pub const controller_enum_name = enum_name ++ "_projectile";
-
-    explode_counter: utl.TickCounter = utl.TickCounter.init(10),
 
     pub fn update(self: *Thing, room: *Room) Error!void {
         const spell_controller = &self.controller.spell;
@@ -77,9 +78,8 @@ pub const Projectile = struct {
         _ = flame_purge;
         const params = spell_controller.params;
         _ = params;
-        const projectile: *@This() = &spell_controller.controller.flame_purge_projectile;
 
-        if (projectile.explode_counter.tick(false)) {
+        if (self.renderer.sprite.playNormal(AnimRef.explode, .{}).contains(.end)) {
             self.deferFree(room);
         }
     }
@@ -100,9 +100,9 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             },
         } },
         .renderer = .{
-            .shape = .{
-                .kind = .{ .circle = .{ .radius = flame_purge.explode_radius } },
-                .poly_opt = .{ .fill_color = Colorf.orange },
+            .sprite = .{
+                .draw_under = true,
+                .draw_normal = false,
             },
         },
         .hitbox = .{
@@ -114,6 +114,8 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
         },
     };
     ball.hitbox.?.activate(room);
+    _ = AnimRef.explode.get();
+    ball.renderer.sprite.setNormalAnim(AnimRef.explode);
     _ = try room.queueSpawnThing(&ball, caster.pos);
     _ = App.get().sfx_player.playSound(&SoundRef.woosh, .{});
 }
