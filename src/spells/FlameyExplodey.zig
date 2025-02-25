@@ -112,6 +112,7 @@ pub fn spawnFiresInRadius(room: *Room, pos: V2f, radius: f32, comptime max_spawn
 
 const AnimRef = struct {
     var ball_projectile = Data.Ref(Data.SpriteAnim).init("spell-projectile-fire-boom");
+    var explode = Data.Ref(Data.SpriteAnim).init("big-explosion-35px-explode");
 };
 const SoundRef = struct {
     var woosh = Data.Ref(Data.Sound).init("long-woosh");
@@ -122,7 +123,6 @@ pub const Projectile = struct {
     pub const controller_enum_name = enum_name ++ "_projectile";
 
     exploded: bool = false,
-    explode_counter: utl.TickCounter = utl.TickCounter.init(10),
 
     pub fn update(self: *Thing, room: *Room) Error!void {
         const spell_controller = &self.controller.spell;
@@ -146,17 +146,16 @@ pub const Projectile = struct {
                 hitbox.mask = Thing.Faction.Mask.initFull();
                 self.vel = .{};
                 try spawnFiresInRadius(room, self.pos, flamey_explodey.explode_radius + 20, 20);
-                self.renderer = .{
-                    .shape = .{
-                        .kind = .{ .circle = .{ .radius = flamey_explodey.explode_radius } },
-                        .poly_opt = .{ .fill_color = Colorf.orange },
-                    },
-                };
+                self.shadow_radius_x = 0;
+                self.renderer = .{ .sprite = .{
+                    .draw_over = true,
+                } };
+                self.renderer.sprite.setNormalAnim(AnimRef.explode);
                 _ = App.get().sfx_player.playSound(&SoundRef.woosh, .{});
             }
         } else {
             self.vel = .{};
-            if (projectile.explode_counter.tick(false)) {
+            if (self.renderer.sprite.playNormal(AnimRef.explode, .{}).contains(.end)) {
                 self.deferFree(room);
             }
         }

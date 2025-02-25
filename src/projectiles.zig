@@ -163,7 +163,7 @@ pub const Gobbomb = struct {
 
     const AnimRef = struct {
         var loop = Data.Ref(Data.SpriteAnim).init("bomb-loop");
-        var explode = Data.Ref(Data.SpriteAnim).init("gobbomb-explode");
+        var explode = Data.Ref(Data.SpriteAnim).init("big-explosion-35px-explode");
         var got: bool = false;
     };
 
@@ -203,6 +203,8 @@ pub const Gobbomb = struct {
                 }
             },
             .hitting => {
+                renderer.draw_over = true;
+                renderer.draw_normal = false;
                 if (renderer.playNormal(AnimRef.explode, .{}).contains(.end)) {
                     self.deferFree(room);
                     return;
