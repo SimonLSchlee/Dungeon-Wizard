@@ -231,7 +231,10 @@ pub const Input = struct {
                 const ai_action = controller.action_slots.get(doing.slot).?;
                 const action: Action.KindData = switch (ai_action.kind) {
                     .player_discard => .{ .discard = .{} },
-                    .spell_cast => |sc| .{ .spell = sc.spell },
+                    .spell_cast => |sc| spell_blk: {
+                        if (sc.wind_down) break :blk null; // stop showing casting indicator once the spell is cast, even though the action continues a bit
+                        break :spell_blk .{ .spell = sc.spell };
+                    },
                     .use_item => |it| .{ .item = it.item },
                     else => break :blk null,
                 };

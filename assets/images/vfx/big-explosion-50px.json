@@ -92,7 +92,7 @@
    { "name": "explode", "from": 0, "to": 8, "direction": "forward", "color": "#000000ff" }
   ],
   "layers": [
-   { "name": "data", "opacity": 255, "blendMode": "normal", "cels": [{ "frame": 9, "data": "pivot-y=44" }] },
+   { "name": "data", "opacity": 255, "blendMode": "normal", "cels": [{ "frame": 9, "data": "pivot-y=44;hit=2" }] },
    { "name": "flame", "opacity": 255, "blendMode": "normal" },
    { "name": "smoke", "opacity": 255, "blendMode": "normal" },
    { "name": "shock", "opacity": 255, "blendMode": "normal" }

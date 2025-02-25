@@ -78,8 +78,11 @@ pub const Projectile = struct {
         _ = flame_purge;
         const params = spell_controller.params;
         _ = params;
-
-        if (self.renderer.sprite.playNormal(AnimRef.explode, .{}).contains(.end)) {
+        const events = self.renderer.sprite.playNormal(AnimRef.explode, .{});
+        if (events.contains(.hit)) {
+            self.hitbox.?.activate(room);
+        }
+        if (events.contains(.end)) {
             self.deferFree(room);
         }
     }
@@ -113,7 +116,6 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
             .radius = flame_purge.explode_radius,
         },
     };
-    ball.hitbox.?.activate(room);
     _ = AnimRef.explode.get();
     ball.renderer.sprite.setNormalAnim(AnimRef.explode);
     _ = try room.queueSpawnThing(&ball, caster.pos);
