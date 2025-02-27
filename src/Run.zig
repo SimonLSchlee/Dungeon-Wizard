@@ -140,8 +140,10 @@ mode: Mode = undefined,
 deck: Spell.SpellArray = .{},
 spell_rarity_weight_offsets: Spell.RarityWeights = Spell.rarity_weight_offsets_base,
 load_timer: u.TickCounter = u.TickCounter.init(20),
+show_progress_timer: u.TickCounter = u.TickCounter.init(core.secsToTicks(2)),
 load_state: enum {
     none,
+    show_progress,
     fade_in,
     fade_out,
 } = .fade_in,
@@ -1331,6 +1333,57 @@ pub fn winUpdate(self: *Run) Error!void {
     curr_btn_pos.y += btn_dims.y + btn_spacing;
 }
 
+pub fn showProgressUpdate(self: *Run) Error!void {
+    if (self.curr_place_idx == 0) return;
+    const plat = getPlat();
+    const ui_scaling = plat.ui_scaling + 1;
+    const scratch_buf = &App.get().scratch_ui.commands;
+    scratch_buf.clear();
+    const center = plat.screen_dims_f.scale(0.5);
+    const place_rect_dims = V2f.splat(10).scale(ui_scaling);
+    const place_spacing_x = 10 * ui_scaling;
+    const places_total_dims = v2f((place_rect_dims.x + place_spacing_x) * u.as(f32, self.places.len) - place_spacing_x, place_rect_dims.y);
+    const places_topleft = center.sub(places_total_dims.scale(0.5)).round();
+    const prev_idx = self.curr_place_idx - 1;
+    const curr_idx = self.curr_place_idx;
+    var wiz_start_pos: V2f = .{};
+    var wiz_end_pos: V2f = .{};
+    var curr_pos: V2f = places_topleft;
+    for (0..self.places.len) |i| {
+        if (prev_idx == i) {
+            wiz_start_pos = curr_pos.add(v2f(0, -place_rect_dims.y));
+        }
+        if (curr_idx == i) {
+            wiz_end_pos = curr_pos.add(v2f(0, -place_rect_dims.y));
+        }
+        const place = &self.places.get(i);
+        const text: []const u8 = switch (place.room.kind) {
+            .first => u.bufPrintLocal("{}", .{icon_text.Icon.doorway}) catch "f",
+            .smol, .big => u.bufPrintLocal("{}", .{icon_text.Icon.ouchy_skull}) catch "r",
+            .boss, .testu => "?",
+            .shop => u.bufPrintLocal("{}", .{icon_text.Icon.coin}) catch "s",
+        };
+        try icon_text.unqRenderIconText(scratch_buf, text, curr_pos, ui_scaling);
+        curr_pos.x += place_rect_dims.x + place_spacing_x;
+    }
+    const wiz_text = u.bufPrintLocal("{}{}{}", .{
+        icon_text.Fmt{ .tint = .orange },
+        icon_text.Icon.wizard,
+        icon_text.Fmt{ .tint = .orange },
+    }) catch "w";
+    const timer_f = self.show_progress_timer.remapTo0_1();
+    const f = u.remapClampf(0, 0.2, 0, 1, timer_f - 0.4);
+    const start_to_end = wiz_end_pos.sub(wiz_start_pos);
+    const jump_height = start_to_end.length() * 0.3;
+    const wiz_pos = wiz_start_pos.add(v2f(
+        start_to_end.x * f,
+        -@sin(f * u.pi) * jump_height,
+    ));
+    try icon_text.unqRenderIconText(scratch_buf, wiz_text, wiz_pos, ui_scaling);
+
+    try ImmUI.render(scratch_buf);
+}
+
 pub fn toggleShowDeck(self: *Run) void {
     if (self.screen == .deck) {
         self.screen = self.prev_screen;
@@ -1373,7 +1426,14 @@ pub fn update(self: *Run) Error!void {
     }
 
     switch (self.load_state) {
-        .none => {},
+        .none => {
+            // we're in the room
+        },
+        .show_progress => {
+            if (self.show_progress_timer.tick(true)) {
+                self.load_state = .fade_in;
+            }
+        },
         .fade_in => {
             if (self.load_timer.tick(true)) {
                 self.load_state = .none;
@@ -1387,12 +1447,11 @@ pub fn update(self: *Run) Error!void {
                     self.load_state = .none;
                 } else {
                     try self.loadPlaceFromCurrIdx();
-                    self.load_state = .fade_in;
+                    self.load_state = .show_progress;
                 }
             }
         },
     }
-
     if (self.room.getPlayer()) |thing| {
         //switch (self.screen) {
         //    .room => try self.ui_slots.roomUpdate(&self.imm_ui.commands, &self.tooltip_ui.commands, self, thing),
@@ -1429,10 +1488,7 @@ pub fn update(self: *Run) Error!void {
                 .how_to_play => try self.howToPlayUpdate(),
             }
         },
-        .fade_in => {
-            self.ui_slots.unselectAction(); // effectively disables UI while fading
-        },
-        .fade_out => {
+        .fade_in, .fade_out, .show_progress => {
             self.ui_slots.unselectAction(); // effectively disables UI while fading
         },
     }
@@ -1489,6 +1545,10 @@ pub fn render(self: *Run, ui_render_texture: Platform.RenderTexture2D, game_rend
     try ImmUI.render(&self.tooltip_ui.commands);
     switch (self.load_state) {
         .none => {},
+        .show_progress => {
+            plat.rectf(.{}, plat.screen_dims_f, .{ .fill_color = .black });
+            try self.showProgressUpdate();
+        },
         .fade_in => {
             const color = Colorf.black.fade(1 - self.load_timer.remapTo0_1());
             plat.rectf(.{}, plat.screen_dims_f, .{ .fill_color = color });
