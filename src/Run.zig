@@ -204,7 +204,7 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
     }
     run.rng.random().shuffleWithIndex(usize, smol_room_idxs.slice(), u32);
 
-    for (0..@min(smol_room_idxs.len, 3)) |i| {
+    for (0..@min(smol_room_idxs.len, 4)) |i| {
         try places.append(.{ .room = .{
             .difficulty_per_wave = 0,
             .kind = .smol,
@@ -219,7 +219,7 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
     }
     run.rng.random().shuffleWithIndex(usize, big_room_idxs.slice(), u32);
 
-    for (0..@min(big_room_idxs.len, 3)) |i| {
+    for (0..@min(big_room_idxs.len, 4)) |i| {
         try places.append(.{ .room = .{
             .difficulty_per_wave = 0,
             .kind = .big,
@@ -230,38 +230,42 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
 
     for (places.slice(), 0..) |*place, i| {
         // TODO this better
-        if (i < 2) {
+
+        if (i < 4) { // pre shop
             place.room.waves_params.enemy_probabilities.getPtr(.slime).* = 1;
             place.room.waves_params.enemy_probabilities.getPtr(.bat).* = 0.5;
-        }
-        if (i >= 2) {
-            place.room.waves_params.enemy_probabilities.getPtr(.slime).* = 1;
-            place.room.waves_params.enemy_probabilities.getPtr(.bat).* = 0.5;
-            place.room.waves_params.enemy_probabilities.getPtr(.gobbow).* = 1;
-            place.room.waves_params.enemy_probabilities.getPtr(.gobbomber).* = 0.5;
-        }
-        if (i >= 3) {
+            if (i >= 2) {
+                place.room.waves_params.enemy_probabilities.getPtr(.gobbow).* = 1;
+            }
+            if (i >= 3) {
+                place.room.waves_params.enemy_probabilities.getPtr(.gobbomber).* = 0.5;
+            }
+        } else { // post shop
+            place.room.waves_params.num_waves = 3;
             place.room.waves_params.enemy_probabilities.getPtr(.slime).* = 0;
             place.room.waves_params.enemy_probabilities.getPtr(.bat).* = 0;
-            place.room.waves_params.enemy_probabilities.getPtr(.gobbow).* = 0.5;
+            place.room.waves_params.enemy_probabilities.getPtr(.gobbow).* = 1;
             place.room.waves_params.enemy_probabilities.getPtr(.gobbomber).* = 1;
             place.room.waves_params.enemy_probabilities.getPtr(.acolyte).* = 1;
+
+            if (i >= 5) {
+                place.room.waves_params.enemy_probabilities.getPtr(.sharpboi).* = 1.5;
+                place.room.waves_params.enemy_probabilities.getPtr(.troll).* = 1.5;
+            }
         }
-        if (i >= 4) {
-            place.room.waves_params.enemy_probabilities.getPtr(.gobbow).* = 1;
-            place.room.waves_params.enemy_probabilities.getPtr(.sharpboi).* = 1;
-            place.room.waves_params.enemy_probabilities.getPtr(.troll).* = 1;
-            place.room.waves_params.num_waves = 3;
-        }
-        place.room.difficulty_per_wave = 1 + u.as(f32, i) * 0.6;
+        place.room.difficulty_per_wave = 1 + u.as(f32, i) * 0.5;
         //TODO unhack this?
         place.room.waves_params.difficulty_per_wave = place.room.difficulty_per_wave;
     }
+    //shop in middle
     try places.insert(places.len / 2, .{ .room = .{ .kind = .shop, .waves_params = .{ .room_kind = .shop, .first_wave_delay_secs = 0 } } });
-    try places.insert(0, .{ .room = .{ .kind = .first, .waves_params = .{ .room_kind = .first, .first_wave_delay_secs = 0 } } });
-    // shop at very start
-    //try places.insert(0, .{ .room = .{ .kind = .shop, .waves_params = .{ .room_kind = .shop, .first_wave_delay_secs = 0 } } });
+    //shop at end
     try places.append(.{ .room = .{ .kind = .shop, .waves_params = .{ .room_kind = .shop, .first_wave_delay_secs = 0 } } });
+    // first room (dummy room)
+    try places.insert(0, .{ .room = .{ .kind = .first, .waves_params = .{ .room_kind = .first, .first_wave_delay_secs = 0 } } });
+    // debug: shop at very start
+    //try places.insert(0, .{ .room = .{ .kind = .shop, .waves_params = .{ .room_kind = .shop, .first_wave_delay_secs = 0 } } });
+    // boss
     try places.append(.{ .room = .{ .difficulty_per_wave = 5, .kind = .boss, .idx = 0, .waves_params = .{ .room_kind = .boss } } });
     // TODO this better
     {
@@ -269,7 +273,6 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
         boss_params.difficulty_per_wave = 4;
         boss_params.num_waves = 4;
         boss_params.enemy_probabilities.getPtr(.sharpboi).* = 1;
-        boss_params.enemy_probabilities.getPtr(.acolyte).* = 1;
         boss_params.enemy_probabilities.getPtr(.gobbow).* = 1;
         boss_params.enemy_probabilities.getPtr(.troll).* = 0.5;
 
@@ -278,7 +281,6 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
     // put boss room at start for testing
     //try places.insert(0, places.buffer[places.len]);
 
-    //try places.append(.{ .room = .{ .difficulty = 4, .idx = 0, .kind = .testu } });
     run.places = places;
 
     // TODO dummy room
@@ -347,6 +349,7 @@ pub fn loadPlaceFromCurrIdx(self: *Run) Error!void {
         self.shop = null;
     }
     const r = self.places.get(self.curr_place_idx).room;
+    Log.debug("Load room {}: {any}", .{ self.curr_place_idx, r.kind });
     var player_thing = player.modePrototype(self.mode);
     if (self.room.getConstPlayer()) |p| {
         player_thing.hp.?.max = p.hp.?.max;
