@@ -85,7 +85,7 @@ pub const DropdownMenu = struct {
     selected_idx: usize = 0,
     is_open: bool = false,
 
-    pub fn update(self: *DropdownMenu, cmd_buf: *ImmUI.CmdBuf, pos: V2f, strings: []const []const u8) Error!?usize {
+    pub fn update(self: *DropdownMenu, cmd_buf: *ImmUI.CmdBuf, pos: V2f, z: f32, strings: []const []const u8) Error!?usize {
         const plat = App.getPlat();
         const data = App.getData();
         const font = data.fonts.get(.pixeloid);
@@ -93,6 +93,7 @@ pub const DropdownMenu = struct {
             .font = font,
             .size = font.base_size * utl.as(u32, plat.ui_scaling),
             .color = .white,
+            .smoothing = .none,
         };
         const ui_scaling = plat.ui_scaling;
         const mouse_pos = plat.getMousePosScreen();
@@ -115,11 +116,13 @@ pub const DropdownMenu = struct {
         // selected
         cmd_buf.appendAssumeCapacity(.{ .rect = .{
             .pos = dropdown_el_pos,
+            .z = z,
             .dims = dropdown_el_dims,
             .opt = .{ .fill_color = el_bg_color_selected },
         } });
         cmd_buf.appendAssumeCapacity(.{ .label = .{
             .pos = dropdown_el_pos.add(el_padding),
+            .z = z,
             .text = ImmUI.initLabel(strings[self.selected_idx]),
             .opt = text_opt,
         } });
@@ -136,6 +139,7 @@ pub const DropdownMenu = struct {
                 if (i == self.selected_idx) continue;
                 cmd_buf.appendAssumeCapacity(.{ .rect = .{
                     .pos = dropdown_el_pos,
+                    .z = z,
                     .dims = dropdown_el_dims,
                     .opt = .{
                         .fill_color = if (hovered) el_bg_color_hovered else el_bg_color,
@@ -143,6 +147,7 @@ pub const DropdownMenu = struct {
                 } });
                 cmd_buf.appendAssumeCapacity(.{ .label = .{
                     .pos = dropdown_el_pos.add(el_padding),
+                    .z = z,
                     .text = ImmUI.initLabel(el_string),
                     .opt = text_opt,
                 } });
@@ -334,11 +339,11 @@ pub const Controls = struct {
             //    &.{ .{ .mouse_button = .right }, .{ .keyboard_key = .a } },
             //    .{ .kind = .attack },
             //),
-            InputBinding.initAction(
-                "Discard",
-                &.{.{ .keyboard_key = .d }},
-                .{ .kind = .discard },
-            ),
+            //InputBinding.initAction(
+            //    "Discard",
+            //    &.{.{ .keyboard_key = .d }},
+            //    .{ .kind = .discard },
+            //),
         });
         const spell_default_keys = &[_]core.Key{ .q, .w, .e, .r };
         for (spell_default_keys, 0..) |key, i| {
@@ -862,7 +867,7 @@ fn updateDisplay(self: *Options, cmd_buf: *ImmUI.CmdBuf, pos: V2f) Error!bool {
         for (self.display.resolutions_strings.constSlice()) |*str| {
             strings_buf.appendAssumeCapacity(str.constSlice());
         }
-        if (try self.display.dropdown.update(cmd_buf, dropdown_pos, strings_buf.constSlice())) |new_idx| {
+        if (try self.display.dropdown.update(cmd_buf, dropdown_pos, 1, strings_buf.constSlice())) |new_idx| {
             self.display.selected_resolution = self.display.resolutions.get(new_idx);
             updateScreenDims(plat, self.display.selected_resolution, true);
             App.get().resolutionChanged();
@@ -883,6 +888,7 @@ fn updateControls(self: *Options, cmd_buf: *ImmUI.CmdBuf, pos: V2f) Error!bool {
         .font = font,
         .size = font.base_size * utl.as(u32, plat.ui_scaling),
         .color = .white,
+        .smoothing = .none,
     };
     const ui_scaling = plat.ui_scaling;
     const el_padding = el_text_padding.scale(ui_scaling);
@@ -899,7 +905,7 @@ fn updateControls(self: *Options, cmd_buf: *ImmUI.CmdBuf, pos: V2f) Error!bool {
         } });
 
         const dropdown_pos = pos.add(v2f(cast_method_text_dims.x + 8 * ui_scaling, 0));
-        if (try self.controls.dropdown.update(cmd_buf, dropdown_pos, &Controls.CastMethod.strings.values)) |new_idx| {
+        if (try self.controls.dropdown.update(cmd_buf, dropdown_pos, 1, &Controls.CastMethod.strings.values)) |new_idx| {
             self.controls.cast_method = @enumFromInt(new_idx);
             dirty = true;
         }

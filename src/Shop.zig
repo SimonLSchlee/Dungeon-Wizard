@@ -196,8 +196,13 @@ pub fn update(self: *Shop, run: *Run) Error!?Product {
     const ui_scaling: f32 = plat.ui_scaling;
     var ret: ?Product = null;
 
-    try run.imm_ui.commands.append(.{ .clear = .{
-        .color = .gray,
+    try run.imm_ui.commands.append(.{ .rect = .{
+        .pos = v2f(0, 0),
+        .z = -1,
+        .dims = plat.screen_dims_f,
+        .opt = .{
+            .fill_color = .gray,
+        },
     } });
 
     const title_center_pos = v2f(

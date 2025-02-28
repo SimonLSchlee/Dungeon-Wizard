@@ -41,17 +41,9 @@ pub const Command = union(enum) {
         dims: V2f = .{},
     };
 
-    panel_start: Panel,
-    panel_end,
-    clear: struct {
-        color: draw.Colorf,
-        pub fn render(self: *const @This()) Error!void {
-            const plat = getPlat();
-            plat.clear(self.color);
-        }
-    },
     rect: struct {
         pos: V2f,
+        z: f32 = 0,
         dims: V2f,
         opt: draw.PolyOpt,
         pub fn render(self: *const @This()) Error!void {
@@ -61,6 +53,7 @@ pub const Command = union(enum) {
     },
     sector: struct {
         pos: V2f,
+        z: f32 = 0,
         radius: f32,
         start_ang_rads: f32,
         end_ang_rads: f32,
@@ -72,6 +65,7 @@ pub const Command = union(enum) {
     },
     circle: struct {
         pos: V2f,
+        z: f32 = 0,
         radius: f32,
         opt: draw.PolyOpt,
         pub fn render(self: *const @This()) Error!void {
@@ -81,6 +75,7 @@ pub const Command = union(enum) {
     },
     triangle: struct {
         points: [3]V2f,
+        z: f32 = 0,
         opt: draw.PolyOpt,
         pub fn render(self: *const @This()) Error!void {
             const plat = getPlat();
@@ -89,6 +84,7 @@ pub const Command = union(enum) {
     },
     label: struct {
         pos: V2f,
+        z: f32 = 0,
         text: LabelString,
         opt: draw.TextOpt,
         pub fn render(self: *const @This()) Error!void {
@@ -98,6 +94,7 @@ pub const Command = union(enum) {
     },
     texture: struct {
         pos: V2f,
+        z: f32 = 0,
         texture: Platform.Texture2D,
         opt: draw.TextureOpt,
         pub fn render(self: *const @This()) Error!void {
@@ -110,6 +107,16 @@ pub const Command = union(enum) {
 pub const CmdBuf = std.BoundedArray(Command, 512);
 
 pub fn render(cmd_buf: *const CmdBuf) Error!void {
+    const SortZ = struct {
+        fn lessThanFn(_: void, lhs: Command, rhs: Command) bool {
+            return switch (lhs) {
+                inline else => |a| switch (rhs) {
+                    inline else => |b| a.z < b.z,
+                },
+            };
+        }
+    };
+    std.sort.block(Command, @constCast(cmd_buf).slice(), {}, SortZ.lessThanFn);
     for (cmd_buf.slice()) |*command| {
         switch (command.*) {
             inline else => |*c| {
