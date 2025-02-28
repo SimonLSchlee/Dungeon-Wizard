@@ -330,7 +330,7 @@ pub const Slots = struct {
         const mana_text_max_dims = plat.measureText(big_mana_txt, hp_mana_text_opt) catch v2f(font_sz_f, 70 * ui_scaling);
         const hp_dims = hp_text_max_dims.add(v2f(6 * ui_scaling, 0)).add(hp_mana_padding.scale(2));
         const mana_dims = mana_text_max_dims.add(v2f(6 * ui_scaling, 0)).add(hp_mana_padding.scale(2));
-        const mana_topleft = items_rects.get(0).pos.sub(v2f(0, hp_dims.y + 34 * ui_scaling));
+        const mana_topleft = items_rects.get(0).pos.sub(v2f(0, hp_dims.y + 9 * ui_scaling));
         const hp_topleft = mana_topleft.sub(v2f(0, hp_dims.y + 5 * ui_scaling));
         self.hp_rect = .{
             .pos = hp_topleft,
@@ -419,9 +419,10 @@ pub const Slots = struct {
         };
         self.how_to_play_slot.key_rect_pos = self.how_to_play_slot.rect.pos.sub(v2f(3, 10).scale(ui_scaling));
 
-        // background rect covers everything at bottom of screen
+        // background rect covers spells n related
         const room_bg_rect_pos = spells_topleft.sub(v2f(spell_item_margin, 10 * ui_scaling));
-        const room_bg_rect_dims = plat.screen_dims_f.sub(room_bg_rect_pos);
+        const room_bg_rect_botright = v2f(pause_topleft.x + pause_discard_btn_dims.x + 10 * ui_scaling, plat.screen_dims_f.y);
+        const room_bg_rect_dims = room_bg_rect_botright.sub(room_bg_rect_pos);
         self.room_ui_bg_rect = .{
             .pos = room_bg_rect_pos,
             .dims = room_bg_rect_dims,
@@ -1127,7 +1128,11 @@ pub const Slots = struct {
     pub fn roomUpdate(self: *Slots, cmd_buf: *ImmUI.CmdBuf, tooltip_cmd_buf: *ImmUI.CmdBuf, run: *Run, caster: *const Thing) Error!void {
         const plat = getPlat();
 
-        try self.cardsUpdate(cmd_buf, tooltip_cmd_buf, run, caster, run.screen == .room);
+        switch (run.screen) {
+            .room, .reward, .dead, .how_to_play => try self.cardsUpdate(cmd_buf, tooltip_cmd_buf, run, caster, run.screen == .room),
+            else => {},
+        }
+
         try self.runUpdate(cmd_buf, tooltip_cmd_buf, run, caster);
         // casting progress bar
         const ui_scaling: f32 = plat.ui_scaling;
