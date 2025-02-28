@@ -325,7 +325,7 @@ pub fn reset(self: *Run) Error!void {
 pub fn startRun(self: *Run, play_tutorial: bool) Error!void {
     try self.loadPlaceFromCurrIdx();
     if (play_tutorial) {
-        self.screen = .how_to_play;
+        self.toggleShowHowToPlay();
     }
 }
 
@@ -701,7 +701,7 @@ pub fn deckUI(self: *Run, deck: []const Spell, hover: *DeckHover, scroll_y: *f32
         modal_topleft.y + modal_dims.y - 7 * ui_scaling - btn_dims.y,
     );
     if (menuUI.textButton(&self.imm_ui.commands, btn_topleft, "Close", btn_dims, ui_scaling)) {
-        self.screen = self.prev_screen;
+        self.toggleShowDeck();
     }
 
     return interaction;
@@ -1134,7 +1134,7 @@ pub fn howToPlayUpdate(self: *Run) Error!void {
     const close_btn_text: []const u8 = "Close";
     const close_btn_pos = modal_topcenter.add(v2f(-close_btn_dims.x * 0.5, 205 * ui_scaling));
     if (menuUI.textButton(&self.imm_ui.commands, close_btn_pos, close_btn_text, close_btn_dims, ui_scaling)) {
-        self.screen = .room;
+        self.toggleShowHowToPlay();
     }
 }
 
@@ -1364,6 +1364,14 @@ pub fn toggleShowDeck(self: *Run) void {
         self.deck_ui.scroll_y = 0;
         self.screen = .deck;
         self.deck_ui.debug_select = false;
+    }
+}
+
+pub fn toggleShowHowToPlay(self: *Run) void {
+    if (self.screen == .how_to_play) {
+        self.screen = .room;
+    } else {
+        self.screen = .how_to_play;
     }
 }
 

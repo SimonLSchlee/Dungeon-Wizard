@@ -1116,12 +1116,13 @@ pub const Slots = struct {
         }
         try self.updateHPandMana(cmd_buf, tooltip_cmd_buf, caster);
         try self.topLeftUpdate(cmd_buf, tooltip_cmd_buf, run);
-        if (try unqCommandUISlot(&self.how_to_play_slot, cmd_buf, tooltip_cmd_buf, run, run.screen == .how_to_play, true)) {
-            if (run.screen == .how_to_play) {
-                run.screen = .room;
-            } else {
-                run.screen = .how_to_play;
-            }
+        switch (run.screen) {
+            .room => {
+                if (try unqCommandUISlot(&self.how_to_play_slot, cmd_buf, tooltip_cmd_buf, run, run.screen == .how_to_play, true)) {
+                    run.toggleShowHowToPlay();
+                }
+            },
+            else => {},
         }
     }
 
