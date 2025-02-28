@@ -1000,26 +1000,7 @@ pub fn howToPlayUpdate(self: *Run) Error!void {
     curr_row_y += 30 * ui_scaling;
     const text_fmts = .{
         .{
-            \\Welcome to Dungeon Wizard! *You* are the Wizard{}{}{}.
-            \\
-            \\But, you are trapped in a Dungeon! To survive and
-            \\progress, you must slay the waves of monsters in each
-            \\room.
-            \\
-            \\Each time you complete a room you will be rewarded
-            \\with a chest of goodies: new spells, items and gold
-            \\to spend.
-            \\
-            \\Can you survive until the end?
-            ,
-            .{
-                icon_text.Fmt{ .tint = .orange },
-                icon_text.Icon.wizard,
-                icon_text.Fmt{ .tint = .white },
-            },
-        },
-        .{
-            \\Listen up, {}{}{}, this is important!
+            \\Welcome to the Dungeon, Wizard{}{}{}!
             \\
             \\As a Wizard, you have a mental "Deck" of Spells, but
             \\unfortunately your memory isn't what it used to be...
@@ -1029,7 +1010,7 @@ pub fn howToPlayUpdate(self: *Run) Error!void {
             \\
             \\Whenever you cast a Spell, that part of your mind goes
             \\blank (it is discarded). Don't worry, another Spell
-            \\will soon take its place!
+            \\will soon take its place.
             \\
             \\When you have exhausted all the Spells in your Deck,
             \\they will recycle, so you won't run out.
@@ -1041,12 +1022,10 @@ pub fn howToPlayUpdate(self: *Run) Error!void {
             },
         },
         .{
-            \\{}{}{}: (But how do I actually...?)
-            \\
-            \\Move around by clicking the right mouse button anywhere.
+            \\Move around by clicking the right mouse button.
             \\
             \\Cast spells by pressing Q,W,E or R on the keyboard, then
-            \\aim with the mouse and left-click to target the spell.
+            \\aim with the mouse and left-click.
             \\
             \\Most spells cost some mana{} to cast, so keep an eye on
             \\it, and pick up mana flames{} when you can.
@@ -1058,24 +1037,16 @@ pub fn howToPlayUpdate(self: *Run) Error!void {
             \\command and it will be executed once you unpause.
             ,
             .{
-                icon_text.Fmt{ .tint = .orange },
-                icon_text.Icon.wizard,
-                icon_text.Fmt{ .tint = .white },
                 icon_text.Icon.mana_crystal_smol,
                 icon_text.Icon.mana_flame,
             },
         },
         .{
-            \\Ready? Let's goooo
-            ,
-            .{},
-        },
-        .{
-            \\Oh, you want more? Here are some {}hot{} tips:
+            \\{}Hot{} tips:
             \\
             \\1. You can enable "quickcast" from the options, which
             \\lets you cast spells and items by just pressing the
-            \\keyboard shortcut (without left-clicking).
+            \\keyboard shortcut (without an additional left-click).
             \\
             \\2. Your mana crystals{} will regenerate automatically
             \\up to 3 mana, but if you pick up mana flames{}, you can
