@@ -6,6 +6,8 @@
 - Progress indicator between rooms
 - Additional spell card art
 - UI tweaks and bugfixes
+- Shop repopulates on buy
+- Secret summon
 
 ## v0.11.0 (2025-02-22)
 
