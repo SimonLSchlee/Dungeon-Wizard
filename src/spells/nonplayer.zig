@@ -197,8 +197,8 @@ pub const spells = [_]type{
             ball.hitbox.?.effect = .{
                 .damage = 0,
                 .status_stacks = StatusEffect.StacksArray.initDefault(0, .{
-                    .protected = 3,
-                    .hasted = 3,
+                    .protected = 4,
+                    .hasted = 4,
                 }),
             };
             _ = try room.queueSpawnThing(&ball, caster.pos);
@@ -269,7 +269,7 @@ pub const spells = [_]type{
             ball.hitbox.?.effect = .{
                 .damage = 0,
                 .status_stacks = StatusEffect.StacksArray.initDefault(0, .{
-                    .protected = 3,
+                    .protected = 4,
                     .promptitude = 3,
                 }),
             };

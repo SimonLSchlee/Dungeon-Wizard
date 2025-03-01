@@ -320,6 +320,7 @@ pub fn @"fairy-redProto"() Thing {
 
 pub fn @"fairy-goldProto"() Thing {
     var ret = fairyBaseProto();
+    ret.hp = Thing.HP.init(6);
     ret.creature_kind = .@"fairy-gold";
     ret.statuses.getPtr(.protected).addStacks(&ret, -1);
     ret.statuses.getPtr(.protected).addStacks(&ret, -1);
@@ -329,7 +330,7 @@ pub fn @"fairy-goldProto"() Thing {
                 .spell = Spell.getProto(.fairy_gold_debuff),
             },
         },
-        .cooldown = utl.TickCounter.initStopped(core.secsToTicks(7)),
+        .cooldown = utl.TickCounter.initStopped(core.secsToTicks(5)),
     });
     ret.controller.ai_actor.actions.getPtr(.spell_cast_thing_buff_1).* = (.{
         .kind = .{
@@ -337,7 +338,7 @@ pub fn @"fairy-goldProto"() Thing {
                 .spell = Spell.getProto(.fairy_gold_buff),
             },
         },
-        .cooldown = utl.TickCounter.initStopped(core.secsToTicks(7)),
+        .cooldown = utl.TickCounter.initStopped(core.secsToTicks(5)),
     });
     return ret;
 }
