@@ -226,36 +226,50 @@ pub fn update(self: *Shop, run: *Run) Error!?Product {
 
     // spells
     const spell_slot_dims = Spell.card_dims.add(V2f.splat(slot_margin).scale(2)).add(v2f(0, price_font_base_sz_f + slot_margin)).scale(ui_scaling);
-    const spells_center = title_center_pos.add(v2f(0, 35 + Spell.card_dims.y * 0.5).scale(ui_scaling));
+    const spells_per_row: usize = 4;
+    const spell_spacing_scaled = spells_spacing * ui_scaling;
+    const spell_row_width = (spell_slot_dims.x + spell_spacing_scaled) * utl.as(f32, spells_per_row) - spell_spacing_scaled;
+    const spells_top_center = title_center_pos.add(v2f(0, 25).scale(ui_scaling));
+    const spells_topleft = spells_top_center.sub(v2f(spell_row_width * 0.5, 0));
+    var spells_curr_pos = spells_topleft;
+    var spells_col: usize = 0;
 
-    var spell_rects = std.BoundedArray(geom.Rectf, max_num_spells){};
-    spell_rects.resize(self.spells.len) catch unreachable;
-    gameUI.layoutRectsFixedSize(
-        spell_rects.len,
-        spell_slot_dims,
-        spells_center,
-        .{ .direction = .horizontal, .space_between = spells_spacing },
-        spell_rects.slice(),
-    );
-    for (spell_rects.constSlice(), 0..) |rect, i| {
-        self.spells.buffer[i].rect = rect;
+    for (self.spells.slice()) |*slot| {
+        slot.rect = .{
+            .pos = spells_curr_pos,
+            .dims = spell_slot_dims,
+        };
+        spells_col += 1;
+        if (spells_col == spells_per_row) {
+            spells_col = 0;
+            spells_curr_pos.y += spell_slot_dims.y + spell_spacing_scaled;
+            spells_curr_pos.x = spells_topleft.x + spell_slot_dims.x + spell_spacing_scaled;
+        } else {
+            spells_curr_pos.x += spell_slot_dims.x + spell_spacing_scaled;
+        }
     }
 
     // items
     const item_slot_dims = Item.icon_dims.add(V2f.splat(slot_margin).scale(2)).add(v2f(0, price_font_base_sz_f + slot_margin)).scale(ui_scaling);
-    const items_center = spells_center.add(v2f(0, spell_slot_dims.y * 0.5 + 20 * ui_scaling + item_slot_dims.y * 0.5));
+    const items_per_row: usize = 3;
+    const item_spacing_scaled = spell_spacing_scaled;
+    const items_topleft = spells_curr_pos;
+    var items_curr_pos = items_topleft;
+    var items_col: usize = 0;
 
-    var item_rects = std.BoundedArray(geom.Rectf, max_num_spells){};
-    item_rects.resize(self.items.len) catch unreachable;
-    gameUI.layoutRectsFixedSize(
-        item_rects.len,
-        item_slot_dims,
-        items_center,
-        .{ .direction = .horizontal, .space_between = items_spacing },
-        item_rects.slice(),
-    );
-    for (item_rects.constSlice(), 0..) |rect, i| {
-        self.items.buffer[i].rect = rect;
+    for (self.items.slice()) |*slot| {
+        slot.rect = .{
+            .pos = items_curr_pos,
+            .dims = item_slot_dims,
+        };
+        items_col += 1;
+        if (items_col == items_per_row) {
+            items_col = 0;
+            items_curr_pos.y += item_slot_dims.y + item_spacing_scaled;
+            items_curr_pos.x = items_topleft.x;
+        } else {
+            items_curr_pos.x += item_slot_dims.x + item_spacing_scaled;
+        }
     }
 
     for (self.spells.slice()) |*slot| {
@@ -277,7 +291,7 @@ pub fn update(self: *Shop, run: *Run) Error!?Product {
     // proceed btn
     {
         const proceed_btn_dims = v2f(60, 40).scale(ui_scaling);
-        const btn_center = items_center.add(v2f(0, item_slot_dims.y * 0.5 + 20 * ui_scaling + proceed_btn_dims.y * 0.5));
+        const btn_center = items_topleft.add(v2f(proceed_btn_dims.x * 0.5, item_slot_dims.y + 20 * ui_scaling + proceed_btn_dims.y * 0.5));
         const proceed_btn_pos = btn_center.sub(proceed_btn_dims.scale(0.5));
 
         if (menuUI.textButton(&run.imm_ui.commands, proceed_btn_pos, "Leave", proceed_btn_dims, ui_scaling)) {
