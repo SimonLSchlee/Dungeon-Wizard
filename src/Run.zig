@@ -297,7 +297,8 @@ pub fn initSeeded(run: *Run, mode: Mode, seed: u64) Error!*Run {
             .waves_params = .{ .room_kind = .first },
         },
     );
-
+    // go to last room
+    //run.curr_place_idx = places.len - 1;
     return run;
 }
 

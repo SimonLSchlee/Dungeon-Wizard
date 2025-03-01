@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.12.0 (2025-02-28)
+
+- Explosion VFX for gobbomber, fire boom, flame burst
+- Progress indicator between rooms
+- Additional spell card art
+- UI tweaks and bugfixes
+
 ## v0.11.0 (2025-02-22)
 
 ***Misc***
@@ -14,6 +21,7 @@
 - You can stop moving by pressing 'S'
 - There's a "How to Play" tutorial, ("???" button in the top right)
 - Add several new spells, including 4 new summons, several more ice and lightning spells
+- Boss!
 
 ***Balance***
 - Various tweaks to spell damage, rarity, effect
