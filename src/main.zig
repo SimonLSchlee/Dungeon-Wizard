@@ -6,7 +6,7 @@ pub const Platform = @import("raylib.zig");
 const core = @import("core.zig");
 
 pub fn main() !void {
-    var plat = try Platform.init("boidsu");
+    var plat = try Platform.init("Dungeon Wizard");
     defer plat.closeWindow();
     try plat.run();
 }
