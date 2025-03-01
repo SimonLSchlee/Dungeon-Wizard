@@ -402,6 +402,54 @@ pub const AIDjinnSmoke = struct {
 pub const AIFairy = struct {
     pub fn decide(_: *AIFairy, self: *Thing, room: *Room) Decision {
         const controller = &self.controller.ai_actor;
+        blk: { // gold fairy creation
+            const FairyKind = enum {
+                red,
+                blue,
+                green,
+                pub fn fromThing(thing: *const Thing) ?@This() {
+                    return switch (thing.creature_kind.?) {
+                        .@"fairy-blue" => .blue,
+                        .@"fairy-green" => .green,
+                        .@"fairy-red" => .red,
+                        else => null,
+                    };
+                }
+            };
+            const my_kind = FairyKind.fromThing(self) orelse break :blk;
+            var kinds = std.EnumArray(FairyKind, ?*Thing).initFill(null);
+            kinds.set(my_kind, self);
+            for (&room.things.items) |*other| {
+                if (!other.isActive()) continue;
+                if (other.id.eql(self.id)) continue;
+                if (other.faction != self.faction) continue;
+                if (!other.isAliveCreature()) continue;
+                const kind = FairyKind.fromThing(other) orelse continue;
+                const ptr = kinds.getPtr(kind);
+                if (ptr.* == null) {
+                    ptr.* = other;
+                }
+            }
+            var avg_pos: V2f = .{};
+            var total_dist: f32 = 0;
+            for (kinds.values) |v| {
+                if (v == null) break :blk;
+                total_dist += self.pos.dist(v.?.pos);
+                avg_pos = avg_pos.add(v.?.pos);
+            }
+            if (my_kind == .red and total_dist < 15) {
+                for (kinds.values) |v| {
+                    v.?.hp.?.curr = 0;
+                }
+                _ = room.queueSpawnCreatureByKind(.@"fairy-gold", self.pos) catch {};
+                return .{ .idle = .{} };
+            } else {
+                avg_pos = avg_pos.scale(0.333);
+                return .{ .move_to = .{
+                    .target_pos = avg_pos,
+                } };
+            }
+        }
         const maybe_ally: ?*Thing = getNearestAlliedNonFairy(self, room);
 
         if (maybe_ally) |ally| {
