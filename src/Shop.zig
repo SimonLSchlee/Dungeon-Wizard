@@ -32,6 +32,7 @@ const Shop = @This();
 const max_num_spells = 5;
 const num_nonrare_spells = 4;
 const num_rare_spells = 1;
+const num_spells = num_nonrare_spells + num_rare_spells;
 const spells_spacing: f32 = 16;
 
 const max_num_items = 4;
@@ -53,7 +54,7 @@ pub const Product = struct {
 };
 
 const ProductSlot = struct {
-    product: ?Product,
+    product: ?Product = null,
     rect: geom.Rectf = .{},
     long_hover: menuUI.LongHover = .{},
 };
@@ -70,42 +71,13 @@ pub fn init(seed: u64, run: *Run) Error!Shop {
     var ret = Shop{
         .rng = std.Random.DefaultPrng.init(seed),
     };
-
-    const rarity_nonrare = Spell.RarityWeights.init(.{
-        .pedestrian = 0.60,
-        .interesting = 0.40,
-        .exceptional = 0.00,
-        .brilliant = 0.00,
-    });
-    const rarity_rare = Spell.RarityWeights.init(.{
-        .pedestrian = 0.0,
-        .interesting = 0.0,
-        .exceptional = 1.0,
-        .brilliant = 0.0,
-    });
-    var spells_buf: [max_num_spells]Spell = undefined;
-    const nonrare_spells_generated = Spell.makeShopSpells(ret.rng.random(), run.mode, &rarity_nonrare, spells_buf[0..num_nonrare_spells]);
-    const rare_spells_generated = Spell.makeShopSpells(ret.rng.random(), run.mode, &rarity_rare, spells_buf[nonrare_spells_generated.len .. nonrare_spells_generated.len + num_rare_spells]);
-    const spells_generated = spells_buf[0 .. nonrare_spells_generated.len + rare_spells_generated.len];
-    for (spells_generated) |spell| {
-        ret.spells.appendAssumeCapacity(.{
-            .product = .{
-                .kind = .{ .spell = spell },
-                .price = .{ .gold = spell.getShopPrice(ret.rng.random()) },
-            },
-        });
+    for (0..num_spells) |_| {
+        ret.spells.appendAssumeCapacity(.{});
     }
-
-    var items_buf: [max_num_items]Item = undefined;
-    const items_generated = Item.makeShopItems(ret.rng.random(), run.mode, items_buf[0..num_items]);
-    for (items_generated) |item| {
-        ret.items.appendAssumeCapacity(.{
-            .product = .{
-                .kind = .{ .item = item },
-                .price = .{ .gold = item.getShopPrice(ret.rng.random()) },
-            },
-        });
+    for (0..num_items) |_| {
+        ret.items.appendAssumeCapacity(.{});
     }
+    ret.fillEmptySlots(run);
 
     return ret;
 }
@@ -120,6 +92,50 @@ pub fn reset(self: *Shop, run: *Run) Error!*Shop {
     const seed = rng.random().int(u64);
     self.* = try init(seed, run);
     return self;
+}
+
+fn fillEmptySlots(self: *Shop, run: *Run) void {
+    const rarity_nonrare = Spell.RarityWeights.init(.{
+        .pedestrian = 0.60,
+        .interesting = 0.40,
+        .exceptional = 0.00,
+        .brilliant = 0.00,
+    });
+    const rarity_rare = Spell.RarityWeights.init(.{
+        .pedestrian = 0.0,
+        .interesting = 0.0,
+        .exceptional = 1.0,
+        .brilliant = 0.0,
+    });
+    var spells_buf: [max_num_spells]Spell = undefined;
+    const nonrare_spells_generated = Spell.makeShopSpells(self.rng.random(), run.mode, &rarity_nonrare, spells_buf[0..num_nonrare_spells]);
+    const rare_spells_generated = Spell.makeShopSpells(self.rng.random(), run.mode, &rarity_rare, spells_buf[nonrare_spells_generated.len .. nonrare_spells_generated.len + num_rare_spells]);
+    const spells_generated = spells_buf[0 .. nonrare_spells_generated.len + rare_spells_generated.len];
+    for (spells_generated, 0..) |spell, i| {
+        if (i >= self.spells.len) break;
+        const slot = &self.spells.buffer[i];
+        if (slot.product != null) continue;
+        slot.* = .{
+            .product = .{
+                .kind = .{ .spell = spell },
+                .price = .{ .gold = spell.getShopPrice(self.rng.random()) },
+            },
+        };
+    }
+
+    var items_buf: [max_num_items]Item = undefined;
+    const items_generated = Item.makeShopItems(self.rng.random(), run.mode, items_buf[0..num_items]);
+    for (items_generated, 0..) |item, i| {
+        if (i >= self.items.len) break;
+        const slot = &self.items.buffer[i];
+        if (slot.product != null) continue;
+        slot.* = .{
+            .product = .{
+                .kind = .{ .item = item },
+                .price = .{ .gold = item.getShopPrice(self.rng.random()) },
+            },
+        };
+    }
 }
 
 pub fn canBuy(run: *Run, product: *const Product) bool {
@@ -272,11 +288,14 @@ pub fn update(self: *Shop, run: *Run) Error!?Product {
         }
     }
 
+    var emptied_slot = false;
+
     for (self.spells.slice()) |*slot| {
         if (try unqProductSlot(&run.imm_ui.commands, &run.tooltip_ui.commands, slot, run)) {
             assert(canBuy(run, &slot.product.?));
             ret = slot.product.?;
             slot.product = null;
+            emptied_slot = true;
         }
     }
 
@@ -285,7 +304,12 @@ pub fn update(self: *Shop, run: *Run) Error!?Product {
             assert(canBuy(run, &slot.product.?));
             ret = slot.product.?;
             slot.product = null;
+            emptied_slot = true;
         }
+    }
+
+    if (emptied_slot) {
+        self.fillEmptySlots(run);
     }
 
     // proceed btn
