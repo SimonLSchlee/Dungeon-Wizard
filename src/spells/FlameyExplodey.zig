@@ -44,7 +44,7 @@ pub const proto = Spell.makeProto(
     .{
         .cast_time = .medium,
         .mana_cost = Spell.ManaCost.num(2),
-        .rarity = .interesting,
+        .rarity = .exceptional,
         .color = Spell.colors.fire,
         .targeting_data = .{
             .kind = .pos,

@@ -1267,11 +1267,25 @@ pub fn winUpdate(self: *Run) Error!void {
     const modal_center_x = modal_topleft.x + modal_dims.x * 0.5;
 
     // title
+    curr_row_y += 10 * ui_scaling;
     const title_font = data.fonts.get(.pixeloid);
-    const title_center = v2f(modal_center_x, curr_row_y + 10 * ui_scaling);
+    const congrats_center = v2f(modal_center_x, curr_row_y);
     self.imm_ui.commands.appendAssumeCapacity(.{ .label = .{
-        .pos = title_center,
-        .text = ImmUI.initLabel("You have survived!"),
+        .pos = congrats_center,
+        .text = ImmUI.initLabel("Congratulations!"),
+        .opt = .{
+            .size = title_font.base_size * u.as(u32, ui_scaling + 1),
+            .font = title_font,
+            .smoothing = .none,
+            .color = .white,
+            .center = true,
+        },
+    } });
+    curr_row_y += 15 * ui_scaling;
+    const you_survived_center = v2f(modal_center_x, curr_row_y);
+    self.imm_ui.commands.appendAssumeCapacity(.{ .label = .{
+        .pos = you_survived_center,
+        .text = ImmUI.initLabel("You have survived"),
         .opt = .{
             .size = title_font.base_size * u.as(u32, ui_scaling + 1),
             .font = title_font,
