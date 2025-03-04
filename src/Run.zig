@@ -162,6 +162,7 @@ deck_ui: struct {
     hover: DeckHover = .{},
     rect: geom.Rectf = .{},
     scroll_y: f32 = 0,
+    scroll_vel: f32 = 0,
     texture: Platform.RenderTexture2D = undefined,
     commands: ImmUI.CmdBuf = .{},
 } = .{},
@@ -564,7 +565,7 @@ pub fn getDeckTextureDims() V2f {
     return dims;
 }
 
-pub fn deckUI(self: *Run, deck: []const Spell, hover: *DeckHover, scroll_y: *f32) Error!?DeckInteraction {
+pub fn deckUI(self: *Run, deck: []const Spell, hover: *DeckHover, scroll_y: *f32, scroll_vel: *f32) Error!?DeckInteraction {
     const plat = getPlat();
     const data = App.getData();
     const ui_scaling: f32 = plat.ui_scaling;
@@ -669,7 +670,12 @@ pub fn deckUI(self: *Run, deck: []const Spell, hover: *DeckHover, scroll_y: *f32
     const max_scroll_y = @max(total_height - self.deck_ui.rect.dims.y / ui_scaling, 0);
     const wheel_y = plat.mouseWheelY();
     if (wheel_y != 0) {
-        scroll_y.* = scroll_y.* - wheel_y * 1.2;
+        scroll_vel.* -= wheel_y;
+        scroll_vel.* = std.math.sign(scroll_vel.*) * @min(@abs(scroll_vel.*), 20);
+        //const abs = @max(@abs(wheel_y) * 1.2, 6);
+        scroll_y.* += scroll_vel.*; //scroll_y.* - abs * std.math.sign(wheel_y);
+    } else {
+        scroll_vel.* *= 0.9;
     }
     // draw scroll bar/arrows
     if (max_scroll_y > 0) {
@@ -1377,6 +1383,7 @@ pub fn toggleShowDeck(self: *Run) void {
         self.prev_screen = self.screen;
         self.deck_ui.hover = .{};
         self.deck_ui.scroll_y = 0;
+        self.deck_ui.scroll_vel = 0;
         self.screen = .deck;
         self.deck_ui.debug_select = false;
     }
@@ -1467,7 +1474,7 @@ pub fn update(self: *Run) Error!void {
                         self.deck_ui.debug_select = !self.deck_ui.debug_select;
                     }
                     if (self.deck_ui.debug_select) {
-                        if (try self.deckUI(&Spell.all_spells, &self.deck_ui.hover, &self.deck_ui.scroll_y)) |interaction| {
+                        if (try self.deckUI(&Spell.all_spells, &self.deck_ui.hover, &self.deck_ui.scroll_y, &self.deck_ui.scroll_vel)) |interaction| {
                             if (interaction.state == .clicked) {
                                 self.ui_slots.debug_spell.spell = Spell.all_spells[interaction.idx];
                                 self.ui_slots.debug_spell.spell.?.mana_cost = Spell.ManaCost.num(0);
@@ -1476,7 +1483,7 @@ pub fn update(self: *Run) Error!void {
                             }
                         }
                     } else {
-                        _ = try self.deckUI(self.deck.constSlice(), &self.deck_ui.hover, &self.deck_ui.scroll_y);
+                        _ = try self.deckUI(self.deck.constSlice(), &self.deck_ui.hover, &self.deck_ui.scroll_y, &self.deck_ui.scroll_vel);
                     }
                 },
                 .how_to_play => try self.howToPlayUpdate(),
