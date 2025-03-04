@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.12.1 (2025-03-04)
+
+- Don't open console on Windows
+- Improve scrolling when viewing deck
+
 ## v0.12.0 (2025-02-28)
 
 - Explosion VFX for gobbomber, fire boom, flame burst

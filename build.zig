@@ -2,11 +2,11 @@ const std = @import("std");
 const raylib_build = @import("raylib");
 
 const title = "Dungeon Wizard";
-const version = "v0.12.0";
+const version = "v0.12.1";
 
 const raylib_config: []const u8 = "-DSUPPORT_CUSTOM_FRAME_CONTROL=1";
 
-fn linkOSStuff(b: *std.Build, target: std.Build.ResolvedTarget, artifact: *std.Build.Step.Compile) void {
+fn linkOSStuff(b: *std.Build, target: std.Build.ResolvedTarget, artifact: *std.Build.Step.Compile, do_release: bool) void {
     switch (target.result.os.tag) {
         .macos => {
             if (std.zig.system.darwin.getSdk(b.allocator, target.result)) |sdk| {
@@ -22,6 +22,10 @@ fn linkOSStuff(b: *std.Build, target: std.Build.ResolvedTarget, artifact: *std.B
             artifact.linkSystemLibrary("User32");
             artifact.linkSystemLibrary("Gdi32");
             artifact.linkSystemLibrary("shell32");
+            if (do_release) {
+                artifact.subsystem = .Windows;
+                artifact.entry = .{ .symbol_name = "mainCRTStartup" };
+            }
         },
         else => {},
     }
@@ -80,7 +84,7 @@ pub fn buildDynamic(b: *std.Build, target: std.Build.ResolvedTarget, optimize: s
             .target = target,
             .optimize = optimize,
         });
-        linkOSStuff(b, target, exe);
+        linkOSStuff(b, target, exe, do_release);
         exe.linkLibrary(raylib);
         exe.addIncludePath(b.path("raylib/src"));
 
@@ -134,7 +138,7 @@ pub fn buildStatic(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
         .target = target,
         .optimize = optimize,
     });
-    linkOSStuff(b, target, exe);
+    linkOSStuff(b, target, exe, do_release);
     exe.linkLibrary(raylib);
     exe.addIncludePath(b.path("raylib/src"));
 

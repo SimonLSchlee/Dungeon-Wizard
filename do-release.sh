@@ -3,7 +3,7 @@
 set -xe
 
 ASSETS="$(pwd)/assets"
-VERSION="v0.12.0-mvp"
+VERSION="v0.12.1-fixes"
 
 rm -rf zig-out/release
 
