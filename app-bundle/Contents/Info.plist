@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key>
+  <string>Dungeon Wizard</string>
+  <key>CFBundleDisplayName</key>
+  <string>Dungeon Wizard</string>
+  <key>CFBundleIdentifier</key>
+  <string>com.nunodasneves.dungeonwizard</string>
+  <key>CFBundleVersion</key>
+  <string>0.12.1</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>CFBundleIconFile</key>
+  <string>Dungeon Wizard.icns</string>
+  <key>CFBundleSignature</key>
+  <string>dwzd</string>
+  <key>CFBundleExecutable</key>
+  <string>launch.sh</string>
+</dict>
+</plist>
