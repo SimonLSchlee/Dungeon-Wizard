@@ -213,34 +213,41 @@ pub fn printStackSize(self: *Platform) void {
 }
 
 pub fn findAssetsPath(self: *Platform) Error!void {
+    var cwd_path_base: []const u8 = ".";
     if (config.is_release) {
         switch (builtin.os.tag) {
             .macos => {
-                const CF = @cImport({
-                    @cInclude("CFBundle.h");
-                    @cInclude("CFURL.h");
-                    @cInclude("CFString.h");
-                });
-                // Zig thinks these are ? but they're just C pointers I guess
-                const bundle = CF.CFBundleGetMainBundle();
-                const cf_url = CF.CFBundleCopyResourcesDirectoryURL(bundle);
-                const cf_str_ref = CF.CFURLCopyFileSystemPath(cf_url, CF.kCFURLPOSIXPathStyle);
-                const c_buf: [*c]u8 = @ptrCast(self.str_fmt_buf);
-                if (CF.CFStringGetCString(cf_str_ref, c_buf, str_fmt_buf_size, CF.kCFStringEncodingASCII) != 0) {
-                    const slice = std.mem.span(c_buf);
-                    self.cwd_path = try std.fmt.allocPrint(self.heap, "{s}", .{slice});
-                    self.assets_path = try std.fmt.allocPrint(self.heap, "{s}/assets", .{self.cwd_path});
-                    return;
-                } else {
-                    return Error.NoSpaceLeft;
+                cwd_path_base = "../Resources/";
+                // this doesn't work with app bundle, funnily enough...
+                // launch.sh script to change working directory works fine
+                if (false) {
+                    const CF = @cImport({
+                        @cInclude("CFBundle.h");
+                        @cInclude("CFURL.h");
+                        @cInclude("CFString.h");
+                    });
+                    // Zig thinks these are ? but they're just C pointers I guess
+                    const bundle = CF.CFBundleGetMainBundle();
+                    const cf_url = CF.CFBundleCopyResourcesDirectoryURL(bundle);
+                    const cf_str_ref = CF.CFURLCopyFileSystemPath(cf_url, CF.kCFURLPOSIXPathStyle);
+                    const c_buf: [*c]u8 = @ptrCast(self.str_fmt_buf);
+                    if (CF.CFStringGetCString(cf_str_ref, c_buf, str_fmt_buf_size, CF.kCFStringEncodingASCII) != 0) {
+                        const slice = std.mem.span(c_buf);
+                        self.cwd_path = std.fs.realpathAlloc(self.heap, slice) catch return Error.OutOfMemory; //try std.fmt.allocPrint(self.heap, "{s}", .{slice});
+                        self.assets_path = try std.fmt.allocPrint(self.heap, "{s}/assets", .{self.cwd_path});
+                        return;
+                    } else {
+                        return Error.NoSpaceLeft;
+                    }
+                    return Error.FileSystemFail;
                 }
-                return Error.FileSystemFail;
             },
             else => {},
         }
     }
-    self.cwd_path = std.fs.realpathAlloc(self.heap, ".") catch return Error.OutOfMemory;
+    self.cwd_path = std.fs.realpathAlloc(self.heap, cwd_path_base) catch return Error.OutOfMemory;
     self.assets_path = try std.fmt.allocPrint(self.heap, "{s}/assets", .{self.cwd_path});
+    std.debug.print("cwd_path: {s}\n", .{self.cwd_path});
 }
 
 pub fn setTargetFPS(_: *Platform, fps: u32) void {
