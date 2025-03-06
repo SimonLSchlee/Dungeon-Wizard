@@ -520,7 +520,7 @@ pub fn FileWalkerIterator(assets_rel_dir: []const u8, file_suffix: []const u8) t
         pub fn init(allocator: std.mem.Allocator) Error!@This() {
             const plat = App.getPlat();
             const path = try u.bufPrintLocal("{s}/{s}", .{ plat.assets_path, assets_rel_dir });
-            var dir = std.fs.cwd().openDir(path, .{ .iterate = true }) catch |err| {
+            var dir = std.fs.openDirAbsolute(path, .{ .iterate = true }) catch |err| {
                 Log.err("Error opening dir \"{s}\"", .{path});
                 Log.errorAndStackTrace(err);
                 return Error.FileSystemFail;

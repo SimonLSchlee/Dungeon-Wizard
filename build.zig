@@ -10,10 +10,12 @@ fn linkOSStuff(b: *std.Build, target: std.Build.ResolvedTarget, artifact: *std.B
     switch (target.result.os.tag) {
         .macos => {
             if (std.zig.system.darwin.getSdk(b.allocator, target.result)) |sdk| {
-                //std.debug.print("\n\n{s}\n\n", .{sdk});
                 artifact.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ sdk, "/System/Library/Frameworks" }) });
                 artifact.linkFramework("CoreFoundation");
                 artifact.addIncludePath(.{ .cwd_relative = b.pathJoin(&.{ sdk, "/System/Library/Frameworks/CoreFoundation.framework/Versions/Current/Headers" }) });
+                // Don't actually need the Foundation headers, just need to link it
+                artifact.linkFramework("Foundation");
+                //artifact.addIncludePath(.{ .cwd_relative = b.pathJoin(&.{ sdk, "/System/Library/Frameworks/Foundation.framework/Versions/Current/Headers" }) });
             }
         },
         .windows => {

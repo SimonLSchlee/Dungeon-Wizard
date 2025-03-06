@@ -474,8 +474,8 @@ pub fn serialize(data: anytype, prefix: []const u8, file: std.fs.File, _: *Platf
 }
 
 pub fn writeToTxt(self: *const Options, plat: *Platform) void {
-    var cwd = std.fs.openDirAbsolute(plat.cwd_path, .{}) catch {
-        plat.log.warn("WARNING: Failed to open cwd {s}", .{plat.cwd_path});
+    var cwd = std.fs.openDirAbsolute(plat.user_data_path, .{}) catch {
+        plat.log.warn("WARNING: Failed to open cwd {s}", .{plat.user_data_path});
         return;
     };
     defer cwd.close();
@@ -703,7 +703,12 @@ pub fn updateScreenDims(plat: *Platform, dims: V2i, resize_window: bool) void {
 pub fn initTryLoad(plat: *App.Platform) Options {
     var ret = initDefault(plat);
     defer ret.writeToTxt(plat);
-    const options_file = std.fs.cwd().openFile("options.txt", .{}) catch return ret;
+    var cwd = std.fs.openDirAbsolute(plat.user_data_path, .{}) catch {
+        plat.log.warn("WARNING: Failed to open cwd {s}", .{plat.user_data_path});
+        return ret;
+    };
+    defer cwd.close();
+    const options_file = cwd.openFile("options.txt", .{}) catch return ret;
     const str = options_file.readToEndAlloc(plat.heap, 1024 * 1024) catch return ret;
     defer plat.heap.free(str);
     var line_it = std.mem.tokenizeScalar(u8, str, '\n');

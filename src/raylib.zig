@@ -87,6 +87,7 @@ input_buffer: core.InputBuffer = .{},
 str_fmt_buf: []u8 = undefined,
 assets_path: []const u8 = undefined,
 cwd_path: []const u8 = undefined,
+user_data_path: []const u8 = undefined,
 
 // move where the game is drawn so it's centered, e.g. if the UI is blocking some part of the screen
 pub fn centerGameRect(self: *Platform, screen_rect_pos: V2f, screen_rect_dims: V2f) void {
@@ -162,10 +163,11 @@ pub fn init(title: []const u8) Error!*Platform {
     ret.str_fmt_buf = try ret.heap.alloc(u8, str_fmt_buf_size);
     // need our cwd and assets path!
     try ret.findAssetsPath();
+    try ret.findUserDataPath();
     // okay need logging
-    var cwd = std.fs.openDirAbsolute(ret.cwd_path, .{}) catch return Error.FileSystemFail;
-    defer cwd.close();
-    ret.log = Log.init(cwd, heap) catch |e| {
+    var user_data_dir = std.fs.openDirAbsolute(ret.user_data_path, .{}) catch return Error.FileSystemFail;
+    defer user_data_dir.close();
+    ret.log = Log.init(user_data_dir, heap) catch |e| {
         std.debug.print("ERROR: init logger: {any}\n", .{e});
         return Error.FileSystemFail;
     };
@@ -212,6 +214,50 @@ pub fn printStackSize(self: *Platform) void {
     std.debug.print("stack size: {x}\n", .{self.stack_base - self.getStackPointer()});
 }
 
+const CF = @cImport({
+    @cInclude("CFArray.h");
+    @cInclude("CFBundle.h");
+    @cInclude("CFURL.h");
+    @cInclude("CFString.h");
+});
+
+const NSApplicationSupportDirectory = 14; // location of application support files (plug-ins, etc) (Library/Application Support)
+const NSUserDomainMask = 1;
+// this really returns a NSArray<NSString *>
+// but it can be cast to CF.CFArrayRef
+extern fn NSSearchPathForDirectoriesInDomains(directory: u64, domain_mask: u64, expand_tilde: i8) CF.CFArrayRef;
+
+pub fn findUserDataPath(self: *Platform) Error!void {
+    self.user_data_path = self.cwd_path; // default to current directory
+    if (config.is_release) {
+        switch (builtin.os.tag) {
+            .macos => {
+                const dir_name = "Dungeon Wizard";
+                const c_buf: [*c]u8 = @ptrCast(self.str_fmt_buf);
+
+                // NOTE this leaks the array. we don't care.
+                const result = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, 1);
+                const count = CF.CFArrayGetCount(result);
+                if (count == 0) return;
+                const first_string = CF.CFArrayGetValueAtIndex(result, 0);
+                // NOTE this leaks the string. we don't care.
+                if (CF.CFStringGetCString(@ptrCast(first_string), c_buf, u.as(c_long, self.str_fmt_buf.len), CF.kCFStringEncodingUTF8) == 0) {
+                    return Error.OutOfMemory;
+                }
+                var len: usize = 0;
+                while (len < self.str_fmt_buf.len and self.str_fmt_buf[len] != 0) {
+                    len += 1;
+                }
+                self.user_data_path = std.fmt.allocPrint(self.heap, "{s}/{s}", .{ self.str_fmt_buf[0..len], dir_name }) catch return Error.OutOfMemory;
+            },
+            else => {},
+        }
+    }
+    var cwd: std.fs.Dir = std.fs.cwd(); // can't close this
+    cwd.makePath(self.user_data_path) catch return Error.FileSystemFail;
+    std.debug.print("user_data_path: {s}\n", .{self.user_data_path});
+}
+
 pub fn findAssetsPath(self: *Platform) Error!void {
     var cwd_path_base: []const u8 = ".";
     if (config.is_release) {
@@ -221,11 +267,6 @@ pub fn findAssetsPath(self: *Platform) Error!void {
                 // this doesn't work with app bundle, funnily enough...
                 // launch.sh script to change working directory works fine
                 if (false) {
-                    const CF = @cImport({
-                        @cInclude("CFBundle.h");
-                        @cInclude("CFURL.h");
-                        @cInclude("CFString.h");
-                    });
                     // Zig thinks these are ? but they're just C pointers I guess
                     const bundle = CF.CFBundleGetMainBundle();
                     const cf_url = CF.CFBundleCopyResourcesDirectoryURL(bundle);
@@ -233,7 +274,7 @@ pub fn findAssetsPath(self: *Platform) Error!void {
                     const c_buf: [*c]u8 = @ptrCast(self.str_fmt_buf);
                     if (CF.CFStringGetCString(cf_str_ref, c_buf, str_fmt_buf_size, CF.kCFStringEncodingASCII) != 0) {
                         const slice = std.mem.span(c_buf);
-                        self.cwd_path = std.fs.realpathAlloc(self.heap, slice) catch return Error.OutOfMemory; //try std.fmt.allocPrint(self.heap, "{s}", .{slice});
+                        self.cwd_path = std.fs.realpathAlloc(self.heap, slice) catch return Error.OutOfMemory;
                         self.assets_path = try std.fmt.allocPrint(self.heap, "{s}/assets", .{self.cwd_path});
                         return;
                     } else {
@@ -1330,7 +1371,7 @@ pub const FileWalkerIterator = struct {
 };
 
 pub fn iteratePath(plat: *Platform, path: []const u8, file_suffixes: ?[]const []const u8) Error!FileWalkerIterator {
-    var dir = std.fs.cwd().openDir(path, .{ .iterate = true }) catch |err| {
+    var dir = std.fs.openDirAbsolute(path, .{ .iterate = true }) catch |err| {
         plat.log.err("Error opening dir \"{s}\"", .{path});
         plat.log.errorAndStackTrace(err);
         return Error.FileSystemFail;
