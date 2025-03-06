@@ -200,7 +200,9 @@ pub fn build(b: *std.Build) !void {
 
     if (do_release) {
         b.release_mode = .safe;
+        //b.release_mode = .off;
     }
+    //const optimize = std.builtin.OptimizeMode.Debug;
     const optimize = if (do_release) std.builtin.OptimizeMode.ReleaseSafe else b.standardOptimizeOption(.{});
 
     for (targets) |target| {
