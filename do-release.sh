@@ -25,6 +25,7 @@ make_app_bundle() {
 	rsync -av --exclude='*tilemaps.tiled-*' --exclude='.DS_Store' $ASSETS "$APP_DIR/Contents/Resources"
 	strip -u -r "Dungeon Wizard"
 	cp "Dungeon Wizard" "$APP_DIR/Contents/MacOS"
+	cp "$REPO_DIR/CHANGELOG.md" "$APP_DIR/Contents"
 	popd
 	mv "$EXE_DIR/$APP_DIR" "$RELEASE_DIR"
 }

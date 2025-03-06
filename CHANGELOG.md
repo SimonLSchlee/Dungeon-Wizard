@@ -1,7 +1,9 @@
 # Changelog
 
-## v0.12.1 (2025-03-04)
+## v0.12.1 (2025-03-05)
 
+- Package as "Dungeon Wizard.app" in a .dmg for MacOS distribution
+- Write options.txt and logs to /Users/username/Library/Application Support/Dungeon Wizard on MacOS
 - Don't open console on Windows
 - Improve scrolling when viewing deck
 
