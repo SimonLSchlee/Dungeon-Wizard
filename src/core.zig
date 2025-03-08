@@ -103,7 +103,7 @@ pub const InputState = struct {
 pub const InputBuffer = struct {
     const buf_sz = 3;
 
-    arr: [buf_sz]InputState = .{.{}} ** buf_sz,
+    arr: [buf_sz]InputState = .{InputState{}} ** buf_sz,
     curr_idx: usize = 0,
 
     pub fn advance_one(self: *InputBuffer) void {

@@ -221,7 +221,7 @@ pub fn build(b: *std.Build) !void {
 
         // installu
         if (do_release) {
-            const arch = target.result.osArchName();
+            const arch = @tagName(target.result.cpu.arch);
             const os = @tagName(target.result.os.tag);
             const install_dir_path = try std.fmt.allocPrint(b.allocator, "release/{s}-{s}/{s}", .{ os, arch, title });
             // NOTE: DONT DO THIS cos the path is needed by build later!
