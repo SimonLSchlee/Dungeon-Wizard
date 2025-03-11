@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.12.2 (2025-03-10)
+
+- Write options.txt and logs to %APPDATA%\Dungeon Wizard on Windows
+
 ## v0.12.1 (2025-03-05)
 
 - Package as "Dungeon Wizard.app" in a .dmg for MacOS distribution
