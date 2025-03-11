@@ -229,10 +229,10 @@ extern fn NSSearchPathForDirectoriesInDomains(directory: u64, domain_mask: u64, 
 
 pub fn findUserDataPath(self: *Platform) Error!void {
     self.user_data_path = self.cwd_path; // default to current directory
+    const dir_name = "Dungeon Wizard";
     if (config.is_release) {
         switch (builtin.os.tag) {
             .macos => {
-                const dir_name = "Dungeon Wizard";
                 const c_buf: [*c]u8 = @ptrCast(self.str_fmt_buf);
 
                 // NOTE this leaks the array. we don't care.
@@ -249,6 +249,13 @@ pub fn findUserDataPath(self: *Platform) Error!void {
                     len += 1;
                 }
                 self.user_data_path = std.fmt.allocPrint(self.heap, "{s}/{s}", .{ self.str_fmt_buf[0..len], dir_name }) catch return Error.OutOfMemory;
+            },
+            .windows => {
+                if (std.process.getenvW(std.unicode.wtf8ToWtf16LeStringLiteral("APPDATA"))) |appdata_w16| {
+                    const appdata = try std.unicode.wtf16LeToWtf8Alloc(self.heap, appdata_w16);
+                    defer self.heap.free(appdata);
+                    self.user_data_path = std.fmt.allocPrint(self.heap, "{s}\\{s}", .{ appdata, dir_name }) catch return Error.OutOfMemory;
+                }
             },
             else => {},
         }
