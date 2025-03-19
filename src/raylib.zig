@@ -450,11 +450,12 @@ pub fn run(self: *Platform) Error!void {
             //const num_updates_to_do: i64 = @divTrunc(self.accumulated_update_ns, core.fixed_ns_per_update);
             //std.debug.print("{}", .{num_updates_to_do});
         }
-
+        var updated = false;
         while (self.accumulated_update_ns >= core.fixed_ns_per_update_upper) {
             r.PollInputEvents();
             self.tickInputBuffer();
             self.appTick();
+            updated = true;
             tick_count_sec += 1;
             self.accumulated_update_ns -= core.fixed_ns_per_update_lower;
             if (self.accumulated_update_ns < core.fixed_ns_per_update_lower - core.fixed_ns_per_update_upper) {
@@ -465,13 +466,19 @@ pub fn run(self: *Platform) Error!void {
             self.onScreenLog("ups: {d:.3}", .{avg_ups});
             self.onScreenLog("fps: {d:.3}", .{avg_fps});
         }
+        if (updated) {
+            //const start_draw_ns = self.getGameTimeNanosecs();
+            r.BeginDrawing();
+            self.appRender();
+            self.drawOnScreenLog();
+            r.EndDrawing();
+            draw_count_sec += 1;
 
-        //const start_draw_ns = self.getGameTimeNanosecs();
-        r.BeginDrawing();
-        self.appRender();
-        self.drawOnScreenLog();
-        r.EndDrawing();
-        draw_count_sec += 1;
+            //const end_draw_ns = self.getGameTimeNanosecs();
+            //std.debug.print("update: {d:.5}\n", .{core.nsToSecs(start_draw_ns - curr_time_ns)});
+            //std.debug.print("draw: {d:.5}\n", .{core.nsToSecs(end_draw_ns - start_draw_ns)});
+            r.SwapScreenBuffer();
+        }
 
         sec_time_ns += delta_ns;
         if (sec_time_ns >= core.ns_per_sec) {
@@ -483,12 +490,7 @@ pub fn run(self: *Platform) Error!void {
             tick_count_sec = 0;
         }
 
-        //const end_draw_ns = self.getGameTimeNanosecs();
-        //std.debug.print("update: {d:.5}\n", .{core.nsToSecs(start_draw_ns - curr_time_ns)});
-        //std.debug.print("draw: {d:.5}\n", .{core.nsToSecs(end_draw_ns - start_draw_ns)});
-        r.SwapScreenBuffer();
-
-        if (false) {
+        if (true) {
             const frame_time_ns = self.getGameTimeNanosecs() - curr_time_ns;
             const time_left_ns = ns_per_refresh - frame_time_ns;
             //std.debug.print("time left: {d:.5}\n", .{core.nsToSecs(time_left_ns)});
