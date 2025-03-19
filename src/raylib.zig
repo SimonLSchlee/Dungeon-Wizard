@@ -178,8 +178,9 @@ pub fn init(title: []const u8) Error!*Platform {
 
     // only useable by code statically linked to raylib.zig
     __plat = ret;
-
-    r.SetTraceLogCallback(raylibTraceLog);
+    if (builtin.os.tag != .linux) {
+        r.SetTraceLogCallback(raylibTraceLog);
+    }
     const title_z = try std.fmt.allocPrintZ(ret.heap, "{s}", .{title});
     r.SetConfigFlags(r.FLAG_WINDOW_RESIZABLE);
 
@@ -310,6 +311,7 @@ pub fn getGameTimeNanosecs(_: *Platform) i64 {
 const app_dll_name = switch (builtin.os.tag) {
     .macos => "libgame.dylib",
     .windows => "game.dll",
+    .linux => "libgame.so",
     else => @compileError("missing app dll name"),
 };
 
