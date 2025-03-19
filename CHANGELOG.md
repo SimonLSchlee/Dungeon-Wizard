@@ -1,7 +1,8 @@
 # Changelog
 
-## v0.12.2 (2025-03-10)
+## v0.12.2 (2025-03-19)
 
+- Sleep between frames to use less CPU time
 - Write options.txt and logs to %APPDATA%\Dungeon Wizard on Windows
 
 ## v0.12.1 (2025-03-05)
