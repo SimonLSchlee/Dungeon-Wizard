@@ -538,3 +538,14 @@ pub fn copyString(allocator: *std.mem.Allocator, str: []const u8) []u8 {
     std.mem.copyForwards(u8, ptr, str);
     return ptr;
 }
+
+// Note this handler is for the game's root module
+// It will only run for dynamic builds if a panic occurs in game code
+pub const panic = std.debug.FullPanic(
+    struct {
+        fn panic(msg: []const u8, first_trace_addr: ?usize) noreturn {
+            const plat = getPlat();
+            Platform.panic(plat, msg, first_trace_addr);
+        }
+    }.panic,
+);

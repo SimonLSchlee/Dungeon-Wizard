@@ -147,13 +147,37 @@ pub inline fn fatal(self: *Log, comptime fmt: []const u8, args: anytype) void {
     self.level(.fatal, fmt, args);
 }
 
-pub fn stackTrace(self: *Log) void {
-    var stack_trace: std.builtin.StackTrace = undefined;
-    std.debug.captureStackTrace(null, &stack_trace);
-    self.raw("{any}\n", .{stack_trace});
+const WriterError = error{};
+
+fn putBytesErr(self: *Log, buf: []const u8) WriterError!usize {
+    self.putBytes(buf);
+    return buf.len;
+}
+
+pub const Writer = std.io.GenericWriter(*Log, WriterError, putBytesErr);
+
+pub fn getWriter(self: *Log) Writer {
+    return .{ .context = self };
+}
+
+pub fn stackTrace(self: *Log, start_addr: ?usize) void {
+    const builtin = @import("builtin");
+    if (builtin.strip_debug_info) {
+        self.err("Unable to dump stack trace: debug info stripped", .{});
+        return;
+    }
+    const debug_info = std.debug.getSelfDebugInfo() catch {
+        self.err("Unable to dump stack trace: Unable to open debug info", .{});
+        return;
+    };
+    const stderr = self.getWriter();
+    std.debug.writeCurrentStackTrace(stderr, debug_info, .no_color, start_addr) catch {
+        self.err("Unable to dump stack trace", .{});
+        return;
+    };
 }
 
 pub fn errorAndStackTrace(self: *Log, e: anytype) void {
     self.raw("ERROR: {any}\n", .{e});
-    self.stackTrace();
+    self.stackTrace(null);
 }

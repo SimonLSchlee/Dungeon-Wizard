@@ -1401,3 +1401,22 @@ pub fn iterateAssets(plat: *Platform, subdir: []const u8, file_suffixes: ?[]cons
     const path = try u.bufPrintLocal("{s}/{s}", .{ plat.assets_path, subdir });
     return plat.iteratePath(path, file_suffixes);
 }
+
+pub fn panic(_plat: ?*Platform, msg: []const u8, first_trace_addr: ?usize) noreturn {
+    if (_plat) |plat| {
+        if (builtin.single_threaded) {
+            plat.log.raw("panic: ", .{});
+        } else {
+            const current_thread_id = std.Thread.getCurrentId();
+            plat.log.raw("thread {} panic: ", .{current_thread_id});
+        }
+        plat.log.raw("{s}\n", .{msg});
+
+        if (@errorReturnTrace()) |t| {
+            plat.log.raw("{any}", .{t});
+        }
+        plat.log.stackTrace(first_trace_addr);
+    }
+
+    std.debug.defaultPanic(msg, first_trace_addr);
+}
