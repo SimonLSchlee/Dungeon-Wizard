@@ -23,7 +23,7 @@ make_app_bundle() {
 	pushd "$EXE_DIR"
 	cp -R "$REPO_DIR/app-bundle" "$APP_DIR"
 	rsync -av --exclude='*tilemaps.tiled-*' --exclude='.DS_Store' $ASSETS "$APP_DIR/Contents/Resources"
-	strip -u -r "Dungeon Wizard"
+	#strip -u -r "Dungeon Wizard"
 	cp "Dungeon Wizard" "$APP_DIR/Contents/MacOS"
 	cp "$REPO_DIR/CHANGELOG.md" "$APP_DIR/Contents"
 	popd
