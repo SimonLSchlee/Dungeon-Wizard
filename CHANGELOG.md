@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.12.3 (2025-03-21)
+
+- Support for building on linux (you need to build it yourself: https://github.com/NunoDasNeves/Dungeon-Wizard)
+- Log panic()s to debug-log.txt, and don't strip symbols on release, for stack traces
+
 ## v0.12.2 (2025-03-19)
 
 - Sleep between frames to use less CPU time
