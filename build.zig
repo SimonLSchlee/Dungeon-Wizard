@@ -48,6 +48,22 @@ pub fn addExeConfig(b: *std.Build, module: *std.Build.Module, static_lib: bool, 
     module.addOptions("config", options);
 }
 
+pub fn linuxDisplayBackend(b: *std.Build) raylib_build.LinuxDisplayBackend {
+    // cache this so it's only set once (otherwise when building multiple targets the option is defined more than once)
+    const S = struct {
+        var cached: ?raylib_build.LinuxDisplayBackend = null;
+    };
+    if (S.cached) |c| {
+        return c;
+    }
+    S.cached = b.option(
+        raylib_build.LinuxDisplayBackend,
+        "linux-display-backend",
+        "Select the linux display backend used by Raylib (default \"Both\")",
+    ) orelse .Both;
+    return S.cached.?;
+}
+
 pub fn buildDynamic(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, app_only: bool, do_release: bool) ![]*std.Build.Step.Compile {
     var artifacts = std.ArrayList(*std.Build.Step.Compile).init(b.allocator);
     std.debug.print(
@@ -64,6 +80,7 @@ pub fn buildDynamic(b: *std.Build, target: std.Build.ResolvedTarget, optimize: s
         .optimize = optimize,
         .shared = true,
         .config = raylib_config,
+        .linux_display_backend = linuxDisplayBackend(b),
     });
     const raylib = raylib_dep.artifact("raylib");
 
@@ -132,6 +149,7 @@ pub fn buildStatic(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
         .optimize = optimize,
         .shared = false,
         .config = raylib_config,
+        .linux_display_backend = linuxDisplayBackend(b),
     });
     const raylib = raylib_dep.artifact("raylib");
     const exe = b.addExecutable(.{
