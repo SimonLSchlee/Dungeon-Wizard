@@ -456,6 +456,18 @@ fn update(self: *App) Error!void {
     self.menu_ui.commands.clear();
     self.tooltip_ui.commands.clear();
 
+    // crash via segfault
+    if (false) {
+        const seggy: *u8 = @ptrFromInt(1);
+        std.debug.print("{}", .{seggy.*});
+    }
+    // crash via optional null deref
+    if (false) {
+        var nully: ?u8 = 1;
+        nully = null;
+        std.debug.print("{}", .{nully.?});
+    }
+
     if (self.options_open) {
         switch (try self.options.update(&self.menu_ui.commands)) {
             .close => self.options_open = false,
