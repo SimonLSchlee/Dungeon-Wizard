@@ -5,6 +5,11 @@
 - Support for building on linux (you need to build it yourself: https://github.com/NunoDasNeves/Dungeon-Wizard)
 - Log panic()s to debug-log.txt, and don't strip symbols on release, for stack traces
 
+***Balance***
+- Promptitude can be cast on allies as well as self
+- Protec can't be cast on enemies, only allies and self
+- Rimefrost shields for 7 (up from 5)
+
 ## v0.12.2 (2025-03-19)
 
 - Sleep between frames to use less CPU time

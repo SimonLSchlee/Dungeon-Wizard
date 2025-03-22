@@ -40,7 +40,13 @@ pub const proto = Spell.makeProto(
         .rarity = .interesting,
         .color = Spell.colors.magic,
         .targeting_data = .{
-            .kind = .self,
+            .kind = .thing,
+            .max_range = 100,
+            .show_max_range_ring = true,
+            .target_faction_mask = Thing.Faction.Mask.initMany(&.{
+                .player,
+                .ally,
+            }),
         },
     },
 );
@@ -48,17 +54,18 @@ pub const proto = Spell.makeProto(
 num_stacks: i32 = 7,
 
 pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Error!void {
-    params.validate(.self, caster);
+    params.validate(.thing, caster);
     const promptitude: @This() = self.kind.promptitude;
-    caster.statuses.getPtr(.promptitude).addStacks(caster, promptitude.num_stacks);
-
-    _ = room;
+    if (room.getThingById(params.thing.?)) |thing| {
+        thing.statuses.getPtr(.promptitude).addStacks(caster, promptitude.num_stacks);
+    }
 }
 
 pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
     const promptitude: @This() = self.kind.promptitude;
     const fmt =
-        \\Gain {any}promptitude for {d:.0} seconds.
+        \\Target ally gains {any}promptitude for
+        \\{d:.0} seconds.
     ;
     tt.desc = try Spell.Tooltip.Desc.fromSlice(
         try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{

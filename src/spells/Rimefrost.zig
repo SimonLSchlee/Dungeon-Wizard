@@ -55,7 +55,7 @@ hit_effect: Thing.HitEffect = .{
         .cold = 1,
     }),
 },
-shield_amount: f32 = 5,
+shield_amount: f32 = 7,
 duration_secs: f32 = 7,
 
 const SoundRef = struct {

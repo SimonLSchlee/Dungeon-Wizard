@@ -41,7 +41,10 @@ pub const proto = Spell.makeProto(
             .kind = .thing,
             .max_range = 100,
             .show_max_range_ring = true,
-            .target_faction_mask = Thing.Faction.Mask.initFull(),
+            .target_faction_mask = Thing.Faction.Mask.initMany(&.{
+                .player,
+                .ally,
+            }),
         },
     },
 );
@@ -59,8 +62,8 @@ pub fn cast(self: *const Spell, caster: *Thing, room: *Room, params: Params) Err
 pub fn getTooltip(self: *const Spell, tt: *Spell.Tooltip) Error!void {
     const protec: @This() = self.kind.protec;
     const fmt =
-        \\Protect{any} the target creature
-        \\from the next attack. Lasts {} seconds.
+        \\Protect{any} the target ally from
+        \\the next attack. Lasts {} seconds.
     ;
     tt.desc = try Spell.Tooltip.Desc.fromSlice(
         try std.fmt.bufPrint(&tt.desc.buffer, fmt, .{
