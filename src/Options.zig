@@ -182,7 +182,7 @@ pub const Display = struct {
     resolutions: std.BoundedArray(V2i, max_resolutions) = .{},
     selected_resolution: V2i = .{},
     dropdown: DropdownMenu = .{},
-    custom_resolution: bool = false,
+    custom_resolution: bool = false, // if true, the 0th resolution in the list is "custom" (manual resize)
     //vsync: bool = false, // TODO?
     pub const OptionSerialize = struct {
         mode: void,
@@ -539,9 +539,7 @@ pub fn initDefault(plat: *Platform) Options {
         };
         std.sort.pdq(V2i, ret.display.resolutions.slice(), {}, Sort.cmp);
         // Pick the third one if possible by default, i.e. not the smallest cos thats really small
-        for (0..@min(ret.display.resolutions.len, 3)) |j| {
-            ret.display.selected_resolution = ret.display.resolutions.get(j);
-        }
+        ret.display.selected_resolution = ret.display.resolutions.get(@min(ret.display.resolutions.len, 3) - 1);
 
         for (ret.display.resolutions.constSlice()) |res| {
             ret.display.resolutions_strings.append(
@@ -1009,13 +1007,18 @@ pub fn update(self: *Options, cmd_buf: *ImmUI.CmdBuf) Error!enum { dont_close, c
 }
 
 pub fn setCustomResolution(options: *Options, res: V2i) void {
-    options.display.resolutions.insert(0, res) catch unreachable;
-    options.display.resolutions_strings.insert(
-        0,
-        Display.ResLabel.fromSlice(
-            utl.bufPrintLocal("{d}x{d}", .{ res.x, res.y }) catch "custom",
-        ) catch unreachable,
+    const res_label = Display.ResLabel.fromSlice(
+        utl.bufPrintLocal("{d}x{d}", .{ res.x, res.y }) catch "custom",
     ) catch unreachable;
+    // old custom resolution is overwritten
+    // if no space for a custom resolution, make space by overwriting the 0th (smallest) resolution
+    if (options.display.custom_resolution or options.display.resolutions.len >= options.display.resolutions.buffer.len) {
+        options.display.resolutions.buffer[0] = res;
+        options.display.resolutions_strings.buffer[0] = res_label;
+    } else {
+        options.display.resolutions.insert(0, res) catch unreachable;
+        options.display.resolutions_strings.insert(0, res_label) catch unreachable;
+    }
     options.display.dropdown.selected_idx = 0;
     options.display.selected_resolution = res;
     options.display.custom_resolution = true;
@@ -1027,10 +1030,6 @@ pub fn alwaysUpdate(options: *Options) void {
     if (!plat.screen_dims.eql(curr_screen_dims)) {
         // manually resized
         updateScreenDims(plat, curr_screen_dims, false);
-        if (options.display.custom_resolution) {
-            _ = options.display.resolutions.orderedRemove(0);
-            _ = options.display.resolutions_strings.orderedRemove(0);
-        }
         options.setCustomResolution(curr_screen_dims);
         App.get().resolutionChanged();
         options.writeToTxt(plat);

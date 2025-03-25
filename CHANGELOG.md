@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.12.4 (2025-03-??)
+
+- Fix crash caused by manually resizing window in certain cases
+
 ## v0.12.3 (2025-03-21)
 
 - Support for building on linux (you need to build it yourself: https://github.com/NunoDasNeves/Dungeon-Wizard)
