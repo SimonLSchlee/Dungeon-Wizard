@@ -1,8 +1,8 @@
 # Changelog
 
-## v0.12.4 (2025-03-??)
+## v0.12.4 (2025-03-30)
 
-- Fix crash caused by manually resizing window in certain cases
+- Fix crash caused by manually resizing window in certain cases (Thanks to https://github.com/JustinBraben)
 
 ## v0.12.3 (2025-03-21)
 
